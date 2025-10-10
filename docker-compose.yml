@@ -1,0 +1,11 @@
+services:
+  musicseerr:
+    build: .
+    container_name: musicseerr
+    ports:
+      - "8688:8688"
+    env_file:
+      - ./backend/.env.example
+    volumes:
+      - ./config:/app/config
+    restart: unless-stopped

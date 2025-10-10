@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.log
+*.db
+.env
+.env.*
+
+# Node / Frontend
+frontend/node_modules/
+frontend/.svelte-kit/
+frontend/build/
+frontend/dist/
+frontend/.vite/
+
+# Docker / local config
+config/
+*.pid
+*.sock
+*.tmp
+
+# System / IDE
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# OS junk
+Thumbs.db
+ehthumbs.db
+
+# Local configs
+config/config.json
+
+# My scripts
+/dump.sh
+/dump.txt
+/dump*.txt
+/manage.sh
