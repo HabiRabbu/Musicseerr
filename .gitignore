@@ -8,6 +8,12 @@ __pycache__/
 .env
 .env.*
 
+# Python virtual environments
+.venv/
+backend/.venv/
+venv/
+env/
+
 # Node / Frontend
 frontend/node_modules/
 frontend/.svelte-kit/
@@ -16,7 +22,8 @@ frontend/dist/
 frontend/.vite/
 
 # Docker / local config
-config/
+config/config.json
+!config/config.example.json
 *.pid
 *.sock
 *.tmp
