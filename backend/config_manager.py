@@ -9,15 +9,14 @@ DEFAULT_CONFIG = {
     "soularr_api_key": "",
     "jellyfin_url": "http://jellyfin:8096",
     "trigger_soularr": True,
-    "port": 8688
+    "quality_profile_id": 1,
+    "metadata_profile_id": 1,
+    "root_folder_path": "/music",
+    "port": 8688,
 }
 
 
 def load_config() -> dict:
-    """
-    Loads configuration from /app/config/config.json.
-    Creates it automatically if missing, using DEFAULT_CONFIG.
-    """
     if not CONFIG_PATH.exists():
         CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
         with open(CONFIG_PATH, "w") as f:

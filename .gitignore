@@ -11,6 +11,7 @@ __pycache__/
 # Python virtual environments
 .venv/
 backend/.venv/
+backend/.ruff*
 venv/
 env/
 
