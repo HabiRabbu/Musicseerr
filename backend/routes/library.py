@@ -14,7 +14,6 @@ async def get_library():
     
 @router.get("/artists")
 async def get_library_grouped():
-    """Return library grouped by artist."""
     try:
         grouped = await lidarr.get_library_grouped()
         return {"library": grouped or []}

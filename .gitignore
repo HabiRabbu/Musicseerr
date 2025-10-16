@@ -47,3 +47,8 @@ config/config.json
 /dump.txt
 /dump*.txt
 /manage.sh
+frontend/dump_be.txt
+.gitignore
+.gitignore
+frontend/dump_fe.txt
+frontend/dump.txt

@@ -2,43 +2,41 @@ from typing import Any
 import asyncio
 import time
 
-import httpx
-
+from http_client import client
 from config_manager import CONFIG
 from models import LibraryAlbum, QueueItem, ServiceStatus
 from utils.common import ApiError, get_auth_headers
+from utils.cache import get_cache
 
 BASE_URL = CONFIG["lidarr_url"].rstrip("/")
+_cache = get_cache()
 
 
 async def _get(endpoint: str, params: dict[str, Any] | None = None) -> Any:
     url = f"{BASE_URL}{endpoint}"
-    async with httpx.AsyncClient(timeout=10.0) as client:
-        r = await client.get(url, headers=get_auth_headers(), params=params)
-        if r.status_code != 200:
-            raise ApiError(f"Lidarr GET failed ({r.status_code})", r.text)
-        return r.json()
+    r = await client.get(url, headers=get_auth_headers(), params=params)
+    if r.status_code != 200:
+        raise ApiError(f"Lidarr GET failed ({r.status_code})", r.text)
+    return r.json()
 
 
 async def _post(endpoint: str, data: dict[str, Any]) -> Any:
     url = f"{BASE_URL}{endpoint}"
-    async with httpx.AsyncClient(timeout=15.0) as client:
-        r = await client.post(url, headers=get_auth_headers(), json=data)
-        if r.status_code not in (200, 201, 202):
-            raise ApiError(f"Lidarr POST failed ({r.status_code})", r.text)
-        return r.json()
+    r = await client.post(url, headers=get_auth_headers(), json=data)
+    if r.status_code not in (200, 201, 202):
+        raise ApiError(f"Lidarr POST failed ({r.status_code})", r.text)
+    return r.json()
 
 
 async def _put(endpoint: str, data: dict[str, Any]) -> Any:
     url = f"{BASE_URL}{endpoint}"
-    async with httpx.AsyncClient(timeout=10.0) as client:
-        r = await client.put(url, headers=get_auth_headers(), json=data)
-        if r.status_code not in (200, 202):
-            raise ApiError(f"Lidarr PUT failed ({r.status_code})", r.text)
-        try:
-            return r.json()
-        except ValueError:
-            return None
+    r = await client.put(url, headers=get_auth_headers(), json=data)
+    if r.status_code not in (200, 202):
+        raise ApiError(f"Lidarr PUT failed ({r.status_code})", r.text)
+    try:
+        return r.json()
+    except ValueError:
+        return None
 
 
 async def get_status() -> ServiceStatus:
@@ -109,6 +107,12 @@ async def get_library_grouped() -> list[dict[str, Any]]:
 
 
 async def get_library_mbids(include_release_ids: bool = True) -> set[str]:
+    cache_key = f"library_mbids:{include_release_ids}"
+    
+    cached_result = await _cache.get(cache_key)
+    if cached_result is not None:
+        return cached_result
+    
     data = await _get("/api/v1/album")
     ids: set[str] = set()
     for item in data:
@@ -120,6 +124,8 @@ async def get_library_mbids(include_release_ids: bool = True) -> set[str]:
                 rid = rel.get("foreignId")
                 if isinstance(rid, str):
                     ids.add(rid.lower())
+    
+    await _cache.set(cache_key, ids, ttl_seconds=60)
     return ids
 
 
@@ -175,12 +181,10 @@ async def _lookup_artist_by_mbid(artist_mbid: str) -> dict[str, Any] | None:
 
 async def _post_command(body: dict[str, Any]) -> Any:
     url = f"{BASE_URL}/api/v1/command"
-    async with httpx.AsyncClient(timeout=15.0) as client:
-        r = await client.post(url, headers=get_auth_headers(), json=body)
-        if r.status_code not in (200, 201, 202):
-            print("[WARN] command failed:", r.text[:300])
-            return None
-        return r.json()
+    r = await client.post(url, headers=get_auth_headers(), json=body)
+    if r.status_code not in (200, 201, 202):
+        return None
+    return r.json()
 
 
 async def _get_command(cmd_id: int) -> Any:

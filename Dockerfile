@@ -32,5 +32,4 @@ COPY --from=frontend-build /app/frontend/build ./static
 ENV PORT=8688
 EXPOSE ${PORT}
 
-# Start FastAPI (serving API + static files)
-CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT}"]
+CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT} --loop uvloop --http httptools"]

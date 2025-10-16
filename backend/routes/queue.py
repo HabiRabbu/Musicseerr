@@ -6,7 +6,6 @@ router = APIRouter(prefix="/api/queue", tags=["queue"])
 
 @router.get("")
 async def get_queue():
-    """Get the current download queue from Lidarr."""
     try:
         queue = await lidarr.get_queue()
         return {"queue": queue or []}

@@ -12,7 +12,6 @@ const config = {
 			fallback: 'index.html',
 			precompress: false
 		}),
-		// For FastAPI static serving
 		paths: {
 			base: ''
 		},
