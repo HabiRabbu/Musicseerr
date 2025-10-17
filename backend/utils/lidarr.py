@@ -120,7 +120,6 @@ async def get_library_mbids(include_release_ids: bool = True) -> set[str]:
     data = await _get("/api/v1/album")
     ids: set[str] = set()
     for item in data:
-        # Only include albums that are monitored
         if not item.get("monitored", False):
             continue
             
@@ -201,25 +200,28 @@ async def _get_command(cmd_id: int) -> Any:
     return await _get(f"/api/v1/command/{cmd_id}")
 
 
-async def _await_command(body: dict[str, Any], timeout: float = 60.0, poll: float = 0.5) -> None:
+async def _await_command(body: dict[str, Any], timeout: float = 60.0, poll: float = 0.5) -> dict[str, Any] | None:
     try:
         cmd = await _post_command(body)
         if not cmd or "id" not in cmd:
             await asyncio.sleep(min(timeout, 5.0))
-            return
+            return None
         cmd_id = cmd["id"]
         deadline = time.monotonic() + timeout
+        last_status = None
         while time.monotonic() < deadline:
             await asyncio.sleep(poll)
             try:
                 status = await _get_command(cmd_id)
+                last_status = status
             except Exception:
                 continue
             state = (status or {}).get("status") or (status or {}).get("state")
             if str(state).lower() in {"completed", "failed", "aborted", "cancelled"}:
-                return
+                return status
+        return last_status
     except Exception:
-        pass
+        return None
 
 
 async def _get_album_by_foreign_id(album_mbid: str) -> dict[str, Any] | None:
@@ -277,8 +279,9 @@ async def _ensure_artist(artist_mbid: str, artist_name_hint: str | None = None) 
     }
     created = await _post("/api/v1/artist", payload)
 
-    await _await_command({"name": "RefreshArtist", "artistId": created["id"]})
-    await _await_command({"name": "RescanArtist", "artistId": created["id"]})
+    # Long timeouts for large artists
+    await _await_command({"name": "RefreshArtist", "artistId": created["id"]}, timeout=300.0)
+    await _await_command({"name": "RescanArtist", "artistId": created["id"]}, timeout=120.0)
 
     return created
 
@@ -321,68 +324,89 @@ async def add_album(album_mbid: str) -> dict[str, Any]:
 
     album_obj = await _get_album_by_foreign_id(album_mbid)
     action = "exists"
+    
     if not album_obj:
-        profile_id = artist.get("qualityProfileId")
-        if profile_id is None:
-            qps = await _list_quality_profiles()
-            if not qps:
-                raise ApiError(
-                    "No quality profiles in Lidarr.", "Create at least one quality profile."
-                )
-            profile_id = qps[0]["id"]
+        async def album_is_indexed():
+            a = await _get_album_by_foreign_id(album_mbid)
+            return a and a.get("id") and a.get("releases")
+        
+        album_obj = await _wait_for(album_is_indexed, timeout=90.0, poll=2.0)
+        
+        if not album_obj:
+            profile_id = artist.get("qualityProfileId")
+            if profile_id is None:
+                qps = await _list_quality_profiles()
+                if not qps:
+                    raise ApiError(
+                        "No quality profiles in Lidarr.", "Create at least one quality profile."
+                    )
+                profile_id = qps[0]["id"]
 
-        payload = {
-            "title": album_title,
-            "artistId": artist_id,
-            "foreignAlbumId": album_mbid,
-            "monitored": True,
-            "anyReleaseOk": True,
-            "profileId": profile_id,
-            "addOptions": {"addType": "automatic", "searchForNewAlbum": True},
-        }
-        album_obj = await _post("/api/v1/album", payload)
-        action = "added"
+            payload = {
+                "title": album_title,
+                "artistId": artist_id,
+                "foreignAlbumId": album_mbid,
+                "monitored": True,
+                "anyReleaseOk": True,
+                "profileId": profile_id,
+                "addOptions": {"addType": "automatic", "searchForNewAlbum": True},
+            }
+            album_obj = await _post("/api/v1/album", payload)
+            action = "added"
+            album_obj = await _wait_for(album_is_indexed, timeout=60.0, poll=1.0)
 
-
-    album_obj = await _wait_for(
-        lambda: _get_album_by_foreign_id(album_mbid), stop=lambda a: a and a.get("id"), timeout=45.0
-    )
     if not album_obj or "id" not in album_obj:
-        await _put(
-            "/api/v1/artist/editor",
-            {"artistIds": [artist_id], "monitored": True, "monitorNewItems": "none"},
-        )
         raise ApiError(
-            "Album not visible after add.", "Timed out waiting for album to index/hydrate."
+            "Album not visible after add.", 
+            f"Timed out waiting for album '{album_title}' to be indexed in Lidarr. The artist may still be refreshing."
         )
 
     album_id = album_obj["id"]
 
-    await _put(
-        "/api/v1/artist/editor",
-        {"artistIds": [artist_id], "monitored": True, "monitorNewItems": "none"},
-    )
-    await _put("/api/v1/album/monitor", {"albumIds": [album_id], "monitored": True})
+    # Retry monitoring up to 3 times
+    for attempt in range(3):
+        try:
+            await _put(
+                "/api/v1/artist/editor",
+                {"artistIds": [artist_id], "monitored": True, "monitorNewItems": "none"},
+            )
+            await _put("/api/v1/album/monitor", {"albumIds": [album_id], "monitored": True})
+            
+            async def both_monitored():
+                a = await _get_album_by_foreign_id(album_mbid)
+                art = await _get_artist_by_id(artist_id)
+                return (a and a.get("monitored") is True) and (art and art.get("monitored") is True)
+            
+            timeout = 30.0 + (attempt * 15.0)
+            ok = await _wait_for(both_monitored, timeout=timeout, poll=1.0)
+            
+            if ok:
+                break
+                
+            if attempt < 2:
+                await asyncio.sleep(3.0)
+        except Exception as e:
+            if attempt == 2:
+                raise ApiError(
+                    "Failed to set monitoring status",
+                    f"Could not ensure '{album_title}' is monitored after 3 attempts: {str(e)}"
+                )
+            await asyncio.sleep(3.0)
 
     try:
         await _post_command({"name": "AlbumSearch", "albumIds": [album_id]})
     except Exception:
         pass
 
-    async def both_monitored():
-        a = await _get_album_by_foreign_id(album_mbid)
-        art = await _get_artist_by_id(artist_id)
-        return (a and a.get("monitored") is True) and (art and art.get("monitored") is True)
-
-    ok = await _wait_for(both_monitored, timeout=20.0, poll=0.5)
-    if not ok:
-        await _put(
-            "/api/v1/artist/editor",
-            {"artistIds": [artist_id], "monitored": True, "monitorNewItems": "none"},
-        )
-        await _put("/api/v1/album/monitor", {"albumIds": [album_id], "monitored": True})
-        await _wait_for(both_monitored, timeout=10.0, poll=0.5)
-
     final_album = await _get_album_by_foreign_id(album_mbid)
+    
+    if final_album and not final_album.get("monitored"):
+        try:
+            await _put("/api/v1/album/monitor", {"albumIds": [album_id], "monitored": True})
+            await asyncio.sleep(2.0)
+            final_album = await _get_album_by_foreign_id(album_mbid)
+        except Exception:
+            pass
+    
     msg = "Album added & monitored" if action == "added" else "Album exists; monitored ensured"
     return {"message": f"{msg}: {album_title}", "payload": final_album}

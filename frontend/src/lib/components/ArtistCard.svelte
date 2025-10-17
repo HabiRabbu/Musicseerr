@@ -43,8 +43,7 @@
 		{/if}
 	</figure>
 
-	<div class="card-body p-3">
-		<h2 class="card-title text-sm line-clamp-2 min-h-[2.5rem]">{artist.title}</h2>
-		<p class="text-xs opacity-70 line-clamp-1">Artist</p>
+	<div class="card-body p-2">
+		<h2 class="card-title text-xs line-clamp-1 min-h-[1.25rem]">{artist.title}</h2>
 	</div>
 </div>

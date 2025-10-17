@@ -3,6 +3,8 @@
 	import { browser } from '$app/environment';
 	import AlbumCard from '$lib/components/AlbumCard.svelte';
 	import ArtistCard from '$lib/components/ArtistCard.svelte';
+	import ViewMoreAlbumCard from '$lib/components/ViewMoreAlbumCard.svelte';
+	import ViewMoreArtistCard from '$lib/components/ViewMoreArtistCard.svelte';
 	import type { Artist, Album } from '$lib/types';
 
 	export let data: { query: string };
@@ -12,9 +14,17 @@
 	let loadingArtists = false;
 	let loadingAlbums = false;
 	let hasSearched = false;
+	let showToast = false;
 
 	$: isSearching = loadingArtists || loadingAlbums;
 	$: hasResults = artists.length > 0 || albums.length > 0;
+
+	function handleAlbumAdded() {
+		showToast = true;
+		setTimeout(() => {
+			showToast = false;
+		}, 3000);
+	}
 
 	async function performSearch(q: string) {
 		if (!q.trim()) {
@@ -67,7 +77,10 @@
 		<div>
 			<h2 class="text-xl font-bold mb-4">Artists</h2>
 			<div class="bg-base-200 rounded-box p-4">
-				<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+				<div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-3">
+					<div class="card bg-base-100 w-full shadow-sm">
+						<div class="skeleton aspect-square w-full"></div>
+					</div>
 					{#each Array(6) as _, i}
 						<div class="card bg-base-100 w-full shadow-sm">
 							<div class="skeleton aspect-square w-full"></div>
@@ -87,7 +100,10 @@
 				<h2 class="text-xl font-bold">Albums</h2>
 			</div>
 			<div class="bg-base-200 rounded-box p-4">
-				<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+				<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4">
+					<div class="card bg-base-100 w-full shadow-sm">
+						<div class="skeleton aspect-square w-full"></div>
+					</div>
 					{#each Array(24) as _, i}
 						<div class="card bg-base-100 w-full shadow-sm">
 							<div class="skeleton aspect-square w-full"></div>
@@ -112,7 +128,8 @@
 				</div>
 			{:else if artists.length > 0}
 				<div class="bg-base-200 rounded-box p-4">
-					<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+					<div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-3">
+						<ViewMoreArtistCard />
 						{#each artists as artist, index}
 							<ArtistCard {artist} {index} />
 						{/each}
@@ -143,9 +160,10 @@
 				</div>
 			{:else if albums.length > 0}
 				<div class="bg-base-200 rounded-box p-4">
-					<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+					<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4">
+						<ViewMoreAlbumCard />
 						{#each albums as album, index}
-							<AlbumCard {album} {index} />
+							<AlbumCard {album} {index} onadded={handleAlbumAdded} />
 						{/each}
 					</div>
 				</div>
@@ -158,4 +176,16 @@
 	</section>
 {:else}
 	<p class="text-center mt-32 text-gray-400">Enter a search query to get started.</p>
+{/if}
+
+<!-- Toast Notification -->
+{#if showToast}
+	<div class="toast toast-end toast-bottom">
+		<div class="alert alert-success">
+			<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+				<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+			</svg>
+			<span>Added to Library</span>
+		</div>
+	</div>
 {/if}

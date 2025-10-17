@@ -52,3 +52,6 @@ frontend/dump_be.txt
 .gitignore
 frontend/dump_fe.txt
 frontend/dump.txt
+
+# Local Info
+/LidarrDocs.json
