@@ -1,8 +1,9 @@
 <script lang="ts">
   import type { Album } from '$lib/types';
+  import { colors } from '$lib/colors';
 
   export let album: Album;
-  export let index: number = 0;  // Position in grid for fetchpriority
+  export let index: number = 0;
   export let onadded: (() => void) | undefined = undefined;
   
   let requesting = false;
@@ -63,8 +64,8 @@
 
   <!-- In Library Checkmark -->
   {#if inLibrary}
-    <div class="absolute top-2 right-2 rounded-full p-1.5 shadow-lg" style="background-color: #CAFF8A;">
-      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="#1D232A" stroke-width="3">
+    <div class="absolute top-2 right-2 rounded-full p-1.5 shadow-lg" style="background-color: {colors.accent};">
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke={colors.secondary} stroke-width="3">
         <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
       </svg>
     </div>
@@ -85,15 +86,15 @@
   {#if !inLibrary}
     <button
       class="absolute bottom-2 right-2 btn btn-square btn-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 border-none shadow-lg"
-      style="background-color: #CAFF8A;"
+      style="background-color: {colors.accent};"
       on:click={handleRequest}
       disabled={requesting}
       aria-label="Request album"
     >
       {#if requesting}
-        <span class="loading loading-spinner loading-sm" style="color: #1D232A;"></span>
+        <span class="loading loading-spinner loading-sm" style="color: {colors.secondary};"></span>
       {:else}
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="#1D232A" stroke-width="2.5">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke={colors.secondary} stroke-width="2.5">
           <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
         </svg>
       {/if}

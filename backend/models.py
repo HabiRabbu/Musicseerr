@@ -64,3 +64,26 @@ class ConfigInfo(BaseModel):
     lidarr_url: str
     quality_profile_id: int
     root_folder_id: int
+
+
+class ExternalLink(BaseModel):
+    type: str
+    url: str
+    label: str
+
+
+class ArtistInfo(BaseModel):
+    name: str
+    musicbrainz_id: str
+    disambiguation: Optional[str] = None
+    type: Optional[str] = None
+    country: Optional[str] = None
+    life_span: Optional[Dict[str, Optional[str]]] = None
+    annotation: Optional[str] = None
+    tags: list[str] = Field(default_factory=list)
+    aliases: list[str] = Field(default_factory=list)
+    external_links: list[ExternalLink] = Field(default_factory=list)
+    in_library: bool = False
+    albums: list[Dict] = Field(default_factory=list)
+    singles: list[Dict] = Field(default_factory=list)
+    eps: list[Dict] = Field(default_factory=list)

@@ -176,6 +176,26 @@ async def _list_metadata_profiles() -> list[dict[str, Any]]:
     return await _get("/api/v1/metadataprofile")
 
 
+async def get_artist_mbids() -> set[str]:
+    cache_key = "artist_mbids"
+    
+    cached_result = await _cache.get(cache_key)
+    if cached_result is not None:
+        return cached_result
+    
+    data = await _get("/api/v1/artist")
+    ids: set[str] = set()
+    for item in data:
+        if not item.get("monitored", False):
+            continue
+        mbid = item.get("foreignArtistId") or item.get("mbId")
+        if isinstance(mbid, str):
+            ids.add(mbid.lower())
+    
+    await _cache.set(cache_key, ids, ttl_seconds=60)
+    return ids
+
+
 async def _find_artist_by_mbid(artist_mbid: str) -> dict[str, Any] | None:
     items = await _get("/api/v1/artist", params={"mbId": artist_mbid})
     return items[0] if items else None
@@ -308,9 +328,16 @@ async def add_album(album_mbid: str) -> dict[str, Any]:
 
     lookup = await _get("/api/v1/album/lookup", params={"term": f"mbid:{album_mbid}"})
     if not lookup:
-        raise ApiError("Album not found from MBID.", f"No lookup result for {album_mbid}")
+        raise ApiError(
+            "Release not found.", 
+            f"Lidarr couldn't find this release (MBID: {album_mbid}). This might be a very obscure release that's not in MusicBrainz, or there's a connectivity issue."
+        )
+    
     candidate = next((a for a in lookup if a.get("foreignAlbumId") == album_mbid), lookup[0])
     album_title = candidate.get("title") or "Unknown Album"
+    album_type = candidate.get("albumType", "Unknown")
+    secondary_types = candidate.get("secondaryTypes", [])
+    
     artist_info = candidate.get("artist") or {}
     artist_mbid = artist_info.get("mbId") or artist_info.get("foreignArtistId")
     artist_name = artist_info.get("artistName")
@@ -330,7 +357,7 @@ async def add_album(album_mbid: str) -> dict[str, Any]:
             a = await _get_album_by_foreign_id(album_mbid)
             return a and a.get("id") and a.get("releases")
         
-        album_obj = await _wait_for(album_is_indexed, timeout=90.0, poll=2.0)
+        album_obj = await _wait_for(album_is_indexed, timeout=30.0, poll=2.0)
         
         if not album_obj:
             profile_id = artist.get("qualityProfileId")
@@ -351,14 +378,30 @@ async def add_album(album_mbid: str) -> dict[str, Any]:
                 "profileId": profile_id,
                 "addOptions": {"addType": "automatic", "searchForNewAlbum": True},
             }
-            album_obj = await _post("/api/v1/album", payload)
-            action = "added"
-            album_obj = await _wait_for(album_is_indexed, timeout=60.0, poll=1.0)
+            
+            try:
+                album_obj = await _post("/api/v1/album", payload)
+                action = "added"
+                album_obj = await _wait_for(album_is_indexed, timeout=30.0, poll=1.0)
+            except ApiError as e:
+                if "POST failed" in str(e.message):
+                    raise ApiError(
+                        f"Cannot add this {album_type}.",
+                        f"Lidarr rejected adding '{album_title}'. This is likely because your Lidarr "
+                        f"Metadata Profile is configured to exclude {album_type}s{' (' + ', '.join(secondary_types) + ')' if secondary_types else ''}. "
+                        f"To fix this: Go to Lidarr → Settings → Profiles → Metadata Profiles, "
+                        f"and enable '{album_type}' in your active profile."
+                    )
+                else:
+                    raise
 
     if not album_obj or "id" not in album_obj:
         raise ApiError(
-            "Album not visible after add.", 
-            f"Timed out waiting for album '{album_title}' to be indexed in Lidarr. The artist may still be refreshing."
+            f"Cannot add this {album_type}.", 
+            f"'{album_title}' could not be found in Lidarr after the artist refresh. This usually means "
+            f"your Lidarr Metadata Profile is configured to exclude {album_type}s. "
+            f"To fix this: Go to Lidarr → Settings → Profiles → Metadata Profiles, "
+            f"enable '{album_type}', then refresh the artist in Lidarr."
         )
 
     album_id = album_obj["id"]

@@ -1,3 +1,5 @@
+.github/
+
 # Python
 __pycache__/
 *.pyc
@@ -55,3 +57,4 @@ frontend/dump.txt
 
 # Local Info
 /LidarrDocs.json
+/mbngsdocs.txt

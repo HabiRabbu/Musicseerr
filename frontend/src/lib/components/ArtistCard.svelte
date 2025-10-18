@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { Artist } from '$lib/types';
+	import { goto } from '$app/navigation';
 
 	export let artist: Artist;
 	export let index: number = 0;
@@ -16,9 +17,19 @@
 		imgLoaded = true;
 		(e.currentTarget as HTMLImageElement).classList.remove('opacity-0');
 	}
+
+	function handleClick() {
+		goto(`/artist/${artist.musicbrainz_id}`);
+	}
 </script>
 
-<div class="card bg-base-100 w-full shadow-sm flex-shrink-0">
+<div 
+	class="card bg-base-100 w-full shadow-sm flex-shrink-0 cursor-pointer transition-transform hover:scale-105 hover:shadow-lg"
+	on:click={handleClick}
+	on:keydown={(e) => e.key === 'Enter' && handleClick()}
+	role="button"
+	tabindex="0"
+>
 	<figure class="aspect-square overflow-hidden relative">
 		{#if imgError}
 			<div

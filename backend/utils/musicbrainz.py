@@ -193,3 +193,25 @@ async def search_musicbrainz_bucket(
     
     return out
 
+
+async def get_artist_by_id(artist_id: str) -> Optional[Dict[str, Any]]:
+    def fetch_artist() -> Optional[Dict[str, Any]]:
+        try:
+            result = musicbrainzngs.get_artist_by_id(
+                artist_id,
+                includes=[
+                    "release-groups",
+                    "tags",
+                    "aliases",
+                    "url-rels",
+                    "ratings",
+                    "annotation"
+                ],
+            )
+            return result.get("artist")
+        except Exception as e:
+            print(f"Error fetching artist {artist_id}: {e}")
+            return None
+    
+    return await asyncio.to_thread(fetch_artist)
+

@@ -1,11 +1,13 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { browser } from '$app/environment';
+	import { goto } from '$app/navigation';
 	import AlbumCard from '$lib/components/AlbumCard.svelte';
 	import ArtistCard from '$lib/components/ArtistCard.svelte';
 	import ViewMoreAlbumCard from '$lib/components/ViewMoreAlbumCard.svelte';
 	import ViewMoreArtistCard from '$lib/components/ViewMoreArtistCard.svelte';
 	import type { Artist, Album } from '$lib/types';
+	import { colors } from '$lib/colors';
 
 	export let data: { query: string };
 	
@@ -18,6 +20,12 @@
 
 	$: isSearching = loadingArtists || loadingAlbums;
 	$: hasResults = artists.length > 0 || albums.length > 0;
+
+	function navigateToBucket(bucket: 'artists' | 'albums') {
+		if (data.query) {
+			goto(`/search/${bucket}?q=${encodeURIComponent(data.query)}`);
+		}
+	}
 
 	function handleAlbumAdded() {
 		showToast = true;
@@ -71,6 +79,31 @@
 		lastQuery = '';
 	}
 </script>
+
+<!-- Filter Badges -->
+{#if hasSearched || isSearching}
+	<div class="px-8 pt-4 pb-2">
+		<div class="flex gap-2">
+			<button class="badge badge-lg cursor-pointer" style="background-color: {colors.primary}; color: {colors.secondary};">
+				All
+			</button>
+			<button 
+				class="badge badge-lg cursor-pointer transition-colors"
+				style="background-color: {colors.secondary}; color: {colors.primary};"
+				on:click={() => navigateToBucket('artists')}
+			>
+				Artists
+			</button>
+			<button 
+				class="badge badge-lg cursor-pointer transition-colors"
+				style="background-color: {colors.secondary}; color: {colors.primary};"
+				on:click={() => navigateToBucket('albums')}
+			>
+				Albums
+			</button>
+		</div>
+	</div>
+{/if}
 
 {#if isSearching && !hasResults}
 	<section class="px-8 py-4 space-y-8">

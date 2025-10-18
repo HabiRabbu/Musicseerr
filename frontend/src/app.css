@@ -2,3 +2,12 @@
 @plugin "daisyui" {
   themes: dark --default;
 }
+@plugin "daisyui/theme" {
+  name: "dark";
+  default: true;
+  --color-base-300: #1F271B; /* 300 - Darkest / 100 - Lightest */
+  --color-base-200: #161d12;
+  --color-base-100: #0d120a;
+  --color-primary: #AED5F2;
+  --color-accent: #BBDB9B;
+}
