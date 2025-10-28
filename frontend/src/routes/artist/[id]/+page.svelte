@@ -141,7 +141,7 @@
 	}
 </style>
 
-<div class="px-4 sm:px-8 py-8 max-w-7xl mx-auto">
+<div class="w-full px-2 sm:px-4 lg:px-8 py-4 sm:py-8 max-w-7xl mx-auto">
 	{#if error}
 		<div class="flex items-center justify-center min-h-[50vh]">
 			<div class="alert alert-error">
@@ -150,22 +150,23 @@
 		</div>
 	{:else if !artist && loading}
 		<!-- Skeleton Loading State -->
-		<div class="space-y-8">
+		<div class="space-y-4 sm:space-y-8">
 			<!-- Artist Hero Skeleton -->
-			<div class="card card-side bg-base-200 shadow-xl overflow-hidden min-h-[32rem]">
-				<div class="w-96 h-96 sm:w-[28rem] sm:h-[28rem] flex-shrink-0 p-6">
-					<div class="skeleton w-full h-full rounded-box"></div>
-				</div>
-				<div class="card-body flex-1 p-8">
-					<div class="flex items-start justify-between gap-4">
-						<div class="flex-1 space-y-3">
-							<div class="skeleton h-12 w-3/4"></div>
-							<div class="skeleton h-4 w-1/4"></div>
-						</div>
-						<div class="skeleton h-8 w-32"></div>
+			<div class="card bg-base-200 shadow-xl overflow-hidden">
+				<div class="flex flex-col lg:flex-row">
+					<div class="w-full lg:w-96 xl:w-[28rem] flex-shrink-0 p-4 sm:p-6">
+						<div class="skeleton w-full aspect-square max-h-96 lg:h-96 rounded-box"></div>
 					</div>
+					<div class="card-body flex-1 p-4 sm:p-6 lg:p-8">
+						<div class="flex flex-col sm:flex-row items-start justify-between gap-4">
+							<div class="flex-1 space-y-3 w-full">
+								<div class="skeleton h-8 sm:h-12 w-3/4"></div>
+								<div class="skeleton h-4 w-1/4"></div>
+							</div>
+							<div class="skeleton h-8 w-32 flex-shrink-0"></div>
+						</div>
 					
-					<div class="mt-6 space-y-2">
+					<div class="mt-4 sm:mt-6 space-y-2">
 						<div class="skeleton h-4 w-20"></div>
 						<div class="skeleton h-4 w-full"></div>
 						<div class="skeleton h-4 w-full"></div>
@@ -180,31 +181,32 @@
 					</div>
 				</div>
 			</div>
+		</div>
 
 			<!-- Links Skeleton -->
-			<div class="px-4 sm:px-8">
-				<div class="skeleton h-8 w-24 mb-4"></div>
-				<div class="bg-base-200 rounded-box p-4 shadow-md">
-					<div class="flex gap-4">
+			<div>
+				<div class="skeleton h-6 sm:h-8 w-20 sm:w-24 mb-3 sm:mb-4"></div>
+				<div class="bg-base-200 rounded-box p-3 sm:p-4 shadow-md overflow-x-auto">
+					<div class="flex gap-3 sm:gap-4">
 						{#each Array(5) as _}
-							<div class="skeleton w-40 h-24 flex-shrink-0 rounded-box"></div>
+							<div class="skeleton w-32 sm:w-40 h-20 sm:h-24 flex-shrink-0 rounded-box"></div>
 						{/each}
 					</div>
 				</div>
 			</div>
 
 			<!-- Albums Skeleton -->
-			<div class="px-4 sm:px-8">
-				<div class="skeleton h-8 w-32 mb-4"></div>
-				<div class="bg-base-200 rounded-box shadow-md p-4 space-y-4">
+			<div>
+				<div class="skeleton h-6 sm:h-8 w-24 sm:w-32 mb-3 sm:mb-4"></div>
+				<div class="bg-base-200 rounded-box shadow-md p-3 sm:p-4 space-y-3 sm:space-y-4">
 					{#each Array(5) as _}
-						<div class="flex items-center gap-4">
-							<div class="skeleton w-16 h-16 rounded-box flex-shrink-0"></div>
-							<div class="flex-1 space-y-2">
-								<div class="skeleton h-5 w-48"></div>
-								<div class="skeleton h-4 w-20"></div>
+						<div class="flex items-center gap-3 sm:gap-4">
+							<div class="skeleton w-12 h-12 sm:w-16 sm:h-16 rounded-box flex-shrink-0"></div>
+							<div class="flex-1 space-y-2 min-w-0">
+								<div class="skeleton h-4 sm:h-5 w-3/4 max-w-48"></div>
+								<div class="skeleton h-3 sm:h-4 w-16 sm:w-20"></div>
 							</div>
-							<div class="skeleton w-12 h-12 rounded-full"></div>
+							<div class="skeleton w-10 h-10 sm:w-12 sm:h-12 rounded-full flex-shrink-0"></div>
 						</div>
 					{/each}
 				</div>
@@ -217,53 +219,59 @@
 			</div>
 		</div>
 	{:else if artist}
-		<div class="space-y-8">
+		<div class="space-y-4 sm:space-y-6 lg:space-y-8">
 			<!-- Artist Hero Section -->
-			<div class="card card-side bg-base-200 shadow-xl overflow-hidden min-h-[32rem]">
-				<figure class="w-96 h-96 sm:w-[28rem] sm:h-[28rem] flex-shrink-0 p-6">
-					<img 
-						src="/api/covers/artist/{artist.musicbrainz_id}" 
-						alt={artist.name}
-						class="w-full h-full object-contain rounded-box"
-						on:error={(e) => {
-							const target = e.currentTarget as HTMLImageElement;
-							target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200"%3E%3Crect fill="%23444" width="200" height="200"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" fill="%23999" font-size="24" font-family="sans-serif"%3ENo Image%3C/text%3E%3C/svg%3E';
-						}}
-					/>
-				</figure>
-				<div class="card-body flex-1 p-8">
-					<div class="flex items-start justify-between gap-4">
-						<div class="flex-1">
-							<h1 class="card-title text-3xl sm:text-5xl font-bold mb-3">{artist.name}</h1>
-							{#if artist.disambiguation}
-								<p class="text-base-content/60 text-sm mb-3">({artist.disambiguation})</p>
+			<div class="card bg-base-200 shadow-xl overflow-hidden">
+				<!-- Mobile: vertical layout, Desktop: horizontal layout -->
+				<div class="flex flex-col lg:flex-row lg:min-h-[32rem]">
+					<figure class="w-full lg:w-96 lg:h-96 xl:w-[28rem] xl:h-[28rem] flex-shrink-0 p-4 sm:p-6">
+						<img 
+							src="/api/covers/artist/{artist.musicbrainz_id}" 
+							alt={artist.name}
+							class="w-full h-full object-contain rounded-box max-h-80 sm:max-h-96 lg:max-h-none"
+							on:error={(e) => {
+								const target = e.currentTarget as HTMLImageElement;
+								target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200"%3E%3Crect fill="%23444" width="200" height="200"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" fill="%23999" font-size="24" font-family="sans-serif"%3ENo Image%3C/text%3E%3C/svg%3E';
+							}}
+						/>
+					</figure>
+					<div class="card-body flex-1 p-4 sm:p-6 lg:p-8">
+						<div class="flex flex-col sm:flex-row items-start justify-between gap-3 sm:gap-4">
+							<div class="flex-1 min-w-0">
+								<h1 class="card-title text-2xl sm:text-3xl lg:text-4xl xl:text-5xl font-bold mb-2 sm:mb-3 break-words">{artist.name}</h1>
+								{#if artist.disambiguation}
+									<p class="text-base-content/60 text-xs sm:text-sm mb-2 sm:mb-3">({artist.disambiguation})</p>
+								{/if}
+							</div>
+							{#if artist.in_library}
+								<span class="badge badge-success badge-lg gap-2 flex-shrink-0">
+									<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+										<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+									</svg>
+									In Library
+								</span>
+							{:else}
+								<span class="badge badge-ghost badge-lg flex-shrink-0">Not in Library</span>
 							{/if}
 						</div>
-						{#if artist.in_library}
-							<span class="badge badge-success badge-lg gap-2">
-								<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-									<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
-								</svg>
-								In Library
-							</span>
-						{:else}
-							<span class="badge badge-ghost badge-lg">Not in Library</span>
-						{/if}
-					</div>
 					
 					{#if artist.description}
-						<div class="mb-6">
-							<h3 class="text-sm font-semibold text-base-content/60 uppercase tracking-wide mb-2">Description</h3>
-							<div class="text-base-content/80 leading-relaxed">
+						<div class="mb-4 sm:mb-6">
+							<h3 class="text-xs sm:text-sm font-semibold text-base-content/60 uppercase tracking-wide mb-2">Description</h3>
+							<div class="text-sm sm:text-base text-base-content/80 leading-relaxed">
 								{#if descriptionExpanded}
 									<div>
 										{@html artist.description.replace(/\n\n/g, '<br><br>').replace(/\n/g, '<br>')}
 									</div>
 									<button 
-										class="btn btn-ghost btn-sm mt-2"
+										class="btn btn-xs sm:btn-sm mt-2 gap-1 sm:gap-2"
+										style="background-color: {colors.accent}; color: {colors.secondary};"
 										on:click={() => descriptionExpanded = false}
 									>
-										Show less
+										Show Less
+										<svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 sm:h-4 sm:w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+											<path stroke-linecap="round" stroke-linejoin="round" d="M5 15l7-7 7 7" />
+										</svg>
 									</button>
 								{:else}
 									<div 
@@ -275,19 +283,23 @@
 									</div>
 									{#if showViewMore}
 										<button 
-											class="btn btn-ghost btn-sm mt-2"
+											class="btn btn-xs sm:btn-sm mt-2 gap-1 sm:gap-2"
+											style="background-color: {colors.accent}; color: {colors.secondary};"
 											on:click={() => {
 												descriptionExpanded = true;
 											}}
 										>
-											View more
+											Expand
+											<svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 sm:h-4 sm:w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+												<path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+											</svg>
 										</button>
 									{/if}
 								{/if}
 							</div>
 						</div>
 					{:else}
-						<p class="text-base-content/60 italic mb-6">No description available</p>
+						<p class="text-base-content/60 italic mb-4 sm:mb-6 text-sm sm:text-base">No description available</p>
 					{/if}
 					
 					<div class="card-actions flex-wrap gap-2 mt-auto">
@@ -304,20 +316,21 @@
 							</div>
 						{/if}
 						{#each artist.tags.slice(0, 8) as tag}
-							<div class="badge badge-primary">{tag}</div>
+							<div class="badge" style="background-color: {colors.primary}; color: {colors.secondary};">{tag}</div>
 						{/each}
 					</div>
 				</div>
 			</div>
+		</div>
 
 			<!-- External Links Section -->
 			{#if validLinks.length > 0}
-				<div class="px-4 sm:px-8">
-					<h2 class="text-2xl font-bold mb-4">Links</h2>
+				<div>
+					<h2 class="text-xl sm:text-2xl font-bold mb-3 sm:mb-4">Links</h2>
 					<div class="relative">
-						<!-- Left Button -->
+						<!-- Left Button - hidden on mobile -->
 						<button 
-							class="btn btn-circle btn-sm absolute left-0 top-1/2 -translate-y-1/2 z-10 bg-base-300 border-none shadow-lg"
+							class="btn btn-circle btn-sm absolute left-0 top-1/2 -translate-y-1/2 z-10 bg-base-300 border-none shadow-lg hidden sm:flex"
 							on:click={() => scrollLinks('left')}
 							aria-label="Scroll left"
 						>
@@ -326,19 +339,19 @@
 						
 						<!-- Links Container -->
 						<div 
-							class="overflow-x-auto scrollbar-hide px-12"
+							class="overflow-x-auto scrollbar-hide sm:px-12"
 							bind:this={linksCarousel}
 						>
-							<div class="flex gap-4 p-4 bg-base-200 rounded-box shadow-md w-max">
+							<div class="flex gap-3 sm:gap-4 p-3 sm:p-4 bg-base-200 rounded-box shadow-md w-max">
 								{#each validLinks as link}
 									<a 
 										href={link.url} 
 										target="_blank" 
 										rel="noopener noreferrer"
-										class="card card-compact bg-base-100 hover:bg-base-300 shadow-sm hover:shadow-md transition-all w-40 h-24 flex-shrink-0"
+										class="card card-compact bg-base-100 hover:bg-base-300 shadow-sm hover:shadow-md transition-all w-32 h-20 sm:w-40 sm:h-24 flex-shrink-0"
 									>
-										<div class="card-body items-center justify-center text-center">
-											<div class="text-2xl mb-1">
+										<div class="card-body items-center justify-center text-center p-2">
+											<div class="text-xl sm:text-2xl mb-0.5 sm:mb-1">
 												{#if link.label === 'Spotify'}
 													🎵
 												{:else if link.label === 'YouTube'}
@@ -371,16 +384,16 @@
 													🔗
 												{/if}
 											</div>
-											<h3 class="text-sm font-semibold line-clamp-2">{link.label}</h3>
+											<h3 class="text-xs sm:text-sm font-semibold line-clamp-2">{link.label}</h3>
 										</div>
 									</a>
 								{/each}
 							</div>
 						</div>
 						
-						<!-- Right Button -->
+						<!-- Right Button - hidden on mobile -->
 						<button 
-							class="btn btn-circle btn-sm absolute right-0 top-1/2 -translate-y-1/2 z-10 bg-base-300 border-none shadow-lg"
+							class="btn btn-circle btn-sm absolute right-0 top-1/2 -translate-y-1/2 z-10 bg-base-300 border-none shadow-lg hidden sm:flex"
 							on:click={() => scrollLinks('right')}
 							aria-label="Scroll right"
 						>
@@ -392,12 +405,12 @@
 
 			<!-- Albums Section -->
 			{#if artist.albums.length > 0}
-				<div class="px-4 sm:px-8">
-					<h2 class="text-2xl font-bold mb-4">Albums ({artist.albums.length})</h2>
+				<div>
+					<h2 class="text-xl sm:text-2xl font-bold mb-3 sm:mb-4">Albums ({artist.albums.length})</h2>
 					<ul class="list bg-base-200 rounded-box shadow-md">
 						{#each artist.albums as rg}
-							<li class="list-row group hover:bg-base-300 transition-colors">
-								<div class="w-16 h-16 flex-shrink-0 rounded-box overflow-hidden bg-base-100 relative">
+							<li class="list-row group hover:bg-base-300 transition-colors p-2 sm:p-3">
+								<div class="w-12 h-12 sm:w-16 sm:h-16 flex-shrink-0 rounded-box overflow-hidden bg-base-100 relative">
 									{#if !loadedImages.has(rg.id)}
 										<div class="skeleton w-full h-full absolute inset-0"></div>
 									{/if}
@@ -421,31 +434,31 @@
 										}}
 									/>
 								</div>
-								<div class="list-col-grow">
-									<div class="font-semibold">{rg.title}</div>
-									<div class="text-sm text-base-content/60">
+								<div class="list-col-grow min-w-0">
+									<div class="font-semibold text-sm sm:text-base truncate">{rg.title}</div>
+									<div class="text-xs sm:text-sm text-base-content/60">
 										{#if rg.year}{rg.year}{/if}
 									</div>
 								</div>
 								
 								{#if rg.in_library}
-									<div class="rounded-full p-2 shadow-sm" style="background-color: {colors.accent};">
-										<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke={colors.secondary} stroke-width="3">
+									<div class="rounded-full p-1.5 sm:p-2 shadow-sm flex-shrink-0" style="background-color: {colors.accent};">
+										<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 sm:h-5 sm:w-5" fill="none" viewBox="0 0 24 24" stroke={colors.secondary} stroke-width="3">
 											<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
 										</svg>
 									</div>
 								{:else}
 									<button
-										class="btn btn-square btn-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 border-none"
+										class="btn btn-square btn-sm sm:btn-md opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity duration-200 border-none flex-shrink-0"
 										style="background-color: {colors.accent};"
 										on:click={() => handleRequest(rg.id, rg.title)}
 										disabled={requestingAlbums.has(rg.id)}
 										aria-label="Request album"
 									>
 										{#if requestingAlbums.has(rg.id)}
-											<span class="loading loading-spinner loading-sm" style="color: {colors.secondary};"></span>
+											<span class="loading loading-spinner loading-xs sm:loading-sm" style="color: {colors.secondary};"></span>
 										{:else}
-											<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke={colors.secondary} stroke-width="2.5">
+											<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 sm:h-5 sm:w-5" fill="none" viewBox="0 0 24 24" stroke={colors.secondary} stroke-width="2.5">
 												<path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
 											</svg>
 										{/if}
@@ -459,12 +472,12 @@
 
 			<!-- EPs Section -->
 			{#if artist.eps.length > 0}
-				<div class="px-4 sm:px-8">
-					<h2 class="text-2xl font-bold mb-4">EPs ({artist.eps.length})</h2>
+				<div>
+					<h2 class="text-xl sm:text-2xl font-bold mb-3 sm:mb-4">EPs ({artist.eps.length})</h2>
 					<ul class="list bg-base-200 rounded-box shadow-md">
 						{#each artist.eps as rg}
-							<li class="list-row group hover:bg-base-300 transition-colors">
-								<div class="w-16 h-16 flex-shrink-0 rounded-box overflow-hidden bg-base-100 relative">
+							<li class="list-row group hover:bg-base-300 transition-colors p-2 sm:p-3">
+								<div class="w-12 h-12 sm:w-16 sm:h-16 flex-shrink-0 rounded-box overflow-hidden bg-base-100 relative">
 									{#if !loadedImages.has(rg.id)}
 										<div class="skeleton w-full h-full absolute inset-0"></div>
 									{/if}
@@ -488,31 +501,31 @@
 										}}
 									/>
 								</div>
-								<div class="list-col-grow">
-									<div class="font-semibold">{rg.title}</div>
-									<div class="text-sm text-base-content/60">
+								<div class="list-col-grow min-w-0">
+									<div class="font-semibold text-sm sm:text-base truncate">{rg.title}</div>
+									<div class="text-xs sm:text-sm text-base-content/60">
 										{#if rg.year}{rg.year}{/if}
 									</div>
 								</div>
 								
 								{#if rg.in_library}
-									<div class="rounded-full p-2 shadow-sm" style="background-color: {colors.accent};">
-										<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke={colors.secondary} stroke-width="3">
+									<div class="rounded-full p-1.5 sm:p-2 shadow-sm flex-shrink-0" style="background-color: {colors.accent};">
+										<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 sm:h-5 sm:w-5" fill="none" viewBox="0 0 24 24" stroke={colors.secondary} stroke-width="3">
 											<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
 										</svg>
 									</div>
 								{:else}
 									<button
-										class="btn btn-square btn-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 border-none"
+										class="btn btn-square btn-sm sm:btn-md opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity duration-200 border-none flex-shrink-0"
 										style="background-color: {colors.accent};"
 										on:click={() => handleRequest(rg.id, rg.title)}
 										disabled={requestingAlbums.has(rg.id)}
 										aria-label="Request EP"
 									>
 										{#if requestingAlbums.has(rg.id)}
-											<span class="loading loading-spinner loading-sm" style="color: {colors.secondary};"></span>
+											<span class="loading loading-spinner loading-xs sm:loading-sm" style="color: {colors.secondary};"></span>
 										{:else}
-											<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke={colors.secondary} stroke-width="2.5">
+											<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 sm:h-5 sm:w-5" fill="none" viewBox="0 0 24 24" stroke={colors.secondary} stroke-width="2.5">
 												<path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
 											</svg>
 										{/if}
@@ -526,12 +539,12 @@
 
 			<!-- Singles Section -->
 			{#if artist.singles.length > 0}
-				<div class="px-4 sm:px-8">
-					<h2 class="text-2xl font-bold mb-4">Singles ({artist.singles.length})</h2>
+				<div>
+					<h2 class="text-xl sm:text-2xl font-bold mb-3 sm:mb-4">Singles ({artist.singles.length})</h2>
 					<ul class="list bg-base-200 rounded-box shadow-md">
 						{#each artist.singles as rg}
-							<li class="list-row group hover:bg-base-300 transition-colors">
-								<div class="w-16 h-16 flex-shrink-0 rounded-box overflow-hidden bg-base-100 relative">
+							<li class="list-row group hover:bg-base-300 transition-colors p-2 sm:p-3">
+								<div class="w-12 h-12 sm:w-16 sm:h-16 flex-shrink-0 rounded-box overflow-hidden bg-base-100 relative">
 									{#if !loadedImages.has(rg.id)}
 										<div class="skeleton w-full h-full absolute inset-0"></div>
 									{/if}
@@ -555,31 +568,31 @@
 										}}
 									/>
 								</div>
-								<div class="list-col-grow">
-									<div class="font-semibold">{rg.title}</div>
-									<div class="text-sm text-base-content/60">
+								<div class="list-col-grow min-w-0">
+									<div class="font-semibold text-sm sm:text-base truncate">{rg.title}</div>
+									<div class="text-xs sm:text-sm text-base-content/60">
 										{#if rg.year}{rg.year}{/if}
 									</div>
 								</div>
 								
 								{#if rg.in_library}
-									<div class="rounded-full p-2 shadow-sm" style="background-color: {colors.accent};">
-										<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke={colors.secondary} stroke-width="3">
+									<div class="rounded-full p-1.5 sm:p-2 shadow-sm flex-shrink-0" style="background-color: {colors.accent};">
+										<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 sm:h-5 sm:w-5" fill="none" viewBox="0 0 24 24" stroke={colors.secondary} stroke-width="3">
 											<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
 										</svg>
 									</div>
 								{:else}
 									<button
-										class="btn btn-square btn-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 border-none"
+										class="btn btn-square btn-sm sm:btn-md opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity duration-200 border-none flex-shrink-0"
 										style="background-color: {colors.accent};"
 										on:click={() => handleRequest(rg.id, rg.title)}
 										disabled={requestingAlbums.has(rg.id)}
 										aria-label="Request single"
 									>
 										{#if requestingAlbums.has(rg.id)}
-											<span class="loading loading-spinner loading-sm" style="color: {colors.secondary};"></span>
+											<span class="loading loading-spinner loading-xs sm:loading-sm" style="color: {colors.secondary};"></span>
 										{:else}
-											<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke={colors.secondary} stroke-width="2.5">
+											<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 sm:h-5 sm:w-5" fill="none" viewBox="0 0 24 24" stroke={colors.secondary} stroke-width="2.5">
 												<path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
 											</svg>
 										{/if}

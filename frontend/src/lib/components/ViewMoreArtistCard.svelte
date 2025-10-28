@@ -37,9 +37,16 @@
     {/if}
   </div>
   <div class="absolute inset-0 z-10 flex flex-col items-center justify-center pointer-events-none">
-    <div class="px-6 py-4 rounded-lg backdrop-blur-sm" style="background-color: {colors.secondary}66;">
-      <span class="text-sm font-semibold mb-1 block text-center drop-shadow-lg" style="color: {colors.accent};">View More</span>
-      <span class="text-3xl font-bold block text-center drop-shadow-lg" style="color: {colors.accent};">ARTISTS</span>
+    <div class="px-6 py-4 rounded-lg backdrop-blur-sm shadow-lg" style="background-color: {colors.secondary}66;">
+      <div class="flex flex-col items-center gap-2">
+        <span class="text-3xl font-bold block text-center drop-shadow-lg" style="color: {colors.accent};">ARTISTS</span>
+        <div class="flex items-center gap-2">
+          <span class="text-sm font-semibold text-center drop-shadow-lg" style="color: {colors.accent};">View More</span>
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 drop-shadow-lg" fill="none" viewBox="0 0 24 24" stroke={colors.accent} stroke-width="2.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+          </svg>
+        </div>
+      </div>
     </div>
   </div>
 </button>
