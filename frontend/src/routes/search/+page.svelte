@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, onDestroy } from 'svelte';
 	import { browser } from '$app/environment';
 	import { goto } from '$app/navigation';
 	import AlbumCard from '$lib/components/AlbumCard.svelte';
@@ -17,6 +17,7 @@
 	let loadingAlbums = false;
 	let hasSearched = false;
 	let showToast = false;
+	let abortController: AbortController | null = null;
 
 	$: isSearching = loadingArtists || loadingAlbums;
 	$: hasResults = artists.length > 0 || albums.length > 0;
@@ -35,6 +36,10 @@
 	}
 
 	async function performSearch(q: string) {
+		if (abortController) {
+			abortController.abort();
+		}
+
 		if (!q.trim()) {
 			artists = [];
 			albums = [];
@@ -42,12 +47,15 @@
 			return;
 		}
 
+		abortController = new AbortController();
 		hasSearched = true;
 		loadingArtists = true;
 		loadingAlbums = true;
 
 		try {
-			const res = await fetch(`/api/search?q=${encodeURIComponent(q)}&limit_artists=6&limit_albums=24`);
+			const res = await fetch(`/api/search?q=${encodeURIComponent(q)}&limit_artists=6&limit_albums=24`, {
+				signal: abortController.signal
+			});
 			
 			if (res.ok) {
 				const data = await res.json();
@@ -58,6 +66,9 @@
 				albums = [];
 			}
 		} catch (error) {
+			if (error instanceof Error && error.name === 'AbortError') {
+				return;
+			}
 			console.error('Search failed:', error);
 			artists = [];
 			albums = [];
@@ -78,6 +89,13 @@
 		hasSearched = false;
 		lastQuery = '';
 	}
+
+	onDestroy(() => {
+		if (abortController) {
+			abortController.abort();
+			abortController = null;
+		}
+	});
 </script>
 
 <!-- Filter Badges -->

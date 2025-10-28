@@ -299,7 +299,6 @@ async def _ensure_artist(artist_mbid: str, artist_name_hint: str | None = None) 
     }
     created = await _post("/api/v1/artist", payload)
 
-    # Long timeouts for large artists
     await _await_command({"name": "RefreshArtist", "artistId": created["id"]}, timeout=300.0)
     await _await_command({"name": "RescanArtist", "artistId": created["id"]}, timeout=120.0)
 
@@ -406,13 +405,24 @@ async def add_album(album_mbid: str) -> dict[str, Any]:
 
     album_id = album_obj["id"]
 
-    # Retry monitoring up to 3 times
+    try:
+        await _put("/api/v1/album/monitor", {"albumIds": [album_id], "monitored": True})
+        await asyncio.sleep(2.0)  # Give Lidarr time to process
+    except Exception as e:
+        raise ApiError(
+            "Failed to monitor album",
+            f"Could not set '{album_title}' to monitored: {str(e)}"
+        )
+
     for attempt in range(3):
         try:
             await _put(
                 "/api/v1/artist/editor",
                 {"artistIds": [artist_id], "monitored": True, "monitorNewItems": "none"},
             )
+            
+            await asyncio.sleep(5.0 + (attempt * 3.0))
+            
             await _put("/api/v1/album/monitor", {"albumIds": [album_id], "monitored": True})
             
             async def both_monitored():
@@ -420,21 +430,21 @@ async def add_album(album_mbid: str) -> dict[str, Any]:
                 art = await _get_artist_by_id(artist_id)
                 return (a and a.get("monitored") is True) and (art and art.get("monitored") is True)
             
-            timeout = 30.0 + (attempt * 15.0)
+            timeout = 20.0 + (attempt * 10.0)
             ok = await _wait_for(both_monitored, timeout=timeout, poll=1.0)
             
             if ok:
                 break
                 
             if attempt < 2:
-                await asyncio.sleep(3.0)
+                await asyncio.sleep(5.0)
         except Exception as e:
             if attempt == 2:
                 raise ApiError(
                     "Failed to set monitoring status",
                     f"Could not ensure '{album_title}' is monitored after 3 attempts: {str(e)}"
                 )
-            await asyncio.sleep(3.0)
+            await asyncio.sleep(5.0)
 
     try:
         await _post_command({"name": "AlbumSearch", "albumIds": [album_id]})

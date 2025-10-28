@@ -45,7 +45,7 @@ export type ArtistInfo = {
 		end?: string | null;
 		ended?: boolean;
 	} | null;
-	annotation?: string | null;
+	description?: string | null;
 	tags: string[];
 	aliases: string[];
 	external_links: ExternalLink[];

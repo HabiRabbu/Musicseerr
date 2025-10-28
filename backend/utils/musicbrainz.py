@@ -204,8 +204,7 @@ async def get_artist_by_id(artist_id: str) -> Optional[Dict[str, Any]]:
                     "tags",
                     "aliases",
                     "url-rels",
-                    "ratings",
-                    "annotation"
+                    "ratings"
                 ],
             )
             return result.get("artist")

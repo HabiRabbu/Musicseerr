@@ -22,16 +22,42 @@ async def get_artist(artist_id: str):
     life_span = artist_parser.extract_life_span(mb_artist)
     external_links = artist_parser.extract_external_links(mb_artist)
     
-    wikipedia_description = None
-    if url_rels := mb_artist.get("url-relation-list", []):
-        for url_rel in url_rels:
-            if url_rel.get("type") == "wikipedia":
-                if wikipedia_url := url_rel.get("target"):
-                    wikipedia_description = await wikidata.get_wikipedia_extract(wikipedia_url)
-                    if wikipedia_description:
-                        break
+    has_annotation = "annotation" in mb_artist
+    annotation_value = mb_artist.get("annotation")
+    print(f"DEBUG - Artist: {mb_artist.get('name')}")
+    print(f"  Has annotation key: {has_annotation}")
+    if has_annotation:
+        print(f"  Annotation type: {type(annotation_value)}")
+        if isinstance(annotation_value, dict):
+            print(f"  Annotation dict keys: {list(annotation_value.keys())}")
+        elif isinstance(annotation_value, str):
+            print(f"  Annotation length: {len(annotation_value)}")
     
-    description = wikipedia_description or mb_artist.get("annotation")
+    description = None
+    if url_rels := mb_artist.get("url-relation-list", []):
+        print(f"  URL relations count: {len(url_rels)}")
+        wiki_urls = [
+            url_rel.get("target") for url_rel in url_rels 
+            if url_rel.get("type") in ("wikipedia", "wikidata")
+        ]
+        print(f"  Wikipedia/Wikidata URLs found: {len(wiki_urls)}")
+        
+        for url_rel in url_rels:
+            url_type = url_rel.get("type")
+            if url_type in ("wikipedia", "wikidata"):
+                if wiki_url := url_rel.get("target"):
+                    print(f"  Fetching from {url_type}: {wiki_url}")
+                    description = await wikidata.get_wikipedia_extract(wiki_url)
+                    if description:
+                        print(f"  ✓ Got description (length: {len(description)})")
+                        break
+                    else:
+                        print("  ✗ No description returned")
+    else:
+        print("  No URL relations found")
+    
+    if not description:
+        print("  Final: No description available")
     
     albums, singles, eps = artist_parser.categorize_release_groups(mb_artist, album_mbids)
     
@@ -42,7 +68,7 @@ async def get_artist(artist_id: str):
         type=mb_artist.get("type"),
         country=mb_artist.get("country"),
         life_span=life_span,
-        annotation=description,
+        description=description,
         tags=tags,
         aliases=aliases,
         external_links=external_links,

@@ -37,7 +37,6 @@ async def cover_from_release_group(
 ):
 	desired_size = _normalize_size(size)
 	
-	# Fetch cover from Cover Art Archive (no rate limiting!)
 	result = await coverart.get_release_group_cover(release_group_id, desired_size)
 	
 	if result:
@@ -46,7 +45,7 @@ async def cover_from_release_group(
 			content=image_data,
 			media_type=content_type,
 			headers={
-				"Cache-Control": "public, max-age=86400",
+				"Cache-Control": "public, max-age=2592000, immutable",
 				"X-Cover-Source": "cover-art-archive",
 			}
 		)
@@ -68,7 +67,7 @@ async def artist_image(
 		content=image_data,
 		media_type=content_type,
 		headers={
-			"Cache-Control": "public, max-age=86400",
+			"Cache-Control": "public, max-age=2592000, immutable",
 			"X-Image-Source": "wikidata",
 			"X-Wikidata-ID": wikidata_id,
 		}

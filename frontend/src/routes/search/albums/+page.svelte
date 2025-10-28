@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onDestroy } from 'svelte';
 	import { browser } from '$app/environment';
 	import { goto } from '$app/navigation';
 	import AlbumCard from '$lib/components/AlbumCard.svelte';
@@ -15,6 +15,8 @@
 	const limit = 24;
 	let sentinel: HTMLElement;
 	let showToast = false;
+	let abortController: AbortController | null = null;
+	let observer: IntersectionObserver | null = null;
 
 	function navigateBack() {
 		if (data.query) {
@@ -39,9 +41,16 @@
 		if (loading || !hasMore || !data.query) return;
 
 		loading = true;
+		
+		if (abortController) {
+			abortController.abort();
+		}
+		abortController = new AbortController();
+
 		try {
 			const res = await fetch(
-				`/api/search/albums?q=${encodeURIComponent(data.query)}&limit=${limit}&offset=${offset}`
+				`/api/search/albums?q=${encodeURIComponent(data.query)}&limit=${limit}&offset=${offset}`,
+				{ signal: abortController.signal }
 			);
 
 			if (res.ok) {
@@ -56,6 +65,9 @@
 				hasMore = false;
 			}
 		} catch (error) {
+			if (error instanceof Error && error.name === 'AbortError') {
+				return;
+			}
 			console.error('Failed to load albums:', error);
 			hasMore = false;
 		} finally {
@@ -64,6 +76,16 @@
 	}
 
 	function resetAndLoad() {
+		if (abortController) {
+			abortController.abort();
+			abortController = null;
+		}
+		
+		if (observer) {
+			observer.disconnect();
+			observer = null;
+		}
+		
 		albums = [];
 		offset = 0;
 		hasMore = true;
@@ -74,15 +96,7 @@
 		resetAndLoad();
 	}
 
-	let observer: IntersectionObserver | null = null;
-
-	$: if (browser && sentinel) {
-		// Clean up previous observer
-		if (observer) {
-			observer.disconnect();
-		}
-
-		// Create new observer
+	$: if (browser && sentinel && !observer) {
 		observer = new IntersectionObserver(
 			(entries) => {
 				if (entries[0].isIntersecting && hasMore && !loading) {
@@ -95,12 +109,15 @@
 		observer.observe(sentinel);
 	}
 
-	onMount(() => {
-		return () => {
-			if (observer) {
-				observer.disconnect();
-			}
-		};
+	onDestroy(() => {
+		if (observer) {
+			observer.disconnect();
+			observer = null;
+		}
+		if (abortController) {
+			abortController.abort();
+			abortController = null;
+		}
 	});
 </script>
 

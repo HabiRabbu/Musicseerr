@@ -13,7 +13,10 @@ async def get_wikipedia_extract(wikipedia_url: str, lang: str = "en") -> Optiona
     
     cached = await _cache.get(cache_key)
     if cached is not None:
+        print(f"    [CACHE HIT] {wikipedia_url}: {'success' if cached else 'None (previous failure)'}")
         return cached
+    
+    print("    [CACHE MISS] Fetching from Wikipedia API")
     
     try:
         wikidata_match = re.search(r'wikidata\.org/wiki/(Q\d+)', wikipedia_url)

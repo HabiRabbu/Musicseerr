@@ -19,18 +19,15 @@ _cache = get_cache()
 COVER_ART_ARCHIVE_BASE = "https://coverartarchive.org"
 CACHE_DIR = "/app/cache/covers"
 
-# Ensure cache directory exists
 os.makedirs(CACHE_DIR, exist_ok=True)
 
 
 async def get_artist_image(artist_id: str) -> Optional[tuple[bytes, str, str]]:
-    # Prepare cache file paths
     fname = f"artist_{artist_id}.bin"
     fpath = os.path.join(CACHE_DIR, fname)
     meta_path = fpath + ".meta"
     wikidata_meta_path = fpath + ".wikidata_id"
     
-    # 1) Try disk cache first
     try:
         async with aiofiles.open(fpath, "rb") as f:
             data = await f.read()
@@ -41,11 +38,10 @@ async def get_artist_image(artist_id: str) -> Optional[tuple[bytes, str, str]]:
         log.debug(f"Disk cache hit for artist {artist_id}")
         return (data, content_type, wikidata_id)
     except FileNotFoundError:
-        pass  # Cache miss, continue to fetch
+        pass
     except Exception as exc:
         log.warning(f"Error reading disk cache for artist {artist_id}: {exc}")
     
-    # 2) Fetch from Wikidata
     cache_key = f"artist_wikidata:{artist_id}"
     cached_info = await _cache.get(cache_key)
     
@@ -96,7 +92,6 @@ async def get_artist_image(artist_id: str) -> Optional[tuple[bytes, str, str]]:
             content_type = response.headers.get("content-type", "image/jpeg")
             content = response.content
             
-            # Save to disk cache
             try:
                 async with aiofiles.open(fpath, "wb") as f:
                     await f.write(content)
@@ -119,12 +114,10 @@ async def get_release_group_cover(
     release_group_id: str,
     size: Optional[str] = "500"
 ) -> Optional[tuple[bytes, str]]:
-    # Prepare cache file paths
     fname = f"rg_{release_group_id}_{size or 'orig'}.bin"
     fpath = os.path.join(CACHE_DIR, fname)
     meta_path = fpath + ".meta"
     
-    # 1) Try disk cache first
     try:
         async with aiofiles.open(fpath, "rb") as f:
             data = await f.read()
@@ -133,11 +126,10 @@ async def get_release_group_cover(
         log.debug(f"Disk cache hit for release group {release_group_id}")
         return (data, content_type)
     except FileNotFoundError:
-        pass  # Cache miss, continue to fetch
+        pass
     except Exception as exc:
         log.warning(f"Error reading disk cache for {release_group_id}: {exc}")
     
-    # 2) Fetch from Cover Art Archive
     if size:
         front_url = f"{COVER_ART_ARCHIVE_BASE}/release-group/{release_group_id}/front-{size}"
     else:
@@ -163,7 +155,6 @@ async def get_release_group_cover(
     except Exception as exc:
         log.debug(f"Failed to fetch release group cover via CAA: {exc}")
     
-    # 3) Fallback to best release
     return await _get_cover_from_best_release(release_group_id, size)
 
 
@@ -173,7 +164,6 @@ async def _get_cover_from_best_release(
 ) -> Optional[tuple[bytes, str]]:
     metadata_url = f"{COVER_ART_ARCHIVE_BASE}/release-group/{release_group_id}"
     
-    # Prepare cache file paths (same as main function)
     fname = f"rg_{release_group_id}_{size or 'orig'}.bin"
     fpath = os.path.join(CACHE_DIR, fname)
     meta_path = fpath + ".meta"
@@ -196,7 +186,6 @@ async def _get_cover_from_best_release(
                     content_type = response2.headers.get("content-type", "image/jpeg")
                     content = response2.content
                     
-                    # Save to disk cache
                     try:
                         async with aiofiles.open(fpath, "wb") as f:
                             await f.write(content)

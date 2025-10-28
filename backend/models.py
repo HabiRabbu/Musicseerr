@@ -79,7 +79,7 @@ class ArtistInfo(BaseModel):
     type: Optional[str] = None
     country: Optional[str] = None
     life_span: Optional[Dict[str, Optional[str]]] = None
-    annotation: Optional[str] = None
+    description: Optional[str] = None
     tags: list[str] = Field(default_factory=list)
     aliases: list[str] = Field(default_factory=list)
     external_links: list[ExternalLink] = Field(default_factory=list)

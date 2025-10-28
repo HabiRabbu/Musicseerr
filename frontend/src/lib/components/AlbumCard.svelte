@@ -25,14 +25,19 @@
 
   async function handleRequest() {
     requesting = true;
-    await fetch('/api/request', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ musicbrainz_id: album.musicbrainz_id })
-    });
-    requesting = false;
-    inLibrary = true;
-    onadded?.();
+    try {
+      await fetch('/api/request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ musicbrainz_id: album.musicbrainz_id })
+      });
+      inLibrary = true;
+      onadded?.();
+    } catch (error) {
+      console.error('Failed to request album:', error);
+    } finally {
+      requesting = false;
+    }
   }
 
   $: displayYear = album.year ?? 'Unknown';

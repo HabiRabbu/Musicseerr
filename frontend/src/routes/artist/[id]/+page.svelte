@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, onDestroy } from 'svelte';
 	import type { ArtistInfo } from '$lib/types';
 	import { colors } from '$lib/colors';
 	import { errorModal } from '$lib/stores/errorModal';
@@ -12,16 +12,45 @@
 	let showToast = false;
 	let linksCarousel: HTMLDivElement;
 	let requestingAlbums = new Set<string>();
+	let descriptionExpanded = false;
+	let abortController: AbortController | null = null;
+	let descriptionElement: HTMLElement;
+	let showViewMore = false;
+	let loadedImages = new Set<string>();
+
+	function checkDescriptionHeight() {
+		if (descriptionElement && !descriptionExpanded) {
+			const lineHeight = parseFloat(getComputedStyle(descriptionElement).lineHeight);
+			const actualHeight = descriptionElement.scrollHeight;
+			const elevenLines = lineHeight * 11;
+			showViewMore = actualHeight > elevenLines;
+		}
+	}
+	
+	function handleImageLoad(id: string) {
+		loadedImages.add(id);
+		loadedImages = loadedImages;
+	}
+	
+	$: validLinks = artist?.external_links.filter(link => link.url && link.url.trim() !== '') || [];
 
 	onMount(async () => {
+		abortController = new AbortController();
+		
 		try {
-			const res = await fetch(`/api/artist/${data.artistId}`);
+			const res = await fetch(`/api/artist/${data.artistId}`, {
+				signal: abortController.signal
+			});
 			if (res.ok) {
 				artist = await res.json();
+				setTimeout(() => checkDescriptionHeight(), 50);
 			} else {
 				error = 'Failed to load artist';
 			}
 		} catch (e) {
+			if (e instanceof Error && e.name === 'AbortError') {
+				return;
+			}
 			error = 'Error loading artist';
 			console.error(e);
 		} finally {
@@ -29,9 +58,16 @@
 		}
 	});
 
+	onDestroy(() => {
+		if (abortController) {
+			abortController.abort();
+			abortController = null;
+		}
+	});
+
 	async function handleRequest(albumId: string, albumTitle?: string) {
 		requestingAlbums.add(albumId);
-		requestingAlbums = requestingAlbums; // Trigger reactivity
+		requestingAlbums = requestingAlbums;
 		
 		try {
 			const res = await fetch('/api/request', {
@@ -41,13 +77,12 @@
 			});
 			
 			if (res.ok) {
-				// Update in_library status
 				if (artist) {
 					const allReleases = [...artist.albums, ...artist.singles, ...artist.eps];
 					const release = allReleases.find(rg => rg.id === albumId);
 					if (release) {
 						release.in_library = true;
-						artist = artist; // Trigger reactivity
+						artist = artist;
 					}
 				}
 				
@@ -59,7 +94,6 @@
 				const errorData = await res.json();
 				const errorDetail = errorData.detail || 'Unknown error';
 				
-				// Check if it's a metadata profile error
 				if (errorDetail.includes('Metadata Profile') || errorDetail.includes('Cannot add this')) {
 					const albumTypeMatch = errorDetail.match(/Cannot add this (\w+)/);
 					const albumType = albumTypeMatch ? albumTypeMatch[1] : 'release';
@@ -108,9 +142,73 @@
 </style>
 
 <div class="px-4 sm:px-8 py-8 max-w-7xl mx-auto">
-	{#if loading}
+	{#if error}
 		<div class="flex items-center justify-center min-h-[50vh]">
-			<span class="loading loading-spinner loading-lg text-primary"></span>
+			<div class="alert alert-error">
+				<span>{error}</span>
+			</div>
+		</div>
+	{:else if !artist && loading}
+		<!-- Skeleton Loading State -->
+		<div class="space-y-8">
+			<!-- Artist Hero Skeleton -->
+			<div class="card card-side bg-base-200 shadow-xl overflow-hidden min-h-[32rem]">
+				<div class="w-96 h-96 sm:w-[28rem] sm:h-[28rem] flex-shrink-0 p-6">
+					<div class="skeleton w-full h-full rounded-box"></div>
+				</div>
+				<div class="card-body flex-1 p-8">
+					<div class="flex items-start justify-between gap-4">
+						<div class="flex-1 space-y-3">
+							<div class="skeleton h-12 w-3/4"></div>
+							<div class="skeleton h-4 w-1/4"></div>
+						</div>
+						<div class="skeleton h-8 w-32"></div>
+					</div>
+					
+					<div class="mt-6 space-y-2">
+						<div class="skeleton h-4 w-20"></div>
+						<div class="skeleton h-4 w-full"></div>
+						<div class="skeleton h-4 w-full"></div>
+						<div class="skeleton h-4 w-3/4"></div>
+					</div>
+					
+					<div class="flex flex-wrap gap-2 mt-auto">
+						<div class="skeleton h-6 w-16"></div>
+						<div class="skeleton h-6 w-20"></div>
+						<div class="skeleton h-6 w-24"></div>
+						<div class="skeleton h-6 w-16"></div>
+					</div>
+				</div>
+			</div>
+
+			<!-- Links Skeleton -->
+			<div class="px-4 sm:px-8">
+				<div class="skeleton h-8 w-24 mb-4"></div>
+				<div class="bg-base-200 rounded-box p-4 shadow-md">
+					<div class="flex gap-4">
+						{#each Array(5) as _}
+							<div class="skeleton w-40 h-24 flex-shrink-0 rounded-box"></div>
+						{/each}
+					</div>
+				</div>
+			</div>
+
+			<!-- Albums Skeleton -->
+			<div class="px-4 sm:px-8">
+				<div class="skeleton h-8 w-32 mb-4"></div>
+				<div class="bg-base-200 rounded-box shadow-md p-4 space-y-4">
+					{#each Array(5) as _}
+						<div class="flex items-center gap-4">
+							<div class="skeleton w-16 h-16 rounded-box flex-shrink-0"></div>
+							<div class="flex-1 space-y-2">
+								<div class="skeleton h-5 w-48"></div>
+								<div class="skeleton h-4 w-20"></div>
+							</div>
+							<div class="skeleton w-12 h-12 rounded-full"></div>
+						</div>
+					{/each}
+				</div>
+			</div>
 		</div>
 	{:else if error}
 		<div class="flex items-center justify-center min-h-[50vh]">
@@ -153,10 +251,41 @@
 						{/if}
 					</div>
 					
-					{#if artist.annotation}
-						<p class="text-base-content/80 leading-relaxed mb-6">
-							{@html artist.annotation.replace(/\n/g, '<br>')}
-						</p>
+					{#if artist.description}
+						<div class="mb-6">
+							<h3 class="text-sm font-semibold text-base-content/60 uppercase tracking-wide mb-2">Description</h3>
+							<div class="text-base-content/80 leading-relaxed">
+								{#if descriptionExpanded}
+									<div>
+										{@html artist.description.replace(/\n\n/g, '<br><br>').replace(/\n/g, '<br>')}
+									</div>
+									<button 
+										class="btn btn-ghost btn-sm mt-2"
+										on:click={() => descriptionExpanded = false}
+									>
+										Show less
+									</button>
+								{:else}
+									<div 
+										bind:this={descriptionElement}
+										class="line-clamp-[11] overflow-hidden"
+										style="display: -webkit-box; -webkit-box-orient: vertical;"
+									>
+										{@html artist.description.replace(/\n\n/g, '<br><br>').replace(/\n/g, '<br>')}
+									</div>
+									{#if showViewMore}
+										<button 
+											class="btn btn-ghost btn-sm mt-2"
+											on:click={() => {
+												descriptionExpanded = true;
+											}}
+										>
+											View more
+										</button>
+									{/if}
+								{/if}
+							</div>
+						</div>
 					{:else}
 						<p class="text-base-content/60 italic mb-6">No description available</p>
 					{/if}
@@ -182,7 +311,7 @@
 			</div>
 
 			<!-- External Links Section -->
-			{#if artist.external_links && artist.external_links.length > 0}
+			{#if validLinks.length > 0}
 				<div class="px-4 sm:px-8">
 					<h2 class="text-2xl font-bold mb-4">Links</h2>
 					<div class="relative">
@@ -201,7 +330,7 @@
 							bind:this={linksCarousel}
 						>
 							<div class="flex gap-4 p-4 bg-base-200 rounded-box shadow-md w-max">
-								{#each artist.external_links as link}
+								{#each validLinks as link}
 									<a 
 										href={link.url} 
 										target="_blank" 
@@ -268,17 +397,26 @@
 					<ul class="list bg-base-200 rounded-box shadow-md">
 						{#each artist.albums as rg}
 							<li class="list-row group hover:bg-base-300 transition-colors">
-								<div class="w-16 h-16 flex-shrink-0 rounded-box overflow-hidden bg-base-100">
+								<div class="w-16 h-16 flex-shrink-0 rounded-box overflow-hidden bg-base-100 relative">
+									{#if !loadedImages.has(rg.id)}
+										<div class="skeleton w-full h-full absolute inset-0"></div>
+									{/if}
 									<img 
 										src="/api/covers/release-group/{rg.id}?size=250" 
 										alt="{rg.title} cover"
 										class="w-full h-full object-cover"
+										loading="lazy"
+										decoding="async"
+										on:load={() => handleImageLoad(rg.id)}
 										on:error={(e) => {
+											handleImageLoad(rg.id);
 											const target = e.currentTarget as HTMLImageElement;
 											target.style.display = 'none';
 											const parent = target.parentElement;
 											if (parent) {
-												parent.innerHTML = '<div class="w-full h-full flex items-center justify-center text-2xl">💿</div>';
+												const skeleton = parent.querySelector('.skeleton');
+												if (skeleton) skeleton.remove();
+												parent.innerHTML += '<div class="w-full h-full flex items-center justify-center text-2xl">💿</div>';
 											}
 										}}
 									/>
@@ -326,17 +464,26 @@
 					<ul class="list bg-base-200 rounded-box shadow-md">
 						{#each artist.eps as rg}
 							<li class="list-row group hover:bg-base-300 transition-colors">
-								<div class="w-16 h-16 flex-shrink-0 rounded-box overflow-hidden bg-base-100">
+								<div class="w-16 h-16 flex-shrink-0 rounded-box overflow-hidden bg-base-100 relative">
+									{#if !loadedImages.has(rg.id)}
+										<div class="skeleton w-full h-full absolute inset-0"></div>
+									{/if}
 									<img 
 										src="/api/covers/release-group/{rg.id}?size=250" 
 										alt="{rg.title} cover"
 										class="w-full h-full object-cover"
+										loading="lazy"
+										decoding="async"
+										on:load={() => handleImageLoad(rg.id)}
 										on:error={(e) => {
+											handleImageLoad(rg.id);
 											const target = e.currentTarget as HTMLImageElement;
 											target.style.display = 'none';
 											const parent = target.parentElement;
 											if (parent) {
-												parent.innerHTML = '<div class="w-full h-full flex items-center justify-center text-2xl">💽</div>';
+												const skeleton = parent.querySelector('.skeleton');
+												if (skeleton) skeleton.remove();
+												parent.innerHTML += '<div class="w-full h-full flex items-center justify-center text-2xl">💽</div>';
 											}
 										}}
 									/>
@@ -384,17 +531,26 @@
 					<ul class="list bg-base-200 rounded-box shadow-md">
 						{#each artist.singles as rg}
 							<li class="list-row group hover:bg-base-300 transition-colors">
-								<div class="w-16 h-16 flex-shrink-0 rounded-box overflow-hidden bg-base-100">
+								<div class="w-16 h-16 flex-shrink-0 rounded-box overflow-hidden bg-base-100 relative">
+									{#if !loadedImages.has(rg.id)}
+										<div class="skeleton w-full h-full absolute inset-0"></div>
+									{/if}
 									<img 
 										src="/api/covers/release-group/{rg.id}?size=250" 
 										alt="{rg.title} cover"
 										class="w-full h-full object-cover"
+										loading="lazy"
+										decoding="async"
+										on:load={() => handleImageLoad(rg.id)}
 										on:error={(e) => {
+											handleImageLoad(rg.id);
 											const target = e.currentTarget as HTMLImageElement;
 											target.style.display = 'none';
 											const parent = target.parentElement;
 											if (parent) {
-												parent.innerHTML = '<div class="w-full h-full flex items-center justify-center text-2xl">🎵</div>';
+												const skeleton = parent.querySelector('.skeleton');
+												if (skeleton) skeleton.remove();
+												parent.innerHTML += '<div class="w-full h-full flex items-center justify-center text-2xl">🎵</div>';
 											}
 										}}
 									/>

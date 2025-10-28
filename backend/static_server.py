@@ -38,7 +38,6 @@ def mount_frontend(app: FastAPI):
     if (build_dir / "_app").exists():
         app.mount("/_app", StaticFiles(directory=build_dir / "_app"), name="_app")
 
-    # Mount img directory for static images
     img_dir = build_dir / "img"
     if img_dir.exists():
         app.mount("/img", StaticFiles(directory=img_dir), name="img")
