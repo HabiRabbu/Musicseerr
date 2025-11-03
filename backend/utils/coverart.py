@@ -1,6 +1,7 @@
+"""Cover Art Archive and artist image fetching."""
 import asyncio
 import logging
-import os
+from pathlib import Path
 from typing import Optional
 
 import aiofiles
@@ -10,42 +11,88 @@ from http_client import client
 from utils.cache import get_cache
 from utils import wikidata
 
-log = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
+
 _cache = get_cache()
-
 COVER_ART_ARCHIVE_BASE = "https://coverartarchive.org"
-CACHE_DIR = "/app/cache/covers"
+CACHE_DIR = Path("/app/cache/covers")
 
-os.makedirs(CACHE_DIR, exist_ok=True)
+# Ensure cache directory exists
+CACHE_DIR.mkdir(parents=True, exist_ok=True)
+
+
+async def _write_cache(
+    file_path: Path,
+    content: bytes,
+    content_type: str,
+    extra_meta: Optional[dict[str, str]] = None,
+) -> None:
+    """Write content to disk cache with metadata."""
+    try:
+        async with aiofiles.open(file_path, "wb") as f:
+            await f.write(content)
+        
+        async with aiofiles.open(f"{file_path}.meta", "w") as m:
+            await m.write(content_type)
+        
+        if extra_meta:
+            for key, value in extra_meta.items():
+                async with aiofiles.open(f"{file_path}.{key}", "w") as meta_file:
+                    await meta_file.write(value)
+    
+    except Exception as e:
+        logger.warning(f"Failed to write cache: {e}")
+
+
+async def _read_cache(
+    file_path: Path,
+    extra_keys: Optional[list[str]] = None,
+) -> Optional[tuple]:
+    """Read content from disk cache."""
+    try:
+        async with aiofiles.open(file_path, "rb") as f:
+            content = await f.read()
+        
+        async with aiofiles.open(f"{file_path}.meta", "r") as m:
+            content_type = (await m.read()).strip()
+        
+        result = [content, content_type]
+        
+        if extra_keys:
+            for key in extra_keys:
+                async with aiofiles.open(f"{file_path}.{key}", "r") as meta_file:
+                    result.append((await meta_file.read()).strip())
+        
+        return tuple(result)
+    
+    except FileNotFoundError:
+        return None
+    except Exception as e:
+        logger.warning(f"Cache read error: {e}")
+        return None
 
 
 async def get_artist_image(artist_id: str) -> Optional[tuple[bytes, str, str]]:
-    fname = f"artist_{artist_id}.bin"
-    fpath = os.path.join(CACHE_DIR, fname)
-    meta_path = fpath + ".meta"
-    wikidata_meta_path = fpath + ".wikidata_id"
+    """Get artist image from Wikidata.
     
-    try:
-        async with aiofiles.open(fpath, "rb") as f:
-            data = await f.read()
-        async with aiofiles.open(meta_path, "r") as m:
-            content_type = (await m.read()).strip()
-        async with aiofiles.open(wikidata_meta_path, "r") as w:
-            wikidata_id = (await w.read()).strip()
-        return (data, content_type, wikidata_id)
-    except FileNotFoundError:
-        pass
-    except Exception as exc:
-        log.warning(f"Disk cache read error for artist {artist_id}: {exc}")
+    Args:
+        artist_id: MusicBrainz artist ID
     
+    Returns:
+        Tuple of (image_data, content_type, wikidata_id) or None
+    """
+    file_path = CACHE_DIR / f"artist_{artist_id}.bin"
+    
+    # Try disk cache first
+    if cached := await _read_cache(file_path, ["wikidata_id"]):
+        return cached
+    
+    # Check memory cache for Wikidata URL
     cache_key = f"artist_wikidata:{artist_id}"
-    cached_info = await _cache.get(cache_key)
+    wikidata_url = await _cache.get(cache_key)
     
-    wikidata_url = None
-    
-    if cached_info:
-        wikidata_url = cached_info
-    else:
+    # Fetch Wikidata URL from MusicBrainz if not cached
+    if wikidata_url is None:
         try:
             artist_data = await asyncio.to_thread(
                 musicbrainzngs.get_artist_by_id,
@@ -53,27 +100,25 @@ async def get_artist_image(artist_id: str) -> Optional[tuple[bytes, str, str]]:
                 includes=["url-rels"]
             )
             
-            if "artist" in artist_data:
-                artist = artist_data["artist"]
+            if artist := artist_data.get("artist"):
                 url_relations = artist.get("url-relation-list", [])
-                
                 for url_rel in url_relations:
                     if url_rel.get("type") == "wikidata":
                         wikidata_url = url_rel.get("target")
-                        if wikidata_url:
-                            break
+                        break
             
-            await _cache.set(cache_key, wikidata_url, ttl_seconds=86400)
-            
-        except musicbrainzngs.ResponseError:
-            await _cache.set(cache_key, None, ttl_seconds=3600)
-            return None
-        except musicbrainzngs.NetworkError:
+            # Cache the result (even if None)
+            ttl = 86400 if wikidata_url else 3600
+            await _cache.set(cache_key, wikidata_url, ttl_seconds=ttl)
+        
+        except Exception as e:
+            logger.error(f"Failed to fetch artist metadata for {artist_id}: {e}")
             return None
     
     if not wikidata_url:
         return None
     
+    # Get Wikidata ID and fetch image
     try:
         wikidata_id = await wikidata.get_wikidata_id_from_url(wikidata_url)
         if not wikidata_id:
@@ -83,116 +128,102 @@ async def get_artist_image(artist_id: str) -> Optional[tuple[bytes, str, str]]:
         if not image_url:
             return None
         
+        # Fetch image
         response = await client.get(image_url)
         if response.status_code == 200:
             content_type = response.headers.get("content-type", "image/jpeg")
             content = response.content
             
-            asyncio.create_task(_write_artist_cache(fpath, meta_path, wikidata_meta_path, content, content_type, wikidata_id))
+            # Write to cache asynchronously
+            asyncio.create_task(_write_cache(
+                file_path,
+                content,
+                content_type,
+                {"wikidata_id": wikidata_id}
+            ))
             
             return (content, content_type, wikidata_id)
-    except Exception as exc:
-        log.error(f"Error fetching artist image for {artist_id}: {exc}")
+    
+    except Exception as e:
+        logger.error(f"Error fetching artist image for {artist_id}: {e}")
     
     return None
-
-
-async def _write_artist_cache(fpath: str, meta_path: str, wikidata_meta_path: str, content: bytes, content_type: str, wikidata_id: str):
-    """Write artist image to disk cache without blocking"""
-    try:
-        async with aiofiles.open(fpath, "wb") as f:
-            await f.write(content)
-        async with aiofiles.open(meta_path, "w") as m:
-            await m.write(content_type)
-        async with aiofiles.open(wikidata_meta_path, "w") as w:
-            await w.write(wikidata_id)
-    except Exception as exc:
-        log.warning(f"Failed to write artist cache: {exc}")
 
 
 async def get_release_group_cover(
     release_group_id: str,
     size: Optional[str] = "500"
 ) -> Optional[tuple[bytes, str]]:
-    fname = f"rg_{release_group_id}_{size or 'orig'}.bin"
-    fpath = os.path.join(CACHE_DIR, fname)
-    meta_path = fpath + ".meta"
+    """Get cover art for a release group.
     
-    try:
-        async with aiofiles.open(fpath, "rb") as f:
-            data = await f.read()
-        async with aiofiles.open(meta_path, "r") as m:
-            content_type = (await m.read()).strip()
-        return (data, content_type)
-    except FileNotFoundError:
-        pass
-    except Exception as exc:
-        log.warning(f"Disk cache read error for RG {release_group_id}: {exc}")
+    Args:
+        release_group_id: MusicBrainz release group ID
+        size: Image size ("250", "500", "1200", or None for original)
     
-    if size:
-        front_url = f"{COVER_ART_ARCHIVE_BASE}/release-group/{release_group_id}/front-{size}"
-    else:
-        front_url = f"{COVER_ART_ARCHIVE_BASE}/release-group/{release_group_id}/front"
+    Returns:
+        Tuple of (image_data, content_type) or None
+    """
+    file_path = CACHE_DIR / f"rg_{release_group_id}_{size or 'orig'}.bin"
     
+    # Try disk cache first
+    if cached := await _read_cache(file_path):
+        return cached
+    
+    # Build Cover Art Archive URL
+    size_suffix = f"-{size}" if size else ""
+    front_url = f"{COVER_ART_ARCHIVE_BASE}/release-group/{release_group_id}/front{size_suffix}"
+    
+    # Try fetching from release group
     try:
         response = await client.get(front_url)
         if response.status_code == 200:
             content_type = response.headers.get("content-type", "image/jpeg")
             content = response.content
             
-            asyncio.create_task(_write_cover_cache(fpath, meta_path, content, content_type))
-            
+            asyncio.create_task(_write_cache(file_path, content, content_type))
             return (content, content_type)
-    except Exception as exc:
-        log.debug(f"Failed to fetch RG cover via CAA: {exc}")
     
-    return await _get_cover_from_best_release(release_group_id, size)
-
-
-async def _write_cover_cache(fpath: str, meta_path: str, content: bytes, content_type: str):
-    try:
-        async with aiofiles.open(fpath, "wb") as f:
-            await f.write(content)
-        async with aiofiles.open(meta_path, "w") as m:
-            await m.write(content_type)
-    except Exception as exc:
-        log.warning(f"Failed to write cover cache: {exc}")
+    except Exception as e:
+        logger.debug(f"Failed to fetch cover via release group: {e}")
+    
+    # Fallback: try fetching from best release
+    return await _get_cover_from_best_release(release_group_id, size, file_path)
 
 
 async def _get_cover_from_best_release(
     release_group_id: str,
-    size: Optional[str]
+    size: Optional[str],
+    cache_path: Path,
 ) -> Optional[tuple[bytes, str]]:
-    metadata_url = f"{COVER_ART_ARCHIVE_BASE}/release-group/{release_group_id}"
-    
-    fname = f"rg_{release_group_id}_{size or 'orig'}.bin"
-    fpath = os.path.join(CACHE_DIR, fname)
-    meta_path = fpath + ".meta"
-    
+    """Fallback: get cover art from best release in group."""
     try:
+        # Get release ID from release group metadata
+        metadata_url = f"{COVER_ART_ARCHIVE_BASE}/release-group/{release_group_id}"
         response = await client.get(metadata_url, headers={"Accept": "application/json"})
+        
+        if response.status_code != 200:
+            return None
+        
+        data = response.json()
+        release_url = data.get("release", "")
+        if not release_url:
+            return None
+        
+        release_id = release_url.split("/")[-1]
+        
+        # Fetch cover from specific release
+        size_suffix = f"-{size}" if size else ""
+        release_front_url = f"{COVER_ART_ARCHIVE_BASE}/release/{release_id}/front{size_suffix}"
+        
+        response = await client.get(release_front_url)
         if response.status_code == 200:
-            data = response.json()
-            release_url = data.get("release", "")
-            if release_url:
-                release_id = release_url.split("/")[-1]
-                
-                if size:
-                    release_front_url = f"{COVER_ART_ARCHIVE_BASE}/release/{release_id}/front-{size}"
-                else:
-                    release_front_url = f"{COVER_ART_ARCHIVE_BASE}/release/{release_id}/front"
-                
-                response2 = await client.get(release_front_url)
-                if response2.status_code == 200:
-                    content_type = response2.headers.get("content-type", "image/jpeg")
-                    content = response2.content
-                    
-                    asyncio.create_task(_write_cover_cache(fpath, meta_path, content, content_type))
-                    
-                    return (content, content_type)
-    except Exception as exc:
-        log.warning(f"Failed to fetch cover art metadata for {release_group_id}: {exc}")
+            content_type = response.headers.get("content-type", "image/jpeg")
+            content = response.content
+            
+            asyncio.create_task(_write_cache(cache_path, content, content_type))
+            return (content, content_type)
     
-    return None
+    except Exception as e:
+        logger.warning(f"Failed to fetch cover from best release: {e}")
     
     return None

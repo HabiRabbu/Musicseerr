@@ -1,9 +1,11 @@
+"""Data models for Musicseerr API."""
 from datetime import datetime
-from typing import Literal, Optional, Dict
+from typing import Literal, Optional
 from pydantic import BaseModel, Field
 
 
 class SearchResult(BaseModel):
+    """A search result for an artist or album."""
     type: Literal["artist", "album"]
     title: str
     artist: Optional[str] = None
@@ -14,76 +16,70 @@ class SearchResult(BaseModel):
 
 
 class AlbumRequest(BaseModel):
+    """Request to add an album to library."""
     musicbrainz_id: str
-    artist: Optional[str] = Field(None, description="Optional")
-    album: Optional[str] = Field(None, description="Optional")
+    artist: Optional[str] = Field(None, description="Artist name (optional)")
+    album: Optional[str] = Field(None, description="Album title (optional)")
     year: Optional[int] = None
 
 
 class LibraryAlbum(BaseModel):
+    """An album in the Lidarr library."""
     artist: str
     album: str
     year: Optional[int] = None
     monitored: bool
     quality: Optional[str] = None
     cover_url: Optional[str] = None
-
     musicbrainz_id: Optional[str] = Field(None, alias="foreignAlbumId")
 
     class Config:
-        allow_population_by_field_name = True
         populate_by_name = True
-        fields = {"musicbrainz_id": {"alias": "foreignAlbumId"}}
-
-    @property
-    def foreignAlbumId(self) -> Optional[str]:
-        return self.musicbrainz_id
 
 
 class QueueItem(BaseModel):
+    """An item in the download queue."""
     artist: str
     album: str
     status: str
-    progress: Optional[int] = None
+    progress: Optional[int] = Field(None, ge=0, le=100)
     eta: Optional[datetime] = None
     musicbrainz_id: Optional[str] = None
 
 
 class ServiceStatus(BaseModel):
+    """Status of an external service."""
     status: Literal["ok", "error"]
     version: Optional[str] = None
     message: Optional[str] = None
 
 
 class StatusReport(BaseModel):
+    """Overall system status report."""
     status: Literal["ok", "degraded", "error"]
-    services: Dict[str, ServiceStatus]
-
-
-class ConfigInfo(BaseModel):
-    lidarr_url: str
-    quality_profile_id: int
-    root_folder_id: int
+    services: dict[str, ServiceStatus]
 
 
 class ExternalLink(BaseModel):
+    """External link for an artist."""
     type: str
     url: str
     label: str
 
 
 class ArtistInfo(BaseModel):
+    """Detailed artist information."""
     name: str
     musicbrainz_id: str
     disambiguation: Optional[str] = None
     type: Optional[str] = None
     country: Optional[str] = None
-    life_span: Optional[Dict[str, Optional[str]]] = None
+    life_span: Optional[dict[str, Optional[str]]] = None
     description: Optional[str] = None
     tags: list[str] = Field(default_factory=list)
     aliases: list[str] = Field(default_factory=list)
     external_links: list[ExternalLink] = Field(default_factory=list)
     in_library: bool = False
-    albums: list[Dict] = Field(default_factory=list)
-    singles: list[Dict] = Field(default_factory=list)
-    eps: list[Dict] = Field(default_factory=list)
+    albums: list[dict] = Field(default_factory=list)
+    singles: list[dict] = Field(default_factory=list)
+    eps: list[dict] = Field(default_factory=list)

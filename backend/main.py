@@ -1,30 +1,46 @@
+"""Musicseerr main application."""
+import logging
+
 from fastapi import FastAPI
 from fastapi.middleware.gzip import GZipMiddleware
+
 from config_manager import CONFIG
 from static_server import mount_frontend
 from http_client import aclose
 from utils import request_queue
 from utils.cache import start_cache_cleanup_task
 from middleware import PerformanceMiddleware
-
 from routes import search, requests, library, status, queue, covers, artist
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="Musicseerr",
+    description="Music request and management system",
+    version="1.0.0",
     docs_url="/api/docs",
     redoc_url="/api/redoc",
 )
 
+# Add middleware
 app.add_middleware(PerformanceMiddleware)
 app.add_middleware(GZipMiddleware, minimum_size=1000, compresslevel=6)
 
+
 @app.get("/health")
-def read_health():
+def health_check():
+    """Health check endpoint."""
     return {
         "status": "ok",
         "message": "Musicseerr backend running",
         "config_loaded": CONFIG is not None,
     }
+
 
 app.include_router(search.router)
 app.include_router(requests.router)
@@ -39,11 +55,17 @@ mount_frontend(app)
 
 @app.on_event("startup")
 async def startup_event():
+    """Initialize services on startup."""
+    logger.info("Starting Musicseerr...")
     request_queue.start_processor()
     start_cache_cleanup_task()
+    logger.info("Musicseerr started successfully")
 
 
 @app.on_event("shutdown")
 async def shutdown_event():
+    """Cleanup on shutdown."""
+    logger.info("Shutting down Musicseerr...")
     await request_queue.stop_processor()
     await aclose()
+    logger.info("Musicseerr shut down successfully")

@@ -1,6 +1,8 @@
-from typing import Any
+"""Lidarr API integration for managing music library."""
 import asyncio
+import logging
 import time
+from typing import Any, Callable, Optional
 
 import httpx
 
@@ -9,13 +11,15 @@ from models import LibraryAlbum, QueueItem, ServiceStatus
 from utils.common import ApiError, get_auth_headers
 from utils.cache import get_cache
 
+logger = logging.getLogger(__name__)
+
 BASE_URL = CONFIG["lidarr_url"].rstrip("/")
 _cache = get_cache()
+_lidarr_client: Optional[httpx.AsyncClient] = None
 
-_lidarr_client: httpx.AsyncClient | None = None
 
-
-def _get_lidarr_client() -> httpx.AsyncClient:
+def _get_client() -> httpx.AsyncClient:
+    """Get or create the Lidarr HTTP client."""
     global _lidarr_client
     if _lidarr_client is None:
         _lidarr_client = httpx.AsyncClient(
@@ -30,34 +34,54 @@ def _get_lidarr_client() -> httpx.AsyncClient:
     return _lidarr_client
 
 
-async def _get(endpoint: str, params: dict[str, Any] | None = None) -> Any:
+async def _request(
+    method: str,
+    endpoint: str,
+    params: Optional[dict[str, Any]] = None,
+    json_data: Optional[dict[str, Any]] = None,
+) -> Any:
+    """Make HTTP request to Lidarr API."""
     url = f"{BASE_URL}{endpoint}"
-    client = _get_lidarr_client()
-    r = await client.get(url, headers=get_auth_headers(), params=params)
-    if r.status_code != 200:
-        raise ApiError(f"Lidarr GET failed ({r.status_code})", r.text)
-    return r.json()
+    client = _get_client()
+    
+    try:
+        response = await client.request(
+            method,
+            url,
+            headers=get_auth_headers(),
+            params=params,
+            json=json_data,
+        )
+        
+        # Check for successful status codes
+        if method == "GET" and response.status_code != 200:
+            raise ApiError(f"Lidarr {method} failed ({response.status_code})", response.text)
+        elif method in ("POST", "PUT") and response.status_code not in (200, 201, 202):
+            raise ApiError(f"Lidarr {method} failed ({response.status_code})", response.text)
+        
+        # Parse JSON response
+        try:
+            return response.json()
+        except ValueError:
+            return None
+    
+    except httpx.HTTPError as e:
+        raise ApiError(f"Lidarr request failed: {str(e)}")
+
+
+async def _get(endpoint: str, params: Optional[dict[str, Any]] = None) -> Any:
+    """GET request to Lidarr API."""
+    return await _request("GET", endpoint, params=params)
 
 
 async def _post(endpoint: str, data: dict[str, Any]) -> Any:
-    url = f"{BASE_URL}{endpoint}"
-    client = _get_lidarr_client()
-    r = await client.post(url, headers=get_auth_headers(), json=data)
-    if r.status_code not in (200, 201, 202):
-        raise ApiError(f"Lidarr POST failed ({r.status_code})", r.text)
-    return r.json()
+    """POST request to Lidarr API."""
+    return await _request("POST", endpoint, json_data=data)
 
 
 async def _put(endpoint: str, data: dict[str, Any]) -> Any:
-    url = f"{BASE_URL}{endpoint}"
-    client = _get_lidarr_client()
-    r = await client.put(url, headers=get_auth_headers(), json=data)
-    if r.status_code not in (200, 202):
-        raise ApiError(f"Lidarr PUT failed ({r.status_code})", r.text)
-    try:
-        return r.json()
-    except ValueError:
-        return None
+    """PUT request to Lidarr API."""
+    return await _request("PUT", endpoint, json_data=data)
 
 
 async def get_status() -> ServiceStatus:
@@ -224,17 +248,20 @@ async def _lookup_artist_by_mbid(artist_mbid: str) -> dict[str, Any] | None:
 
 
 async def _post_command(body: dict[str, Any]) -> Any:
-    url = f"{BASE_URL}/api/v1/command"
-    client = _get_lidarr_client()
-    r = await client.post(
-        url, 
-        headers=get_auth_headers(), 
-        json=body,
-        timeout=120.0
-    )
-    if r.status_code not in (200, 201, 202):
+    """Post a command to Lidarr."""
+    client = _get_client()
+    try:
+        r = await client.post(
+            f"{BASE_URL}/api/v1/command",
+            headers=get_auth_headers(),
+            json=body,
+            timeout=120.0
+        )
+        if r.status_code not in (200, 201, 202):
+            return None
+        return r.json()
+    except Exception:
         return None
-    return r.json()
 
 
 async def _get_command(cmd_id: int) -> Any:

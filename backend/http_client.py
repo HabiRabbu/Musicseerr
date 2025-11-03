@@ -1,3 +1,4 @@
+"""Shared HTTP client for making external API calls."""
 import httpx
 
 client = httpx.AsyncClient(
@@ -9,12 +10,10 @@ client = httpx.AsyncClient(
         keepalive_expiry=30.0,
     ),
     follow_redirects=True,
-    transport=httpx.AsyncHTTPTransport(
-        http2=True,
-        retries=2,
-    )
+    transport=httpx.AsyncHTTPTransport(http2=True, retries=2),
 )
 
 
-async def aclose():
+async def aclose() -> None:
+    """Close the HTTP client gracefully."""
     await client.aclose()
