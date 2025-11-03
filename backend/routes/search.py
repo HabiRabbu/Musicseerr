@@ -32,11 +32,17 @@ async def search(
     lib_task = asyncio.create_task(lidarr.get_library_mbids(include_release_ids=True))
 
     try:
-        grouped, library_mbids = await asyncio.gather(mb_task, lib_task)
+        grouped, library_mbids = await asyncio.gather(mb_task, lib_task, return_exceptions=True)
+        
+        if isinstance(grouped, Exception):
+            grouped = {"artists": [], "albums": []}
+        if isinstance(library_mbids, Exception):
+            library_mbids = set()
     except Exception:
-        if mb_task.done() and mb_task.exception():
-            raise mb_task.exception()
-        grouped = await mb_task
+        try:
+            grouped = await mb_task
+        except Exception:
+            grouped = {"artists": [], "albums": []}
         library_mbids = set()
 
     lib = library_mbids or set()
@@ -49,7 +55,7 @@ async def search(
             background_tasks.add_task(
                 coverart.get_release_group_cover, 
                 item.musicbrainz_id, 
-                "250"  # Use 250px size for grid
+                "250"
             )
 
     return grouped
@@ -68,11 +74,17 @@ async def search_bucket(
     lib_task = asyncio.create_task(lidarr.get_library_mbids(include_release_ids=True))
 
     try:
-        results, library_mbids = await asyncio.gather(mb_task, lib_task)
+        results, library_mbids = await asyncio.gather(mb_task, lib_task, return_exceptions=True)
+        
+        if isinstance(results, Exception):
+            results = []
+        if isinstance(library_mbids, Exception):
+            library_mbids = set()
     except Exception:
-        if mb_task.done() and mb_task.exception():
-            raise mb_task.exception()
-        results = await mb_task
+        try:
+            results = await mb_task
+        except Exception:
+            results = []
         library_mbids = set()
 
     lib = library_mbids or set()

@@ -36,17 +36,29 @@ def mount_frontend(app: FastAPI):
         return None
 
     if (build_dir / "_app").exists():
-        app.mount("/_app", StaticFiles(directory=build_dir / "_app"), name="_app")
+        app.mount(
+            "/_app", 
+            StaticFiles(directory=build_dir / "_app", html=False), 
+            name="_app"
+        )
 
     img_dir = build_dir / "img"
     if img_dir.exists():
-        app.mount("/img", StaticFiles(directory=img_dir), name="img")
+        app.mount(
+            "/img", 
+            StaticFiles(directory=img_dir, html=False), 
+            name="img"
+        )
 
     @app.get("/robots.txt")
     async def serve_robots():
         robots = resolve_asset("robots.txt")
         if robots:
-            return FileResponse(robots)
+            return FileResponse(
+                robots,
+                media_type="text/plain",
+                headers={"Cache-Control": "public, max-age=86400"}
+            )
         raise HTTPException(status_code=404, detail="Not found")
 
     @app.get("/logo.png")

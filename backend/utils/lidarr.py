@@ -12,35 +12,52 @@ from utils.cache import get_cache
 BASE_URL = CONFIG["lidarr_url"].rstrip("/")
 _cache = get_cache()
 
+_lidarr_client: httpx.AsyncClient | None = None
+
+
+def _get_lidarr_client() -> httpx.AsyncClient:
+    global _lidarr_client
+    if _lidarr_client is None:
+        _lidarr_client = httpx.AsyncClient(
+            timeout=httpx.Timeout(60.0, connect=10.0),
+            limits=httpx.Limits(
+                max_connections=50,
+                max_keepalive_connections=20,
+                keepalive_expiry=30.0,
+            ),
+            http2=True,
+        )
+    return _lidarr_client
+
 
 async def _get(endpoint: str, params: dict[str, Any] | None = None) -> Any:
     url = f"{BASE_URL}{endpoint}"
-    async with httpx.AsyncClient(timeout=60.0) as client:
-        r = await client.get(url, headers=get_auth_headers(), params=params)
-        if r.status_code != 200:
-            raise ApiError(f"Lidarr GET failed ({r.status_code})", r.text)
-        return r.json()
+    client = _get_lidarr_client()
+    r = await client.get(url, headers=get_auth_headers(), params=params)
+    if r.status_code != 200:
+        raise ApiError(f"Lidarr GET failed ({r.status_code})", r.text)
+    return r.json()
 
 
 async def _post(endpoint: str, data: dict[str, Any]) -> Any:
     url = f"{BASE_URL}{endpoint}"
-    async with httpx.AsyncClient(timeout=120.0) as client:
-        r = await client.post(url, headers=get_auth_headers(), json=data)
-        if r.status_code not in (200, 201, 202):
-            raise ApiError(f"Lidarr POST failed ({r.status_code})", r.text)
-        return r.json()
+    client = _get_lidarr_client()
+    r = await client.post(url, headers=get_auth_headers(), json=data)
+    if r.status_code not in (200, 201, 202):
+        raise ApiError(f"Lidarr POST failed ({r.status_code})", r.text)
+    return r.json()
 
 
 async def _put(endpoint: str, data: dict[str, Any]) -> Any:
     url = f"{BASE_URL}{endpoint}"
-    async with httpx.AsyncClient(timeout=60.0) as client:
-        r = await client.put(url, headers=get_auth_headers(), json=data)
-        if r.status_code not in (200, 202):
-            raise ApiError(f"Lidarr PUT failed ({r.status_code})", r.text)
-        try:
-            return r.json()
-        except ValueError:
-            return None
+    client = _get_lidarr_client()
+    r = await client.put(url, headers=get_auth_headers(), json=data)
+    if r.status_code not in (200, 202):
+        raise ApiError(f"Lidarr PUT failed ({r.status_code})", r.text)
+    try:
+        return r.json()
+    except ValueError:
+        return None
 
 
 async def get_status() -> ServiceStatus:
@@ -136,6 +153,26 @@ async def get_library_mbids(include_release_ids: bool = True) -> set[str]:
     return ids
 
 
+async def get_artist_mbids() -> set[str]:
+    cache_key = "artist_mbids"
+    
+    cached_result = await _cache.get(cache_key)
+    if cached_result is not None:
+        return cached_result
+    
+    data = await _get("/api/v1/artist")
+    ids: set[str] = set()
+    for item in data:
+        if not item.get("monitored", False):
+            continue
+        mbid = item.get("foreignArtistId") or item.get("mbId")
+        if isinstance(mbid, str):
+            ids.add(mbid.lower())
+    
+    await _cache.set(cache_key, ids, ttl_seconds=60)
+    return ids
+
+
 async def get_queue() -> list[QueueItem]:
     data = await _get("/api/v1/queue")
     items = data.get("records", []) if isinstance(data, dict) else data
@@ -176,26 +213,6 @@ async def _list_metadata_profiles() -> list[dict[str, Any]]:
     return await _get("/api/v1/metadataprofile")
 
 
-async def get_artist_mbids() -> set[str]:
-    cache_key = "artist_mbids"
-    
-    cached_result = await _cache.get(cache_key)
-    if cached_result is not None:
-        return cached_result
-    
-    data = await _get("/api/v1/artist")
-    ids: set[str] = set()
-    for item in data:
-        if not item.get("monitored", False):
-            continue
-        mbid = item.get("foreignArtistId") or item.get("mbId")
-        if isinstance(mbid, str):
-            ids.add(mbid.lower())
-    
-    await _cache.set(cache_key, ids, ttl_seconds=60)
-    return ids
-
-
 async def _find_artist_by_mbid(artist_mbid: str) -> dict[str, Any] | None:
     items = await _get("/api/v1/artist", params={"mbId": artist_mbid})
     return items[0] if items else None
@@ -208,12 +225,16 @@ async def _lookup_artist_by_mbid(artist_mbid: str) -> dict[str, Any] | None:
 
 async def _post_command(body: dict[str, Any]) -> Any:
     url = f"{BASE_URL}/api/v1/command"
-    async with httpx.AsyncClient(timeout=120.0) as client:
-        r = await client.post(url, headers=get_auth_headers(), json=body)
-        if r.status_code not in (200, 201, 202):
-            print("[WARN] command failed:", r.text[:300])
-            return None
-        return r.json()
+    client = _get_lidarr_client()
+    r = await client.post(
+        url, 
+        headers=get_auth_headers(), 
+        json=body,
+        timeout=120.0
+    )
+    if r.status_code not in (200, 201, 202):
+        return None
+    return r.json()
 
 
 async def _get_command(cmd_id: int) -> Any:
@@ -299,8 +320,10 @@ async def _ensure_artist(artist_mbid: str, artist_name_hint: str | None = None) 
     }
     created = await _post("/api/v1/artist", payload)
 
-    await _await_command({"name": "RefreshArtist", "artistId": created["id"]}, timeout=300.0)
-    await _await_command({"name": "RescanArtist", "artistId": created["id"]}, timeout=120.0)
+    await _await_command({"name": "RefreshArtist", "artistId": created["id"]}, timeout=600.0)
+    await _await_command({"name": "RescanArtist", "artistId": created["id"]}, timeout=300.0)
+    
+    await asyncio.sleep(5.0)
 
     return created
 
@@ -319,6 +342,62 @@ async def _wait_for(
             pass
         await asyncio.sleep(poll)
     return last
+
+
+async def _wait_for_artist_commands_to_complete(artist_id: int, timeout: float = 600.0) -> None:
+    async def no_artist_commands_running():
+        commands = await _get("/api/v1/command")
+        if not commands:
+            return True
+        
+        for cmd in commands:
+            if cmd.get("status") in ["queued", "started"]:
+                body = cmd.get("body", {})
+                if body.get("artistId") == artist_id or body.get("artistIds") == [artist_id]:
+                    return False
+        return True
+    
+    await _wait_for(no_artist_commands_running, timeout=timeout, poll=5.0)
+    await asyncio.sleep(5.0)
+
+
+async def _monitor_artist_and_album(
+    artist_id: int, 
+    album_id: int, 
+    album_mbid: str, 
+    album_title: str,
+    max_attempts: int = 3
+) -> None:
+    for attempt in range(max_attempts):
+        try:
+            await _put(
+                "/api/v1/artist/editor",
+                {"artistIds": [artist_id], "monitored": True, "monitorNewItems": "none"},
+            )
+            
+            await asyncio.sleep(5.0 + (attempt * 3.0))
+            
+            await _put("/api/v1/album/monitor", {"albumIds": [album_id], "monitored": True})
+            
+            async def both_monitored():
+                album = await _get_album_by_foreign_id(album_mbid)
+                artist = await _get_artist_by_id(artist_id)
+                return (album and album.get("monitored")) and (artist and artist.get("monitored"))
+            
+            timeout = 20.0 + (attempt * 10.0)
+            if await _wait_for(both_monitored, timeout=timeout, poll=1.0):
+                return
+                
+            if attempt < max_attempts - 1:
+                await asyncio.sleep(5.0)
+                
+        except Exception as e:
+            if attempt == max_attempts - 1:
+                raise ApiError(
+                    "Failed to set monitoring status",
+                    f"Could not ensure '{album_title}' is monitored after {max_attempts} attempts: {str(e)}"
+                )
+            await asyncio.sleep(5.0)
 
 
 async def add_album(album_mbid: str) -> dict[str, Any]:
@@ -356,7 +435,7 @@ async def add_album(album_mbid: str) -> dict[str, Any]:
             a = await _get_album_by_foreign_id(album_mbid)
             return a and a.get("id") and a.get("releases")
         
-        album_obj = await _wait_for(album_is_indexed, timeout=30.0, poll=2.0)
+        album_obj = await _wait_for(album_is_indexed, timeout=60.0, poll=3.0)
         
         if not album_obj:
             profile_id = artist.get("qualityProfileId")
@@ -381,7 +460,7 @@ async def add_album(album_mbid: str) -> dict[str, Any]:
             try:
                 album_obj = await _post("/api/v1/album", payload)
                 action = "added"
-                album_obj = await _wait_for(album_is_indexed, timeout=30.0, poll=1.0)
+                album_obj = await _wait_for(album_is_indexed, timeout=120.0, poll=2.0)
             except ApiError as e:
                 if "POST failed" in str(e.message):
                     raise ApiError(
@@ -404,47 +483,10 @@ async def add_album(album_mbid: str) -> dict[str, Any]:
         )
 
     album_id = album_obj["id"]
+    
+    await _wait_for_artist_commands_to_complete(artist_id, timeout=600.0)
 
-    try:
-        await _put("/api/v1/album/monitor", {"albumIds": [album_id], "monitored": True})
-        await asyncio.sleep(2.0)  # Give Lidarr time to process
-    except Exception as e:
-        raise ApiError(
-            "Failed to monitor album",
-            f"Could not set '{album_title}' to monitored: {str(e)}"
-        )
-
-    for attempt in range(3):
-        try:
-            await _put(
-                "/api/v1/artist/editor",
-                {"artistIds": [artist_id], "monitored": True, "monitorNewItems": "none"},
-            )
-            
-            await asyncio.sleep(5.0 + (attempt * 3.0))
-            
-            await _put("/api/v1/album/monitor", {"albumIds": [album_id], "monitored": True})
-            
-            async def both_monitored():
-                a = await _get_album_by_foreign_id(album_mbid)
-                art = await _get_artist_by_id(artist_id)
-                return (a and a.get("monitored") is True) and (art and art.get("monitored") is True)
-            
-            timeout = 20.0 + (attempt * 10.0)
-            ok = await _wait_for(both_monitored, timeout=timeout, poll=1.0)
-            
-            if ok:
-                break
-                
-            if attempt < 2:
-                await asyncio.sleep(5.0)
-        except Exception as e:
-            if attempt == 2:
-                raise ApiError(
-                    "Failed to set monitoring status",
-                    f"Could not ensure '{album_title}' is monitored after 3 attempts: {str(e)}"
-                )
-            await asyncio.sleep(5.0)
+    await _monitor_artist_and_album(artist_id, album_id, album_mbid, album_title)
 
     try:
         await _post_command({"name": "AlbumSearch", "albumIds": [album_id]})

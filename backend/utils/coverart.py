@@ -1,6 +1,3 @@
-"""
-Cover Art Archive utilities for fetching album and artist cover art.
-"""
 import asyncio
 import logging
 import os
@@ -35,12 +32,11 @@ async def get_artist_image(artist_id: str) -> Optional[tuple[bytes, str, str]]:
             content_type = (await m.read()).strip()
         async with aiofiles.open(wikidata_meta_path, "r") as w:
             wikidata_id = (await w.read()).strip()
-        log.debug(f"Disk cache hit for artist {artist_id}")
         return (data, content_type, wikidata_id)
     except FileNotFoundError:
         pass
     except Exception as exc:
-        log.warning(f"Error reading disk cache for artist {artist_id}: {exc}")
+        log.warning(f"Disk cache read error for artist {artist_id}: {exc}")
     
     cache_key = f"artist_wikidata:{artist_id}"
     cached_info = await _cache.get(cache_key)
@@ -92,22 +88,26 @@ async def get_artist_image(artist_id: str) -> Optional[tuple[bytes, str, str]]:
             content_type = response.headers.get("content-type", "image/jpeg")
             content = response.content
             
-            try:
-                async with aiofiles.open(fpath, "wb") as f:
-                    await f.write(content)
-                async with aiofiles.open(meta_path, "w") as m:
-                    await m.write(content_type)
-                async with aiofiles.open(wikidata_meta_path, "w") as w:
-                    await w.write(wikidata_id)
-                log.debug(f"Cached artist image for {artist_id}")
-            except Exception as exc:
-                log.warning(f"Failed to write cache for artist {artist_id}: {exc}")
+            asyncio.create_task(_write_artist_cache(fpath, meta_path, wikidata_meta_path, content, content_type, wikidata_id))
             
             return (content, content_type, wikidata_id)
     except Exception as exc:
         log.error(f"Error fetching artist image for {artist_id}: {exc}")
     
     return None
+
+
+async def _write_artist_cache(fpath: str, meta_path: str, wikidata_meta_path: str, content: bytes, content_type: str, wikidata_id: str):
+    """Write artist image to disk cache without blocking"""
+    try:
+        async with aiofiles.open(fpath, "wb") as f:
+            await f.write(content)
+        async with aiofiles.open(meta_path, "w") as m:
+            await m.write(content_type)
+        async with aiofiles.open(wikidata_meta_path, "w") as w:
+            await w.write(wikidata_id)
+    except Exception as exc:
+        log.warning(f"Failed to write artist cache: {exc}")
 
 
 async def get_release_group_cover(
@@ -123,12 +123,11 @@ async def get_release_group_cover(
             data = await f.read()
         async with aiofiles.open(meta_path, "r") as m:
             content_type = (await m.read()).strip()
-        log.debug(f"Disk cache hit for release group {release_group_id}")
         return (data, content_type)
     except FileNotFoundError:
         pass
     except Exception as exc:
-        log.warning(f"Error reading disk cache for {release_group_id}: {exc}")
+        log.warning(f"Disk cache read error for RG {release_group_id}: {exc}")
     
     if size:
         front_url = f"{COVER_ART_ARCHIVE_BASE}/release-group/{release_group_id}/front-{size}"
@@ -141,21 +140,23 @@ async def get_release_group_cover(
             content_type = response.headers.get("content-type", "image/jpeg")
             content = response.content
             
-            # Save to disk cache
-            try:
-                async with aiofiles.open(fpath, "wb") as f:
-                    await f.write(content)
-                async with aiofiles.open(meta_path, "w") as m:
-                    await m.write(content_type)
-                log.debug(f"Cached cover art for release group {release_group_id}")
-            except Exception as exc:
-                log.warning(f"Failed to write cache for {release_group_id}: {exc}")
+            asyncio.create_task(_write_cover_cache(fpath, meta_path, content, content_type))
             
             return (content, content_type)
     except Exception as exc:
-        log.debug(f"Failed to fetch release group cover via CAA: {exc}")
+        log.debug(f"Failed to fetch RG cover via CAA: {exc}")
     
     return await _get_cover_from_best_release(release_group_id, size)
+
+
+async def _write_cover_cache(fpath: str, meta_path: str, content: bytes, content_type: str):
+    try:
+        async with aiofiles.open(fpath, "wb") as f:
+            await f.write(content)
+        async with aiofiles.open(meta_path, "w") as m:
+            await m.write(content_type)
+    except Exception as exc:
+        log.warning(f"Failed to write cover cache: {exc}")
 
 
 async def _get_cover_from_best_release(
@@ -186,17 +187,12 @@ async def _get_cover_from_best_release(
                     content_type = response2.headers.get("content-type", "image/jpeg")
                     content = response2.content
                     
-                    try:
-                        async with aiofiles.open(fpath, "wb") as f:
-                            await f.write(content)
-                        async with aiofiles.open(meta_path, "w") as m:
-                            await m.write(content_type)
-                        log.debug(f"Cached cover art (from release) for {release_group_id}")
-                    except Exception as exc:
-                        log.warning(f"Failed to write cache for {release_group_id}: {exc}")
+                    asyncio.create_task(_write_cover_cache(fpath, meta_path, content, content_type))
                     
                     return (content, content_type)
     except Exception as exc:
         log.warning(f"Failed to fetch cover art metadata for {release_group_id}: {exc}")
+    
+    return None
     
     return None

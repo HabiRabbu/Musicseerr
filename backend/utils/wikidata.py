@@ -3,21 +3,10 @@ from typing import Optional
 from urllib.parse import quote
 
 from http_client import client
-from utils.cache import get_cache
+from utils.cache import cached
 
-_cache = get_cache()
-
-
+@cached(ttl_seconds=604800, key_prefix="wiki_extract:")
 async def get_wikipedia_extract(wikipedia_url: str, lang: str = "en") -> Optional[str]:
-    cache_key = f"wikipedia_extract:{wikipedia_url}"
-    
-    cached = await _cache.get(cache_key)
-    if cached is not None:
-        print(f"    [CACHE HIT] {wikipedia_url}: {'success' if cached else 'None (previous failure)'}")
-        return cached
-    
-    print("    [CACHE MISS] Fetching from Wikipedia API")
-    
     try:
         wikidata_match = re.search(r'wikidata\.org/wiki/(Q\d+)', wikipedia_url)
         if wikidata_match:
@@ -27,7 +16,6 @@ async def get_wikipedia_extract(wikipedia_url: str, lang: str = "en") -> Optiona
             response = await client.get(wikidata_api_url)
             
             if response.status_code != 200:
-                await _cache.set(cache_key, None, ttl_seconds=3600)
                 return None
             
             data = response.json()
@@ -37,17 +25,14 @@ async def get_wikipedia_extract(wikipedia_url: str, lang: str = "en") -> Optiona
             en_wiki = sitelinks.get("enwiki", {})
             
             if not en_wiki:
-                await _cache.set(cache_key, None, ttl_seconds=3600)
                 return None
             
             page_title = en_wiki.get("title")
             if not page_title:
-                await _cache.set(cache_key, None, ttl_seconds=3600)
                 return None
         else:
             match = re.search(r'/wiki/(.+)$', wikipedia_url)
             if not match:
-                await _cache.set(cache_key, None, ttl_seconds=3600)
                 return None
             
             page_title = match.group(1)
@@ -61,7 +46,6 @@ async def get_wikipedia_extract(wikipedia_url: str, lang: str = "en") -> Optiona
         response = await client.get(api_url)
         
         if response.status_code != 200:
-            await _cache.set(cache_key, None, ttl_seconds=300)
             return None
         
         data = response.json()
@@ -69,20 +53,15 @@ async def get_wikipedia_extract(wikipedia_url: str, lang: str = "en") -> Optiona
         
         for page_data in pages.values():
             if page_data.get("pageid", -1) < 0:
-                await _cache.set(cache_key, None, ttl_seconds=3600)
                 return None
             
             extract = page_data.get("extract")
             if extract:
-                await _cache.set(cache_key, extract, ttl_seconds=604800)
                 return extract
         
-        await _cache.set(cache_key, None, ttl_seconds=3600)
         return None
             
-    except Exception as e:
-        print(f"ERROR: Exception fetching Wikipedia extract for {wikipedia_url}: {e}")
-        await _cache.set(cache_key, None, ttl_seconds=300)
+    except Exception:
         return None
 
 
@@ -91,19 +70,13 @@ async def get_wikidata_id_from_url(wikidata_url: str) -> Optional[str]:
     return match.group(1) if match else None
 
 
+@cached(ttl_seconds=86400, key_prefix="wikidata_img:")
 async def get_artist_image_from_wikidata(wikidata_id: str) -> Optional[str]:
-    cache_key = f"wikidata_image:{wikidata_id}"
-    
-    cached = await _cache.get(cache_key)
-    if cached is not None:
-        return cached
-    
     try:
         wikidata_url = f"https://www.wikidata.org/wiki/Special:EntityData/{wikidata_id}.json"
         response = await client.get(wikidata_url)
         
         if response.status_code != 200:
-            await _cache.set(cache_key, None, ttl_seconds=300)
             return None
         
         data = response.json()
@@ -111,7 +84,6 @@ async def get_artist_image_from_wikidata(wikidata_id: str) -> Optional[str]:
         
         image_claims = entity.get("claims", {}).get("P18", [])
         if not image_claims:
-            await _cache.set(cache_key, None, ttl_seconds=3600)
             return None
         
         image_filename = image_claims[0]["mainsnak"]["datavalue"]["value"]
@@ -124,7 +96,6 @@ async def get_artist_image_from_wikidata(wikidata_id: str) -> Optional[str]:
         
         response = await client.get(commons_url)
         if response.status_code != 200:
-            await _cache.set(cache_key, None, ttl_seconds=300)
             return None
         
         commons_data = response.json()
@@ -135,13 +106,10 @@ async def get_artist_image_from_wikidata(wikidata_id: str) -> Optional[str]:
             if imageinfo and isinstance(imageinfo, list):
                 image_url = imageinfo[0].get("url")
                 if image_url:
-                    await _cache.set(cache_key, image_url, ttl_seconds=3600)
                     return image_url
         
-        await _cache.set(cache_key, None, ttl_seconds=3600)
         return None
             
     except Exception:
-        await _cache.set(cache_key, None, ttl_seconds=300)
         return None
 

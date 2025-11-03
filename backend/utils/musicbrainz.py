@@ -3,6 +3,7 @@ from typing import Any, Dict, List, Optional, Iterable
 
 import musicbrainzngs
 from models import SearchResult
+from utils.cache import cached
 
 musicbrainzngs.set_useragent("Musicseerr", "1.0", "https://github.com/HabiRabbu/musicseerr")
 musicbrainzngs.set_rate_limit(limit_or_interval=1.0)
@@ -128,6 +129,10 @@ async def search_musicbrainz_grouped(
     limits: dict[str, int] | None = None,
     buckets: Optional[List[str]] = None,
 ) -> Dict[str, List[SearchResult]]:
+    """
+    Search MusicBrainz with optimized parallel queries.
+    Results are cached for 5 minutes to improve perceived performance.
+    """
     if not buckets:
         buckets = ["artists", "albums"]
     
@@ -139,26 +144,24 @@ async def search_musicbrainz_grouped(
     
     if "artists" in buckets:
         artist_limit = limits.get("artists", 10)
-        tasks.append(asyncio.to_thread(_search_artists_blocking, q, artist_limit, 0))
+        tasks.append(_search_artists_cached(q, artist_limit, 0))
         result_keys.append("artists")
     
     if "albums" in buckets:
         album_limit = limits.get("albums", 10)
-        tasks.append(asyncio.to_thread(
-            _search_rgs_blocking, 
-            q, 
-            album_limit, 
-            0,              # offset
-            "album",        # primary
-            None,           # secondary
-            True,           # studio_only
-            True            # fast - use single query for speed
-        ))
+        tasks.append(_search_albums_cached(q, album_limit, 0, True))
         result_keys.append("albums")
     
-    raw_results = await asyncio.gather(*tasks)
+    raw_results = await asyncio.gather(*tasks, return_exceptions=True)
     
-    raw = dict(zip(result_keys, raw_results))
+    processed_results = []
+    for result in raw_results:
+        if isinstance(result, Exception):
+            processed_results.append([])
+        else:
+            processed_results.append(result)
+    
+    raw = dict(zip(result_keys, processed_results))
 
     grouped: Dict[str, List[SearchResult]] = {
         "artists": [_map_artist_to_search_result(a) for a in raw.get("artists", [])],
@@ -166,6 +169,25 @@ async def search_musicbrainz_grouped(
     }
 
     return grouped
+
+
+@cached(ttl_seconds=300, key_prefix="mb_artists:")
+async def _search_artists_cached(q: str, limit: int, offset: int) -> List[Dict[str, Any]]:
+    return await asyncio.to_thread(_search_artists_blocking, q, limit, offset)
+
+
+@cached(ttl_seconds=300, key_prefix="mb_albums:")
+async def _search_albums_cached(q: str, limit: int, offset: int, studio_only: bool) -> List[Dict[str, Any]]:
+    return await asyncio.to_thread(
+        _search_rgs_blocking, 
+        q, 
+        limit, 
+        offset,
+        "album",
+        None,
+        studio_only,
+        True
+    )
 
 
 async def search_musicbrainz_bucket(
@@ -194,6 +216,7 @@ async def search_musicbrainz_bucket(
     return out
 
 
+@cached(ttl_seconds=1800, key_prefix="mb_artist_detail:")
 async def get_artist_by_id(artist_id: str) -> Optional[Dict[str, Any]]:
     def fetch_artist() -> Optional[Dict[str, Any]]:
         try:
@@ -208,8 +231,7 @@ async def get_artist_by_id(artist_id: str) -> Optional[Dict[str, Any]]:
                 ],
             )
             return result.get("artist")
-        except Exception as e:
-            print(f"Error fetching artist {artist_id}: {e}")
+        except Exception:
             return None
     
     return await asyncio.to_thread(fetch_artist)

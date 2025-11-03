@@ -45,7 +45,7 @@ async def cover_from_release_group(
 			content=image_data,
 			media_type=content_type,
 			headers={
-				"Cache-Control": "public, max-age=2592000, immutable",
+				"Cache-Control": "public, max-age=31536000, immutable",
 				"X-Cover-Source": "cover-art-archive",
 			}
 		)
@@ -67,7 +67,7 @@ async def artist_image(
 		content=image_data,
 		media_type=content_type,
 		headers={
-			"Cache-Control": "public, max-age=2592000, immutable",
+			"Cache-Control": "public, max-age=31536000, immutable",
 			"X-Image-Source": "wikidata",
 			"X-Wikidata-ID": wikidata_id,
 		}

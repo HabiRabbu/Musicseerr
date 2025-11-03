@@ -2,15 +2,19 @@ import httpx
 
 client = httpx.AsyncClient(
     http2=True,
-    timeout=10.0,
+    timeout=httpx.Timeout(10.0, connect=5.0),
     limits=httpx.Limits(
-        max_connections=100,
-        max_keepalive_connections=20
+        max_connections=200,
+        max_keepalive_connections=50,
+        keepalive_expiry=30.0,
     ),
-    follow_redirects=True
+    follow_redirects=True,
+    transport=httpx.AsyncHTTPTransport(
+        http2=True,
+        retries=2,
+    )
 )
 
 
 async def aclose():
-    """Close the shared HTTP client on shutdown."""
     await client.aclose()
