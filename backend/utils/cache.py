@@ -56,6 +56,18 @@ class InMemoryCache:
         async with self._lock:
             self._cache.clear()
 
+    async def clear_prefix(self, prefix: str) -> int:
+        """Clear all cache entries with a given prefix. Returns count removed."""
+        keys_to_remove = [k for k in self._cache.keys() if k.startswith(prefix)]
+        
+        if keys_to_remove:
+            async with self._lock:
+                for key in keys_to_remove:
+                    self._cache.pop(key, None)
+            logger.info(f"Cleared {len(keys_to_remove)} cache entries with prefix '{prefix}'")
+        
+        return len(keys_to_remove)
+
     async def cleanup_expired(self) -> int:
         """Remove expired entries and return count removed."""
         now = time.time()
@@ -74,7 +86,6 @@ class InMemoryCache:
         return len(self._cache)
 
 
-# Global cache instance
 _cache = InMemoryCache()
 
 
@@ -103,12 +114,10 @@ def cached(ttl_seconds: int = 60, key_prefix: str = ""):
         async def wrapper(*args, **kwargs):
             cache_key = f"{key_prefix}{func.__name__}:{make_cache_key(*args, **kwargs)}"
             
-            # Try to get from cache
             cached_value = await _cache.get(cache_key)
             if cached_value is not None:
                 return cached_value
             
-            # Compute and cache the result
             result = await func(*args, **kwargs)
             asyncio.create_task(_cache.set(cache_key, result, ttl_seconds))
             
@@ -133,4 +142,9 @@ async def _cleanup_cache_periodically(interval: int = 300) -> None:
 def start_cache_cleanup_task() -> None:
     """Start the background cache cleanup task."""
     asyncio.create_task(_cleanup_cache_periodically())
+
+
+async def clear_cache_prefix(prefix: str) -> int:
+    """Clear all cache entries with a given prefix. Returns count removed."""
+    return await _cache.clear_prefix(prefix)
 

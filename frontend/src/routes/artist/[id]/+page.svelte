@@ -1,5 +1,7 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
+	import { browser } from '$app/environment';
+	import { invalidate } from '$app/navigation';
 	import type { ArtistInfo } from '$lib/types';
 	import { colors } from '$lib/colors';
 	import { errorModal } from '$lib/stores/errorModal';
@@ -17,6 +19,7 @@
 	let descriptionElement: HTMLElement;
 	let showViewMore = false;
 	let loadedImages = new Set<string>();
+	let lastFetchTime = 0;
 
 	function checkDescriptionHeight() {
 		if (descriptionElement && !descriptionExpanded) {
@@ -34,12 +37,29 @@
 	
 	$: validLinks = artist?.external_links.filter(link => link.url && link.url.trim() !== '') || [];
 
-	onMount(async () => {
+	async function fetchArtist(force = false) {
+		
+		const now = Date.now();
+		if (!force && now - lastFetchTime < 1000) {
+			return;
+		}
+		lastFetchTime = now;
+
+		loading = true;
+		error = null;
+		
+		if (abortController) {
+			abortController.abort();
+		}
 		abortController = new AbortController();
 		
 		try {
-			const res = await fetch(`/api/artist/${data.artistId}`, {
-				signal: abortController.signal
+			
+			const cacheBuster = force ? `?t=${now}` : '';
+			const res = await fetch(`/api/artist/${data.artistId}${cacheBuster}`, {
+				signal: abortController.signal,
+				
+				cache: force ? 'no-cache' : 'default'
 			});
 			if (res.ok) {
 				artist = await res.json();
@@ -55,6 +75,21 @@
 			console.error(e);
 		} finally {
 			loading = false;
+		}
+	}
+
+	onMount(() => {
+		fetchArtist();
+
+		
+		if (browser) {
+			const handleRefresh = () => fetchArtist(true);
+			window.addEventListener('artist-refresh', handleRefresh);
+			
+			
+			return () => {
+				window.removeEventListener('artist-refresh', handleRefresh);
+			};
 		}
 	});
 
@@ -121,7 +156,7 @@
 
 	function scrollLinks(direction: 'left' | 'right') {
 		if (linksCarousel) {
-			const scrollAmount = 400; // Scroll ~2.5 cards at a time
+			const scrollAmount = 400; 
 			const newPosition = linksCarousel.scrollLeft + (direction === 'right' ? scrollAmount : -scrollAmount);
 			linksCarousel.scrollTo({
 				left: newPosition,
@@ -133,11 +168,11 @@
 
 <style>
 	.scrollbar-hide {
-		-ms-overflow-style: none;  /* IE and Edge */
-		scrollbar-width: none;  /* Firefox */
+		-ms-overflow-style: none;  
+		scrollbar-width: none;  
 	}
 	.scrollbar-hide::-webkit-scrollbar {
-		display: none;  /* Chrome, Safari and Opera */
+		display: none;  
 	}
 </style>
 
@@ -149,9 +184,9 @@
 			</div>
 		</div>
 	{:else if !artist && loading}
-		<!-- Skeleton Loading State -->
+		
 		<div class="space-y-4 sm:space-y-8">
-			<!-- Artist Hero Skeleton -->
+			
 			<div class="card bg-base-200 shadow-xl overflow-hidden">
 				<div class="flex flex-col lg:flex-row">
 					<div class="w-full lg:w-96 xl:w-[28rem] flex-shrink-0 p-4 sm:p-6">
@@ -183,7 +218,7 @@
 			</div>
 		</div>
 
-			<!-- Links Skeleton -->
+			
 			<div>
 				<div class="skeleton h-6 sm:h-8 w-20 sm:w-24 mb-3 sm:mb-4"></div>
 				<div class="bg-base-200 rounded-box p-3 sm:p-4 shadow-md overflow-x-auto">
@@ -195,7 +230,7 @@
 				</div>
 			</div>
 
-			<!-- Albums Skeleton -->
+			
 			<div>
 				<div class="skeleton h-6 sm:h-8 w-24 sm:w-32 mb-3 sm:mb-4"></div>
 				<div class="bg-base-200 rounded-box shadow-md p-3 sm:p-4 space-y-3 sm:space-y-4">
@@ -220,9 +255,9 @@
 		</div>
 	{:else if artist}
 		<div class="space-y-4 sm:space-y-6 lg:space-y-8">
-			<!-- Artist Hero Section -->
+			
 			<div class="card bg-base-200 shadow-xl overflow-hidden">
-				<!-- Mobile: vertical layout, Desktop: horizontal layout -->
+				
 				<div class="flex flex-col lg:flex-row lg:min-h-[32rem]">
 					<figure class="w-full lg:w-96 lg:h-96 xl:w-[28rem] xl:h-[28rem] flex-shrink-0 p-4 sm:p-6">
 						<img 
@@ -231,7 +266,7 @@
 							class="w-full h-full object-contain rounded-box max-h-80 sm:max-h-96 lg:max-h-none"
 							on:error={(e) => {
 								const target = e.currentTarget as HTMLImageElement;
-								target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200"%3E%3Crect fill="%23444" width="200" height="200"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" fill="%23999" font-size="24" font-family="sans-serif"%3ENo Image%3C/text%3E%3C/svg%3E';
+								target.src = 'data:image/svg+xml,%3Csvg xmlns="http:
 							}}
 						/>
 					</figure>
@@ -245,7 +280,7 @@
 							</div>
 							{#if artist.in_library}
 								<span class="badge badge-success badge-lg gap-2 flex-shrink-0">
-									<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+									<svg xmlns="http:
 										<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
 									</svg>
 									In Library
@@ -269,7 +304,7 @@
 										on:click={() => descriptionExpanded = false}
 									>
 										Show Less
-										<svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 sm:h-4 sm:w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+										<svg xmlns="http:
 											<path stroke-linecap="round" stroke-linejoin="round" d="M5 15l7-7 7 7" />
 										</svg>
 									</button>
@@ -290,7 +325,7 @@
 											}}
 										>
 											Expand
-											<svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 sm:h-4 sm:w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+											<svg xmlns="http:
 												<path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
 											</svg>
 										</button>
@@ -323,12 +358,12 @@
 			</div>
 		</div>
 
-			<!-- External Links Section -->
+			
 			{#if validLinks.length > 0}
 				<div>
 					<h2 class="text-xl sm:text-2xl font-bold mb-3 sm:mb-4">Links</h2>
 					<div class="relative">
-						<!-- Left Button - hidden on mobile -->
+						
 						<button 
 							class="btn btn-circle btn-sm absolute left-0 top-1/2 -translate-y-1/2 z-10 bg-base-300 border-none shadow-lg hidden sm:flex"
 							on:click={() => scrollLinks('left')}
@@ -337,7 +372,7 @@
 							❮
 						</button>
 						
-						<!-- Links Container -->
+						
 						<div 
 							class="overflow-x-auto scrollbar-hide sm:px-12"
 							bind:this={linksCarousel}
@@ -391,7 +426,7 @@
 							</div>
 						</div>
 						
-						<!-- Right Button - hidden on mobile -->
+						
 						<button 
 							class="btn btn-circle btn-sm absolute right-0 top-1/2 -translate-y-1/2 z-10 bg-base-300 border-none shadow-lg hidden sm:flex"
 							on:click={() => scrollLinks('right')}
@@ -403,7 +438,7 @@
 				</div>
 			{/if}
 
-			<!-- Albums Section -->
+			
 			{#if artist.albums.length > 0}
 				<div>
 					<h2 class="text-xl sm:text-2xl font-bold mb-3 sm:mb-4">Albums ({artist.albums.length})</h2>
@@ -443,7 +478,7 @@
 								
 								{#if rg.in_library}
 									<div class="rounded-full p-1.5 sm:p-2 shadow-sm flex-shrink-0" style="background-color: {colors.accent};">
-										<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 sm:h-5 sm:w-5" fill="none" viewBox="0 0 24 24" stroke={colors.secondary} stroke-width="3">
+										<svg xmlns="http:
 											<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
 										</svg>
 									</div>
@@ -458,7 +493,7 @@
 										{#if requestingAlbums.has(rg.id)}
 											<span class="loading loading-spinner loading-xs sm:loading-sm" style="color: {colors.secondary};"></span>
 										{:else}
-											<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 sm:h-5 sm:w-5" fill="none" viewBox="0 0 24 24" stroke={colors.secondary} stroke-width="2.5">
+											<svg xmlns="http:
 												<path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
 											</svg>
 										{/if}
@@ -470,7 +505,7 @@
 				</div>
 			{/if}
 
-			<!-- EPs Section -->
+			
 			{#if artist.eps.length > 0}
 				<div>
 					<h2 class="text-xl sm:text-2xl font-bold mb-3 sm:mb-4">EPs ({artist.eps.length})</h2>
@@ -510,7 +545,7 @@
 								
 								{#if rg.in_library}
 									<div class="rounded-full p-1.5 sm:p-2 shadow-sm flex-shrink-0" style="background-color: {colors.accent};">
-										<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 sm:h-5 sm:w-5" fill="none" viewBox="0 0 24 24" stroke={colors.secondary} stroke-width="3">
+										<svg xmlns="http:
 											<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
 										</svg>
 									</div>
@@ -525,7 +560,7 @@
 										{#if requestingAlbums.has(rg.id)}
 											<span class="loading loading-spinner loading-xs sm:loading-sm" style="color: {colors.secondary};"></span>
 										{:else}
-											<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 sm:h-5 sm:w-5" fill="none" viewBox="0 0 24 24" stroke={colors.secondary} stroke-width="2.5">
+											<svg xmlns="http:
 												<path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
 											</svg>
 										{/if}
@@ -537,7 +572,7 @@
 				</div>
 			{/if}
 
-			<!-- Singles Section -->
+			
 			{#if artist.singles.length > 0}
 				<div>
 					<h2 class="text-xl sm:text-2xl font-bold mb-3 sm:mb-4">Singles ({artist.singles.length})</h2>
@@ -577,7 +612,7 @@
 								
 								{#if rg.in_library}
 									<div class="rounded-full p-1.5 sm:p-2 shadow-sm flex-shrink-0" style="background-color: {colors.accent};">
-										<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 sm:h-5 sm:w-5" fill="none" viewBox="0 0 24 24" stroke={colors.secondary} stroke-width="3">
+										<svg xmlns="http:
 											<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
 										</svg>
 									</div>
@@ -592,7 +627,7 @@
 										{#if requestingAlbums.has(rg.id)}
 											<span class="loading loading-spinner loading-xs sm:loading-sm" style="color: {colors.secondary};"></span>
 										{:else}
-											<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 sm:h-5 sm:w-5" fill="none" viewBox="0 0 24 24" stroke={colors.secondary} stroke-width="2.5">
+											<svg xmlns="http:
 												<path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
 											</svg>
 										{/if}
@@ -611,11 +646,11 @@
 	{/if}
 </div>
 
-<!-- Toast Notification -->
+
 {#if showToast}
 	<div class="toast toast-end toast-bottom">
 		<div class="alert alert-success">
-			<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+			<svg xmlns="http:
 				<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
 			</svg>
 			<span>Added to Library</span>

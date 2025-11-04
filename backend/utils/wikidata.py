@@ -85,13 +85,11 @@ async def get_wikipedia_extract(wikipedia_url: str, lang: str = "en") -> Optiona
         Article extract text or None
     """
     try:
-        # Handle Wikidata URLs
         if wikidata_id := _extract_wikidata_id(wikipedia_url):
             page_title = await _get_wikipedia_title_from_wikidata(wikidata_id, lang)
             if not page_title:
                 return None
         
-        # Handle Wikipedia URLs
         elif page_title := _extract_wikipedia_title(wikipedia_url):
             pass
         
@@ -121,7 +119,6 @@ async def get_artist_image_from_wikidata(wikidata_id: str) -> Optional[str]:
         Image URL or None
     """
     try:
-        # Get Wikidata entity
         entity_url = f"https://www.wikidata.org/wiki/Special:EntityData/{wikidata_id}.json"
         response = await client.get(entity_url)
         
@@ -131,14 +128,12 @@ async def get_artist_image_from_wikidata(wikidata_id: str) -> Optional[str]:
         data = response.json()
         entity = data.get("entities", {}).get(wikidata_id, {})
         
-        # Get image filename from P18 (image) claim
         image_claims = entity.get("claims", {}).get("P18", [])
         if not image_claims:
             return None
         
         image_filename = image_claims[0]["mainsnak"]["datavalue"]["value"]
         
-        # Get image URL from Wikimedia Commons
         commons_url = (
             f"https://commons.wikimedia.org/w/api.php"
             f"?action=query&titles=File:{quote(image_filename)}"

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onDestroy } from 'svelte';
+	import { onDestroy, onMount } from 'svelte';
 	import { browser } from '$app/environment';
 	import { goto } from '$app/navigation';
 	import ArtistCard from '$lib/components/ArtistCard.svelte';
@@ -101,6 +101,19 @@
 		observer.observe(sentinel);
 	}
 
+	onMount(() => {
+		
+		if (browser) {
+			const handleRefresh = () => resetAndLoad();
+			window.addEventListener('search-refresh', handleRefresh);
+			
+			
+			return () => {
+				window.removeEventListener('search-refresh', handleRefresh);
+			};
+		}
+	});
+
 	onDestroy(() => {
 		if (observer) {
 			observer.disconnect();
@@ -113,7 +126,7 @@
 	});
 </script>
 
-<!-- Filter Badges -->
+
 <div class="px-8 pt-4 pb-2">
 	<div class="flex gap-2">
 		<button 
@@ -152,7 +165,7 @@
 			</div>
 		</div>
 
-		<!-- Sentinel for infinite scroll -->
+		
 		<div bind:this={sentinel} class="h-20 flex items-center justify-center">
 			{#if loading}
 				<span class="loading loading-spinner loading-md text-primary"></span>

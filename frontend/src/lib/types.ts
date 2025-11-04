@@ -1,5 +1,5 @@
 export type Artist = {
-	title: string;                 // Artist name
+	title: string;                 
 	musicbrainz_id: string;
 	in_library: boolean;
 	cover_url?: string | null;
@@ -9,7 +9,7 @@ export type Album = {
 	title: string;
 	artist: string | null;
 	year: number | null;
-	musicbrainz_id: string;        // Release group ID
+	musicbrainz_id: string;        
 	in_library: boolean;
 	cover_url?: string | null;
 };
@@ -53,4 +53,16 @@ export type ArtistInfo = {
 	albums: ReleaseGroup[];
 	singles: ReleaseGroup[];
 	eps: ReleaseGroup[];
+};
+
+export type UserPreferences = {
+	primary_types: string[];
+	secondary_types: string[];
+	release_statuses: string[];
+};
+
+export type ReleaseTypeOption = {
+	id: string;
+	title: string;
+	description: string;
 };

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onDestroy } from 'svelte';
+	import { onDestroy, onMount } from 'svelte';
 	import { browser } from '$app/environment';
 	import { goto } from '$app/navigation';
 	import AlbumCard from '$lib/components/AlbumCard.svelte';
@@ -109,6 +109,19 @@
 		observer.observe(sentinel);
 	}
 
+	onMount(() => {
+		
+		if (browser) {
+			const handleRefresh = () => resetAndLoad();
+			window.addEventListener('search-refresh', handleRefresh);
+			
+			
+			return () => {
+				window.removeEventListener('search-refresh', handleRefresh);
+			};
+		}
+	});
+
 	onDestroy(() => {
 		if (observer) {
 			observer.disconnect();
@@ -121,7 +134,7 @@
 	});
 </script>
 
-<!-- Filter Badges -->
+
 <div class="px-8 pt-4 pb-2">
 	<div class="flex gap-2">
 		<button 
@@ -160,7 +173,7 @@
 			</div>
 		</div>
 
-		<!-- Sentinel for infinite scroll -->
+		
 		<div bind:this={sentinel} class="h-20 flex items-center justify-center">
 			{#if loading}
 				<span class="loading loading-spinner loading-md text-primary"></span>
@@ -171,11 +184,11 @@
 	{/if}
 </section>
 
-<!-- Toast Notification -->
+
 {#if showToast}
 	<div class="toast toast-end toast-bottom">
 		<div class="alert alert-success">
-			<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+			<svg xmlns="http:
 				<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
 			</svg>
 			<span>Added to Library</span>

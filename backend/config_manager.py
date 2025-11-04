@@ -19,11 +19,15 @@ DEFAULT_CONFIG = {
     "metadata_profile_id": 1,
     "root_folder_path": "/music",
     "port": 8688,
+    "user_preferences": {
+        "primary_types": ["album", "ep", "single"],
+        "secondary_types": ["studio"],
+        "release_statuses": ["official"],
+    },
 }
 
 
 def _create_default_config() -> None:
-    """Create default config file if it doesn't exist."""
     CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
     with open(CONFIG_PATH, "w") as f:
         json.dump(DEFAULT_CONFIG, f, indent=2)
@@ -31,7 +35,6 @@ def _create_default_config() -> None:
 
 
 def load_config() -> dict[str, Any]:
-    """Load configuration from file, creating default if needed."""
     try:
         if not CONFIG_PATH.exists():
             _create_default_config()
@@ -39,7 +42,6 @@ def load_config() -> dict[str, Any]:
         with open(CONFIG_PATH) as f:
             config = json.load(f)
         
-        # Merge with defaults for any missing keys
         return {**DEFAULT_CONFIG, **config}
     
     except json.JSONDecodeError as e:
@@ -51,3 +53,28 @@ def load_config() -> dict[str, Any]:
 
 
 CONFIG = load_config()
+
+
+def save_config(config: dict[str, Any]) -> None:
+    try:
+        CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
+        with open(CONFIG_PATH, "w") as f:
+            json.dump(config, f, indent=2)
+        logger.info(f"Saved config to {CONFIG_PATH}")
+    except Exception as e:
+        logger.error(f"Failed to save config: {e}")
+        raise
+
+
+def get_user_preferences() -> dict[str, Any]:
+    config = load_config()
+    return config.get("user_preferences", DEFAULT_CONFIG["user_preferences"])
+
+
+def save_user_preferences(preferences: dict[str, Any]) -> None:
+    config = load_config()
+    config["user_preferences"] = preferences
+    save_config(config)
+    global CONFIG
+    CONFIG = config
+

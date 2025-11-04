@@ -102,7 +102,6 @@ async def add_to_queue(album_mbid: str) -> dict:
     queue = _get_queue()
     await queue.put(request)
     
-    # Wait for result
     result = await request.future
     return result
 

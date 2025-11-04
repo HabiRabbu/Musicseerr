@@ -17,7 +17,6 @@ _cache = get_cache()
 COVER_ART_ARCHIVE_BASE = "https://coverartarchive.org"
 CACHE_DIR = Path("/app/cache/covers")
 
-# Ensure cache directory exists
 CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
 
@@ -83,15 +82,12 @@ async def get_artist_image(artist_id: str) -> Optional[tuple[bytes, str, str]]:
     """
     file_path = CACHE_DIR / f"artist_{artist_id}.bin"
     
-    # Try disk cache first
     if cached := await _read_cache(file_path, ["wikidata_id"]):
         return cached
     
-    # Check memory cache for Wikidata URL
     cache_key = f"artist_wikidata:{artist_id}"
     wikidata_url = await _cache.get(cache_key)
     
-    # Fetch Wikidata URL from MusicBrainz if not cached
     if wikidata_url is None:
         try:
             artist_data = await asyncio.to_thread(
@@ -107,7 +103,6 @@ async def get_artist_image(artist_id: str) -> Optional[tuple[bytes, str, str]]:
                         wikidata_url = url_rel.get("target")
                         break
             
-            # Cache the result (even if None)
             ttl = 86400 if wikidata_url else 3600
             await _cache.set(cache_key, wikidata_url, ttl_seconds=ttl)
         
@@ -118,7 +113,6 @@ async def get_artist_image(artist_id: str) -> Optional[tuple[bytes, str, str]]:
     if not wikidata_url:
         return None
     
-    # Get Wikidata ID and fetch image
     try:
         wikidata_id = await wikidata.get_wikidata_id_from_url(wikidata_url)
         if not wikidata_id:
@@ -128,13 +122,11 @@ async def get_artist_image(artist_id: str) -> Optional[tuple[bytes, str, str]]:
         if not image_url:
             return None
         
-        # Fetch image
         response = await client.get(image_url)
         if response.status_code == 200:
             content_type = response.headers.get("content-type", "image/jpeg")
             content = response.content
             
-            # Write to cache asynchronously
             asyncio.create_task(_write_cache(
                 file_path,
                 content,
@@ -165,15 +157,12 @@ async def get_release_group_cover(
     """
     file_path = CACHE_DIR / f"rg_{release_group_id}_{size or 'orig'}.bin"
     
-    # Try disk cache first
     if cached := await _read_cache(file_path):
         return cached
     
-    # Build Cover Art Archive URL
     size_suffix = f"-{size}" if size else ""
     front_url = f"{COVER_ART_ARCHIVE_BASE}/release-group/{release_group_id}/front{size_suffix}"
     
-    # Try fetching from release group
     try:
         response = await client.get(front_url)
         if response.status_code == 200:
@@ -186,7 +175,6 @@ async def get_release_group_cover(
     except Exception as e:
         logger.debug(f"Failed to fetch cover via release group: {e}")
     
-    # Fallback: try fetching from best release
     return await _get_cover_from_best_release(release_group_id, size, file_path)
 
 
@@ -197,7 +185,6 @@ async def _get_cover_from_best_release(
 ) -> Optional[tuple[bytes, str]]:
     """Fallback: get cover art from best release in group."""
     try:
-        # Get release ID from release group metadata
         metadata_url = f"{COVER_ART_ARCHIVE_BASE}/release-group/{release_group_id}"
         response = await client.get(metadata_url, headers={"Accept": "application/json"})
         
@@ -211,7 +198,6 @@ async def _get_cover_from_best_release(
         
         release_id = release_url.split("/")[-1]
         
-        # Fetch cover from specific release
         size_suffix = f"-{size}" if size else ""
         release_front_url = f"{COVER_ART_ARCHIVE_BASE}/release/{release_id}/front{size_suffix}"
         

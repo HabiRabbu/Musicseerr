@@ -1,7 +1,6 @@
 """Parse and extract artist data from MusicBrainz responses."""
 from typing import Any, Optional
 
-# Platform detection mapping
 _PLATFORM_PATTERNS = {
     "instagram.com": "Instagram",
     "twitter.com": "Twitter",
@@ -92,12 +91,10 @@ def _detect_platform(url: str, rel_type: str) -> str:
     """Detect platform from URL and relationship type."""
     url_lower = url.lower()
     
-    # Check URL patterns first
     for pattern, platform in _PLATFORM_PATTERNS.items():
         if pattern in url_lower:
             return platform
     
-    # Fallback to relationship type
     if rel_type == "social network":
         return "Social Media"
     elif rel_type == "free streaming":
@@ -105,7 +102,6 @@ def _detect_platform(url: str, rel_type: str) -> str:
     elif rel_type == "purchase for download":
         return "Purchase"
     
-    # Use label mapping or title-case the type
     return _LINK_TYPE_LABELS.get(rel_type, rel_type.title())
 
 
@@ -143,17 +139,24 @@ def extract_external_links(mb_artist: dict[str, Any]) -> list[dict[str, str]]:
 
 def categorize_release_groups(
     mb_artist: dict[str, Any],
-    album_mbids: set[str]
+    album_mbids: set[str],
+    included_primary_types: Optional[set[str]] = None,
+    included_secondary_types: Optional[set[str]] = None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
     """Categorize release groups into albums, singles, and EPs.
     
     Args:
         mb_artist: MusicBrainz artist dict
         album_mbids: Set of MBIDs that are in the user's library
+        included_primary_types: Set of allowed primary types. If None, includes all.
+        included_secondary_types: Set of allowed secondary types. If None, includes all.
     
     Returns:
         Tuple of (albums, singles, eps) lists
     """
+    if included_primary_types is None:
+        included_primary_types = {"album", "single", "ep", "broadcast", "other"}
+    
     albums = []
     singles = []
     eps = []
@@ -163,6 +166,18 @@ def categorize_release_groups(
             rg_id = rg.get("id")
             primary_type = (rg.get("primary-type") or "").lower()
             
+            if primary_type not in included_primary_types:
+                continue
+            
+            if included_secondary_types is not None:
+                secondary_types = set(map(str.lower, rg.get("secondary-type-list", []) or []))
+                
+                if not secondary_types:
+                    if "studio" not in included_secondary_types:
+                        continue
+                elif not secondary_types.intersection(included_secondary_types):
+                    continue
+            
             rg_data = {
                 "id": rg_id,
                 "title": rg.get("title"),
@@ -171,14 +186,12 @@ def categorize_release_groups(
                 "in_library": rg_id.lower() in album_mbids if rg_id else False,
             }
             
-            # Extract year from date
             if date := rg_data.get("first_release_date"):
                 try:
                     rg_data["year"] = int(date.split("-")[0])
                 except (ValueError, AttributeError):
                     pass
             
-            # Categorize by type
             if primary_type == "album":
                 albums.append(rg_data)
             elif primary_type == "single":
@@ -186,7 +199,6 @@ def categorize_release_groups(
             elif primary_type == "ep":
                 eps.append(rg_data)
         
-        # Sort each list by year (newest first, None at end)
         for lst in [albums, singles, eps]:
             lst.sort(key=lambda x: (x.get("year") is None, -(x.get("year") or 0)))
     

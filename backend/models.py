@@ -76,6 +76,7 @@ class ArtistInfo(BaseModel):
     country: Optional[str] = None
     life_span: Optional[dict[str, Optional[str]]] = None
     description: Optional[str] = None
+    image: Optional[str] = None
     tags: list[str] = Field(default_factory=list)
     aliases: list[str] = Field(default_factory=list)
     external_links: list[ExternalLink] = Field(default_factory=list)
@@ -83,3 +84,19 @@ class ArtistInfo(BaseModel):
     albums: list[dict] = Field(default_factory=list)
     singles: list[dict] = Field(default_factory=list)
     eps: list[dict] = Field(default_factory=list)
+
+
+class UserPreferences(BaseModel):
+    """User preferences for filtering releases."""
+    primary_types: list[str] = Field(
+        default=["album", "ep", "single"],
+        description="Included primary release types"
+    )
+    secondary_types: list[str] = Field(
+        default=["studio"],
+        description="Included secondary release types"
+    )
+    release_statuses: list[str] = Field(
+        default=["official"],
+        description="Included release statuses"
+    )

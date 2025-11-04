@@ -10,9 +10,8 @@ from http_client import aclose
 from utils import request_queue
 from utils.cache import start_cache_cleanup_task
 from middleware import PerformanceMiddleware
-from routes import search, requests, library, status, queue, covers, artist
+from routes import search, requests, library, status, queue, covers, artist, settings
 
-# Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
@@ -27,14 +26,12 @@ app = FastAPI(
     redoc_url="/api/redoc",
 )
 
-# Add middleware
 app.add_middleware(PerformanceMiddleware)
 app.add_middleware(GZipMiddleware, minimum_size=1000, compresslevel=6)
 
 
 @app.get("/health")
 def health_check():
-    """Health check endpoint."""
     return {
         "status": "ok",
         "message": "Musicseerr backend running",
@@ -49,13 +46,13 @@ app.include_router(queue.router)
 app.include_router(status.router)
 app.include_router(covers.router)
 app.include_router(artist.router)
+app.include_router(settings.router)
 
 mount_frontend(app)
 
 
 @app.on_event("startup")
 async def startup_event():
-    """Initialize services on startup."""
     logger.info("Starting Musicseerr...")
     request_queue.start_processor()
     start_cache_cleanup_task()
@@ -64,7 +61,6 @@ async def startup_event():
 
 @app.on_event("shutdown")
 async def shutdown_event():
-    """Cleanup on shutdown."""
     logger.info("Shutting down Musicseerr...")
     await request_queue.stop_processor()
     await aclose()

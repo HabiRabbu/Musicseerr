@@ -11,7 +11,6 @@ SLOW_REQUEST_THRESHOLD = 1.0
 
 
 class PerformanceMiddleware(BaseHTTPMiddleware):
-    """Middleware to track request performance and log slow requests."""
     
     def __init__(self, app: ASGIApp):
         super().__init__(app)

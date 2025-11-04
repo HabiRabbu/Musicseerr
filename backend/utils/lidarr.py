@@ -53,13 +53,11 @@ async def _request(
             json=json_data,
         )
         
-        # Check for successful status codes
         if method == "GET" and response.status_code != 200:
             raise ApiError(f"Lidarr {method} failed ({response.status_code})", response.text)
         elif method in ("POST", "PUT") and response.status_code not in (200, 201, 202):
             raise ApiError(f"Lidarr {method} failed ({response.status_code})", response.text)
         
-        # Parse JSON response
         try:
             return response.json()
         except ValueError:

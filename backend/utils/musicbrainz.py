@@ -10,12 +10,35 @@ from utils.cache import cached
 
 logger = logging.getLogger(__name__)
 
-# Configure MusicBrainz client
 musicbrainzngs.set_useragent("Musicseerr", "1.0", "https://github.com/HabiRabbu/musicseerr")
 musicbrainzngs.set_rate_limit(limit_or_interval=1.0)
 
-# Excluded secondary release types (compilations, live, etc.)
 _EXCLUDE_SECONDARY_TYPES = {"compilation", "live", "remix", "soundtrack", "dj-mix", "mixtape/street", "demo"}
+
+
+def _should_include_release(
+    release_group: dict[str, Any],
+    included_secondary_types: Optional[set[str]] = None
+) -> bool:
+    """Check if release group should be included based on secondary types.
+    
+    Args:
+        release_group: MusicBrainz release group dict
+        included_secondary_types: Set of allowed secondary types (lowercase).
+                                  If None, uses old exclusion logic.
+    
+    Returns:
+        True if release should be included
+    """
+    secondary_types = set(map(str.lower, release_group.get("secondary-type-list", []) or []))
+    
+    if included_secondary_types is None:
+        return secondary_types.isdisjoint(_EXCLUDE_SECONDARY_TYPES)
+    
+    if not secondary_types:
+        return "studio" in included_secondary_types
+    
+    return bool(secondary_types.intersection(included_secondary_types))
 
 
 def _extract_artist_name(release_group: dict[str, Any]) -> Optional[str]:
@@ -90,7 +113,6 @@ def _map_album_to_result(release_group: dict[str, Any]) -> SearchResult:
 
 def _search_artists_sync(query: str, limit: int, offset: int = 0) -> list[dict[str, Any]]:
     """Synchronous artist search."""
-    # Build optimized query string
     search_query = f'artist:"{query}"^3 OR artistaccent:"{query}"^3 OR alias:"{query}"^2 OR {query}'
     
     results = musicbrainzngs.search_artists(
@@ -109,13 +131,21 @@ def _search_release_groups_sync(
     limit: int,
     offset: int = 0,
     primary_type: str = "album",
-    studio_only: bool = False,
+    included_secondary_types: Optional[set[str]] = None,
     detailed: bool = False,
 ) -> list[dict[str, Any]]:
-    """Synchronous release group search."""
+    """Synchronous release group search.
+    
+    Args:
+        query: Search query
+        limit: Max results to return
+        offset: Pagination offset
+        primary_type: Primary release type (album, single, ep, etc.)
+        included_secondary_types: Set of allowed secondary types. If None, uses legacy filtering.
+        detailed: Whether to do detailed search
+    """
     internal_limit = min(100, max(int(limit * 1.5), 25))
     
-    # Simple search
     results_1 = musicbrainzngs.search_release_groups(
         releasegroup=query,
         primarytype=primary_type,
@@ -124,7 +154,6 @@ def _search_release_groups_sync(
         offset=offset,
     ).get("release-group-list", [])
     
-    # Detailed search if requested
     if detailed:
         results_2 = musicbrainzngs.search_release_groups(
             query=f'releasegroup:"{query}"^3 OR artistname:"{query}"^2 OR artist:"{query}"^2',
@@ -137,9 +166,10 @@ def _search_release_groups_sync(
     else:
         release_groups = _dedupe_by_id(results_1)
     
-    # Filter studio albums if requested
-    if studio_only:
-        release_groups = [rg for rg in release_groups if _is_studio_album(rg)]
+    release_groups = [
+        rg for rg in release_groups
+        if _should_include_release(rg, included_secondary_types)
+    ]
     
     return release_groups[:limit]
 
@@ -152,7 +182,10 @@ async def _search_artists_cached(query: str, limit: int, offset: int) -> list[di
 
 @cached(ttl_seconds=300, key_prefix="mb_albums:")
 async def _search_albums_cached(
-    query: str, limit: int, offset: int, studio_only: bool
+    query: str,
+    limit: int,
+    offset: int,
+    included_secondary_types: Optional[set[str]] = None
 ) -> list[dict[str, Any]]:
     """Cached async wrapper for album search."""
     return await asyncio.to_thread(
@@ -161,7 +194,7 @@ async def _search_albums_cached(
         limit,
         offset,
         "album",
-        studio_only,
+        included_secondary_types,
         False,
     )
 
@@ -170,6 +203,7 @@ async def search_musicbrainz_grouped(
     query: str,
     limits: Optional[dict[str, int]] = None,
     buckets: Optional[list[str]] = None,
+    included_secondary_types: Optional[set[str]] = None,
 ) -> dict[str, list[SearchResult]]:
     """Search MusicBrainz for artists and albums with parallel queries.
     
@@ -177,6 +211,7 @@ async def search_musicbrainz_grouped(
         query: Search query string
         limits: Dict with "artists" and "albums" limits
         buckets: List of search types to include (["artists", "albums"])
+        included_secondary_types: Set of allowed secondary types for filtering
     
     Returns:
         Dict with "artists" and "albums" lists of SearchResult objects
@@ -187,7 +222,6 @@ async def search_musicbrainz_grouped(
     tasks = []
     task_keys = []
     
-    # Build parallel search tasks
     if "artists" in buckets:
         artist_limit = limits.get("artists", 10)
         tasks.append(_search_artists_cached(query, artist_limit, 0))
@@ -195,20 +229,17 @@ async def search_musicbrainz_grouped(
     
     if "albums" in buckets:
         album_limit = limits.get("albums", 10)
-        tasks.append(_search_albums_cached(query, album_limit, 0, True))
+        tasks.append(_search_albums_cached(query, album_limit, 0, included_secondary_types))
         task_keys.append("albums")
     
-    # Execute searches in parallel
     raw_results = await asyncio.gather(*tasks, return_exceptions=True)
     
-    # Handle errors gracefully
     processed = []
     for result in raw_results:
         processed.append([] if isinstance(result, Exception) else result)
     
     raw_data = dict(zip(task_keys, processed))
     
-    # Map to SearchResult objects
     return {
         "artists": [_map_artist_to_result(a) for a in raw_data.get("artists", [])],
         "albums": [_map_album_to_result(rg) for rg in raw_data.get("albums", [])],
@@ -220,6 +251,7 @@ async def search_musicbrainz_bucket(
     bucket: str,
     limit: int = 50,
     offset: int = 0,
+    included_secondary_types: Optional[set[str]] = None,
 ) -> list[SearchResult]:
     """Search a single MusicBrainz bucket (artists or albums).
     
@@ -228,6 +260,7 @@ async def search_musicbrainz_bucket(
         bucket: Type of search ("artists" or "albums")
         limit: Max results to return
         offset: Pagination offset
+        included_secondary_types: Set of allowed secondary types for filtering
     
     Returns:
         List of SearchResult objects
@@ -244,8 +277,8 @@ async def search_musicbrainz_bucket(
                 limit,
                 offset,
                 "album",
-                True,  # studio_only
-                True,  # detailed
+                included_secondary_types,
+                True,
             )
         return []
     
@@ -255,7 +288,6 @@ async def search_musicbrainz_bucket(
         logger.error(f"MusicBrainz search error for {bucket}: {e}")
         return []
     
-    # Map to SearchResult objects
     if bucket == "artists":
         return [_map_artist_to_result(a) for a in raw_data]
     return [_map_album_to_result(rg) for rg in raw_data]
@@ -264,6 +296,8 @@ async def search_musicbrainz_bucket(
 @cached(ttl_seconds=1800, key_prefix="mb_artist_detail:")
 async def get_artist_by_id(artist_id: str) -> Optional[dict[str, Any]]:
     """Get detailed artist information by MusicBrainz ID.
+    
+    Fetches up to 100 release groups using the browse API.
     
     Args:
         artist_id: MusicBrainz artist ID
@@ -275,9 +309,23 @@ async def get_artist_by_id(artist_id: str) -> Optional[dict[str, Any]]:
         try:
             result = musicbrainzngs.get_artist_by_id(
                 artist_id,
-                includes=["release-groups", "tags", "aliases", "url-rels", "ratings"],
+                includes=["tags", "aliases", "url-rels", "ratings"],
             )
-            return result.get("artist")
+            artist = result.get("artist")
+            
+            if not artist:
+                return None
+            
+            rg_result = musicbrainzngs.browse_release_groups(
+                artist=artist_id,
+                limit=100,
+            )
+            
+            if rg_result and "release-group-list" in rg_result:
+                artist["release-group-list"] = rg_result["release-group-list"]
+            
+            return artist
+            
         except Exception as e:
             logger.error(f"Failed to fetch artist {artist_id}: {e}")
             return None
