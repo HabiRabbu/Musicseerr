@@ -100,3 +100,30 @@ class UserPreferences(BaseModel):
         default=["official"],
         description="Included release statuses"
     )
+
+
+class Track(BaseModel):
+    """A track in an album."""
+    position: int
+    title: str
+    length: Optional[int] = None  # Length in milliseconds
+    recording_id: Optional[str] = None
+
+
+class AlbumInfo(BaseModel):
+    """Detailed album information."""
+    title: str
+    musicbrainz_id: str
+    artist_name: str
+    artist_id: str
+    release_date: Optional[str] = None
+    year: Optional[int] = None
+    type: Optional[str] = None
+    label: Optional[str] = None
+    barcode: Optional[str] = None
+    country: Optional[str] = None
+    disambiguation: Optional[str] = None
+    tracks: list[Track] = Field(default_factory=list)
+    total_tracks: int = 0
+    total_length: Optional[int] = None  # Total length in milliseconds
+    in_library: bool = False

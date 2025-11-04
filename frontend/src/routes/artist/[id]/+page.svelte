@@ -2,6 +2,7 @@
 	import { onMount, onDestroy } from 'svelte';
 	import { browser } from '$app/environment';
 	import { invalidate } from '$app/navigation';
+	import { goto } from '$app/navigation';
 	import type { ArtistInfo } from '$lib/types';
 	import { colors } from '$lib/colors';
 	import { errorModal } from '$lib/stores/errorModal';
@@ -163,6 +164,13 @@
 				behavior: 'smooth'
 			});
 		}
+	}
+
+	function goToAlbum(albumId: string, event?: Event) {
+		if (event) {
+			event.stopPropagation();
+		}
+		goto(`/album/${albumId}`);
 	}
 </script>
 
@@ -444,7 +452,13 @@
 					<h2 class="text-xl sm:text-2xl font-bold mb-3 sm:mb-4">Albums ({artist.albums.length})</h2>
 					<ul class="list bg-base-200 rounded-box shadow-md">
 						{#each artist.albums as rg}
-							<li class="list-row group hover:bg-base-300 transition-colors p-2 sm:p-3">
+							<li 
+								class="list-row group hover:bg-base-300 transition-colors p-2 sm:p-3 cursor-pointer"
+								on:click={() => goToAlbum(rg.id)}
+								on:keypress={(e) => e.key === 'Enter' && goToAlbum(rg.id)}
+								role="button"
+								tabindex="0"
+							>
 								<div class="w-12 h-12 sm:w-16 sm:h-16 flex-shrink-0 rounded-box overflow-hidden bg-base-100 relative">
 									{#if !loadedImages.has(rg.id)}
 										<div class="skeleton w-full h-full absolute inset-0"></div>
@@ -486,7 +500,7 @@
 									<button
 										class="btn btn-square btn-sm sm:btn-md opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity duration-200 border-none flex-shrink-0"
 										style="background-color: {colors.accent};"
-										on:click={() => handleRequest(rg.id, rg.title)}
+										on:click={(e) => { e.stopPropagation(); handleRequest(rg.id, rg.title); }}
 										disabled={requestingAlbums.has(rg.id)}
 										aria-label="Request album"
 									>
@@ -511,7 +525,13 @@
 					<h2 class="text-xl sm:text-2xl font-bold mb-3 sm:mb-4">EPs ({artist.eps.length})</h2>
 					<ul class="list bg-base-200 rounded-box shadow-md">
 						{#each artist.eps as rg}
-							<li class="list-row group hover:bg-base-300 transition-colors p-2 sm:p-3">
+							<li 
+								class="list-row group hover:bg-base-300 transition-colors p-2 sm:p-3 cursor-pointer"
+								on:click={() => goToAlbum(rg.id)}
+								on:keypress={(e) => e.key === 'Enter' && goToAlbum(rg.id)}
+								role="button"
+								tabindex="0"
+							>
 								<div class="w-12 h-12 sm:w-16 sm:h-16 flex-shrink-0 rounded-box overflow-hidden bg-base-100 relative">
 									{#if !loadedImages.has(rg.id)}
 										<div class="skeleton w-full h-full absolute inset-0"></div>
@@ -553,7 +573,7 @@
 									<button
 										class="btn btn-square btn-sm sm:btn-md opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity duration-200 border-none flex-shrink-0"
 										style="background-color: {colors.accent};"
-										on:click={() => handleRequest(rg.id, rg.title)}
+										on:click={(e) => { e.stopPropagation(); handleRequest(rg.id, rg.title); }}
 										disabled={requestingAlbums.has(rg.id)}
 										aria-label="Request EP"
 									>
@@ -578,7 +598,13 @@
 					<h2 class="text-xl sm:text-2xl font-bold mb-3 sm:mb-4">Singles ({artist.singles.length})</h2>
 					<ul class="list bg-base-200 rounded-box shadow-md">
 						{#each artist.singles as rg}
-							<li class="list-row group hover:bg-base-300 transition-colors p-2 sm:p-3">
+							<li 
+								class="list-row group hover:bg-base-300 transition-colors p-2 sm:p-3 cursor-pointer"
+								on:click={() => goToAlbum(rg.id)}
+								on:keypress={(e) => e.key === 'Enter' && goToAlbum(rg.id)}
+								role="button"
+								tabindex="0"
+							>
 								<div class="w-12 h-12 sm:w-16 sm:h-16 flex-shrink-0 rounded-box overflow-hidden bg-base-100 relative">
 									{#if !loadedImages.has(rg.id)}
 										<div class="skeleton w-full h-full absolute inset-0"></div>
@@ -620,7 +646,7 @@
 									<button
 										class="btn btn-square btn-sm sm:btn-md opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity duration-200 border-none flex-shrink-0"
 										style="background-color: {colors.accent};"
-										on:click={() => handleRequest(rg.id, rg.title)}
+										on:click={(e) => { e.stopPropagation(); handleRequest(rg.id, rg.title); }}
 										disabled={requestingAlbums.has(rg.id)}
 										aria-label="Request single"
 									>

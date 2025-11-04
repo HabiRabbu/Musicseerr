@@ -10,7 +10,7 @@ from http_client import aclose
 from utils import request_queue
 from utils.cache import start_cache_cleanup_task
 from middleware import PerformanceMiddleware
-from routes import search, requests, library, status, queue, covers, artist, settings
+from routes import search, requests, library, status, queue, covers, artist, settings, album
 
 logging.basicConfig(
     level=logging.INFO,
@@ -46,6 +46,7 @@ app.include_router(queue.router)
 app.include_router(status.router)
 app.include_router(covers.router)
 app.include_router(artist.router)
+app.include_router(album.router)
 app.include_router(settings.router)
 
 mount_frontend(app)

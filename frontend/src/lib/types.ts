@@ -66,3 +66,28 @@ export type ReleaseTypeOption = {
 	title: string;
 	description: string;
 };
+
+export type Track = {
+	position: number;
+	title: string;
+	length?: number | null;  // Length in milliseconds
+	recording_id?: string | null;
+};
+
+export type AlbumInfo = {
+	title: string;
+	musicbrainz_id: string;
+	artist_name: string;
+	artist_id: string;
+	release_date?: string | null;
+	year?: number | null;
+	type?: string | null;
+	label?: string | null;
+	barcode?: string | null;
+	country?: string | null;
+	disambiguation?: string | null;
+	tracks: Track[];
+	total_tracks: number;
+	total_length?: number | null;  // Total length in milliseconds
+	in_library: boolean;
+};

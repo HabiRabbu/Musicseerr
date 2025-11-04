@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { Album } from '$lib/types';
   import { colors } from '$lib/colors';
+  import { goto } from '$app/navigation';
 
   export let album: Album;
   export let index: number = 0;
@@ -23,7 +24,8 @@
 
   $: coverUrl = album.cover_url ?? `/api/covers/release-group/${album.musicbrainz_id}?size=250`;
 
-  async function handleRequest() {
+  async function handleRequest(e: Event) {
+    e.stopPropagation();
     requesting = true;
     try {
       await fetch('/api/request', {
@@ -40,11 +42,21 @@
     }
   }
 
+  function handleClick() {
+    goto(`/album/${album.musicbrainz_id}`);
+  }
+
   $: displayYear = album.year ?? 'Unknown';
 
 </script>
 
-<div class="card bg-base-100 w-full shadow-sm flex-shrink-0 group relative">
+<div 
+  class="card bg-base-100 w-full shadow-sm flex-shrink-0 group relative cursor-pointer hover:shadow-lg transition-shadow"
+  on:click={handleClick}
+  on:keydown={(e) => e.key === 'Enter' && handleClick()}
+  role="button"
+  tabindex="0"
+>
   <figure class="aspect-square overflow-hidden relative">
     {#if imgError}
       <div class="w-full h-full flex items-center justify-center text-6xl opacity-50 bg-base-200">
