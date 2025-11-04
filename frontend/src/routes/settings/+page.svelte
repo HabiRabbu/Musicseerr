@@ -107,7 +107,7 @@
 							on:click={() => (activeTab = 'settings')}
 						>
 							<svg
-								xmlns="http:
+								xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
 								viewBox="0 0 24 24"
 								fill="none"
 								stroke="currentColor"
@@ -220,7 +220,7 @@
 									>
 										{#if saveMessage.includes('success')}
 											<svg
-												xmlns="http:
+												xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
 												class="h-6 w-6 shrink-0 stroke-current"
 												fill="none"
 												viewBox="0 0 24 24"
@@ -234,7 +234,7 @@
 											</svg>
 										{:else}
 											<svg
-												xmlns="http:
+												xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
 												class="h-6 w-6 shrink-0 stroke-current"
 												fill="none"
 												viewBox="0 0 24 24"

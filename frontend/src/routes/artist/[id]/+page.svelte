@@ -259,17 +259,17 @@
 			<div class="card bg-base-200 shadow-xl overflow-hidden">
 				
 				<div class="flex flex-col lg:flex-row lg:min-h-[32rem]">
-					<figure class="w-full lg:w-96 lg:h-96 xl:w-[28rem] xl:h-[28rem] flex-shrink-0 p-4 sm:p-6">
-						<img 
-							src="/api/covers/artist/{artist.musicbrainz_id}" 
-							alt={artist.name}
-							class="w-full h-full object-contain rounded-box max-h-80 sm:max-h-96 lg:max-h-none"
-							on:error={(e) => {
-								const target = e.currentTarget as HTMLImageElement;
-								target.src = 'data:image/svg+xml,%3Csvg xmlns="http:
-							}}
-						/>
-					</figure>
+				<figure class="w-full lg:w-96 lg:h-96 xl:w-[28rem] xl:h-[28rem] flex-shrink-0 p-4 sm:p-6">
+					<img 
+						src="/api/covers/artist/{artist.musicbrainz_id}" 
+						alt={artist.name}
+						class="w-full h-full object-contain rounded-box max-h-80 sm:max-h-96 lg:max-h-none"
+						on:error={(e) => {
+							const target = e.currentTarget as HTMLImageElement;
+							target.src = 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 200 200%22%3E%3Crect fill=%22%23444%22 width=%22200%22 height=%22200%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22 fill=%22%23999%22 font-size=%2224%22 font-family=%22sans-serif%22%3ENo Image%3C/text%3E%3C/svg%3E';
+						}}
+					/>
+				</figure>
 					<div class="card-body flex-1 p-4 sm:p-6 lg:p-8">
 						<div class="flex flex-col sm:flex-row items-start justify-between gap-3 sm:gap-4">
 							<div class="flex-1 min-w-0">
@@ -278,13 +278,13 @@
 									<p class="text-base-content/60 text-xs sm:text-sm mb-2 sm:mb-3">({artist.disambiguation})</p>
 								{/if}
 							</div>
-							{#if artist.in_library}
-								<span class="badge badge-success badge-lg gap-2 flex-shrink-0">
-									<svg xmlns="http:
-										<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
-									</svg>
-									In Library
-								</span>
+						{#if artist.in_library}
+							<span class="badge badge-success badge-lg gap-2 flex-shrink-0">
+								<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+									<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+								</svg>
+								In Library
+							</span>
 							{:else}
 								<span class="badge badge-ghost badge-lg flex-shrink-0">Not in Library</span>
 							{/if}
@@ -304,7 +304,7 @@
 										on:click={() => descriptionExpanded = false}
 									>
 										Show Less
-										<svg xmlns="http:
+										<svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 sm:h-4 sm:w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
 											<path stroke-linecap="round" stroke-linejoin="round" d="M5 15l7-7 7 7" />
 										</svg>
 									</button>
@@ -325,7 +325,7 @@
 											}}
 										>
 											Expand
-											<svg xmlns="http:
+											<svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 sm:h-4 sm:w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
 												<path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
 											</svg>
 										</button>
@@ -476,12 +476,12 @@
 									</div>
 								</div>
 								
-								{#if rg.in_library}
-									<div class="rounded-full p-1.5 sm:p-2 shadow-sm flex-shrink-0" style="background-color: {colors.accent};">
-										<svg xmlns="http:
-											<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
-										</svg>
-									</div>
+							{#if rg.in_library}
+								<div class="rounded-full p-1.5 sm:p-2 shadow-sm flex-shrink-0" style="background-color: {colors.accent};">
+									<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 sm:h-5 sm:w-5" fill="none" viewBox="0 0 24 24" stroke={colors.secondary} stroke-width="3">
+										<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+									</svg>
+								</div>
 								{:else}
 									<button
 										class="btn btn-square btn-sm sm:btn-md opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity duration-200 border-none flex-shrink-0"
@@ -490,13 +490,13 @@
 										disabled={requestingAlbums.has(rg.id)}
 										aria-label="Request album"
 									>
-										{#if requestingAlbums.has(rg.id)}
-											<span class="loading loading-spinner loading-xs sm:loading-sm" style="color: {colors.secondary};"></span>
-										{:else}
-											<svg xmlns="http:
-												<path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-											</svg>
-										{/if}
+									{#if requestingAlbums.has(rg.id)}
+										<span class="loading loading-spinner loading-xs sm:loading-sm" style="color: {colors.secondary};"></span>
+									{:else}
+										<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 sm:h-5 sm:w-5" fill="none" viewBox="0 0 24 24" stroke={colors.secondary} stroke-width="2.5">
+											<path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+										</svg>
+									{/if}
 									</button>
 								{/if}
 							</li>
@@ -543,12 +543,12 @@
 									</div>
 								</div>
 								
-								{#if rg.in_library}
-									<div class="rounded-full p-1.5 sm:p-2 shadow-sm flex-shrink-0" style="background-color: {colors.accent};">
-										<svg xmlns="http:
-											<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
-										</svg>
-									</div>
+							{#if rg.in_library}
+								<div class="rounded-full p-1.5 sm:p-2 shadow-sm flex-shrink-0" style="background-color: {colors.accent};">
+									<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 sm:h-5 sm:w-5" fill="none" viewBox="0 0 24 24" stroke={colors.secondary} stroke-width="3">
+										<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+									</svg>
+								</div>
 								{:else}
 									<button
 										class="btn btn-square btn-sm sm:btn-md opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity duration-200 border-none flex-shrink-0"
@@ -557,13 +557,13 @@
 										disabled={requestingAlbums.has(rg.id)}
 										aria-label="Request EP"
 									>
-										{#if requestingAlbums.has(rg.id)}
-											<span class="loading loading-spinner loading-xs sm:loading-sm" style="color: {colors.secondary};"></span>
-										{:else}
-											<svg xmlns="http:
-												<path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-											</svg>
-										{/if}
+									{#if requestingAlbums.has(rg.id)}
+										<span class="loading loading-spinner loading-xs sm:loading-sm" style="color: {colors.secondary};"></span>
+									{:else}
+										<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 sm:h-5 sm:w-5" fill="none" viewBox="0 0 24 24" stroke={colors.secondary} stroke-width="2.5">
+											<path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+										</svg>
+									{/if}
 									</button>
 								{/if}
 							</li>
@@ -610,12 +610,12 @@
 									</div>
 								</div>
 								
-								{#if rg.in_library}
-									<div class="rounded-full p-1.5 sm:p-2 shadow-sm flex-shrink-0" style="background-color: {colors.accent};">
-										<svg xmlns="http:
-											<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
-										</svg>
-									</div>
+							{#if rg.in_library}
+								<div class="rounded-full p-1.5 sm:p-2 shadow-sm flex-shrink-0" style="background-color: {colors.accent};">
+									<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 sm:h-5 sm:w-5" fill="none" viewBox="0 0 24 24" stroke={colors.secondary} stroke-width="3">
+										<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+									</svg>
+								</div>
 								{:else}
 									<button
 										class="btn btn-square btn-sm sm:btn-md opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity duration-200 border-none flex-shrink-0"
@@ -624,13 +624,13 @@
 										disabled={requestingAlbums.has(rg.id)}
 										aria-label="Request single"
 									>
-										{#if requestingAlbums.has(rg.id)}
-											<span class="loading loading-spinner loading-xs sm:loading-sm" style="color: {colors.secondary};"></span>
-										{:else}
-											<svg xmlns="http:
-												<path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-											</svg>
-										{/if}
+									{#if requestingAlbums.has(rg.id)}
+										<span class="loading loading-spinner loading-xs sm:loading-sm" style="color: {colors.secondary};"></span>
+									{:else}
+										<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 sm:h-5 sm:w-5" fill="none" viewBox="0 0 24 24" stroke={colors.secondary} stroke-width="2.5">
+											<path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+										</svg>
+									{/if}
 									</button>
 								{/if}
 							</li>
@@ -650,7 +650,7 @@
 {#if showToast}
 	<div class="toast toast-end toast-bottom">
 		<div class="alert alert-success">
-			<svg xmlns="http:
+			<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
 				<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
 			</svg>
 			<span>Added to Library</span>
