@@ -1,18 +1,39 @@
 <script lang="ts">
-	import { onDestroy } from 'svelte';
+	import { onMount, onDestroy } from 'svelte';
 	import { browser } from '$app/environment';
 	import { goto } from '$app/navigation';
 	import type { AlbumInfo } from '$lib/types';
 	import { colors } from '$lib/colors';
 	import { errorModal } from '$lib/stores/errorModal';
 
-	export let data: { albumId: string; album: AlbumInfo | null; error?: string };
+	export let data: { albumId: string; album: AlbumInfo | null };
 
 	let album: AlbumInfo | null = data.album;
-	let error: string | null = data.error || null;
+	let error: string | null = null;
+	let loading: boolean = true;
 	let showToast = false;
 	let requesting = false;
 	let imageLoaded = false;
+
+	// Fetch album data in the background after component mounts
+	onMount(async () => {
+		if (!album) {
+			try {
+				const res = await fetch(`/api/album/${data.albumId}`);
+				if (res.ok) {
+					album = await res.json();
+				} else {
+					error = 'Failed to load album';
+				}
+			} catch (e) {
+				error = 'Error loading album';
+			} finally {
+				loading = false;
+			}
+		} else {
+			loading = false;
+		}
+	});
 
 	function formatDuration(ms?: number | null): string {
 		if (!ms) return '--:--';
@@ -117,6 +138,33 @@
 		<div class="flex items-center justify-center min-h-[50vh]">
 			<div class="alert alert-error">
 				<span>{error}</span>
+			</div>
+		</div>
+	{:else if loading || !album}
+		<!-- Skeleton Loading State -->
+		<div class="space-y-6 sm:space-y-8">
+			<div class="flex flex-col lg:flex-row gap-6 lg:gap-8">
+				<!-- Skeleton Cover -->
+				<div class="skeleton w-full lg:w-64 xl:w-80 aspect-square rounded-box flex-shrink-0"></div>
+				
+				<!-- Skeleton Info -->
+				<div class="flex-1 flex flex-col justify-end space-y-4">
+					<div class="skeleton h-4 w-20"></div>
+					<div class="skeleton h-12 w-3/4"></div>
+					<div class="skeleton h-6 w-1/2"></div>
+					<div class="flex gap-4 mt-6">
+						<div class="skeleton h-12 w-32"></div>
+						<div class="skeleton h-12 w-32"></div>
+					</div>
+				</div>
+			</div>
+			
+			<!-- Skeleton Tracklist -->
+			<div class="space-y-2">
+				<div class="skeleton h-8 w-32 mb-4"></div>
+				{#each Array(8) as _, i}
+					<div class="skeleton h-12 w-full"></div>
+				{/each}
 			</div>
 		</div>
 	{:else if album}

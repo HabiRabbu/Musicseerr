@@ -21,6 +21,10 @@
 	let showViewMore = false;
 	let loadedImages = new Set<string>();
 	let lastFetchTime = 0;
+	let albumsCollapsed = false;
+	let epsCollapsed = false;
+	let singlesCollapsed = false;
+	let releasesLoading = true;
 
 	function checkDescriptionHeight() {
 		if (descriptionElement && !descriptionExpanded) {
@@ -47,6 +51,7 @@
 		lastFetchTime = now;
 
 		loading = true;
+		releasesLoading = true;
 		error = null;
 		
 		if (abortController) {
@@ -64,18 +69,22 @@
 			});
 			if (res.ok) {
 				artist = await res.json();
+				loading = false; // Artist info is loaded, show it immediately
+				releasesLoading = false; // Releases are included in the same response
 				setTimeout(() => checkDescriptionHeight(), 50);
 			} else {
 				error = 'Failed to load artist';
+				loading = false;
+				releasesLoading = false;
 			}
 		} catch (e) {
 			if (e instanceof Error && e.name === 'AbortError') {
 				return;
 			}
 			error = 'Error loading artist';
-			console.error(e);
-		} finally {
 			loading = false;
+			releasesLoading = false;
+			console.error(e);
 		}
 	}
 
@@ -172,6 +181,14 @@
 		}
 		goto(`/album/${albumId}`);
 	}
+
+	function goBack() {
+		if (browser && window.history.length > 1) {
+			window.history.back();
+		} else {
+			goto('/');
+		}
+	}
 </script>
 
 <style>
@@ -185,13 +202,24 @@
 </style>
 
 <div class="w-full px-2 sm:px-4 lg:px-8 py-4 sm:py-8 max-w-7xl mx-auto">
+	<!-- Back Button -->
+	<button 
+		on:click={goBack}
+		class="btn btn-ghost btn-circle mb-4"
+		aria-label="Go back"
+	>
+		<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+			<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+		</svg>
+	</button>
+
 	{#if error}
 		<div class="flex items-center justify-center min-h-[50vh]">
 			<div class="alert alert-error">
 				<span>{error}</span>
 			</div>
 		</div>
-	{:else if !artist && loading}
+	{:else if loading && !artist}
 		
 		<div class="space-y-4 sm:space-y-8">
 			
@@ -447,222 +475,290 @@
 			{/if}
 
 			
-			{#if artist.albums.length > 0}
+			{#if releasesLoading}
+				<!-- Loading state for releases -->
 				<div>
-					<h2 class="text-xl sm:text-2xl font-bold mb-3 sm:mb-4">Albums ({artist.albums.length})</h2>
-					<ul class="list bg-base-200 rounded-box shadow-md">
-						{#each artist.albums as rg}
-							<li 
-								class="list-row group hover:bg-base-300 transition-colors p-2 sm:p-3 cursor-pointer"
-								on:click={() => goToAlbum(rg.id)}
-								on:keypress={(e) => e.key === 'Enter' && goToAlbum(rg.id)}
-								role="button"
-								tabindex="0"
-							>
-								<div class="w-12 h-12 sm:w-16 sm:h-16 flex-shrink-0 rounded-box overflow-hidden bg-base-100 relative">
-									{#if !loadedImages.has(rg.id)}
-										<div class="skeleton w-full h-full absolute inset-0"></div>
-									{/if}
-									<img 
-										src="/api/covers/release-group/{rg.id}?size=250" 
-										alt="{rg.title} cover"
-										class="w-full h-full object-cover"
-										loading="lazy"
-										decoding="async"
-										on:load={() => handleImageLoad(rg.id)}
-										on:error={(e) => {
-											handleImageLoad(rg.id);
-											const target = e.currentTarget as HTMLImageElement;
-											target.style.display = 'none';
-											const parent = target.parentElement;
-											if (parent) {
-												const skeleton = parent.querySelector('.skeleton');
-												if (skeleton) skeleton.remove();
-												parent.innerHTML += '<div class="w-full h-full flex items-center justify-center text-2xl">💿</div>';
-											}
-										}}
-									/>
+					<div class="skeleton h-8 w-32 mb-4"></div>
+					<div class="bg-base-200 rounded-box shadow-md p-4 space-y-3">
+						{#each Array(5) as _}
+							<div class="flex items-center gap-4">
+								<div class="skeleton w-16 h-16 rounded-box flex-shrink-0"></div>
+								<div class="flex-1 space-y-2">
+									<div class="skeleton h-5 w-3/4"></div>
+									<div class="skeleton h-4 w-20"></div>
 								</div>
-								<div class="list-col-grow min-w-0">
-									<div class="font-semibold text-sm sm:text-base truncate">{rg.title}</div>
-									<div class="text-xs sm:text-sm text-base-content/60">
-										{#if rg.year}{rg.year}{/if}
-									</div>
-								</div>
-								
-							{#if rg.in_library}
-								<div class="rounded-full p-1.5 sm:p-2 shadow-sm flex-shrink-0" style="background-color: {colors.accent};">
-									<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 sm:h-5 sm:w-5" fill="none" viewBox="0 0 24 24" stroke={colors.secondary} stroke-width="3">
-										<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
-									</svg>
-								</div>
-								{:else}
-									<button
-										class="btn btn-square btn-sm sm:btn-md opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity duration-200 border-none flex-shrink-0"
-										style="background-color: {colors.accent};"
-										on:click={(e) => { e.stopPropagation(); handleRequest(rg.id, rg.title); }}
-										disabled={requestingAlbums.has(rg.id)}
-										aria-label="Request album"
-									>
-									{#if requestingAlbums.has(rg.id)}
-										<span class="loading loading-spinner loading-xs sm:loading-sm" style="color: {colors.secondary};"></span>
-									{:else}
-										<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 sm:h-5 sm:w-5" fill="none" viewBox="0 0 24 24" stroke={colors.secondary} stroke-width="2.5">
-											<path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-										</svg>
-									{/if}
-									</button>
-								{/if}
-							</li>
+								<div class="skeleton w-12 h-12 rounded-full flex-shrink-0"></div>
+							</div>
 						{/each}
-					</ul>
+					</div>
+				</div>
+			{:else}
+				
+				{#if artist.albums.length > 0}
+				<div>
+					<button 
+						class="w-full flex items-center justify-between text-xl sm:text-2xl font-bold mb-3 sm:mb-4 hover:opacity-80 transition-opacity"
+						on:click={() => albumsCollapsed = !albumsCollapsed}
+					>
+						<span>Albums ({artist.albums.length})</span>
+						<svg 
+							xmlns="http://www.w3.org/2000/svg" 
+							class="h-6 w-6 transition-transform duration-200 {albumsCollapsed ? '' : 'rotate-180'}" 
+							fill="none" 
+							viewBox="0 0 24 24" 
+							stroke="currentColor"
+						>
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+						</svg>
+					</button>
+					{#if !albumsCollapsed}
+						<ul class="list bg-base-200 rounded-box shadow-md">
+							{#each artist.albums as rg}
+								<li 
+									class="list-row group hover:bg-base-300 transition-colors p-2 sm:p-3 cursor-pointer"
+									on:click={() => goToAlbum(rg.id)}
+									on:keypress={(e) => e.key === 'Enter' && goToAlbum(rg.id)}
+									role="button"
+									tabindex="0"
+								>
+									<div class="w-12 h-12 sm:w-16 sm:h-16 flex-shrink-0 rounded-box overflow-hidden bg-base-100 relative">
+										{#if !loadedImages.has(rg.id)}
+											<div class="skeleton w-full h-full absolute inset-0"></div>
+										{/if}
+										<img 
+											src="/api/covers/release-group/{rg.id}?size=250" 
+											alt="{rg.title} cover"
+											class="w-full h-full object-cover"
+											loading="lazy"
+											decoding="async"
+											on:load={() => handleImageLoad(rg.id)}
+											on:error={(e) => {
+												handleImageLoad(rg.id);
+												const target = e.currentTarget as HTMLImageElement;
+												target.style.display = 'none';
+												const parent = target.parentElement;
+												if (parent) {
+													const skeleton = parent.querySelector('.skeleton');
+													if (skeleton) skeleton.remove();
+													parent.innerHTML += '<div class="w-full h-full flex items-center justify-center text-2xl">💿</div>';
+												}
+											}}
+										/>
+									</div>
+									<div class="list-col-grow min-w-0">
+										<div class="font-semibold text-sm sm:text-base truncate">{rg.title}</div>
+										<div class="text-xs sm:text-sm text-base-content/60">
+											{#if rg.year}{rg.year}{/if}
+										</div>
+									</div>
+									
+								{#if rg.in_library}
+									<div class="rounded-full p-1.5 sm:p-2 shadow-sm flex-shrink-0" style="background-color: {colors.accent};">
+										<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 sm:h-5 sm:w-5" fill="none" viewBox="0 0 24 24" stroke={colors.secondary} stroke-width="3">
+											<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+										</svg>
+									</div>
+									{:else}
+										<button
+											class="btn btn-square btn-sm sm:btn-md opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity duration-200 border-none flex-shrink-0"
+											style="background-color: {colors.accent};"
+											on:click={(e) => { e.stopPropagation(); handleRequest(rg.id, rg.title); }}
+											disabled={requestingAlbums.has(rg.id)}
+											aria-label="Request album"
+										>
+										{#if requestingAlbums.has(rg.id)}
+											<span class="loading loading-spinner loading-xs sm:loading-sm" style="color: {colors.secondary};"></span>
+										{:else}
+											<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 sm:h-5 sm:w-5" fill="none" viewBox="0 0 24 24" stroke={colors.secondary} stroke-width="2.5">
+												<path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+											</svg>
+										{/if}
+										</button>
+									{/if}
+								</li>
+							{/each}
+						</ul>
+					{/if}
 				</div>
 			{/if}
 
 			
 			{#if artist.eps.length > 0}
 				<div>
-					<h2 class="text-xl sm:text-2xl font-bold mb-3 sm:mb-4">EPs ({artist.eps.length})</h2>
-					<ul class="list bg-base-200 rounded-box shadow-md">
-						{#each artist.eps as rg}
-							<li 
-								class="list-row group hover:bg-base-300 transition-colors p-2 sm:p-3 cursor-pointer"
-								on:click={() => goToAlbum(rg.id)}
-								on:keypress={(e) => e.key === 'Enter' && goToAlbum(rg.id)}
-								role="button"
-								tabindex="0"
-							>
-								<div class="w-12 h-12 sm:w-16 sm:h-16 flex-shrink-0 rounded-box overflow-hidden bg-base-100 relative">
-									{#if !loadedImages.has(rg.id)}
-										<div class="skeleton w-full h-full absolute inset-0"></div>
-									{/if}
-									<img 
-										src="/api/covers/release-group/{rg.id}?size=250" 
-										alt="{rg.title} cover"
-										class="w-full h-full object-cover"
-										loading="lazy"
-										decoding="async"
-										on:load={() => handleImageLoad(rg.id)}
-										on:error={(e) => {
-											handleImageLoad(rg.id);
-											const target = e.currentTarget as HTMLImageElement;
-											target.style.display = 'none';
-											const parent = target.parentElement;
-											if (parent) {
-												const skeleton = parent.querySelector('.skeleton');
-												if (skeleton) skeleton.remove();
-												parent.innerHTML += '<div class="w-full h-full flex items-center justify-center text-2xl">💽</div>';
-											}
-										}}
-									/>
-								</div>
-								<div class="list-col-grow min-w-0">
-									<div class="font-semibold text-sm sm:text-base truncate">{rg.title}</div>
-									<div class="text-xs sm:text-sm text-base-content/60">
-										{#if rg.year}{rg.year}{/if}
+					<button 
+						class="w-full flex items-center justify-between text-xl sm:text-2xl font-bold mb-3 sm:mb-4 hover:opacity-80 transition-opacity"
+						on:click={() => epsCollapsed = !epsCollapsed}
+					>
+						<span>EPs ({artist.eps.length})</span>
+						<svg 
+							xmlns="http://www.w3.org/2000/svg" 
+							class="h-6 w-6 transition-transform duration-200 {epsCollapsed ? '' : 'rotate-180'}" 
+							fill="none" 
+							viewBox="0 0 24 24" 
+							stroke="currentColor"
+						>
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+						</svg>
+					</button>
+					{#if !epsCollapsed}
+						<ul class="list bg-base-200 rounded-box shadow-md">
+							{#each artist.eps as rg}
+								<li 
+									class="list-row group hover:bg-base-300 transition-colors p-2 sm:p-3 cursor-pointer"
+									on:click={() => goToAlbum(rg.id)}
+									on:keypress={(e) => e.key === 'Enter' && goToAlbum(rg.id)}
+									role="button"
+									tabindex="0"
+								>
+									<div class="w-12 h-12 sm:w-16 sm:h-16 flex-shrink-0 rounded-box overflow-hidden bg-base-100 relative">
+										{#if !loadedImages.has(rg.id)}
+											<div class="skeleton w-full h-full absolute inset-0"></div>
+										{/if}
+										<img 
+											src="/api/covers/release-group/{rg.id}?size=250" 
+											alt="{rg.title} cover"
+											class="w-full h-full object-cover"
+											loading="lazy"
+											decoding="async"
+											on:load={() => handleImageLoad(rg.id)}
+											on:error={(e) => {
+												handleImageLoad(rg.id);
+												const target = e.currentTarget as HTMLImageElement;
+												target.style.display = 'none';
+												const parent = target.parentElement;
+												if (parent) {
+													const skeleton = parent.querySelector('.skeleton');
+													if (skeleton) skeleton.remove();
+													parent.innerHTML += '<div class="w-full h-full flex items-center justify-center text-2xl">💽</div>';
+												}
+											}}
+										/>
 									</div>
-								</div>
-								
-							{#if rg.in_library}
-								<div class="rounded-full p-1.5 sm:p-2 shadow-sm flex-shrink-0" style="background-color: {colors.accent};">
-									<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 sm:h-5 sm:w-5" fill="none" viewBox="0 0 24 24" stroke={colors.secondary} stroke-width="3">
-										<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
-									</svg>
-								</div>
-								{:else}
-									<button
-										class="btn btn-square btn-sm sm:btn-md opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity duration-200 border-none flex-shrink-0"
-										style="background-color: {colors.accent};"
-										on:click={(e) => { e.stopPropagation(); handleRequest(rg.id, rg.title); }}
-										disabled={requestingAlbums.has(rg.id)}
-										aria-label="Request EP"
-									>
-									{#if requestingAlbums.has(rg.id)}
-										<span class="loading loading-spinner loading-xs sm:loading-sm" style="color: {colors.secondary};"></span>
-									{:else}
-										<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 sm:h-5 sm:w-5" fill="none" viewBox="0 0 24 24" stroke={colors.secondary} stroke-width="2.5">
-											<path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+									<div class="list-col-grow min-w-0">
+										<div class="font-semibold text-sm sm:text-base truncate">{rg.title}</div>
+										<div class="text-xs sm:text-sm text-base-content/60">
+											{#if rg.year}{rg.year}{/if}
+										</div>
+									</div>
+									
+								{#if rg.in_library}
+									<div class="rounded-full p-1.5 sm:p-2 shadow-sm flex-shrink-0" style="background-color: {colors.accent};">
+										<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 sm:h-5 sm:w-5" fill="none" viewBox="0 0 24 24" stroke={colors.secondary} stroke-width="3">
+											<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
 										</svg>
+									</div>
+									{:else}
+										<button
+											class="btn btn-square btn-sm sm:btn-md opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity duration-200 border-none flex-shrink-0"
+											style="background-color: {colors.accent};"
+											on:click={(e) => { e.stopPropagation(); handleRequest(rg.id, rg.title); }}
+											disabled={requestingAlbums.has(rg.id)}
+											aria-label="Request EP"
+										>
+										{#if requestingAlbums.has(rg.id)}
+											<span class="loading loading-spinner loading-xs sm:loading-sm" style="color: {colors.secondary};"></span>
+										{:else}
+											<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 sm:h-5 sm:w-5" fill="none" viewBox="0 0 24 24" stroke={colors.secondary} stroke-width="2.5">
+												<path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+											</svg>
+										{/if}
+										</button>
 									{/if}
-									</button>
-								{/if}
-							</li>
-						{/each}
-					</ul>
+								</li>
+							{/each}
+						</ul>
+					{/if}
 				</div>
 			{/if}
 
 			
 			{#if artist.singles.length > 0}
 				<div>
-					<h2 class="text-xl sm:text-2xl font-bold mb-3 sm:mb-4">Singles ({artist.singles.length})</h2>
-					<ul class="list bg-base-200 rounded-box shadow-md">
-						{#each artist.singles as rg}
-							<li 
-								class="list-row group hover:bg-base-300 transition-colors p-2 sm:p-3 cursor-pointer"
-								on:click={() => goToAlbum(rg.id)}
-								on:keypress={(e) => e.key === 'Enter' && goToAlbum(rg.id)}
-								role="button"
-								tabindex="0"
-							>
-								<div class="w-12 h-12 sm:w-16 sm:h-16 flex-shrink-0 rounded-box overflow-hidden bg-base-100 relative">
-									{#if !loadedImages.has(rg.id)}
-										<div class="skeleton w-full h-full absolute inset-0"></div>
-									{/if}
-									<img 
-										src="/api/covers/release-group/{rg.id}?size=250" 
-										alt="{rg.title} cover"
-										class="w-full h-full object-cover"
-										loading="lazy"
-										decoding="async"
-										on:load={() => handleImageLoad(rg.id)}
-										on:error={(e) => {
-											handleImageLoad(rg.id);
-											const target = e.currentTarget as HTMLImageElement;
-											target.style.display = 'none';
-											const parent = target.parentElement;
-											if (parent) {
-												const skeleton = parent.querySelector('.skeleton');
-												if (skeleton) skeleton.remove();
-												parent.innerHTML += '<div class="w-full h-full flex items-center justify-center text-2xl">🎵</div>';
-											}
-										}}
-									/>
-								</div>
-								<div class="list-col-grow min-w-0">
-									<div class="font-semibold text-sm sm:text-base truncate">{rg.title}</div>
-									<div class="text-xs sm:text-sm text-base-content/60">
-										{#if rg.year}{rg.year}{/if}
+					<button 
+						class="w-full flex items-center justify-between text-xl sm:text-2xl font-bold mb-3 sm:mb-4 hover:opacity-80 transition-opacity"
+						on:click={() => singlesCollapsed = !singlesCollapsed}
+					>
+						<span>Singles ({artist.singles.length})</span>
+						<svg 
+							xmlns="http://www.w3.org/2000/svg" 
+							class="h-6 w-6 transition-transform duration-200 {singlesCollapsed ? '' : 'rotate-180'}" 
+							fill="none" 
+							viewBox="0 0 24 24" 
+							stroke="currentColor"
+						>
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+						</svg>
+					</button>
+					{#if !singlesCollapsed}
+						<ul class="list bg-base-200 rounded-box shadow-md">
+							{#each artist.singles as rg}
+								<li 
+									class="list-row group hover:bg-base-300 transition-colors p-2 sm:p-3 cursor-pointer"
+									on:click={() => goToAlbum(rg.id)}
+									on:keypress={(e) => e.key === 'Enter' && goToAlbum(rg.id)}
+									role="button"
+									tabindex="0"
+								>
+									<div class="w-12 h-12 sm:w-16 sm:h-16 flex-shrink-0 rounded-box overflow-hidden bg-base-100 relative">
+										{#if !loadedImages.has(rg.id)}
+											<div class="skeleton w-full h-full absolute inset-0"></div>
+										{/if}
+										<img 
+											src="/api/covers/release-group/{rg.id}?size=250" 
+											alt="{rg.title} cover"
+											class="w-full h-full object-cover"
+											loading="lazy"
+											decoding="async"
+											on:load={() => handleImageLoad(rg.id)}
+											on:error={(e) => {
+												handleImageLoad(rg.id);
+												const target = e.currentTarget as HTMLImageElement;
+												target.style.display = 'none';
+												const parent = target.parentElement;
+												if (parent) {
+													const skeleton = parent.querySelector('.skeleton');
+													if (skeleton) skeleton.remove();
+													parent.innerHTML += '<div class="w-full h-full flex items-center justify-center text-2xl">🎵</div>';
+												}
+											}}
+										/>
 									</div>
-								</div>
-								
-							{#if rg.in_library}
-								<div class="rounded-full p-1.5 sm:p-2 shadow-sm flex-shrink-0" style="background-color: {colors.accent};">
-									<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 sm:h-5 sm:w-5" fill="none" viewBox="0 0 24 24" stroke={colors.secondary} stroke-width="3">
-										<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
-									</svg>
-								</div>
-								{:else}
-									<button
-										class="btn btn-square btn-sm sm:btn-md opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity duration-200 border-none flex-shrink-0"
-										style="background-color: {colors.accent};"
-										on:click={(e) => { e.stopPropagation(); handleRequest(rg.id, rg.title); }}
-										disabled={requestingAlbums.has(rg.id)}
-										aria-label="Request single"
-									>
-									{#if requestingAlbums.has(rg.id)}
-										<span class="loading loading-spinner loading-xs sm:loading-sm" style="color: {colors.secondary};"></span>
-									{:else}
-										<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 sm:h-5 sm:w-5" fill="none" viewBox="0 0 24 24" stroke={colors.secondary} stroke-width="2.5">
-											<path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+									<div class="list-col-grow min-w-0">
+										<div class="font-semibold text-sm sm:text-base truncate">{rg.title}</div>
+										<div class="text-xs sm:text-sm text-base-content/60">
+											{#if rg.year}{rg.year}{/if}
+										</div>
+									</div>
+									
+								{#if rg.in_library}
+									<div class="rounded-full p-1.5 sm:p-2 shadow-sm flex-shrink-0" style="background-color: {colors.accent};">
+										<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 sm:h-5 sm:w-5" fill="none" viewBox="0 0 24 24" stroke={colors.secondary} stroke-width="3">
+											<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
 										</svg>
+									</div>
+									{:else}
+										<button
+											class="btn btn-square btn-sm sm:btn-md opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity duration-200 border-none flex-shrink-0"
+											style="background-color: {colors.accent};"
+											on:click={(e) => { e.stopPropagation(); handleRequest(rg.id, rg.title); }}
+											disabled={requestingAlbums.has(rg.id)}
+											aria-label="Request single"
+										>
+										{#if requestingAlbums.has(rg.id)}
+											<span class="loading loading-spinner loading-xs sm:loading-sm" style="color: {colors.secondary};"></span>
+										{:else}
+											<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 sm:h-5 sm:w-5" fill="none" viewBox="0 0 24 24" stroke={colors.secondary} stroke-width="2.5">
+												<path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+											</svg>
+										{/if}
+										</button>
 									{/if}
-									</button>
-								{/if}
-							</li>
-						{/each}
-					</ul>
+								</li>
+							{/each}
+						</ul>
+					{/if}
 				</div>
+			{/if}
 			{/if}
 		</div>
 	{:else}
