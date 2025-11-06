@@ -91,7 +91,6 @@
 	}
 
 	onMount(() => {
-		
 		if (browser) {
 			const handleRefresh = () => {
 				if (data.query) {
@@ -99,7 +98,6 @@
 				}
 			};
 			window.addEventListener('search-refresh', handleRefresh);
-			
 			
 			return () => {
 				window.removeEventListener('search-refresh', handleRefresh);
@@ -191,8 +189,17 @@
 		<div>
 			<h2 class="text-xl font-bold mb-4">Artists</h2>
 			{#if loadingArtists}
-				<div class="flex items-center justify-center p-8 bg-base-200 rounded-box">
-					<span class="loading loading-spinner loading-md text-primary"></span>
+				<div class="bg-base-200 rounded-box p-4">
+					<div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-3">
+						{#each Array(7) as _, i}
+							<div class="card bg-base-100 w-full shadow-sm">
+								<div class="skeleton aspect-square w-full"></div>
+								<div class="card-body p-2">
+									<div class="skeleton h-4 w-full"></div>
+								</div>
+							</div>
+						{/each}
+					</div>
 				</div>
 			{:else if artists.length > 0}
 				<div class="bg-base-200 rounded-box p-4">
@@ -223,8 +230,18 @@
 				{/if}
 			</div>
 			{#if loadingAlbums}
-				<div class="flex items-center justify-center p-8 bg-base-200 rounded-box">
-					<span class="loading loading-spinner loading-md text-primary"></span>
+				<div class="bg-base-200 rounded-box p-4">
+					<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4">
+						{#each Array(8) as _, i}
+							<div class="card bg-base-100 w-full shadow-sm">
+								<div class="skeleton aspect-square w-full"></div>
+								<div class="card-body p-3">
+									<div class="skeleton h-4 w-full mb-2"></div>
+									<div class="skeleton h-3 w-3/4"></div>
+								</div>
+							</div>
+						{/each}
+					</div>
 				</div>
 			{:else if albums.length > 0}
 				<div class="bg-base-200 rounded-box p-4">

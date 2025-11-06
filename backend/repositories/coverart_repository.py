@@ -113,16 +113,9 @@ class CoverArtRepository:
         """Make HTTP GET request with retry and circuit breaker."""
         return await self._client.get(url, **kwargs)
     
-    async def get_artist_image(self, artist_id: str) -> Optional[tuple[bytes, str, str]]:
-        """Get artist image from Wikidata.
-        
-        Args:
-            artist_id: MusicBrainz artist ID
-        
-        Returns:
-            Tuple of (image_data, content_type, wikidata_id) or None
-        """
-        cache_filename = _get_cache_filename(f"artist_{artist_id}", "img")
+    async def get_artist_image(self, artist_id: str, size: Optional[int] = None) -> Optional[tuple[bytes, str, str]]:
+        size_suffix = f"_{size}" if size else ""
+        cache_filename = _get_cache_filename(f"artist_{artist_id}{size_suffix}", "img")
         file_path = CACHE_DIR / f"{cache_filename}.bin"
         
         if cached := await self._read_disk_cache(file_path, ["wikidata_id"]):
@@ -186,6 +179,8 @@ class CoverArtRepository:
                     f"?action=query&titles=File:{quote(filename)}"
                     f"&prop=imageinfo&iiprop=url&format=json"
                 )
+                if size:
+                    commons_api += f"&iiurlwidth={size}"
                 
                 commons_response = await self._http_get(commons_api)
                 if commons_response.status_code != 200:
@@ -198,7 +193,10 @@ class CoverArtRepository:
                 for page in pages.values():
                     imageinfo = page.get("imageinfo", [])
                     if imageinfo:
-                        image_url = imageinfo[0].get("url")
+                        if size and "thumburl" in imageinfo[0]:
+                            image_url = imageinfo[0].get("thumburl")
+                        else:
+                            image_url = imageinfo[0].get("url")
                         break
                 
                 if not image_url:

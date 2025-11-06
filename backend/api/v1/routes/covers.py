@@ -1,8 +1,9 @@
 import logging
 from typing import Optional
-from fastapi import APIRouter, HTTPException, Path, Query
+from fastapi import APIRouter, HTTPException, Path, Query, Depends
 from fastapi.responses import Response
 from core.dependencies import get_coverart_repository
+from repositories.coverart_repository import CoverArtRepository
 
 router = APIRouter(prefix="/api/covers", tags=["covers"])
 log = logging.getLogger(__name__)
@@ -78,23 +79,22 @@ async def cover_from_release(
 
 
 @router.get("/artist/{artist_id}")
-async def cover_from_artist(
-    artist_id: str = Path(..., min_length=1, description="MusicBrainz artist ID"),
+async def get_artist_cover(
+    artist_id: str,
+    size: Optional[int] = None,
+    coverart_repo: CoverArtRepository = Depends(get_coverart_repository)
 ):
-    """Get artist image from Wikidata"""
-    coverart_repo = get_coverart_repository()
-    result = await coverart_repo.get_artist_image(artist_id)
+    result = await coverart_repo.get_artist_image(artist_id, size)
     
-    if result:
-        image_data, content_type, wikidata_id = result
-        return Response(
-            content=image_data,
-            media_type=content_type,
-            headers={
-                "Cache-Control": "public, max-age=31536000, immutable",
-                "X-Image-Source": "wikidata",
-                "X-Wikidata-ID": wikidata_id,
-            }
-        )
+    if not result:
+        raise HTTPException(status_code=404, detail="Artist image not found")
     
-    raise HTTPException(status_code=404, detail="Artist image not found")
+    image_data, content_type, wikidata_id = result
+    return Response(
+        content=image_data,
+        media_type=content_type,
+        headers={
+            "Cache-Control": "public, max-age=31536000, immutable",
+            "X-Cover-Source": "wikidata",
+        }
+    )

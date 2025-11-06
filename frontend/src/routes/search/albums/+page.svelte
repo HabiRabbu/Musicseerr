@@ -110,11 +110,9 @@
 	}
 
 	onMount(() => {
-		
 		if (browser) {
 			const handleRefresh = () => resetAndLoad();
 			window.addEventListener('search-refresh', handleRefresh);
-			
 			
 			return () => {
 				window.removeEventListener('search-refresh', handleRefresh);
@@ -160,6 +158,20 @@
 <section class="px-8 py-4">
 	{#if !data.query}
 		<p class="text-center mt-32 text-gray-400">Enter a search query to get started.</p>
+	{:else if loading && albums.length === 0}
+		<div class="bg-base-200 rounded-box p-4">
+			<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4">
+				{#each Array(16) as _, i}
+					<div class="card bg-base-100 w-full shadow-sm">
+						<div class="skeleton aspect-square w-full"></div>
+						<div class="card-body p-3">
+							<div class="skeleton h-4 w-full mb-2"></div>
+							<div class="skeleton h-3 w-3/4"></div>
+						</div>
+					</div>
+				{/each}
+			</div>
+		</div>
 	{:else if albums.length === 0 && !loading}
 		<div class="p-8 bg-base-200 rounded-box text-center text-gray-500">
 			No albums found
@@ -173,7 +185,6 @@
 			</div>
 		</div>
 
-		
 		<div bind:this={sentinel} class="h-20 flex items-center justify-center">
 			{#if loading}
 				<span class="loading loading-spinner loading-md text-primary"></span>

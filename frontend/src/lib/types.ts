@@ -1,5 +1,5 @@
 export type Artist = {
-	title: string;                 
+	title: string;
 	musicbrainz_id: string;
 	in_library: boolean;
 	cover_url?: string | null;
@@ -9,7 +9,7 @@ export type Album = {
 	title: string;
 	artist: string | null;
 	year: number | null;
-	musicbrainz_id: string;        
+	musicbrainz_id: string;
 	in_library: boolean;
 	cover_url?: string | null;
 };
@@ -46,6 +46,7 @@ export type ArtistInfo = {
 		ended?: boolean;
 	} | null;
 	description?: string | null;
+	image?: string | null;
 	tags: string[];
 	aliases: string[];
 	external_links: ExternalLink[];
@@ -53,6 +54,15 @@ export type ArtistInfo = {
 	albums: ReleaseGroup[];
 	singles: ReleaseGroup[];
 	eps: ReleaseGroup[];
+	release_group_count?: number;
+};
+
+export type ArtistReleases = {
+	albums: ReleaseGroup[];
+	singles: ReleaseGroup[];
+	eps: ReleaseGroup[];
+	total_count: number;
+	has_more: boolean;
 };
 
 export type UserPreferences = {
@@ -70,7 +80,7 @@ export type ReleaseTypeOption = {
 export type Track = {
 	position: number;
 	title: string;
-	length?: number | null;  // Length in milliseconds
+	length?: number | null;
 	recording_id?: string | null;
 };
 
@@ -88,6 +98,6 @@ export type AlbumInfo = {
 	disambiguation?: string | null;
 	tracks: Track[];
 	total_tracks: number;
-	total_length?: number | null;  // Total length in milliseconds
+	total_length?: number | null;
 	in_library: boolean;
 };

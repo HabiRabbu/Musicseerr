@@ -1,7 +1,7 @@
 import asyncio
 import logging
 from typing import Any, Optional
-from api.v1.schemas.artist import ArtistInfo, ExternalLink
+from api.v1.schemas.artist import ArtistInfo, ArtistExtendedInfo, ArtistReleases, ExternalLink
 from repositories.musicbrainz_repository import MusicBrainzRepository
 from repositories.lidarr_repository import LidarrRepository
 from repositories.wikidata_repository import WikidataRepository
@@ -89,6 +89,93 @@ class ArtistService:
             singles=singles,
             eps=eps,
         )
+    
+    async def get_artist_info_basic(self, artist_id: str) -> ArtistInfo:
+        mb_artist, library_mbids, album_mbids = await self._fetch_artist_data(artist_id)
+        
+        in_library = artist_id.lower() in library_mbids
+        tags = self._extract_tags(mb_artist)
+        aliases = self._extract_aliases(mb_artist)
+        life_span = self._extract_life_span(mb_artist)
+        external_links = self._build_external_links(mb_artist)
+        
+        albums, singles, eps = await self._get_categorized_releases(mb_artist, album_mbids)
+        
+        total_release_count = mb_artist.get("release-group-count", 0)
+        
+        return ArtistInfo(
+            name=mb_artist.get("name", "Unknown Artist"),
+            musicbrainz_id=artist_id,
+            disambiguation=mb_artist.get("disambiguation"),
+            type=mb_artist.get("type"),
+            country=mb_artist.get("country"),
+            life_span=life_span,
+            description=None,
+            image=None,
+            tags=tags,
+            aliases=aliases,
+            external_links=external_links,
+            in_library=in_library,
+            albums=albums,
+            singles=singles,
+            eps=eps,
+            release_group_count=total_release_count,
+        )
+    
+    async def get_artist_extended_info(self, artist_id: str) -> ArtistExtendedInfo:
+        try:
+            mb_artist = await self._mb_repo.get_artist_by_id(artist_id)
+            if not mb_artist:
+                raise ResourceNotFoundError("Artist not found")
+            
+            description, image = await self._fetch_wikidata_info(mb_artist)
+            
+            return ArtistExtendedInfo(
+                description=description,
+                image=image
+            )
+        except Exception as e:
+            logger.error(f"Error fetching extended artist info for {artist_id}: {e}")
+            return ArtistExtendedInfo(description=None, image=None)
+    
+    async def get_artist_releases(
+        self,
+        artist_id: str,
+        offset: int = 0,
+        limit: int = 50
+    ) -> ArtistReleases:
+        try:
+            release_groups, total_count = await self._mb_repo.get_artist_release_groups(
+                artist_id, offset, limit
+            )
+            
+            album_mbids = await self._lidarr_repo.get_library_mbids(include_release_ids=True)
+            
+            temp_artist = {"release-group-list": release_groups}
+            
+            prefs = self._preferences_service.get_preferences()
+            included_primary_types = set(t.lower() for t in prefs.primary_types)
+            included_secondary_types = set(t.lower() for t in prefs.secondary_types)
+            
+            albums, singles, eps = self._categorize_release_groups(
+                temp_artist,
+                album_mbids,
+                included_primary_types,
+                included_secondary_types
+            )
+            
+            has_more = (offset + len(release_groups)) < total_count
+            
+            return ArtistReleases(
+                albums=albums,
+                singles=singles,
+                eps=eps,
+                total_count=total_count,
+                has_more=has_more
+            )
+        except Exception as e:
+            logger.error(f"Error fetching releases for artist {artist_id} at offset {offset}: {e}")
+            return ArtistReleases(albums=[], singles=[], eps=[], total_count=0, has_more=False)
     
     async def _fetch_artist_data(self, artist_id: str) -> tuple[dict, set[str], set[str]]:
         """Fetch artist data from MusicBrainz and library info from Lidarr."""

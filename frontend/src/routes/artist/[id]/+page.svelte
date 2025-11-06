@@ -3,7 +3,7 @@
 	import { browser } from '$app/environment';
 	import { invalidate } from '$app/navigation';
 	import { goto } from '$app/navigation';
-	import type { ArtistInfo } from '$lib/types';
+	import type { ArtistInfo, ArtistReleases } from '$lib/types';
 	import { colors } from '$lib/colors';
 	import { errorModal } from '$lib/stores/errorModal';
 
@@ -24,7 +24,14 @@
 	let albumsCollapsed = false;
 	let epsCollapsed = false;
 	let singlesCollapsed = false;
-	let releasesLoading = true;
+	let extendedInfoLoading = true;
+	let loadingMoreReleases = false;
+	let currentOffset = 50; // Start after initial 50
+	let hasMoreReleases = false;
+	let totalReleaseCount = 0;
+	let loadedReleaseCount = 0;
+	const BATCH_SIZE = 50;
+	let imageObserver: IntersectionObserver | null = null;
 
 	function checkDescriptionHeight() {
 		if (descriptionElement && !descriptionExpanded) {
@@ -35,9 +42,34 @@
 		}
 	}
 	
+	function sortReleasesByYear(releases: any[]) {
+		return releases.sort((a, b) => {
+			const yearA = a.year;
+			const yearB = b.year;
+			
+			if (yearA === null || yearA === undefined) return 1;
+			if (yearB === null || yearB === undefined) return -1;
+			
+			return yearB - yearA;
+		});
+	}
+	
 	function handleImageLoad(id: string) {
 		loadedImages.add(id);
 		loadedImages = loadedImages;
+	}
+	
+	function setupImageObserver(img: HTMLImageElement) {
+		if (imageObserver && img) {
+			imageObserver.observe(img);
+		}
+		return {
+			destroy() {
+				if (imageObserver && img) {
+					imageObserver.unobserve(img);
+				}
+			}
+		};
 	}
 	
 	$: validLinks = artist?.external_links.filter(link => link.url && link.url.trim() !== '') || [];
@@ -51,7 +83,7 @@
 		lastFetchTime = now;
 
 		loading = true;
-		releasesLoading = true;
+		extendedInfoLoading = true;
 		error = null;
 		
 		if (abortController) {
@@ -60,22 +92,34 @@
 		abortController = new AbortController();
 		
 		try {
-			
 			const cacheBuster = force ? `?t=${now}` : '';
 			const res = await fetch(`/api/artist/${data.artistId}${cacheBuster}`, {
 				signal: abortController.signal,
-				
 				cache: force ? 'no-cache' : 'default'
 			});
+			
 			if (res.ok) {
 				artist = await res.json();
-				loading = false; // Artist info is loaded, show it immediately
-				releasesLoading = false; // Releases are included in the same response
-				setTimeout(() => checkDescriptionHeight(), 50);
+				loading = false;
+				
+				if (artist) {
+					artist.albums = sortReleasesByYear(artist.albums);
+					artist.singles = sortReleasesByYear(artist.singles);
+					artist.eps = sortReleasesByYear(artist.eps);
+					loadedReleaseCount = artist.albums.length + artist.singles.length + artist.eps.length;
+				}
+				
+				if (artist?.release_group_count && artist.release_group_count > BATCH_SIZE) {
+					hasMoreReleases = true;
+					totalReleaseCount = artist.release_group_count;
+					fetchMoreReleases();
+				}
+				
+				fetchExtendedInfo(force);
 			} else {
 				error = 'Failed to load artist';
 				loading = false;
-				releasesLoading = false;
+				extendedInfoLoading = false;
 			}
 		} catch (e) {
 			if (e instanceof Error && e.name === 'AbortError') {
@@ -83,8 +127,78 @@
 			}
 			error = 'Error loading artist';
 			loading = false;
-			releasesLoading = false;
+			extendedInfoLoading = false;
 			console.error(e);
+		}
+	}
+	
+	async function fetchExtendedInfo(force = false) {
+		if (!artist) return;
+		
+		try {
+			const now = Date.now();
+			const cacheBuster = force ? `?t=${now}` : '';
+			const res = await fetch(`/api/artist/${data.artistId}/extended${cacheBuster}`, {
+				signal: abortController?.signal,
+				cache: force ? 'no-cache' : 'default'
+			});
+			
+			if (res.ok) {
+				const extendedInfo = await res.json();
+				if (artist) {
+					artist.description = extendedInfo.description;
+					artist.image = extendedInfo.image;
+					artist = artist; // Trigger reactivity
+					setTimeout(() => checkDescriptionHeight(), 50);
+				}
+			}
+		} catch (e) {
+			if (e instanceof Error && e.name === 'AbortError') {
+				return;
+			}
+			console.error('Error loading extended artist info:', e);
+		} finally {
+			extendedInfoLoading = false;
+		}
+	}
+	
+	async function fetchMoreReleases() {
+		if (!artist || loadingMoreReleases || !hasMoreReleases) return;
+		
+		loadingMoreReleases = true;
+		
+		try {
+			const res = await fetch(
+				`/api/artist/${data.artistId}/releases?offset=${currentOffset}&limit=${BATCH_SIZE}`,
+				{ signal: abortController?.signal }
+			);
+			
+			if (res.ok) {
+				const moreReleases: ArtistReleases = await res.json();
+				
+				if (artist) {
+					artist.albums = sortReleasesByYear([...artist.albums, ...moreReleases.albums]);
+					artist.singles = sortReleasesByYear([...artist.singles, ...moreReleases.singles]);
+					artist.eps = sortReleasesByYear([...artist.eps, ...moreReleases.eps]);
+					artist = artist;
+					
+					currentOffset += BATCH_SIZE;
+					hasMoreReleases = moreReleases.has_more;
+					loadedReleaseCount = artist.albums.length + artist.singles.length + artist.eps.length;
+					
+					if (hasMoreReleases) {
+						setTimeout(() => fetchMoreReleases(), 1000);
+					}
+				}
+			}
+		} catch (e) {
+			if (e instanceof Error && e.name === 'AbortError') {
+				return;
+			}
+			console.error('Error loading more releases:', e);
+			hasMoreReleases = false; // Stop trying on error
+		} finally {
+			loadingMoreReleases = false;
 		}
 	}
 
@@ -93,12 +207,33 @@
 
 		
 		if (browser) {
+			imageObserver = new IntersectionObserver(
+				(entries) => {
+					entries.forEach((entry) => {
+						if (entry.isIntersecting) {
+							const img = entry.target as HTMLImageElement;
+							const src = img.dataset.src;
+							if (src && img.src !== src) {
+								img.src = src;
+								imageObserver?.unobserve(img);
+							}
+						}
+					});
+				},
+				{
+					rootMargin: '200px',
+					threshold: 0.01
+				}
+			);
+
 			const handleRefresh = () => fetchArtist(true);
 			window.addEventListener('artist-refresh', handleRefresh);
 			
-			
 			return () => {
 				window.removeEventListener('artist-refresh', handleRefresh);
+				if (imageObserver) {
+					imageObserver.disconnect();
+				}
 			};
 		}
 	});
@@ -107,6 +242,10 @@
 		if (abortController) {
 			abortController.abort();
 			abortController = null;
+		}
+		if (imageObserver) {
+			imageObserver.disconnect();
+			imageObserver = null;
 		}
 	});
 
@@ -326,7 +465,17 @@
 							{/if}
 						</div>
 					
-					{#if artist.description}
+					{#if extendedInfoLoading}
+						<div class="mb-4 sm:mb-6">
+							<h3 class="text-xs sm:text-sm font-semibold text-base-content/60 uppercase tracking-wide mb-2">Description</h3>
+							<div class="space-y-2">
+								<div class="skeleton h-4 w-full"></div>
+								<div class="skeleton h-4 w-full"></div>
+								<div class="skeleton h-4 w-full"></div>
+								<div class="skeleton h-4 w-3/4"></div>
+							</div>
+						</div>
+					{:else if artist.description}
 						<div class="mb-4 sm:mb-6">
 							<h3 class="text-xs sm:text-sm font-semibold text-base-content/60 uppercase tracking-wide mb-2">Description</h3>
 							<div class="text-sm sm:text-base text-base-content/80 leading-relaxed">
@@ -474,27 +623,17 @@
 				</div>
 			{/if}
 
-			
-			{#if releasesLoading}
-				<!-- Loading state for releases -->
-				<div>
-					<div class="skeleton h-8 w-32 mb-4"></div>
-					<div class="bg-base-200 rounded-box shadow-md p-4 space-y-3">
-						{#each Array(5) as _}
-							<div class="flex items-center gap-4">
-								<div class="skeleton w-16 h-16 rounded-box flex-shrink-0"></div>
-								<div class="flex-1 space-y-2">
-									<div class="skeleton h-5 w-3/4"></div>
-									<div class="skeleton h-4 w-20"></div>
-								</div>
-								<div class="skeleton w-12 h-12 rounded-full flex-shrink-0"></div>
-							</div>
-						{/each}
+			{#if hasMoreReleases || loadingMoreReleases}
+				<div class="flex items-center justify-center gap-3 p-4 bg-base-300 rounded-box mb-6" style="border: 2px solid {colors.accent};">
+					<span class="loading loading-spinner loading-md" style="color: {colors.accent};"></span>
+					<div class="flex flex-col items-start">
+						<span class="font-semibold text-base" style="color: {colors.accent};">Loading all releases...</span>
+						<span class="text-sm text-base-content/70">Loaded {loadedReleaseCount} of {totalReleaseCount} releases</span>
 					</div>
 				</div>
-			{:else}
-				
-				{#if artist.albums.length > 0}
+			{/if}
+			
+			{#if artist.albums.length > 0}
 				<div>
 					<button 
 						class="w-full flex items-center justify-between text-xl sm:text-2xl font-bold mb-3 sm:mb-4 hover:opacity-80 transition-opacity"
@@ -526,11 +665,12 @@
 											<div class="skeleton w-full h-full absolute inset-0"></div>
 										{/if}
 										<img 
-											src="/api/covers/release-group/{rg.id}?size=250" 
+											src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
+											data-src="/api/covers/release-group/{rg.id}?size=250"
 											alt="{rg.title} cover"
 											class="w-full h-full object-cover"
-											loading="lazy"
 											decoding="async"
+											use:setupImageObserver
 											on:load={() => handleImageLoad(rg.id)}
 											on:error={(e) => {
 												handleImageLoad(rg.id);
@@ -578,6 +718,11 @@
 								</li>
 							{/each}
 						</ul>
+						{#if hasMoreReleases || loadingMoreReleases}
+							<div class="flex items-center justify-center gap-2 p-3 mt-2">
+								<span class="loading loading-spinner loading-sm" style="color: {colors.accent};"></span>
+							</div>
+						{/if}
 					{/if}
 				</div>
 			{/if}
@@ -615,11 +760,12 @@
 											<div class="skeleton w-full h-full absolute inset-0"></div>
 										{/if}
 										<img 
-											src="/api/covers/release-group/{rg.id}?size=250" 
+											src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
+											data-src="/api/covers/release-group/{rg.id}?size=250"
 											alt="{rg.title} cover"
 											class="w-full h-full object-cover"
-											loading="lazy"
 											decoding="async"
+											use:setupImageObserver
 											on:load={() => handleImageLoad(rg.id)}
 											on:error={(e) => {
 												handleImageLoad(rg.id);
@@ -667,6 +813,11 @@
 								</li>
 							{/each}
 						</ul>
+						{#if hasMoreReleases || loadingMoreReleases}
+							<div class="flex items-center justify-center gap-2 p-3 mt-2">
+								<span class="loading loading-spinner loading-sm" style="color: {colors.accent};"></span>
+							</div>
+						{/if}
 					{/if}
 				</div>
 			{/if}
@@ -704,11 +855,12 @@
 											<div class="skeleton w-full h-full absolute inset-0"></div>
 										{/if}
 										<img 
-											src="/api/covers/release-group/{rg.id}?size=250" 
+											src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
+											data-src="/api/covers/release-group/{rg.id}?size=250"
 											alt="{rg.title} cover"
 											class="w-full h-full object-cover"
-											loading="lazy"
 											decoding="async"
+											use:setupImageObserver
 											on:load={() => handleImageLoad(rg.id)}
 											on:error={(e) => {
 												handleImageLoad(rg.id);
@@ -756,9 +908,13 @@
 								</li>
 							{/each}
 						</ul>
+						{#if hasMoreReleases || loadingMoreReleases}
+							<div class="flex items-center justify-center gap-2 p-3 mt-2">
+								<span class="loading loading-spinner loading-sm" style="color: {colors.accent};"></span>
+							</div>
+						{/if}
 					{/if}
 				</div>
-			{/if}
 			{/if}
 		</div>
 	{:else}

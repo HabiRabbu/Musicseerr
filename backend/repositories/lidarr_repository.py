@@ -182,7 +182,7 @@ class LidarrRepository:
                     if isinstance(rid, str):
                         ids.add(rid.lower())
         
-        await self._cache.set(cache_key, ids, ttl_seconds=30)
+        await self._cache.set(cache_key, ids, ttl_seconds=300)
         return ids
     
     async def get_artist_mbids(self) -> set[str]:
@@ -201,7 +201,7 @@ class LidarrRepository:
             if isinstance(mbid, str):
                 ids.add(mbid.lower())
         
-        await self._cache.set(cache_key, ids, ttl_seconds=30)
+        await self._cache.set(cache_key, ids, ttl_seconds=300)
         return ids
     
     async def get_queue(self) -> list[QueueItem]:

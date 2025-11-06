@@ -224,47 +224,64 @@ class MusicBrainzRepository:
             result = await self._mb_call(
                 musicbrainzngs.get_artist_by_id,
                 mbid,
-                includes=["tags", "aliases", "url-rels", "ratings"]
+                includes=["tags", "aliases", "url-rels"]
             )
             artist = result.get("artist")
             
             if not artist:
                 return None
             
-            # Fetch all release groups in batches of 100 (MusicBrainz API limit)
-            all_release_groups = []
-            offset = 0
-            limit = 100
+            limit = 50
             
-            while True:
-                rg_result = await self._mb_call(
-                    musicbrainzngs.browse_release_groups,
-                    artist=mbid,
-                    limit=limit,
-                    offset=offset
-                )
-                
-                if rg_result and "release-group-list" in rg_result:
-                    release_groups = rg_result["release-group-list"]
-                    all_release_groups.extend(release_groups)
-                    
-                    # Check if we've fetched all available release groups
-                    total_count = int(rg_result.get("release-group-count", 0))
-                    if offset + len(release_groups) >= total_count or len(release_groups) < limit:
-                        break
-                    
-                    offset += limit
-                else:
-                    break
+            first_batch = await self._mb_call(
+                musicbrainzngs.browse_release_groups,
+                artist=mbid,
+                limit=limit,
+                offset=0
+            )
+            
+            all_release_groups = []
+            total_count = 0
+            if first_batch and "release-group-list" in first_batch:
+                all_release_groups.extend(first_batch["release-group-list"])
+                total_count = int(first_batch.get("release-group-count", 0))
             
             if all_release_groups:
                 artist["release-group-list"] = all_release_groups
             
-            await self._cache.set(cache_key, artist, ttl_seconds=3600)  # 1 hour
+            artist["release-group-count"] = total_count
+            
+            await self._cache.set(cache_key, artist, ttl_seconds=21600)
             return artist
         except Exception as e:
             logger.error(f"Failed to fetch artist {mbid}: {e}")
             return None
+    
+    async def get_artist_release_groups(
+        self,
+        artist_mbid: str,
+        offset: int = 0,
+        limit: int = 50
+    ) -> tuple[list[dict[str, Any]], int]:
+        try:
+            result = await self._mb_call(
+                musicbrainzngs.browse_release_groups,
+                artist=artist_mbid,
+                limit=limit,
+                offset=offset
+            )
+            
+            release_groups = []
+            total_count = 0
+            
+            if result and "release-group-list" in result:
+                release_groups = result["release-group-list"]
+                total_count = int(result.get("release-group-count", 0))
+            
+            return release_groups, total_count
+        except Exception as e:
+            logger.error(f"Failed to fetch release groups for artist {artist_mbid} at offset {offset}: {e}")
+            return [], 0
     
     async def get_release_group_by_id(
         self,

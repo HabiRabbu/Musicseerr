@@ -24,3 +24,17 @@ class ArtistInfo(BaseModel):
     albums: list[dict] = Field(default_factory=list)
     singles: list[dict] = Field(default_factory=list)
     eps: list[dict] = Field(default_factory=list)
+    release_group_count: int = 0
+
+
+class ArtistExtendedInfo(BaseModel):
+    description: Optional[str] = None
+    image: Optional[str] = None
+
+
+class ArtistReleases(BaseModel):
+    albums: list[dict] = Field(default_factory=list)
+    singles: list[dict] = Field(default_factory=list)
+    eps: list[dict] = Field(default_factory=list)
+    total_count: int = 0
+    has_more: bool = False
