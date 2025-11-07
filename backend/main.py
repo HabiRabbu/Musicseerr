@@ -14,7 +14,10 @@ from core.exception_handlers import (
 from infrastructure.resilience.retry import CircuitOpenError
 from middleware import PerformanceMiddleware
 from static_server import mount_frontend
-from api.v1.routes import search, requests, library, status, queue, covers, artists, albums, settings
+from api.v1.routes import (
+    search, requests, library, status, queue, covers, artists, albums, settings
+)
+from api.v1.routes import cache as cache_routes
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -25,28 +28,22 @@ async def lifespan(app: FastAPI):
     """Lifespan context manager for startup and shutdown."""
     logger.info("Starting Musicseerr...")
     
-    # Initialize app state (cache, queue, etc.)
     await init_app_state(app)
     
-    # Start background tasks
     cache = get_cache()
     start_cache_cleanup_task(cache)
-    
-    # Start request queue processor
+
     request_queue = get_request_queue()
     await request_queue.start()
     
     logger.info("Musicseerr started successfully")
     
     yield
-    
-    # Shutdown
+
     logger.info("Shutting down Musicseerr...")
-    
-    # Stop queue gracefully
+
     await request_queue.stop()
-    
-    # Cleanup app state (close HTTP clients, etc.)
+
     await cleanup_app_state()
     
     logger.info("Musicseerr shut down successfully")
@@ -84,5 +81,6 @@ app.include_router(covers.router)
 app.include_router(artists.router)
 app.include_router(albums.router)
 app.include_router(settings.router)
+app.include_router(cache_routes.router)
 
 mount_frontend(app)

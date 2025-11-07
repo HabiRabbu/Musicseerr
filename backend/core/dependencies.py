@@ -13,6 +13,7 @@ from services.album_service import AlbumService
 from services.request_service import RequestService
 from services.library_service import LibraryService
 from services.status_service import StatusService
+from services.cache_service import CacheService
 import logging
 
 logger = logging.getLogger(__name__)
@@ -109,6 +110,11 @@ def get_library_service() -> LibraryService:
 def get_status_service() -> StatusService:
     lidarr_repo = get_lidarr_repository()
     return StatusService(lidarr_repo)
+
+
+def get_cache_service() -> CacheService:
+    cache = get_cache()
+    return CacheService(cache)
 
 
 async def init_app_state(app) -> None:

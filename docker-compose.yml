@@ -8,6 +8,7 @@ services:
       - ./backend/.env.example
     volumes:
       - ./config:/app/config
+      - ./cache:/app/cache
     restart: unless-stopped
     networks:
       - gooseberry-internal

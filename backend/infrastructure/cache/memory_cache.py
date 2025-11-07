@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import sys
 import time
 from typing import Any, Optional
 from abc import ABC, abstractmethod
@@ -35,6 +36,10 @@ class CacheInterface(ABC):
     
     @abstractmethod
     def size(self) -> int:
+        pass
+    
+    @abstractmethod
+    def estimate_memory_bytes(self) -> int:
         pass
 
 
@@ -105,7 +110,6 @@ class InMemoryCache(CacheInterface):
         """Clean up expired entries. Snapshot keys to avoid iteration issues."""
         now = time.time()
         
-        # Snapshot keys outside the lock to minimize lock time
         snapshot_keys = list(self._cache.keys())
         
         expired_keys = []
@@ -124,3 +128,19 @@ class InMemoryCache(CacheInterface):
     
     def size(self) -> int:
         return len(self._cache)
+    
+    def estimate_memory_bytes(self) -> int:
+        """
+        Estimate the memory usage of the cache in bytes.
+        This is an approximation and may not be 100% accurate.
+        """
+        total_size = 0
+        
+        total_size += sys.getsizeof(self._cache)
+        
+        for key, entry in self._cache.items():
+            total_size += sys.getsizeof(key)
+            total_size += sys.getsizeof(entry)
+            total_size += sys.getsizeof(entry.value)
+        
+        return total_size
