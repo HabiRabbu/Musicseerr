@@ -166,6 +166,13 @@ class CoverArtRepository:
             logger.debug(f"Cache HIT (disk): Artist image {artist_id[:8]}...")
             return cached
         
+        if size and size != 250:
+            fallback_filename = _get_cache_filename(f"artist_{artist_id}_250", "img")
+            fallback_path = self.cache_dir / f"{fallback_filename}.bin"
+            if cached := await self._read_disk_cache(fallback_path, ["wikidata_id"]):
+                logger.debug(f"Cache HIT (disk - fallback 250px): Artist image {artist_id[:8]}...")
+                return cached
+        
         logger.debug(f"Cache MISS (disk): Artist image {artist_id[:8]}... - fetching from Wikidata")
         
         cache_key = f"artist_wikidata:{artist_id}"

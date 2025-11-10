@@ -2,7 +2,14 @@
 	import { onMount } from 'svelte';
 	import { browser } from '$app/environment';
 	import { preferencesStore } from '$lib/stores/preferences';
-	import type { UserPreferences, ReleaseTypeOption } from '$lib/types';
+	import type { 
+		UserPreferences, 
+		ReleaseTypeOption,
+		LidarrConnectionSettings,
+		SoularrConnectionSettings,
+		JellyfinConnectionSettings,
+		LidarrVerifyResponse
+	} from '$lib/types';
 
 	let activeTab = 'settings';
 	let preferences: UserPreferences = {
@@ -23,6 +30,25 @@
 	let savingLidarr = false;
 	let syncingLibrary = false;
 	let lidarrMessage = '';
+	
+	let lidarrConnection: LidarrConnectionSettings | null = null;
+	let loadingLidarrConnection = false;
+	let savingLidarrConnection = false;
+	let verifyingLidarr = false;
+	let lidarrConnectionMessage = '';
+	let lidarrVerifyResult: LidarrVerifyResponse | null = null;
+	let showApiKey = false;
+	
+	let soularrConnection: SoularrConnectionSettings | null = null;
+	let loadingSoularr = false;
+	let savingSoularr = false;
+	let soularrMessage = '';
+	let showSoularrApiKey = false;
+	
+	let jellyfinConnection: JellyfinConnectionSettings | null = null;
+	let loadingJellyfin = false;
+	let savingJellyfin = false;
+	let jellyfinMessage = '';
 	
 	let advancedSettings: any = null;
 	let loadingAdvanced = false;
@@ -154,6 +180,15 @@
 		if (tab === 'lidarr' && !lidarrSettings) {
 			loadLidarrSettings();
 		}
+		if (tab === 'lidarr-connection' && !lidarrConnection) {
+			loadLidarrConnection();
+		}
+		if (tab === 'soularr' && !soularrConnection) {
+			loadSoularrConnection();
+		}
+		if (tab === 'jellyfin' && !jellyfinConnection) {
+			loadJellyfinConnection();
+		}
 		if (tab === 'advanced' && !advancedSettings) {
 			loadAdvancedSettings();
 		}
@@ -281,6 +316,181 @@
 			savingAdvanced = false;
 		}
 	}
+	
+	async function loadLidarrConnection() {
+		loadingLidarrConnection = true;
+		lidarrConnectionMessage = '';
+		lidarrVerifyResult = null;
+		try {
+			const response = await fetch('/api/settings/lidarr/connection');
+			if (response.ok) {
+				lidarrConnection = await response.json();
+			} else {
+				lidarrConnectionMessage = 'Failed to load Lidarr connection settings';
+			}
+		} catch (error) {
+			console.error('Failed to load Lidarr connection:', error);
+			lidarrConnectionMessage = 'Failed to load Lidarr connection settings';
+		} finally {
+			loadingLidarrConnection = false;
+		}
+	}
+	
+	async function saveLidarrConnection() {
+		savingLidarrConnection = true;
+		lidarrConnectionMessage = '';
+		try {
+			const response = await fetch('/api/settings/lidarr/connection', {
+				method: 'PUT',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify(lidarrConnection)
+			});
+			
+			if (response.ok) {
+				lidarrConnectionMessage = 'Lidarr connection settings saved successfully!';
+				lidarrConnection = await response.json();
+				
+				setTimeout(() => {
+					lidarrConnectionMessage = '';
+				}, 5000);
+			} else {
+				const error = await response.json();
+				lidarrConnectionMessage = error.detail || 'Failed to save settings';
+			}
+		} catch (error) {
+			console.error('Failed to save Lidarr connection:', error);
+			lidarrConnectionMessage = 'Failed to save settings';
+		} finally {
+			savingLidarrConnection = false;
+		}
+	}
+	
+	async function verifyLidarrConnection() {
+		if (!lidarrConnection) return;
+		
+		verifyingLidarr = true;
+		lidarrConnectionMessage = '';
+		lidarrVerifyResult = null;
+		try {
+			const response = await fetch('/api/settings/lidarr/verify', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify(lidarrConnection)
+			});
+			
+			if (response.ok) {
+				const result = await response.json();
+				lidarrVerifyResult = result;
+				if (result && result.success) {
+					lidarrConnectionMessage = result.message;
+				} else if (result) {
+					lidarrConnectionMessage = `Connection failed: ${result.message}`;
+				}
+			} else {
+				const error = await response.json();
+				lidarrConnectionMessage = error.detail || 'Failed to verify connection';
+			}
+		} catch (error) {
+			console.error('Failed to verify Lidarr connection:', error);
+			lidarrConnectionMessage = 'Failed to verify connection';
+		} finally {
+			verifyingLidarr = false;
+		}
+	}
+	
+	async function loadSoularrConnection() {
+		loadingSoularr = true;
+		soularrMessage = '';
+		try {
+			const response = await fetch('/api/settings/soularr');
+			if (response.ok) {
+				soularrConnection = await response.json();
+			} else {
+				soularrMessage = 'Failed to load Soularr settings';
+			}
+		} catch (error) {
+			console.error('Failed to load Soularr settings:', error);
+			soularrMessage = 'Failed to load Soularr settings';
+		} finally {
+			loadingSoularr = false;
+		}
+	}
+	
+	async function saveSoularrConnection() {
+		savingSoularr = true;
+		soularrMessage = '';
+		try {
+			const response = await fetch('/api/settings/soularr', {
+				method: 'PUT',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify(soularrConnection)
+			});
+			
+			if (response.ok) {
+				soularrMessage = 'Soularr settings saved successfully!';
+				soularrConnection = await response.json();
+				
+				setTimeout(() => {
+					soularrMessage = '';
+				}, 5000);
+			} else {
+				const error = await response.json();
+				soularrMessage = error.detail || 'Failed to save settings';
+			}
+		} catch (error) {
+			console.error('Failed to save Soularr settings:', error);
+			soularrMessage = 'Failed to save settings';
+		} finally {
+			savingSoularr = false;
+		}
+	}
+	
+	async function loadJellyfinConnection() {
+		loadingJellyfin = true;
+		jellyfinMessage = '';
+		try {
+			const response = await fetch('/api/settings/jellyfin');
+			if (response.ok) {
+				jellyfinConnection = await response.json();
+			} else {
+				jellyfinMessage = 'Failed to load Jellyfin settings';
+			}
+		} catch (error) {
+			console.error('Failed to load Jellyfin settings:', error);
+			jellyfinMessage = 'Failed to load Jellyfin settings';
+		} finally {
+			loadingJellyfin = false;
+		}
+	}
+	
+	async function saveJellyfinConnection() {
+		savingJellyfin = true;
+		jellyfinMessage = '';
+		try {
+			const response = await fetch('/api/settings/jellyfin', {
+				method: 'PUT',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify(jellyfinConnection)
+			});
+			
+			if (response.ok) {
+				jellyfinMessage = 'Jellyfin settings saved successfully!';
+				jellyfinConnection = await response.json();
+				
+				setTimeout(() => {
+					jellyfinMessage = '';
+				}, 5000);
+			} else {
+				const error = await response.json();
+				jellyfinMessage = error.detail || 'Failed to save settings';
+			}
+		} catch (error) {
+			console.error('Failed to save Jellyfin settings:', error);
+			jellyfinMessage = 'Failed to save settings';
+		} finally {
+			savingJellyfin = false;
+		}
+	}
 
 	onMount(async () => {
 		await preferencesStore.load();
@@ -302,96 +512,188 @@
 
 		<div class="flex flex-col lg:flex-row gap-6">
 			
-			<aside class="w-full lg:w-80">
-				<ul class="menu bg-base-200 rounded-box p-2">
-					<li>
-						<button
-							class="text-base justify-start"
-							class:btn-active={activeTab === 'settings'}
-							on:click={() => switchTab('settings')}
-						>
-							<svg
-								xmlns="http://www.w3.org/2000/svg"
-								viewBox="0 0 24 24"
-								fill="none"
-								stroke="currentColor"
-								stroke-width="2"
-								class="w-5 h-5"
+			<aside class="w-full lg:w-80 space-y-4">
+				<!-- Preferences Group -->
+				<div class="bg-base-200 rounded-box p-2">
+					<div class="px-4 py-2">
+						<h3 class="text-xs font-semibold text-base-content/50 uppercase tracking-wider">Preferences</h3>
+					</div>
+					<ul class="menu p-0">
+						<li>
+							<button
+								class="text-base justify-start"
+								class:btn-active={activeTab === 'settings'}
+								on:click={() => switchTab('settings')}
 							>
-								<circle cx="12" cy="12" r="3"></circle>
-								<path
-									d="M12 1v6m0 6v6m-9-9h6m6 0h6M4.5 5.5l4 4m6 6l4 4m0-14l-4 4m-6 6l-4 4"
-								></path>
-							</svg>
-							<span>Release Preferences</span>
-						</button>
-					</li>
-					<li>
-						<button
-							class="text-base justify-start"
-							class:btn-active={activeTab === 'lidarr'}
-							on:click={() => switchTab('lidarr')}
-						>
-							<svg
-								xmlns="http://www.w3.org/2000/svg"
-								viewBox="0 0 24 24"
-								fill="none"
-								stroke="currentColor"
-								stroke-width="2"
-								class="w-5 h-5"
+								<svg
+									xmlns="http://www.w3.org/2000/svg"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="2"
+									class="w-5 h-5"
+								>
+									<circle cx="12" cy="12" r="3"></circle>
+									<path
+										d="M12 1v6m0 6v6m-9-9h6m6 0h6M4.5 5.5l4 4m6 6l4 4m0-14l-4 4m-6 6l-4 4"
+									></path>
+								</svg>
+								<span>Release Preferences</span>
+							</button>
+						</li>
+					</ul>
+				</div>
+
+				<!-- Library Management Group -->
+				<div class="bg-base-200 rounded-box p-2">
+					<div class="px-4 py-2">
+						<h3 class="text-xs font-semibold text-base-content/50 uppercase tracking-wider">Library Management</h3>
+					</div>
+					<ul class="menu p-0">
+						<li>
+							<button
+								class="text-base justify-start"
+								class:btn-active={activeTab === 'lidarr'}
+								on:click={() => switchTab('lidarr')}
 							>
-								<path d="M9 18V5l12-2v13"></path>
-								<circle cx="6" cy="18" r="3"></circle>
-								<circle cx="18" cy="16" r="3"></circle>
-							</svg>
-							<span>Library Sync</span>
-						</button>
-					</li>
-					<li>
-						<button
-							class="text-base justify-start"
-							class:btn-active={activeTab === 'cache'}
-							on:click={() => switchTab('cache')}
-						>
-							<svg
-								xmlns="http://www.w3.org/2000/svg"
-								viewBox="0 0 24 24"
-								fill="none"
-								stroke="currentColor"
-								stroke-width="2"
-								class="w-5 h-5"
+								<svg
+									xmlns="http://www.w3.org/2000/svg"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="2"
+									class="w-5 h-5"
+								>
+									<path d="M9 18V5l12-2v13"></path>
+									<circle cx="6" cy="18" r="3"></circle>
+									<circle cx="18" cy="16" r="3"></circle>
+								</svg>
+								<span>Library Sync</span>
+							</button>
+						</li>
+					</ul>
+				</div>
+
+				<!-- External Services Group -->
+				<div class="bg-base-200 rounded-box p-2">
+					<div class="px-4 py-2">
+						<h3 class="text-xs font-semibold text-base-content/50 uppercase tracking-wider">External Services</h3>
+					</div>
+					<ul class="menu p-0">
+						<li>
+							<button
+								class="text-base justify-start"
+								class:btn-active={activeTab === 'lidarr-connection'}
+								on:click={() => switchTab('lidarr-connection')}
 							>
-								<path d="M3 7v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V7"></path>
-								<path d="M21 3H3v4h18V3z"></path>
-								<path d="M10 12h4"></path>
-							</svg>
-							<span>Cache</span>
-						</button>
-					</li>
-					<li>
-						<button
-							class="text-base justify-start"
-							class:btn-active={activeTab === 'advanced'}
-							on:click={() => switchTab('advanced')}
-						>
-							<svg
-								xmlns="http://www.w3.org/2000/svg"
-								viewBox="0 0 24 24"
-								fill="none"
-								stroke="currentColor"
-								stroke-width="2"
-								class="w-5 h-5"
+								<svg
+									xmlns="http://www.w3.org/2000/svg"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="2"
+									class="w-5 h-5"
+								>
+									<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+								</svg>
+								<span>Lidarr Connection</span>
+							</button>
+						</li>
+						<li>
+							<button
+								class="text-base justify-start"
+								class:btn-active={activeTab === 'soularr'}
+								on:click={() => switchTab('soularr')}
 							>
-								<circle cx="12" cy="12" r="3"></circle>
-								<path d="M12 1v6m0 6v6"></path>
-								<path d="M1 12h6m6 0h6"></path>
-								<path d="M4.2 4.2l4.3 4.3m7 7l4.3 4.3"></path>
-								<path d="M19.8 4.2l-4.3 4.3m-7 7l-4.3 4.3"></path>
-							</svg>
-							<span>Advanced</span>
-						</button>
-					</li>
-				</ul>
+								<svg
+									xmlns="http://www.w3.org/2000/svg"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="2"
+									class="w-5 h-5"
+								>
+									<circle cx="12" cy="12" r="10"></circle>
+									<polygon points="10 8 16 12 10 16 10 8"></polygon>
+								</svg>
+								<span>Soularr</span>
+							</button>
+						</li>
+						<li>
+							<button
+								class="text-base justify-start"
+								class:btn-active={activeTab === 'jellyfin'}
+								on:click={() => switchTab('jellyfin')}
+							>
+								<svg
+									xmlns="http://www.w3.org/2000/svg"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="2"
+									class="w-5 h-5"
+								>
+									<rect x="2" y="7" width="20" height="15" rx="2" ry="2"></rect>
+									<polyline points="17 2 12 7 7 2"></polyline>
+								</svg>
+								<span>Jellyfin</span>
+							</button>
+						</li>
+					</ul>
+				</div>
+
+				<!-- System Group -->
+				<div class="bg-base-200 rounded-box p-2">
+					<div class="px-4 py-2">
+						<h3 class="text-xs font-semibold text-base-content/50 uppercase tracking-wider">System</h3>
+					</div>
+					<ul class="menu p-0">
+						<li>
+							<button
+								class="text-base justify-start"
+								class:btn-active={activeTab === 'cache'}
+								on:click={() => switchTab('cache')}
+							>
+								<svg
+									xmlns="http://www.w3.org/2000/svg"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="2"
+									class="w-5 h-5"
+								>
+									<path d="M3 7v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V7"></path>
+									<path d="M21 3H3v4h18V3z"></path>
+									<path d="M10 12h4"></path>
+								</svg>
+								<span>Cache</span>
+							</button>
+						</li>
+						<li>
+							<button
+								class="text-base justify-start"
+								class:btn-active={activeTab === 'advanced'}
+								on:click={() => switchTab('advanced')}
+							>
+								<svg
+									xmlns="http://www.w3.org/2000/svg"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="2"
+									class="w-5 h-5"
+								>
+									<circle cx="12" cy="12" r="3"></circle>
+									<path d="M12 1v6m0 6v6"></path>
+									<path d="M1 12h6m6 0h6"></path>
+									<path d="M4.2 4.2l4.3 4.3m7 7l4.3 4.3"></path>
+									<path d="M19.8 4.2l-4.3 4.3m-7 7l-4.3 4.3"></path>
+								</svg>
+								<span>Advanced</span>
+							</button>
+						</li>
+					</ul>
+				</div>
 			</aside>
 
 			
@@ -721,6 +1023,445 @@
 											Loading...
 										{:else}
 											Refresh Stats
+										{/if}
+									</button>
+								</div>
+							{/if}
+						</div>
+					</div>
+				{:else if activeTab === 'lidarr-connection'}
+					<div class="card bg-base-200">
+						<div class="card-body">
+							<h2 class="card-title text-2xl mb-4">Lidarr Connection</h2>
+							<p class="text-base-content/70 mb-6">
+								Configure your Lidarr server connection, quality profiles, and default settings.
+							</p>
+
+							{#if loadingLidarrConnection}
+								<div class="flex justify-center items-center py-12">
+									<span class="loading loading-spinner loading-lg"></span>
+								</div>
+							{:else if lidarrConnection}
+								<!-- Connection Settings -->
+								<div class="mb-8">
+									<h3 class="text-xl font-semibold mb-4">Server Connection</h3>
+									
+									<div class="grid grid-cols-1 gap-4">
+										<label class="form-control">
+											<div class="label">
+												<span class="label-text font-medium">Lidarr URL</span>
+												<span class="label-text-alt text-base-content/50">Required</span>
+											</div>
+											<input 
+												type="url" 
+												bind:value={lidarrConnection.lidarr_url}
+												class="input input-bordered"
+												placeholder="http://lidarr:8686"
+											/>
+											<div class="label">
+												<span class="label-text-alt text-base-content/50">
+													Full URL including http:// or https://
+												</span>
+											</div>
+										</label>
+
+										<label class="form-control">
+											<div class="label">
+												<span class="label-text font-medium">API Key</span>
+												<span class="label-text-alt text-base-content/50">Required</span>
+											</div>
+											<div class="join">
+												<input 
+													type={showApiKey ? 'text' : 'password'}
+													bind:value={lidarrConnection.lidarr_api_key}
+													class="input input-bordered join-item flex-1"
+													placeholder="Enter your Lidarr API key"
+												/>
+												<button 
+													class="btn btn-square join-item"
+													on:click={() => showApiKey = !showApiKey}
+													type="button"
+												>
+													{#if showApiKey}
+														<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-5 h-5">
+															<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+															<line x1="1" y1="1" x2="23" y2="23"></line>
+														</svg>
+													{:else}
+														<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-5 h-5">
+															<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+															<circle cx="12" cy="12" r="3"></circle>
+														</svg>
+													{/if}
+												</button>
+											</div>
+											<div class="label">
+												<span class="label-text-alt text-base-content/50">
+													Found in Lidarr → Settings → General → Security
+												</span>
+											</div>
+										</label>
+									</div>
+
+									<!-- Test Connection Button -->
+									<div class="mt-4">
+										<button 
+											class="btn btn-outline btn-secondary"
+											on:click={verifyLidarrConnection}
+											disabled={verifyingLidarr || !lidarrConnection.lidarr_url || !lidarrConnection.lidarr_api_key}
+										>
+											{#if verifyingLidarr}
+												<span class="loading loading-spinner loading-sm"></span>
+												Testing Connection...
+											{:else}
+												<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-5 h-5">
+													<polyline points="20 6 9 17 4 12"></polyline>
+												</svg>
+												Test Connection
+											{/if}
+										</button>
+									</div>
+								</div>
+
+								<!-- Lidarr Profiles (shown after successful verification) -->
+								{#if lidarrVerifyResult && lidarrVerifyResult.success}
+									<div class="mb-8">
+										<h3 class="text-xl font-semibold mb-4">Lidarr Configuration</h3>
+										<p class="text-sm text-base-content/70 mb-4">
+											These settings determine how new artists are added to Lidarr.
+										</p>
+										
+										<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+											<label class="form-control">
+												<div class="label">
+													<span class="label-text font-medium">Quality Profile</span>
+												</div>
+												<select 
+													bind:value={lidarrConnection.quality_profile_id}
+													class="select select-bordered"
+												>
+													{#each lidarrVerifyResult.quality_profiles as profile}
+														<option value={profile.id}>{profile.name}</option>
+													{/each}
+												</select>
+												<div class="label">
+													<span class="label-text-alt text-base-content/50">
+														Default quality for new artists
+													</span>
+												</div>
+											</label>
+
+											<label class="form-control">
+												<div class="label">
+													<span class="label-text font-medium">Metadata Profile</span>
+												</div>
+												<select 
+													bind:value={lidarrConnection.metadata_profile_id}
+													class="select select-bordered"
+												>
+													{#each lidarrVerifyResult.metadata_profiles as profile}
+														<option value={profile.id}>{profile.name}</option>
+													{/each}
+												</select>
+												<div class="label">
+													<span class="label-text-alt text-base-content/50">
+														Which release types to include
+													</span>
+												</div>
+											</label>
+
+											<label class="form-control md:col-span-2">
+												<div class="label">
+													<span class="label-text font-medium">Root Folder</span>
+												</div>
+												<select 
+													bind:value={lidarrConnection.root_folder_path}
+													class="select select-bordered"
+												>
+													{#each lidarrVerifyResult.root_folders as folder}
+														<option value={folder.path}>{folder.path}</option>
+													{/each}
+												</select>
+												<div class="label">
+													<span class="label-text-alt text-base-content/50">
+														Where to save music files
+													</span>
+												</div>
+											</label>
+										</div>
+									</div>
+								{/if}
+
+								<!-- Messages -->
+								{#if lidarrConnectionMessage}
+									<div 
+										class="alert mb-6"
+										class:alert-success={lidarrConnectionMessage.includes('success') || lidarrVerifyResult?.success}
+										class:alert-error={lidarrConnectionMessage.includes('Failed') || lidarrConnectionMessage.includes('failed') || (lidarrVerifyResult && !lidarrVerifyResult.success)}
+									>
+										<svg
+											xmlns="http://www.w3.org/2000/svg"
+											class="h-6 w-6 shrink-0 stroke-current"
+											fill="none"
+											viewBox="0 0 24 24"
+										>
+											<path
+												stroke-linecap="round"
+												stroke-linejoin="round"
+												stroke-width="2"
+												d={lidarrConnectionMessage.includes('success') || lidarrVerifyResult?.success
+													? "M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" 
+													: "M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"}
+											/>
+										</svg>
+										<span>{lidarrConnectionMessage}</span>
+									</div>
+								{/if}
+
+								<!-- Action Buttons -->
+								<div class="card-actions justify-end gap-2">
+									<button 
+										class="btn btn-ghost" 
+										on:click={loadLidarrConnection}
+										disabled={savingLidarrConnection}
+									>
+										Reset
+									</button>
+									<button 
+										class="btn btn-primary" 
+										on:click={saveLidarrConnection}
+										disabled={savingLidarrConnection || !lidarrConnection.lidarr_url || !lidarrConnection.lidarr_api_key}
+									>
+										{#if savingLidarrConnection}
+											<span class="loading loading-spinner loading-sm"></span>
+											Saving...
+										{:else}
+											Save Settings
+										{/if}
+									</button>
+								</div>
+							{/if}
+						</div>
+					</div>
+				{:else if activeTab === 'soularr'}
+					<div class="card bg-base-200">
+						<div class="card-body">
+							<h2 class="card-title text-2xl mb-4">Soularr Connection</h2>
+							<p class="text-base-content/70 mb-6">
+								Configure Soularr integration for automatic music enhancement and tagging.
+							</p>
+
+							{#if loadingSoularr}
+								<div class="flex justify-center items-center py-12">
+									<span class="loading loading-spinner loading-lg"></span>
+								</div>
+							{:else if soularrConnection}
+								<div class="mb-8">
+									<h3 class="text-xl font-semibold mb-4">Server Connection</h3>
+									
+									<div class="grid grid-cols-1 gap-4">
+										<label class="form-control">
+											<div class="label">
+												<span class="label-text font-medium">Soularr URL</span>
+											</div>
+											<input 
+												type="url" 
+												bind:value={soularrConnection.soularr_url}
+												class="input input-bordered"
+												placeholder="http://soularr:8181"
+											/>
+											<div class="label">
+												<span class="label-text-alt text-base-content/50">
+													Full URL including http:// or https://
+												</span>
+											</div>
+										</label>
+
+										<label class="form-control">
+											<div class="label">
+												<span class="label-text font-medium">API Key</span>
+											</div>
+											<div class="join">
+												<input 
+													type={showSoularrApiKey ? 'text' : 'password'}
+													bind:value={soularrConnection.soularr_api_key}
+													class="input input-bordered join-item flex-1"
+													placeholder="Enter your Soularr API key (if required)"
+												/>
+												<button 
+													class="btn btn-square join-item"
+													on:click={() => showSoularrApiKey = !showSoularrApiKey}
+													type="button"
+												>
+													{#if showSoularrApiKey}
+														<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-5 h-5">
+															<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+															<line x1="1" y1="1" x2="23" y2="23"></line>
+														</svg>
+													{:else}
+														<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-5 h-5">
+															<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+															<circle cx="12" cy="12" r="3"></circle>
+														</svg>
+													{/if}
+												</button>
+											</div>
+											<div class="label">
+												<span class="label-text-alt text-base-content/50">
+													Optional - leave blank if not required
+												</span>
+											</div>
+										</label>
+
+										<label class="form-control">
+											<div class="label">
+												<span class="label-text font-medium">Automatic Trigger</span>
+											</div>
+											<div class="form-control">
+												<label class="label cursor-pointer justify-start gap-4">
+													<input 
+														type="checkbox" 
+														bind:checked={soularrConnection.trigger_soularr}
+														class="toggle toggle-primary"
+													/>
+													<span class="label-text">Automatically trigger Soularr after adding to Lidarr</span>
+												</label>
+											</div>
+											<div class="label">
+												<span class="label-text-alt text-base-content/50">
+													When enabled, Soularr will process new downloads automatically
+												</span>
+											</div>
+										</label>
+									</div>
+								</div>
+
+								{#if soularrMessage}
+									<div 
+										class="alert mb-6"
+										class:alert-success={soularrMessage.includes('success')}
+										class:alert-error={soularrMessage.includes('Failed')}
+									>
+										<svg
+											xmlns="http://www.w3.org/2000/svg"
+											class="h-6 w-6 shrink-0 stroke-current"
+											fill="none"
+											viewBox="0 0 24 24"
+										>
+											<path
+												stroke-linecap="round"
+												stroke-linejoin="round"
+												stroke-width="2"
+												d={soularrMessage.includes('success') 
+													? "M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" 
+													: "M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"}
+											/>
+										</svg>
+										<span>{soularrMessage}</span>
+									</div>
+								{/if}
+
+								<div class="card-actions justify-end gap-2">
+									<button 
+										class="btn btn-ghost" 
+										on:click={loadSoularrConnection}
+										disabled={savingSoularr}
+									>
+										Reset
+									</button>
+									<button 
+										class="btn btn-primary" 
+										on:click={saveSoularrConnection}
+										disabled={savingSoularr || !soularrConnection.soularr_url}
+									>
+										{#if savingSoularr}
+											<span class="loading loading-spinner loading-sm"></span>
+											Saving...
+										{:else}
+											Save Settings
+										{/if}
+									</button>
+								</div>
+							{/if}
+						</div>
+					</div>
+				{:else if activeTab === 'jellyfin'}
+					<div class="card bg-base-200">
+						<div class="card-body">
+							<h2 class="card-title text-2xl mb-4">Jellyfin Connection</h2>
+							<p class="text-base-content/70 mb-6">
+								Configure your Jellyfin media server URL for integration features.
+							</p>
+
+							{#if loadingJellyfin}
+								<div class="flex justify-center items-center py-12">
+									<span class="loading loading-spinner loading-lg"></span>
+								</div>
+							{:else if jellyfinConnection}
+								<div class="mb-8">
+									<h3 class="text-xl font-semibold mb-4">Server Connection</h3>
+									
+									<label class="form-control">
+										<div class="label">
+											<span class="label-text font-medium">Jellyfin URL</span>
+										</div>
+										<input 
+											type="url" 
+											bind:value={jellyfinConnection.jellyfin_url}
+											class="input input-bordered"
+											placeholder="http://jellyfin:8096"
+										/>
+										<div class="label">
+											<span class="label-text-alt text-base-content/50">
+												Full URL including http:// or https://
+											</span>
+										</div>
+									</label>
+								</div>
+
+								{#if jellyfinMessage}
+									<div 
+										class="alert mb-6"
+										class:alert-success={jellyfinMessage.includes('success')}
+										class:alert-error={jellyfinMessage.includes('Failed')}
+									>
+										<svg
+											xmlns="http://www.w3.org/2000/svg"
+											class="h-6 w-6 shrink-0 stroke-current"
+											fill="none"
+											viewBox="0 0 24 24"
+										>
+											<path
+												stroke-linecap="round"
+												stroke-linejoin="round"
+												stroke-width="2"
+												d={jellyfinMessage.includes('success') 
+													? "M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" 
+													: "M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"}
+											/>
+										</svg>
+										<span>{jellyfinMessage}</span>
+									</div>
+								{/if}
+
+								<div class="card-actions justify-end gap-2">
+									<button 
+										class="btn btn-ghost" 
+										on:click={loadJellyfinConnection}
+										disabled={savingJellyfin}
+									>
+										Reset
+									</button>
+									<button 
+										class="btn btn-primary" 
+										on:click={saveJellyfinConnection}
+										disabled={savingJellyfin || !jellyfinConnection.jellyfin_url}
+									>
+										{#if savingJellyfin}
+											<span class="loading loading-spinner loading-sm"></span>
+											Saving...
+										{:else}
+											Save Settings
 										{/if}
 									</button>
 								</div>

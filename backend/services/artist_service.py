@@ -146,9 +146,29 @@ class ArtistService:
     async def get_artist_info_basic(self, artist_id: str) -> ArtistInfo:
         artist_id = validate_mbid(artist_id, "artist")
         
+        cache_key = f"artist_info:{artist_id}"
+        cached_info = await self._cache.get(cache_key)
+        if cached_info:
+            logger.debug(f"Cache HIT (RAM): Artist {artist_id[:8]}...")
+            return cached_info
+        
+        logger.debug(f"Cache MISS (RAM): Artist {artist_id[:8]}...")
+        
+        disk_data = await self._disk_cache.get_artist(artist_id)
+        if disk_data:
+            logger.debug(f"Cache HIT (Disk): Artist {artist_id[:8]}... - loading from persistent cache")
+            artist_info = ArtistInfo(**disk_data)
+            advanced_settings = self._preferences_service.get_advanced_settings()
+            ttl = advanced_settings.cache_ttl_artist_library if artist_info.in_library else advanced_settings.cache_ttl_artist_non_library
+            await self._cache.set(cache_key, artist_info, ttl_seconds=ttl)
+            return artist_info
+        
+        logger.debug(f"Cache MISS (Disk): Artist {artist_id[:8]}... - fetching from API")
+        
         mb_artist, library_mbids, album_mbids = await self._fetch_artist_data(artist_id)
         
         in_library = artist_id.lower() in library_mbids
+
         tags = self._extract_tags(mb_artist)
         aliases = self._extract_aliases(mb_artist)
         life_span = self._extract_life_span(mb_artist)
@@ -158,7 +178,7 @@ class ArtistService:
         
         total_release_count = mb_artist.get("release-group-count", 0)
         
-        return ArtistInfo(
+        artist_info = ArtistInfo(
             name=mb_artist.get("name", "Unknown Artist"),
             musicbrainz_id=artist_id,
             disambiguation=mb_artist.get("disambiguation"),
@@ -176,14 +196,45 @@ class ArtistService:
             eps=eps,
             release_group_count=total_release_count,
         )
+        
+        advanced_settings = self._preferences_service.get_advanced_settings()
+        ttl = advanced_settings.cache_ttl_artist_library if in_library else advanced_settings.cache_ttl_artist_non_library
+        await self._cache.set(cache_key, artist_info, ttl_seconds=ttl)
+        
+        return artist_info
     
     async def get_artist_extended_info(self, artist_id: str) -> ArtistExtendedInfo:
         try:
+            artist_id = validate_mbid(artist_id, "artist")
+            
+            cache_key = f"artist_info:{artist_id}"
+            cached_info = await self._cache.get(cache_key)
+            if cached_info and cached_info.description is not None:
+                logger.debug(f"Extended info cache HIT: Artist {artist_id[:8]}...")
+                return ArtistExtendedInfo(
+                    description=cached_info.description,
+                    image=cached_info.image
+                )
+            
             mb_artist = await self._mb_repo.get_artist_by_id(artist_id)
             if not mb_artist:
                 raise ResourceNotFoundError("Artist not found")
             
             description, image = await self._fetch_wikidata_info(mb_artist)
+            
+            if cached_info:
+                cached_info.description = description
+                cached_info.image = image
+                advanced_settings = self._preferences_service.get_advanced_settings()
+                ttl = advanced_settings.cache_ttl_artist_library if cached_info.in_library else advanced_settings.cache_ttl_artist_non_library
+                await self._cache.set(cache_key, cached_info, ttl_seconds=ttl)
+                
+                await self._disk_cache.set_artist(
+                    artist_id, 
+                    cached_info, 
+                    is_monitored=cached_info.in_library,
+                    ttl_seconds=ttl if not cached_info.in_library else None
+                )
             
             return ArtistExtendedInfo(
                 description=description,

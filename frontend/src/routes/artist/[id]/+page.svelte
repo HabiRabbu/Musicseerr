@@ -3,14 +3,18 @@
 	import { browser } from '$app/environment';
 	import { invalidate } from '$app/navigation';
 	import { goto } from '$app/navigation';
+	import { fade } from 'svelte/transition';
 	import type { ArtistInfo, ArtistReleases } from '$lib/types';
 	import { colors } from '$lib/colors';
 	import { errorModal } from '$lib/stores/errorModal';
+	import ArtistHeaderSkeleton from '$lib/components/ArtistHeaderSkeleton.svelte';
+	import AlbumGridSkeleton from '$lib/components/AlbumGridSkeleton.svelte';
 
 	export let data: { artistId: string };
 
 	let artist: ArtistInfo | null = null;
-	let loading = true;
+	let loadingBasic = true;
+	let loadingExtended = true;
 	let error: string | null = null;
 	let showToast = false;
 	let linksCarousel: HTMLDivElement;
@@ -24,7 +28,6 @@
 	let albumsCollapsed = false;
 	let epsCollapsed = false;
 	let singlesCollapsed = false;
-	let extendedInfoLoading = true;
 	let loadingMoreReleases = false;
 	let currentOffset = 50; // Start after initial 50
 	let hasMoreReleases = false;
@@ -82,8 +85,8 @@
 		}
 		lastFetchTime = now;
 
-		loading = true;
-		extendedInfoLoading = true;
+		loadingBasic = true;
+		loadingExtended = true;
 		error = null;
 		
 		if (abortController) {
@@ -91,50 +94,76 @@
 		}
 		abortController = new AbortController();
 		
+		await fetchBasicInfo(force);
+		
+		if (artist) {
+			fetchExtendedInfo(force); // Don't await - let it load in background
+		}
+	}
+	
+	async function fetchBasicInfo(force = false) {
 		try {
+			const now = Date.now();
 			const cacheBuster = force ? `?t=${now}` : '';
 			const res = await fetch(`/api/artist/${data.artistId}${cacheBuster}`, {
-				signal: abortController.signal,
+				signal: abortController?.signal,
 				cache: force ? 'no-cache' : 'default'
 			});
 			
 			if (res.ok) {
 				artist = await res.json();
-				loading = false;
 				
 				if (artist) {
 					artist.albums = sortReleasesByYear(artist.albums);
 					artist.singles = sortReleasesByYear(artist.singles);
 					artist.eps = sortReleasesByYear(artist.eps);
 					loadedReleaseCount = artist.albums.length + artist.singles.length + artist.eps.length;
+					
+
+					if ((!artist.release_group_count || artist.release_group_count === 0) && loadedReleaseCount === BATCH_SIZE) {
+						console.warn('release_group_count is 0 but we have exactly 50 releases - old cache? Trying to fetch more...');
+						hasMoreReleases = true;
+						totalReleaseCount = loadedReleaseCount;
+						currentOffset = BATCH_SIZE;
+						fetchMoreReleases();
+					} else if (artist.release_group_count && artist.release_group_count > BATCH_SIZE) {
+						console.log('Triggering fetchMoreReleases - has more releases');
+						hasMoreReleases = true;
+						totalReleaseCount = artist.release_group_count;
+						fetchMoreReleases();
+					} else {
+						console.log('No more releases to fetch', {
+							releaseGroupCount: artist?.release_group_count,
+							loadedReleaseCount,
+							batchSize: BATCH_SIZE
+						});
+					}
+					
+					console.log('Artist loaded:', {
+						name: artist.name,
+						totalReleaseGroupCount: artist.release_group_count,
+						currentlyLoaded: loadedReleaseCount,
+						albums: artist.albums.length,
+						singles: artist.singles.length,
+						eps: artist.eps.length,
+						batchSize: BATCH_SIZE
+					});
 				}
-				
-				if (artist?.release_group_count && artist.release_group_count > BATCH_SIZE) {
-					hasMoreReleases = true;
-					totalReleaseCount = artist.release_group_count;
-					fetchMoreReleases();
-				}
-				
-				fetchExtendedInfo(force);
 			} else {
 				error = 'Failed to load artist';
-				loading = false;
-				extendedInfoLoading = false;
 			}
 		} catch (e) {
 			if (e instanceof Error && e.name === 'AbortError') {
 				return;
 			}
 			error = 'Error loading artist';
-			loading = false;
-			extendedInfoLoading = false;
 			console.error(e);
+		} finally {
+			loadingBasic = false;
 		}
 	}
 	
 	async function fetchExtendedInfo(force = false) {
-		if (!artist) return;
-		
 		try {
 			const now = Date.now();
 			const cacheBuster = force ? `?t=${now}` : '';
@@ -145,11 +174,20 @@
 			
 			if (res.ok) {
 				const extendedInfo = await res.json();
+				
+				let attempts = 0;
+				while (!artist && attempts < 50) {
+					await new Promise(resolve => setTimeout(resolve, 100));
+					attempts++;
+				}
+				
 				if (artist) {
 					artist.description = extendedInfo.description;
 					artist.image = extendedInfo.image;
 					artist = artist; // Trigger reactivity
 					setTimeout(() => checkDescriptionHeight(), 50);
+				} else {
+					console.warn('Extended info loaded but artist data not available yet');
 				}
 			}
 		} catch (e) {
@@ -158,23 +196,44 @@
 			}
 			console.error('Error loading extended artist info:', e);
 		} finally {
-			extendedInfoLoading = false;
+			loadingExtended = false;
 		}
 	}
 	
 	async function fetchMoreReleases() {
-		if (!artist || loadingMoreReleases || !hasMoreReleases) return;
+		if (!artist || loadingMoreReleases || !hasMoreReleases) {
+			console.log('fetchMoreReleases skipped:', {
+				hasArtist: !!artist,
+				loadingMoreReleases,
+				hasMoreReleases
+			});
+			return;
+		}
+		
+		console.log('fetchMoreReleases starting:', {
+			currentOffset,
+			batchSize: BATCH_SIZE,
+			currentlyLoaded: loadedReleaseCount
+		});
 		
 		loadingMoreReleases = true;
 		
 		try {
-			const res = await fetch(
-				`/api/artist/${data.artistId}/releases?offset=${currentOffset}&limit=${BATCH_SIZE}`,
-				{ signal: abortController?.signal }
-			);
+			const url = `/api/artist/${data.artistId}/releases?offset=${currentOffset}&limit=${BATCH_SIZE}`;
+			console.log('Fetching:', url);
+			
+			const res = await fetch(url, { signal: abortController?.signal });
 			
 			if (res.ok) {
 				const moreReleases: ArtistReleases = await res.json();
+				
+				console.log('Received more releases:', {
+					albums: moreReleases.albums.length,
+					singles: moreReleases.singles.length,
+					eps: moreReleases.eps.length,
+					hasMore: moreReleases.has_more,
+					totalCount: moreReleases.total_count
+				});
 				
 				if (artist) {
 					artist.albums = sortReleasesByYear([...artist.albums, ...moreReleases.albums]);
@@ -186,10 +245,21 @@
 					hasMoreReleases = moreReleases.has_more;
 					loadedReleaseCount = artist.albums.length + artist.singles.length + artist.eps.length;
 					
+					console.log('After merging:', {
+						totalLoaded: loadedReleaseCount,
+						hasMoreReleases,
+						nextOffset: currentOffset
+					});
+					
 					if (hasMoreReleases) {
+						console.log('Scheduling next batch in 1 second...');
 						setTimeout(() => fetchMoreReleases(), 1000);
+					} else {
+						console.log('All releases loaded!');
 					}
 				}
+			} else {
+				console.error('Failed to fetch more releases:', res.status, res.statusText);
 			}
 		} catch (e) {
 			if (e instanceof Error && e.name === 'AbortError') {
@@ -358,75 +428,10 @@
 				<span>{error}</span>
 			</div>
 		</div>
-	{:else if loading && !artist}
-		
+	{:else if loadingBasic && !artist}
 		<div class="space-y-4 sm:space-y-8">
-			
-			<div class="card bg-base-200 shadow-xl overflow-hidden">
-				<div class="flex flex-col lg:flex-row">
-					<div class="w-full lg:w-96 xl:w-[28rem] flex-shrink-0 p-4 sm:p-6">
-						<div class="skeleton w-full aspect-square max-h-96 lg:h-96 rounded-box"></div>
-					</div>
-					<div class="card-body flex-1 p-4 sm:p-6 lg:p-8">
-						<div class="flex flex-col sm:flex-row items-start justify-between gap-4">
-							<div class="flex-1 space-y-3 w-full">
-								<div class="skeleton h-8 sm:h-12 w-3/4"></div>
-								<div class="skeleton h-4 w-1/4"></div>
-							</div>
-							<div class="skeleton h-8 w-32 flex-shrink-0"></div>
-						</div>
-					
-					<div class="mt-4 sm:mt-6 space-y-2">
-						<div class="skeleton h-4 w-20"></div>
-						<div class="skeleton h-4 w-full"></div>
-						<div class="skeleton h-4 w-full"></div>
-						<div class="skeleton h-4 w-3/4"></div>
-					</div>
-					
-					<div class="flex flex-wrap gap-2 mt-auto">
-						<div class="skeleton h-6 w-16"></div>
-						<div class="skeleton h-6 w-20"></div>
-						<div class="skeleton h-6 w-24"></div>
-						<div class="skeleton h-6 w-16"></div>
-					</div>
-				</div>
-			</div>
-		</div>
-
-			
-			<div>
-				<div class="skeleton h-6 sm:h-8 w-20 sm:w-24 mb-3 sm:mb-4"></div>
-				<div class="bg-base-200 rounded-box p-3 sm:p-4 shadow-md overflow-x-auto">
-					<div class="flex gap-3 sm:gap-4">
-						{#each Array(5) as _}
-							<div class="skeleton w-32 sm:w-40 h-20 sm:h-24 flex-shrink-0 rounded-box"></div>
-						{/each}
-					</div>
-				</div>
-			</div>
-
-			
-			<div>
-				<div class="skeleton h-6 sm:h-8 w-24 sm:w-32 mb-3 sm:mb-4"></div>
-				<div class="bg-base-200 rounded-box shadow-md p-3 sm:p-4 space-y-3 sm:space-y-4">
-					{#each Array(5) as _}
-						<div class="flex items-center gap-3 sm:gap-4">
-							<div class="skeleton w-12 h-12 sm:w-16 sm:h-16 rounded-box flex-shrink-0"></div>
-							<div class="flex-1 space-y-2 min-w-0">
-								<div class="skeleton h-4 sm:h-5 w-3/4 max-w-48"></div>
-								<div class="skeleton h-3 sm:h-4 w-16 sm:w-20"></div>
-							</div>
-							<div class="skeleton w-10 h-10 sm:w-12 sm:h-12 rounded-full flex-shrink-0"></div>
-						</div>
-					{/each}
-				</div>
-			</div>
-		</div>
-	{:else if error}
-		<div class="flex items-center justify-center min-h-[50vh]">
-			<div class="alert alert-error">
-				<span>{error}</span>
-			</div>
+			<ArtistHeaderSkeleton />
+			<AlbumGridSkeleton title="Albums" count={12} />
 		</div>
 	{:else if artist}
 		<div class="space-y-4 sm:space-y-6 lg:space-y-8">
@@ -436,7 +441,7 @@
 				<div class="flex flex-col lg:flex-row lg:min-h-[32rem]">
 				<figure class="w-full lg:w-96 lg:h-96 xl:w-[28rem] xl:h-[28rem] flex-shrink-0 p-4 sm:p-6">
 					<img 
-						src="/api/covers/artist/{artist.musicbrainz_id}" 
+						src="/api/covers/artist/{artist.musicbrainz_id}?size=500" 
 						alt={artist.name}
 						class="w-full h-full object-contain rounded-box max-h-80 sm:max-h-96 lg:max-h-none"
 						on:error={(e) => {
@@ -465,7 +470,7 @@
 							{/if}
 						</div>
 					
-					{#if extendedInfoLoading}
+					{#if loadingExtended}
 						<div class="mb-4 sm:mb-6">
 							<h3 class="text-xs sm:text-sm font-semibold text-base-content/60 uppercase tracking-wide mb-2">Description</h3>
 							<div class="space-y-2">

@@ -854,3 +854,12 @@ class LidarrRepository:
         
         logger.info(f"Retrieved {len(out)} recently added albums sorted by track file dateAdded (fallback)")
         return out
+    
+    async def get_quality_profiles(self) -> list[dict[str, Any]]:
+        return await self._get("/api/v1/qualityprofile")
+    
+    async def get_metadata_profiles(self) -> list[dict[str, Any]]:
+        return await self._get("/api/v1/metadataprofile")
+    
+    async def get_root_folders(self) -> list[dict[str, Any]]:
+        return await self._get("/api/v1/rootfolder")

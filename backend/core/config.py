@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     
     soularr_url: str = Field(default="http://soularr:8181")
     soularr_api_key: str = Field(default="")
-    trigger_soularr: bool = Field(default=True)
+    trigger_soularr: bool = Field(default=False)
     
     jellyfin_url: str = Field(default="http://jellyfin:8096")
     

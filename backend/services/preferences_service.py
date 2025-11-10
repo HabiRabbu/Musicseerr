@@ -1,7 +1,13 @@
 import json
 import logging
 from typing import Optional
-from api.v1.schemas.settings import UserPreferences, LidarrSettings
+from api.v1.schemas.settings import (
+    UserPreferences, 
+    LidarrSettings,
+    LidarrConnectionSettings,
+    SoularrConnectionSettings,
+    JellyfinConnectionSettings
+)
 from api.v1.schemas.advanced_settings import AdvancedSettings
 from core.config import Settings
 from core.exceptions import ConfigurationError
@@ -136,3 +142,148 @@ class PreferencesService:
         except Exception as e:
             logger.error(f"Failed to save advanced settings: {e}")
             raise ConfigurationError(f"Failed to save advanced settings: {e}")
+    
+    def get_lidarr_connection(self) -> LidarrConnectionSettings:
+        try:
+            if not self._config_path.exists():
+                return LidarrConnectionSettings(
+                    lidarr_url=self._settings.lidarr_url,
+                    lidarr_api_key=self._settings.lidarr_api_key,
+                    quality_profile_id=self._settings.quality_profile_id,
+                    metadata_profile_id=self._settings.metadata_profile_id,
+                    root_folder_path=self._settings.root_folder_path,
+                )
+            
+            with open(self._config_path, encoding='utf-8') as f:
+                config = json.load(f)
+            
+            return LidarrConnectionSettings(
+                lidarr_url=config.get("lidarr_url", self._settings.lidarr_url),
+                lidarr_api_key=config.get("lidarr_api_key", self._settings.lidarr_api_key),
+                quality_profile_id=config.get("quality_profile_id", self._settings.quality_profile_id),
+                metadata_profile_id=config.get("metadata_profile_id", self._settings.metadata_profile_id),
+                root_folder_path=config.get("root_folder_path", self._settings.root_folder_path),
+            )
+        
+        except Exception as e:
+            logger.error(f"Failed to get Lidarr connection settings: {e}")
+            return LidarrConnectionSettings()
+    
+    def save_lidarr_connection(self, settings: LidarrConnectionSettings) -> None:
+        try:
+            self._config_path.parent.mkdir(parents=True, exist_ok=True)
+            
+            config = {}
+            if self._config_path.exists():
+                with open(self._config_path, encoding='utf-8') as f:
+                    config = json.load(f)
+            
+            config.update({
+                "lidarr_url": settings.lidarr_url,
+                "lidarr_api_key": settings.lidarr_api_key,
+                "quality_profile_id": settings.quality_profile_id,
+                "metadata_profile_id": settings.metadata_profile_id,
+                "root_folder_path": settings.root_folder_path,
+            })
+            
+            atomic_write_json(self._config_path, config)
+            
+            self._settings.lidarr_url = settings.lidarr_url
+            self._settings.lidarr_api_key = settings.lidarr_api_key
+            self._settings.quality_profile_id = settings.quality_profile_id
+            self._settings.metadata_profile_id = settings.metadata_profile_id
+            self._settings.root_folder_path = settings.root_folder_path
+            
+            logger.info(f"Saved Lidarr connection settings to {self._config_path}")
+        
+        except Exception as e:
+            logger.error(f"Failed to save Lidarr connection settings: {e}")
+            raise ConfigurationError(f"Failed to save Lidarr connection settings: {e}")
+    
+    def get_soularr_connection(self) -> SoularrConnectionSettings:
+        try:
+            if not self._config_path.exists():
+                return SoularrConnectionSettings(
+                    soularr_url=self._settings.soularr_url,
+                    soularr_api_key=self._settings.soularr_api_key,
+                    trigger_soularr=self._settings.trigger_soularr,
+                )
+            
+            with open(self._config_path, encoding='utf-8') as f:
+                config = json.load(f)
+            
+            return SoularrConnectionSettings(
+                soularr_url=config.get("soularr_url", self._settings.soularr_url),
+                soularr_api_key=config.get("soularr_api_key", self._settings.soularr_api_key),
+                trigger_soularr=config.get("trigger_soularr", self._settings.trigger_soularr),
+            )
+        
+        except Exception as e:
+            logger.error(f"Failed to get Soularr connection settings: {e}")
+            return SoularrConnectionSettings()
+    
+    def save_soularr_connection(self, settings: SoularrConnectionSettings) -> None:
+        try:
+            self._config_path.parent.mkdir(parents=True, exist_ok=True)
+            
+            config = {}
+            if self._config_path.exists():
+                with open(self._config_path, encoding='utf-8') as f:
+                    config = json.load(f)
+            
+            config.update({
+                "soularr_url": settings.soularr_url,
+                "soularr_api_key": settings.soularr_api_key,
+                "trigger_soularr": settings.trigger_soularr,
+            })
+            
+            atomic_write_json(self._config_path, config)
+            
+            self._settings.soularr_url = settings.soularr_url
+            self._settings.soularr_api_key = settings.soularr_api_key
+            self._settings.trigger_soularr = settings.trigger_soularr
+            
+            logger.info(f"Saved Soularr connection settings to {self._config_path}")
+        
+        except Exception as e:
+            logger.error(f"Failed to save Soularr connection settings: {e}")
+            raise ConfigurationError(f"Failed to save Soularr connection settings: {e}")
+    
+    def get_jellyfin_connection(self) -> JellyfinConnectionSettings:
+        try:
+            if not self._config_path.exists():
+                return JellyfinConnectionSettings(
+                    jellyfin_url=self._settings.jellyfin_url,
+                )
+            
+            with open(self._config_path, encoding='utf-8') as f:
+                config = json.load(f)
+            
+            return JellyfinConnectionSettings(
+                jellyfin_url=config.get("jellyfin_url", self._settings.jellyfin_url),
+            )
+        
+        except Exception as e:
+            logger.error(f"Failed to get Jellyfin connection settings: {e}")
+            return JellyfinConnectionSettings()
+    
+    def save_jellyfin_connection(self, settings: JellyfinConnectionSettings) -> None:
+        try:
+            self._config_path.parent.mkdir(parents=True, exist_ok=True)
+            
+            config = {}
+            if self._config_path.exists():
+                with open(self._config_path, encoding='utf-8') as f:
+                    config = json.load(f)
+            
+            config["jellyfin_url"] = settings.jellyfin_url
+            
+            atomic_write_json(self._config_path, config)
+            
+            self._settings.jellyfin_url = settings.jellyfin_url
+            
+            logger.info(f"Saved Jellyfin connection settings to {self._config_path}")
+        
+        except Exception as e:
+            logger.error(f"Failed to save Jellyfin connection settings: {e}")
+            raise ConfigurationError(f"Failed to save Jellyfin connection settings: {e}")

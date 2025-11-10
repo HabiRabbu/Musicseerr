@@ -101,3 +101,44 @@ export type AlbumInfo = {
 	total_length?: number | null;
 	in_library: boolean;
 };
+
+export type LidarrConnectionSettings = {
+	lidarr_url: string;
+	lidarr_api_key: string;
+	quality_profile_id: number;
+	metadata_profile_id: number;
+	root_folder_path: string;
+};
+
+export type SoularrConnectionSettings = {
+	soularr_url: string;
+	soularr_api_key: string;
+	trigger_soularr: boolean;
+};
+
+export type JellyfinConnectionSettings = {
+	jellyfin_url: string;
+};
+
+export type QualityProfile = {
+	id: number;
+	name: string;
+};
+
+export type MetadataProfile = {
+	id: number;
+	name: string;
+};
+
+export type RootFolder = {
+	id: string;
+	path: string;
+};
+
+export type LidarrVerifyResponse = {
+	success: boolean;
+	message: string;
+	quality_profiles: QualityProfile[];
+	metadata_profiles: MetadataProfile[];
+	root_folders: RootFolder[];
+};

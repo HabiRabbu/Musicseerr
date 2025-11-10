@@ -341,16 +341,21 @@ class LibraryService:
                 else:
                     logger.debug(f"Artist metadata for {artist_name} already cached, skipping fetch")
 
-                cache_filename = _get_cache_filename(f"artist_{mbid}_250", "img")
-                file_path = DEFAULT_CACHE_DIR / f"{cache_filename}.bin"
+                cache_filename_250 = _get_cache_filename(f"artist_{mbid}_250", "img")
+                file_path_250 = DEFAULT_CACHE_DIR / f"{cache_filename_250}.bin"
+                cache_filename_500 = _get_cache_filename(f"artist_{mbid}_500", "img")
+                file_path_500 = DEFAULT_CACHE_DIR / f"{cache_filename_500}.bin"
 
-                if file_path.exists():
-                    logger.debug(f"Artist image for {artist_name} already cached, skipping")
+                if file_path_250.exists() and file_path_500.exists():
+                    logger.debug(f"Artist images for {artist_name} already cached, skipping")
                     await status_service.update_progress(index + 1, artist_name)
                     return
 
-                await status_service.update_progress(index + 1, f"Fetching image for {artist_name}")
-                await self._cover_repo.get_artist_image(mbid, size=250)
+                await status_service.update_progress(index + 1, f"Fetching images for {artist_name}")
+                if not file_path_250.exists():
+                    await self._cover_repo.get_artist_image(mbid, size=250)
+                if not file_path_500.exists():
+                    await self._cover_repo.get_artist_image(mbid, size=500)
                 await status_service.update_progress(index + 1, artist_name)
 
             except Exception as e:

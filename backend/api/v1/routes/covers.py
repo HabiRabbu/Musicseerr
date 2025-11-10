@@ -81,13 +81,25 @@ async def cover_from_release(
 @router.get("/artist/{artist_id}")
 async def get_artist_cover(
     artist_id: str,
-    size: Optional[int] = None,
+    size: Optional[int] = Query(None, description="Preferred size in pixels for width"),
     coverart_repo: CoverArtRepository = Depends(get_coverart_repository)
 ):
     result = await coverart_repo.get_artist_image(artist_id, size)
     
     if not result:
-        raise HTTPException(status_code=404, detail="Artist image not found")
+        placeholder_svg = '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+            <rect fill="#374151" width="200" height="200"/>
+            <circle cx="100" cy="80" r="30" fill="#6B7280"/>
+            <path d="M60 120 Q100 140 140 120 L140 160 Q100 180 60 160 Z" fill="#6B7280"/>
+        </svg>'''
+        return Response(
+            content=placeholder_svg.encode(),
+            media_type="image/svg+xml",
+            headers={
+                "Cache-Control": "public, max-age=86400",
+                "X-Cover-Source": "placeholder",
+            }
+        )
     
     image_data, content_type, wikidata_id = result
     return Response(
