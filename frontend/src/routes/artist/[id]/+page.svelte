@@ -285,7 +285,7 @@
 					errorModal.show(
 						`Cannot Add ${albumType}`,
 						errorDetail,
-						'Go to Lidarr → Settings → Profiles → Metadata Profiles, and enable the appropriate release types in your active profile. After enabling, refresh the artist in Lidarr.'
+						'Go to Lidarr -> Settings -> Profiles -> Metadata Profiles, and enable the appropriate release types in your active profile. After enabling, refresh the artist in Lidarr.'
 					);
 				} else {
 					errorModal.show(

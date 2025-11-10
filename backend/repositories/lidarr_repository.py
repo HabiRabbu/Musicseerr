@@ -2,6 +2,7 @@ import asyncio
 import httpx
 import logging
 from typing import Any, Optional
+from datetime import datetime
 from core.config import Settings
 from core.exceptions import ExternalServiceError
 from api.v1.schemas.library import LibraryAlbum
@@ -103,21 +104,42 @@ class LidarrRepository:
         except Exception as e:
             return ServiceStatus(status="error", message=str(e))
     
-    async def get_library(self) -> list[LibraryAlbum]:
+    async def get_library(self, include_unmonitored: bool = False) -> list[LibraryAlbum]:
         data = await self._get("/api/v1/album")
         out: list[LibraryAlbum] = []
+        filtered_count = 0
+        
         for item in data:
-            artist = item.get("artist", {}).get("artistName", "Unknown")
+            is_monitored = item.get("monitored", False)
+            
+            if not is_monitored and not include_unmonitored:
+                filtered_count += 1
+                continue
+        
+            artist_data = item.get("artist", {})
+            artist = artist_data.get("artistName", "Unknown")
+            artist_mbid = artist_data.get("foreignArtistId")
+            
             year = None
             if date := item.get("releaseDate"):
                 try:
                     year = int(date.split("-")[0])
                 except ValueError:
                     pass
+            
             cover = None
             if imgs := item.get("images"):
                 first = imgs[0] if imgs else {}
                 cover = first.get("remoteUrl") or first.get("url")
+            
+            date_added = None
+            if added_str := item.get("added"):
+                try:
+                    dt = datetime.fromisoformat(added_str.replace('Z', '+00:00'))
+                    date_added = int(dt.timestamp())
+                except Exception as e:
+                    logger.warning(f"Failed to parse date_added '{added_str}' for album '{item.get('title')}': {e}")
+            
             out.append(
                 LibraryAlbum(
                     artist=artist,
@@ -126,9 +148,61 @@ class LidarrRepository:
                     monitored=item.get("monitored", False),
                     quality=None,
                     cover_url=cover,
+                    musicbrainz_id=item.get("foreignAlbumId"),
+                    artist_mbid=artist_mbid,
+                    date_added=date_added,
                 )
             )
+        
+        if filtered_count > 0:
+            logger.info(f"Filtered out {filtered_count} unmonitored albums from library")
+        
         return out
+    
+    async def get_artists_from_library(self, include_unmonitored: bool = False) -> list[dict]:
+        albums_data = await self._get("/api/v1/album")
+        artists_dict: dict[str, dict] = {}
+        filtered_count = 0
+        
+        for item in albums_data:
+            is_monitored = item.get("monitored", False)
+            
+            if not is_monitored and not include_unmonitored:
+                filtered_count += 1
+                continue
+            
+            artist_data = item.get("artist", {})
+            artist_mbid = artist_data.get("foreignArtistId")
+            artist_name = artist_data.get("artistName", "Unknown")
+            
+            if not artist_mbid:
+                continue
+            
+            date_added = None
+            if added_str := item.get("added"):
+                try:
+                    dt = datetime.fromisoformat(added_str.replace('Z', '+00:00'))
+                    date_added = int(dt.timestamp())
+                except Exception as e:
+                    logger.warning(f"Failed to parse date_added '{added_str}' for artist '{artist_name}': {e}")
+            
+            if artist_mbid not in artists_dict:
+                artists_dict[artist_mbid] = {
+                    'mbid': artist_mbid,
+                    'name': artist_name,
+                    'album_count': 0,
+                    'date_added': date_added
+                }
+            
+            artists_dict[artist_mbid]['album_count'] += 1
+            if date_added and (not artists_dict[artist_mbid]['date_added'] or 
+                              date_added < artists_dict[artist_mbid]['date_added']):
+                artists_dict[artist_mbid]['date_added'] = date_added
+        
+        if filtered_count > 0:
+            logger.info(f"Filtered out {filtered_count} unmonitored albums from artist extraction")
+        
+        return list(artists_dict.values())
     
     async def get_library_grouped(self) -> list[dict[str, Any]]:
         data = await self._get("/api/v1/album")
@@ -227,14 +301,6 @@ class LidarrRepository:
         return queue_items
     
     async def add_album(self, musicbrainz_id: str) -> dict:
-        """Add an album to Lidarr by MusicBrainz release group ID.
-        
-        Args:
-            musicbrainz_id: MusicBrainz release group ID
-            
-        Returns:
-            Dict with status message and response from Lidarr
-        """
         if not musicbrainz_id or not isinstance(musicbrainz_id, str):
             raise ExternalServiceError("Invalid MBID provided")
 
@@ -302,7 +368,7 @@ class LidarrRepository:
                             f"Cannot add this {album_type}. "
                             f"Lidarr rejected adding '{album_title}'. This is likely because your Lidarr "
                             f"Metadata Profile is configured to exclude {album_type}s{' (' + ', '.join(secondary_types) + ')' if secondary_types else ''}. "
-                            f"To fix this: Go to Lidarr → Settings → Profiles → Metadata Profiles, "
+                            f"To fix this: Go to Lidarr -> Settings -> Profiles -> Metadata Profiles, "
                             f"and enable '{album_type}' in your active profile."
                         )
                     else:
@@ -313,7 +379,7 @@ class LidarrRepository:
                 f"Cannot add this {album_type}. "
                 f"'{album_title}' could not be found in Lidarr after the artist refresh. This usually means "
                 f"your Lidarr Metadata Profile is configured to exclude {album_type}s. "
-                f"To fix this: Go to Lidarr → Settings → Profiles → Metadata Profiles, "
+                f"To fix this: Go to Lidarr -> Settings -> Profiles -> Metadata Profiles, "
                 f"enable '{album_type}', then refresh the artist in Lidarr."
             )
 
@@ -350,7 +416,6 @@ class LidarrRepository:
         }
     
     async def _get_album_by_foreign_id(self, album_mbid: str) -> Optional[dict[str, Any]]:
-        """Get an album from Lidarr by its foreign (MusicBrainz) ID."""
         try:
             items = await self._get("/api/v1/album", params={"foreignAlbumId": album_mbid})
             return items[0] if items else None
@@ -359,7 +424,6 @@ class LidarrRepository:
             return None
     
     async def _get_artist_by_id(self, artist_id: int) -> Optional[dict[str, Any]]:
-        """Get an artist from Lidarr by ID."""
         try:
             return await self._get(f"/api/v1/artist/{artist_id}")
         except Exception as e:
@@ -367,35 +431,15 @@ class LidarrRepository:
             return None
     
     async def _post_command(self, body: dict[str, Any]) -> Any:
-        """Post a command to Lidarr and return the command object."""
         try:
-            response = await self._client.post(
-                f"{self._base_url}/api/v1/command",
-                headers=self._get_headers(),
-                json=body,
-                timeout=120.0
-            )
-            if response.status_code not in (200, 201, 202):
-                return None
-            return response.json()
+            return await self._post("/api/v1/command", body)
         except Exception:
             return None
 
     async def _get_command(self, cmd_id: int) -> Any:
-        """Get the status of a command by its ID."""
         return await self._get(f"/api/v1/command/{cmd_id}")
 
     async def _await_command(self, body: dict[str, Any], timeout: float = 60.0, poll: float = 0.5) -> dict[str, Any] | None:
-        """Post a command and wait for it to complete.
-        
-        Args:
-            body: Command body to post
-            timeout: Maximum time to wait for completion
-            poll: Polling interval in seconds
-            
-        Returns:
-            Final command status or None if failed
-        """
         import time
         try:
             cmd = await self._post_command(body)
@@ -430,17 +474,6 @@ class LidarrRepository:
         timeout: float = 30.0,
         poll: float = 0.5
     ):
-        """Generic wait-for helper that polls until condition is met.
-        
-        Args:
-            fetch_coro_factory: Async function that fetches the value to check
-            stop: Function that returns True when condition is met
-            timeout: Maximum time to wait
-            poll: Polling interval
-            
-        Returns:
-            Last fetched value
-        """
         import time
         deadline = time.monotonic() + timeout
         last = None
@@ -455,15 +488,6 @@ class LidarrRepository:
         return last
 
     async def _wait_for_artist_commands_to_complete(self, artist_id: int, timeout: float = 600.0) -> None:
-        """Wait for all Lidarr commands related to an artist to complete.
-        
-        This is CRITICAL - we must wait for RefreshArtist and RescanArtist to finish
-        before attempting to add albums, otherwise the album won't be indexed yet.
-        
-        Args:
-            artist_id: Lidarr artist ID
-            timeout: Maximum time to wait in seconds (default 10 minutes)
-        """
         import time
         deadline = time.monotonic() + timeout
         
@@ -503,15 +527,6 @@ class LidarrRepository:
         album_title: str,
         max_attempts: int = 3
     ) -> None:
-        """Monitor both artist and album with retries.
-        
-        Args:
-            artist_id: Lidarr artist ID
-            album_id: Lidarr album ID
-            album_mbid: MusicBrainz album ID
-            album_title: Album title for logging
-            max_attempts: Maximum number of retry attempts
-        """
         for attempt in range(max_attempts):
             try:
                 await self._put(
@@ -544,22 +559,6 @@ class LidarrRepository:
                 await asyncio.sleep(5.0)
 
     async def _ensure_artist_exists(self, artist_mbid: str, artist_name_hint: Optional[str] = None) -> dict[str, Any]:
-        """Ensure an artist exists in Lidarr, adding if necessary and waiting for full refresh.
-        
-        This method will:
-        1. Check if artist already exists
-        2. If not, create the artist with minimal monitoring
-        3. Trigger RefreshArtist and RescanArtist commands
-        4. WAIT for those commands to complete (this can take several minutes!)
-        5. Return the artist object
-        
-        Args:
-            artist_mbid: MusicBrainz artist ID
-            artist_name_hint: Optional artist name hint for display
-            
-        Returns:
-            Artist object from Lidarr
-        """
         try:
             items = await self._get("/api/v1/artist", params={"mbId": artist_mbid})
             if items:
@@ -631,3 +630,227 @@ class LidarrRepository:
     async def search_for_album(self, term: str) -> list[dict]:
         params = {"term": term}
         return await self._get("/api/v1/album/lookup", params=params)
+    
+    async def get_recently_imported(self, limit: int = 20) -> list[LibraryAlbum]:
+        try:
+            album_dates: dict[str, tuple[int, dict]] = {}
+            
+            try:
+                params = {
+                    "page": 1,
+                    "pageSize": limit * 10,
+                    "sortKey": "date",
+                    "sortDirection": "descending",
+                    "includeAlbum": True,
+                    "includeArtist": True,
+                    "eventType": [2, 3, 8]  # artistFolderImported, trackFileImported, downloadImported
+                }
+                
+                history_data = await self._get("/api/v1/history", params=params)
+                
+                if history_data and history_data.get("records"):
+                    for record in history_data.get("records", []):
+                        album_data = record.get("album", {})
+                        if not album_data:
+                            continue
+                        
+                        album_mbid = album_data.get("foreignAlbumId")
+                        if not album_mbid:
+                            continue
+                        
+                        date_added = None
+                        if date_str := record.get("date"):
+                            try:
+                                dt = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+                                date_added = int(dt.timestamp())
+                            except Exception:
+                                continue
+                        
+                        if not date_added:
+                            continue
+                        
+                        if album_mbid not in album_dates or date_added > album_dates[album_mbid][0]:
+                            album_dates[album_mbid] = (date_added, {
+                                'album_data': album_data,
+                                'artist_data': record.get("artist", {})
+                            })
+                    
+                    logger.info(f"Found {len(album_dates)} unique albums from {len(history_data.get('records', []))} history records")
+            except Exception as e:
+                logger.warning(f"Failed to get history data: {e}")
+            
+            if len(album_dates) < limit * 2:
+                try:
+                    albums_data = await self._get("/api/v1/album")
+                    
+                    albums_with_dates = []
+                    
+                    for album in albums_data:
+                        if not album.get("monitored", False):
+                            continue
+                        
+                        album_id = album.get("id")
+                        album_mbid = album.get("foreignAlbumId")
+                        
+                        if not album_id or not album_mbid:
+                            continue
+                        
+                        if album_mbid in album_dates:
+                            continue
+                        
+                        try:
+                            track_files = await self._get("/api/v1/trackfile", params={"albumId": [album_id]})
+                            
+                            if not track_files:
+                                continue
+                            
+                            most_recent = None
+                            for track_file in track_files:
+                                date_added_str = track_file.get("dateAdded")
+                                if not date_added_str:
+                                    continue
+                                
+                                try:
+                                    date_added = datetime.fromisoformat(date_added_str.replace('Z', '+00:00'))
+                                    if most_recent is None or date_added > most_recent:
+                                        most_recent = date_added
+                                except Exception:
+                                    continue
+                            
+                            if most_recent:
+                                albums_with_dates.append((album, most_recent, album_mbid))
+                        except Exception:
+                            continue
+                    
+                    albums_with_dates.sort(key=lambda x: x[1], reverse=True)
+                    
+                    for album, most_recent, album_mbid in albums_with_dates[:limit * 2]:
+                        album_dates[album_mbid] = (int(most_recent.timestamp()), {
+                            'album_data': album,
+                            'artist_data': album.get("artist", {})
+                        })
+                    
+                    logger.info(f"Total {len(album_dates)} unique albums after supplementing with track file dates")
+                except Exception as e:
+                    logger.warning(f"Failed to supplement with track file data: {e}")
+            
+            if not album_dates:
+                logger.warning("No albums found with dates from either history or track files")
+                return []
+            
+            sorted_albums = sorted(album_dates.items(), key=lambda x: x[1][0], reverse=True)
+            recent_albums = sorted_albums[:limit]
+            
+            out: list[LibraryAlbum] = []
+            for album_mbid, (date_added, data) in recent_albums:
+                album_data = data['album_data']
+                artist_data = data['artist_data']
+                
+                artist = artist_data.get("artistName", "Unknown")
+                artist_mbid = artist_data.get("foreignArtistId")
+                
+                year = None
+                if date := album_data.get("releaseDate"):
+                    try:
+                        year = int(date.split("-")[0])
+                    except ValueError:
+                        pass
+                
+                cover = None
+                if imgs := album_data.get("images"):
+                    first = imgs[0] if imgs else {}
+                    cover = first.get("remoteUrl") or first.get("url")
+                
+                out.append(
+                    LibraryAlbum(
+                        artist=artist,
+                        album=album_data.get("title"),
+                        year=year,
+                        monitored=album_data.get("monitored", False),
+                        quality=None,
+                        cover_url=cover,
+                        musicbrainz_id=album_mbid,
+                        artist_mbid=artist_mbid,
+                        date_added=date_added,
+                    )
+                )
+            
+            logger.info(f"Retrieved {len(out)} recently added albums (merged from history and track files)")
+            return out
+            
+        except Exception as e:
+            logger.error(f"Failed to get recently imported albums: {e}")
+            return []
+    
+    async def _get_recently_added_fallback(self, limit: int = 20) -> list[LibraryAlbum]:
+        track_files = await self._get("/api/v1/trackfile")
+        
+        album_dates: dict[int, datetime] = {}
+        for track_file in track_files:
+            album_id = track_file.get("albumId")
+            date_added_str = track_file.get("dateAdded")
+            
+            if not album_id or not date_added_str:
+                continue
+            
+            try:
+                date_added = datetime.fromisoformat(date_added_str.replace('Z', '+00:00'))
+                if album_id not in album_dates or date_added < album_dates[album_id]:
+                    album_dates[album_id] = date_added
+            except Exception:
+                continue
+        
+        if not album_dates:
+            logger.warning("No track files with dateAdded found, cannot determine recently added albums")
+            return []
+        
+        albums_data = await self._get("/api/v1/album")
+        
+        albums_with_dates = []
+        for album in albums_data:
+            if not album.get("monitored", False):
+                continue
+            
+            album_id = album.get("id")
+            if album_id in album_dates:
+                albums_with_dates.append((album, album_dates[album_id]))
+        
+        albums_with_dates.sort(key=lambda x: x[1], reverse=True)
+        recent_albums = albums_with_dates[:limit]
+        
+        out: list[LibraryAlbum] = []
+        for item, date_added_dt in recent_albums:
+            artist_data = item.get("artist", {})
+            artist = artist_data.get("artistName", "Unknown")
+            artist_mbid = artist_data.get("foreignArtistId")
+            
+            year = None
+            if date := item.get("releaseDate"):
+                try:
+                    year = int(date.split("-")[0])
+                except ValueError:
+                    pass
+            
+            cover = None
+            if imgs := item.get("images"):
+                first = imgs[0] if imgs else {}
+                cover = first.get("remoteUrl") or first.get("url")
+            
+            date_added = int(date_added_dt.timestamp())
+            
+            out.append(
+                LibraryAlbum(
+                    artist=artist,
+                    album=item.get("title"),
+                    year=year,
+                    monitored=item.get("monitored", False),
+                    quality=None,
+                    cover_url=cover,
+                    musicbrainz_id=item.get("foreignAlbumId"),
+                    artist_mbid=artist_mbid,
+                    date_added=date_added,
+                )
+            )
+        
+        logger.info(f"Retrieved {len(out)} recently added albums sorted by track file dateAdded (fallback)")
+        return out

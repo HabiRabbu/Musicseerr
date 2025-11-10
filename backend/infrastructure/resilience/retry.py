@@ -1,4 +1,3 @@
-"""Circuit breaker and retry decorator for resilient service calls."""
 import asyncio
 import logging
 import random
@@ -14,18 +13,12 @@ T = TypeVar('T')
 
 
 class CircuitState(Enum):
-    """Circuit breaker states."""
-    CLOSED = "closed"      # Normal operation
-    OPEN = "open"          # Failing, rejecting calls
-    HALF_OPEN = "half_open"  # Testing if service recovered
+    CLOSED = "closed"
+    OPEN = "open"
+    HALF_OPEN = "half_open"
 
 
 class CircuitBreaker:
-    """Circuit breaker pattern implementation.
-    
-    Prevents cascading failures by stopping requests to failing services.
-    Automatically retries after a timeout period.
-    """
     
     def __init__(
         self,
@@ -34,14 +27,6 @@ class CircuitBreaker:
         timeout: float = 60.0,
         name: str = "default"
     ):
-        """Initialize circuit breaker.
-        
-        Args:
-            failure_threshold: Number of failures before opening circuit
-            success_threshold: Number of successes in half-open before closing
-            timeout: Seconds to wait before attempting recovery
-            name: Name for logging
-        """
         self.failure_threshold = failure_threshold
         self.success_threshold = success_threshold
         self.timeout = timeout
@@ -53,7 +38,6 @@ class CircuitBreaker:
         self.state = CircuitState.CLOSED
     
     def is_open(self) -> bool:
-        """Check if circuit is open (rejecting calls)."""
         if self.state == CircuitState.OPEN:
             if time.time() - self.last_failure_time > self.timeout:
                 logger.info(f"Circuit breaker '{self.name}' transitioning to HALF_OPEN")
@@ -64,7 +48,6 @@ class CircuitBreaker:
         return False
     
     def record_success(self):
-        """Record successful call."""
         if self.state == CircuitState.HALF_OPEN:
             self.success_count += 1
             if self.success_count >= self.success_threshold:
@@ -76,7 +59,6 @@ class CircuitBreaker:
             self.failure_count = 0
     
     def record_failure(self):
-        """Record failed call."""
         self.last_failure_time = time.time()
         
         if self.state == CircuitState.HALF_OPEN:
@@ -93,7 +75,6 @@ class CircuitBreaker:
                 self.state = CircuitState.OPEN
     
     def get_state(self) -> dict:
-        """Get current state for monitoring."""
         return {
             "name": self.name,
             "state": self.state.value,
@@ -104,7 +85,6 @@ class CircuitBreaker:
 
 
 class CircuitOpenError(Exception):
-    """Raised when circuit breaker is open."""
     pass
 
 
@@ -117,22 +97,6 @@ def with_retry(
     circuit_breaker: Optional[CircuitBreaker] = None,
     retriable_exceptions: tuple = (Exception,)
 ):
-    """Decorator for retrying async functions with exponential backoff and jitter.
-    
-    Args:
-        max_attempts: Maximum number of attempts (including first try)
-        base_delay: Initial delay between retries in seconds
-        max_delay: Maximum delay between retries
-        exponential_base: Base for exponential backoff (2.0 = double each time)
-        jitter: Add random jitter to prevent thundering herd
-        circuit_breaker: Optional circuit breaker instance
-        retriable_exceptions: Tuple of exceptions that should trigger retry
-    
-    Example:
-        @with_retry(max_attempts=3, circuit_breaker=my_breaker)
-        async def fetch_data():
-            return await external_api_call()
-    """
     def decorator(func: Callable[P, T]) -> Callable[P, T]:
         @wraps(func)
         async def wrapper(*args: P.args, **kwargs: P.kwargs) -> T:

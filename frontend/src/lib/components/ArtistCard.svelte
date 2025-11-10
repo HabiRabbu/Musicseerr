@@ -5,7 +5,7 @@
 	import { browser } from '$app/environment';
 
 	export let artist: Artist;
-	export let index: number = 0;
+	export let index: number = 0; // Used for staggered loading in some views
 	
 	let coverUrl = `/api/covers/artist/${artist.musicbrainz_id}?size=250`;
 	let imgError = false;
@@ -28,22 +28,51 @@
 	function setupImageObserver(img: HTMLImageElement) {
 		if (!img) return;
 		
-		if (imageObserver) {
-			imageObserver.observe(img);
-		} else {
-			const checkObserver = setInterval(() => {
-				if (imageObserver) {
-					imageObserver.observe(img);
-					clearInterval(checkObserver);
+		let interval: ReturnType<typeof setInterval> | null = null;
+		let timeout: ReturnType<typeof setTimeout> | null = null;
+		let observed = false;
+		
+		const checkAndObserve = () => {
+			if (imageObserver && !observed) {
+				imageObserver.observe(img);
+				observed = true;
+				return true;
+			}
+			return false;
+		};
+		
+		// Try immediate observation
+		if (checkAndObserve()) {
+			return {
+				destroy() {
+					if (imageObserver && img && observed) {
+						imageObserver.unobserve(img);
+					}
 				}
-			}, 50);
-			
-			setTimeout(() => clearInterval(checkObserver), 1000);
+			};
 		}
+		
+		// Poll for observer initialization with timeout
+		interval = setInterval(() => {
+			if (checkAndObserve()) {
+				if (interval) clearInterval(interval);
+				if (timeout) clearTimeout(timeout);
+				interval = null;
+				timeout = null;
+			}
+		}, 50);
+		
+		timeout = setTimeout(() => {
+			if (interval) clearInterval(interval);
+			interval = null;
+			timeout = null;
+		}, 1000);
 		
 		return {
 			destroy() {
-				if (imageObserver && img) {
+				if (interval) clearInterval(interval);
+				if (timeout) clearTimeout(timeout);
+				if (imageObserver && img && observed) {
 					imageObserver.unobserve(img);
 				}
 			}
@@ -59,7 +88,6 @@
 							const img = entry.target as HTMLImageElement;
 							const src = img.dataset.src;
 							if (src && img.src !== src) {
-								console.log('Loading artist image:', src);
 								img.src = src;
 								imageObserver?.unobserve(img);
 							}
@@ -83,37 +111,37 @@
 </script>
 
 <div 
-	class="card bg-base-100 w-full shadow-sm flex-shrink-0 cursor-pointer transition-transform hover:scale-105 hover:shadow-lg"
-	on:click={handleClick}
-	on:keydown={(e) => e.key === 'Enter' && handleClick()}
-	role="button"
-	tabindex="0"
+class="card bg-base-100 w-full shadow-sm flex-shrink-0 cursor-pointer transition-transform hover:scale-105 hover:shadow-lg"
+on:click={handleClick}
+on:keydown={(e) => e.key === 'Enter' && handleClick()}
+role="button"
+tabindex="0"
 >
-	<figure class="aspect-square overflow-hidden relative">
-		{#if imgError}
-			<div
-				class="w-full h-full flex items-center justify-center text-6xl opacity-50 bg-base-200"
-			>
-				🎤
-			</div>
-		{:else}
-			{#if !imgLoaded}
-				<div class="skeleton w-full h-full absolute inset-0"></div>
-			{/if}
-			<img
-				src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
-				data-src={coverUrl}
-				alt={artist.title}
-				class="w-full h-full object-cover opacity-0 transition-opacity duration-300"
-				decoding="async"
-				use:setupImageObserver
-				on:error={onImgError}
-				on:load={onImgLoad}
-			/>
-		{/if}
-	</figure>
+<figure class="aspect-square overflow-hidden relative">
+{#if imgError}
+<div
+class="w-full h-full flex items-center justify-center text-6xl opacity-50 bg-base-200"
+>
+🎤
+</div>
+{:else}
+{#if !imgLoaded}
+<div class="skeleton w-full h-full absolute inset-0"></div>
+{/if}
+<img
+src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
+data-src={coverUrl}
+alt={artist.title}
+class="w-full h-full object-cover opacity-0 transition-opacity duration-300"
+decoding="async"
+use:setupImageObserver
+on:error={onImgError}
+on:load={onImgLoad}
+/>
+{/if}
+</figure>
 
-	<div class="card-body p-2">
-		<h2 class="card-title text-xs line-clamp-1 min-h-[1.25rem]">{artist.title}</h2>
-	</div>
+<div class="card-body p-2">
+<h2 class="card-title text-xs line-clamp-1 min-h-[1.25rem]">{artist.title}</h2>
+</div>
 </div>

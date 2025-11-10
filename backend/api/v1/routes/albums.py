@@ -1,8 +1,9 @@
 import logging
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 from api.v1.schemas.album import AlbumInfo
 from core.dependencies import get_album_service
 from services.album_service import AlbumService
+from infrastructure.validators import is_unknown_mbid
 
 logger = logging.getLogger(__name__)
 
@@ -14,4 +15,16 @@ async def get_album(
     album_id: str,
     album_service: AlbumService = Depends(get_album_service)
 ):
-    return await album_service.get_album_info(album_id)
+    if is_unknown_mbid(album_id):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid or unknown album ID: {album_id}"
+        )
+    
+    try:
+        return await album_service.get_album_info(album_id)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )

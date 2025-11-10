@@ -67,10 +67,6 @@ class SearchService:
         )
     
     def schedule_cover_prefetch(self, albums: list[SearchResult]) -> list[str]:
-        """Extract album IDs for cover prefetch scheduling.
-        
-        Returns list of album IDs to prefetch (up to COVER_PREFETCH_LIMIT).
-        """
         return [
             item.musicbrainz_id
             for item in albums[:COVER_PREFETCH_LIMIT]

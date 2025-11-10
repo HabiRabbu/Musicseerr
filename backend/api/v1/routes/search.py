@@ -12,6 +12,7 @@ router = APIRouter(prefix="/api/search", tags=["search"])
 
 @router.get("", response_model=SearchResponse)
 async def search(
+    background_tasks: BackgroundTasks,
     q: str = Query(..., min_length=1, description="Search term"),
     limit_per_bucket: int | None = Query(
         None, ge=1, le=100,
@@ -23,8 +24,7 @@ async def search(
         None, description="Comma-separated subset: artists,albums"
     ),
     search_service: SearchService = Depends(get_search_service),
-    coverart_repo: CoverArtRepository = Depends(get_coverart_repository),
-    background_tasks: BackgroundTasks = BackgroundTasks()
+    coverart_repo: CoverArtRepository = Depends(get_coverart_repository)
 ):
     buckets_list = [b.strip().lower() for b in buckets.split(",")] if buckets else None
     

@@ -1,9 +1,17 @@
 import logging
+import asyncio
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.gzip import GZipMiddleware
-from core.dependencies import get_request_queue, get_cache, init_app_state, cleanup_app_state
-from core.tasks import start_cache_cleanup_task
+from core.dependencies import (
+    get_request_queue, 
+    get_cache, 
+    get_library_service,
+    get_preferences_service,
+    init_app_state, 
+    cleanup_app_state
+)
+from core.tasks import start_cache_cleanup_task, start_library_sync_task, start_disk_cache_cleanup_task
 from core.exceptions import ResourceNotFoundError, ExternalServiceError
 from core.exception_handlers import (
     resource_not_found_handler,
@@ -18,35 +26,74 @@ from api.v1.routes import (
     search, requests, library, status, queue, covers, artists, albums, settings
 )
 from api.v1.routes import cache as cache_routes
+from api.v1.routes import cache_status as cache_status_routes
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
+logging.getLogger('musicbrainzngs').setLevel(logging.WARNING)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Lifespan context manager for startup and shutdown."""
     logger.info("Starting Musicseerr...")
     
     await init_app_state(app)
     
     cache = get_cache()
     start_cache_cleanup_task(cache)
+    
+    from core.dependencies import get_disk_cache
+    disk_cache = get_disk_cache()
+    start_disk_cache_cleanup_task(disk_cache)
+    
+    library_service = get_library_service()
+    preferences_service = get_preferences_service()
+    start_library_sync_task(library_service, preferences_service)
 
     request_queue = get_request_queue()
     await request_queue.start()
     
+    from core.tasks import warm_library_cache
+    from core.dependencies import get_album_service, get_library_cache
+    
+    def handle_cache_warming_error(task: asyncio.Task):
+        try:
+            if task.cancelled():
+                logger.info("Cache warming was cancelled")
+                return
+            
+            exc = task.exception()
+            if exc:
+                logger.error(f"Cache warming failed: {exc}", exc_info=exc)
+        except asyncio.CancelledError:
+            logger.info("Cache warming was cancelled")
+        except Exception as e:
+            logger.error(f"Error checking cache warming task: {e}")
+    
+    cache_task = asyncio.create_task(
+        warm_library_cache(library_service, get_album_service(), get_library_cache())
+    )
+    cache_task.add_done_callback(handle_cache_warming_error)
+    
     logger.info("Musicseerr started successfully")
     
-    yield
+    try:
+        yield
+    finally:
+        logger.info("Shutting down Musicseerr...")
 
-    logger.info("Shutting down Musicseerr...")
+        try:
+            await request_queue.stop()
+        except Exception as e:
+            logger.error(f"Error stopping request queue: {e}")
 
-    await request_queue.stop()
-
-    await cleanup_app_state()
-    
-    logger.info("Musicseerr shut down successfully")
+        try:
+            await cleanup_app_state()
+        except Exception as e:
+            logger.error(f"Error during cleanup: {e}")
+        
+        logger.info("Musicseerr shut down successfully")
 
 
 app = FastAPI(
@@ -82,5 +129,6 @@ app.include_router(artists.router)
 app.include_router(albums.router)
 app.include_router(settings.router)
 app.include_router(cache_routes.router)
+app.include_router(cache_status_routes.router)
 
 mount_frontend(app)

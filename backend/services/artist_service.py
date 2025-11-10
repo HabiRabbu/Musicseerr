@@ -6,6 +6,9 @@ from repositories.musicbrainz_repository import MusicBrainzRepository
 from repositories.lidarr_repository import LidarrRepository
 from repositories.wikidata_repository import WikidataRepository
 from services.preferences_service import PreferencesService
+from infrastructure.cache.memory_cache import CacheInterface
+from infrastructure.cache.disk_cache import DiskMetadataCache
+from infrastructure.validators import validate_mbid
 from core.exceptions import ResourceNotFoundError
 
 logger = logging.getLogger(__name__)
@@ -48,49 +51,101 @@ class ArtistService:
         mb_repo: MusicBrainzRepository,
         lidarr_repo: LidarrRepository,
         wikidata_repo: WikidataRepository,
-        preferences_service: PreferencesService
+        preferences_service: PreferencesService,
+        memory_cache: CacheInterface,
+        disk_cache: DiskMetadataCache
     ):
         self._mb_repo = mb_repo
         self._lidarr_repo = lidarr_repo
         self._wikidata_repo = wikidata_repo
         self._preferences_service = preferences_service
+        self._cache = memory_cache
+        self._disk_cache = disk_cache
     
-    async def get_artist_info(self, artist_id: str) -> ArtistInfo:
-        """Get comprehensive artist information.
+    async def get_artist_info(
+        self, 
+        artist_id: str,
+        library_artist_mbids: set[str] = None,
+        library_album_mbids: dict[str, Any] = None
+    ) -> ArtistInfo:
+        try:
+            artist_id = validate_mbid(artist_id, "artist")
+        except ValueError as e:
+            logger.error(f"Invalid artist MBID: {e}")
+            raise
         
-        Main orchestration method - delegates to smaller helper methods.
-        """
-        mb_artist, library_mbids, album_mbids = await self._fetch_artist_data(artist_id)
+        try:
+            cache_key = f"artist_info:{artist_id}"
+            cached_info = await self._cache.get(cache_key)
+            if cached_info:
+                logger.debug(f"Cache HIT (RAM): Artist {artist_id[:8]}...")
+                return cached_info
+            
+            logger.debug(f"Cache MISS (RAM): Artist {artist_id[:8]}...")
+            
+            disk_data = await self._disk_cache.get_artist(artist_id)
+            if disk_data:
+                logger.debug(f"Cache HIT (Disk): Artist {artist_id[:8]}... - loading from persistent cache")
+                artist_info = ArtistInfo(**disk_data)
+                advanced_settings = self._preferences_service.get_advanced_settings()
+                ttl = advanced_settings.cache_ttl_artist_library if artist_info.in_library else advanced_settings.cache_ttl_artist_non_library
+                await self._cache.set(cache_key, artist_info, ttl_seconds=ttl)
+                return artist_info
+            
+            logger.debug(f"Cache MISS (Disk): Artist {artist_id[:8]}...")
+            
+            mb_artist, library_mbids, album_mbids = await self._fetch_artist_data(
+                artist_id,
+                library_artist_mbids=library_artist_mbids,
+                library_album_mbids=library_album_mbids
+            )
+            
+            in_library = artist_id.lower() in library_mbids
+            tags = self._extract_tags(mb_artist)
+            aliases = self._extract_aliases(mb_artist)
+            life_span = self._extract_life_span(mb_artist)
+            external_links = self._build_external_links(mb_artist)
+            
+            albums, singles, eps = await self._get_categorized_releases(mb_artist, album_mbids)
+            
+            description, image = await self._fetch_wikidata_info(mb_artist)
+            
+            artist_info = ArtistInfo(
+                name=mb_artist.get("name", "Unknown Artist"),
+                musicbrainz_id=artist_id,
+                disambiguation=mb_artist.get("disambiguation"),
+                type=mb_artist.get("type"),
+                country=mb_artist.get("country"),
+                life_span=life_span,
+                description=description,
+                image=image,
+                tags=tags,
+                aliases=aliases,
+                external_links=external_links,
+                in_library=in_library,
+                albums=albums,
+                singles=singles,
+                eps=eps,
+            )
+            
+            advanced_settings = self._preferences_service.get_advanced_settings()
+            ttl = advanced_settings.cache_ttl_artist_library if in_library else advanced_settings.cache_ttl_artist_non_library
+            
+            await self._cache.set(cache_key, artist_info, ttl_seconds=ttl)
+            
+            await self._disk_cache.set_artist(artist_id, artist_info, is_monitored=in_library, ttl_seconds=ttl if not in_library else None)
+            
+            return artist_info
         
-        in_library = artist_id.lower() in library_mbids
-        tags = self._extract_tags(mb_artist)
-        aliases = self._extract_aliases(mb_artist)
-        life_span = self._extract_life_span(mb_artist)
-        external_links = self._build_external_links(mb_artist)
-        
-        albums, singles, eps = await self._get_categorized_releases(mb_artist, album_mbids)
-        
-        description, image = await self._fetch_wikidata_info(mb_artist)
-        
-        return ArtistInfo(
-            name=mb_artist.get("name", "Unknown Artist"),
-            musicbrainz_id=artist_id,
-            disambiguation=mb_artist.get("disambiguation"),
-            type=mb_artist.get("type"),
-            country=mb_artist.get("country"),
-            life_span=life_span,
-            description=description,
-            image=image,
-            tags=tags,
-            aliases=aliases,
-            external_links=external_links,
-            in_library=in_library,
-            albums=albums,
-            singles=singles,
-            eps=eps,
-        )
+        except ValueError:
+            raise
+        except Exception as e:
+            logger.error(f"API call failed for artist {artist_id}: {e}")
+            raise ResourceNotFoundError(f"Failed to get artist info: {e}")
     
     async def get_artist_info_basic(self, artist_id: str) -> ArtistInfo:
+        artist_id = validate_mbid(artist_id, "artist")
+        
         mb_artist, library_mbids, album_mbids = await self._fetch_artist_data(artist_id)
         
         in_library = artist_id.lower() in library_mbids
@@ -177,14 +232,23 @@ class ArtistService:
             logger.error(f"Error fetching releases for artist {artist_id} at offset {offset}: {e}")
             return ArtistReleases(albums=[], singles=[], eps=[], total_count=0, has_more=False)
     
-    async def _fetch_artist_data(self, artist_id: str) -> tuple[dict, set[str], set[str]]:
-        """Fetch artist data from MusicBrainz and library info from Lidarr."""
+    async def _fetch_artist_data(
+        self, 
+        artist_id: str,
+        library_artist_mbids: set[str] = None,
+        library_album_mbids: dict[str, Any] = None
+    ) -> tuple[dict, set[str], set[str]]:
         try:
-            mb_artist, library_mbids, album_mbids = await asyncio.gather(
-                self._mb_repo.get_artist_by_id(artist_id),
-                self._lidarr_repo.get_artist_mbids(),
-                self._lidarr_repo.get_library_mbids(include_release_ids=True),
-            )
+            if library_artist_mbids is not None and library_album_mbids is not None:
+                mb_artist = await self._mb_repo.get_artist_by_id(artist_id)
+                library_mbids = library_artist_mbids
+                album_mbids = library_album_mbids
+            else:
+                mb_artist, library_mbids, album_mbids = await asyncio.gather(
+                    self._mb_repo.get_artist_by_id(artist_id),
+                    self._lidarr_repo.get_artist_mbids(),
+                    self._lidarr_repo.get_library_mbids(include_release_ids=True),
+                )
         except Exception as e:
             logger.error(f"Error fetching artist data for {artist_id}: {e}")
             raise ResourceNotFoundError(f"Failed to fetch artist: {e}")
@@ -195,7 +259,6 @@ class ArtistService:
         return mb_artist, library_mbids, album_mbids
     
     def _build_external_links(self, mb_artist: dict[str, Any]) -> list[ExternalLink]:
-        """Build external links list from artist data."""
         external_links_data = self._extract_external_links(mb_artist)
         return [
             ExternalLink(type=link["type"], url=link["url"], label=link["label"])
@@ -207,7 +270,6 @@ class ArtistService:
         mb_artist: dict[str, Any],
         album_mbids: set[str]
     ) -> tuple[list[dict], list[dict], list[dict]]:
-        """Get and categorize release groups by type."""
         prefs = self._preferences_service.get_preferences()
         included_primary_types = set(t.lower() for t in prefs.primary_types)
         included_secondary_types = set(t.lower() for t in prefs.secondary_types)
@@ -220,7 +282,6 @@ class ArtistService:
         )
     
     async def _fetch_wikidata_info(self, mb_artist: dict[str, Any]) -> tuple[Optional[str], Optional[str]]:
-        """Fetch Wikipedia description and artist image in parallel."""
         wikidata_id, wiki_urls = self._extract_wiki_info(mb_artist)
         
         tasks = []
@@ -242,7 +303,6 @@ class ArtistService:
         return description, image
     
     def _extract_wiki_info(self, mb_artist: dict[str, Any]) -> tuple[Optional[str], list[str]]:
-        """Extract Wikidata ID and Wikipedia URLs from artist data."""
         wikidata_id = None
         wiki_urls = []
         
@@ -264,7 +324,6 @@ class ArtistService:
     
     @staticmethod
     def _extract_tags(mb_artist: dict[str, Any], limit: int = 10) -> list[str]:
-        """Extract tags from artist data."""
         tags = []
         if mb_tags := mb_artist.get("tag-list", []):
             tags = [tag.get("name") for tag in mb_tags if tag.get("name")][:limit]
@@ -272,7 +331,6 @@ class ArtistService:
     
     @staticmethod
     def _extract_aliases(mb_artist: dict[str, Any], limit: int = 10) -> list[str]:
-        """Extract aliases from artist data."""
         aliases = []
         if mb_aliases := mb_artist.get("alias-list", []):
             aliases = [
@@ -284,7 +342,6 @@ class ArtistService:
     
     @staticmethod
     def _extract_life_span(mb_artist: dict[str, Any]) -> Optional[dict[str, Any]]:
-        """Extract life span information from artist data."""
         if life_span := mb_artist.get("life-span"):
             return {
                 "begin": life_span.get("begin"),
@@ -295,7 +352,6 @@ class ArtistService:
     
     @staticmethod
     def _detect_platform(url: str, rel_type: str) -> str:
-        """Detect platform from URL and relationship type."""
         url_lower = url.lower()
         
         for pattern, platform in _PLATFORM_PATTERNS.items():
@@ -313,7 +369,6 @@ class ArtistService:
     
     @staticmethod
     def _extract_external_links(mb_artist: dict[str, Any]) -> list[dict[str, str]]:
-        """Extract external links from artist data."""
         external_links = []
         seen_urls = set()
         
@@ -343,7 +398,6 @@ class ArtistService:
         included_primary_types: Optional[set[str]] = None,
         included_secondary_types: Optional[set[str]] = None,
     ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
-        """Categorize release groups into albums, singles, and EPs."""
         if included_primary_types is None:
             included_primary_types = {"album", "single", "ep", "broadcast", "other"}
         

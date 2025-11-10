@@ -33,9 +33,9 @@ async def cover_from_release_group(
         "500",
         description="Preferred size: 250, 500, 1200, or 'original' for full size",
     ),
+    coverart_repo: CoverArtRepository = Depends(get_coverart_repository)
 ):
     desired_size = _normalize_size(size)
-    coverart_repo = get_coverart_repository()
     result = await coverart_repo.get_release_group_cover(release_group_id, desired_size)
     
     if result:
@@ -59,9 +59,9 @@ async def cover_from_release(
         "500",
         description="Preferred size: 250, 500, 1200, or 'original' for full size",
     ),
+    coverart_repo: CoverArtRepository = Depends(get_coverart_repository)
 ):
     desired_size = _normalize_size(size)
-    coverart_repo = get_coverart_repository()
     result = await coverart_repo.get_release_cover(release_id, desired_size)
     
     if result:

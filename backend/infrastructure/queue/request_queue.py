@@ -55,9 +55,7 @@ class RequestQueue(QueueInterface):
             logger.info("Queue processor started")
     
     async def stop(self) -> None:
-        """Stop the queue processor gracefully, draining remaining items."""
         if self._processor_task and not self._processor_task.done():
-            # Wait for current processing to finish and queue to drain
             await self.drain()
             
             self._processor_task.cancel()
@@ -69,12 +67,6 @@ class RequestQueue(QueueInterface):
             logger.info("Queue processor stopped")
     
     async def drain(self, timeout: float = 30.0) -> None:
-        """
-        Wait for all pending items in queue to be processed.
-        
-        Args:
-            timeout: Maximum time to wait for drain (seconds)
-        """
         try:
             await asyncio.wait_for(self._queue.join(), timeout=timeout)
             logger.info("Queue drained successfully")

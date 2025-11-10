@@ -15,6 +15,7 @@
   let imgError = false;
   let imgLoaded = false;
   let imageObserver: IntersectionObserver | null = null;
+  let imgElement: HTMLImageElement | null = null;
 
   function onImgError() {
     imgError = true;
@@ -26,6 +27,20 @@
   }
 
   $: coverUrl = album.cover_url ?? `/api/covers/release-group/${album.musicbrainz_id}?size=250`;
+  
+  $: if (album) {
+    imgError = false;
+    imgLoaded = false;
+    if (imgElement) {
+      imgElement.classList.add('opacity-0');
+      imgElement.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+      imgElement.dataset.src = coverUrl;
+      if (imageObserver) {
+        imageObserver.unobserve(imgElement);
+        imageObserver.observe(imgElement);
+      }
+    }
+  }
 
   async function handleRequest(e: Event) {
     e.stopPropagation();
@@ -54,6 +69,8 @@
   function setupImageObserver(img: HTMLImageElement) {
     if (!img) return;
     
+    imgElement = img;
+    
     if (imageObserver) {
       imageObserver.observe(img);
     } else {
@@ -71,6 +88,9 @@
       destroy() {
         if (imageObserver && img) {
           imageObserver.unobserve(img);
+        }
+        if (imgElement === img) {
+          imgElement = null;
         }
       }
     };

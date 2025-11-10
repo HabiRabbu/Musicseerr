@@ -1,4 +1,4 @@
-"""Repository layer with Protocol interfaces for dependency inversion."""
+
 
 from repositories.protocols import (
     MusicBrainzRepositoryProtocol,

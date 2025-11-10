@@ -3,34 +3,89 @@ from typing import Optional
 from api.v1.schemas.album import AlbumInfo, Track
 from repositories.lidarr_repository import LidarrRepository
 from repositories.musicbrainz_repository import MusicBrainzRepository
+from services.preferences_service import PreferencesService
+from infrastructure.cache.persistent_cache import LibraryCache
+from infrastructure.cache.memory_cache import CacheInterface
+from infrastructure.cache.disk_cache import DiskMetadataCache
+from infrastructure.validators import validate_mbid
 from core.exceptions import ResourceNotFoundError
 
 logger = logging.getLogger(__name__)
 
 
 class AlbumService:
-    def __init__(self, lidarr_repo: LidarrRepository, mb_repo: MusicBrainzRepository):
+    def __init__(
+        self, 
+        lidarr_repo: LidarrRepository, 
+        mb_repo: MusicBrainzRepository,
+        library_cache: LibraryCache,
+        memory_cache: CacheInterface,
+        disk_cache: DiskMetadataCache,
+        preferences_service: PreferencesService
+    ):
         self._lidarr_repo = lidarr_repo
         self._mb_repo = mb_repo
+        self._library_cache = library_cache
+        self._cache = memory_cache
+        self._disk_cache = disk_cache
+        self._preferences_service = preferences_service
     
     @staticmethod
     def _parse_year(date_str: Optional[str]) -> Optional[int]:
-        """Parse year from date string."""
         if not date_str:
             return None
         year = date_str.split("-", 1)[0]
         return int(year) if year.isdigit() else None
     
-    async def get_album_info(self, release_group_id: str) -> AlbumInfo:
-        """Get comprehensive album information.
+    async def _get_cached_album_info(self, release_group_id: str, cache_key: str) -> Optional[AlbumInfo]:
+        cached_info = await self._cache.get(cache_key)
+        if cached_info:
+            logger.info(f"Cache HIT (RAM): Album {release_group_id[:8]}... - instant load")
+            return cached_info
         
-        This is the main orchestration method - kept thin by delegating to helpers.
-        """
+        logger.debug(f"Cache MISS (RAM): Album {release_group_id[:8]}...")
+        
+        disk_data = await self._disk_cache.get_album(release_group_id)
+        if disk_data:
+            logger.info(f"Cache HIT (Disk): Album {release_group_id[:8]}... - loading from persistent cache")
+            album_info = AlbumInfo(**disk_data)
+            advanced_settings = self._preferences_service.get_advanced_settings()
+            ttl = advanced_settings.cache_ttl_album_library if album_info.in_library else advanced_settings.cache_ttl_album_non_library
+            await self._cache.set(cache_key, album_info, ttl_seconds=ttl)
+            return album_info
+        
+        logger.debug(f"Cache MISS (Disk): Album {release_group_id[:8]}...")
+        return None
+    
+    async def get_album_info(self, release_group_id: str, monitored_mbids: set[str] = None) -> AlbumInfo:
         try:
+            release_group_id = validate_mbid(release_group_id, "album")
+        except ValueError as e:
+            logger.error(f"Invalid album MBID: {e}")
+            raise
+        
+        try:
+            cache_key = f"album_info:{release_group_id}"
+            
+            cached_album_info = await self._get_cached_album_info(release_group_id, cache_key)
+            if cached_album_info:
+                return cached_album_info
+            
+            cached_album = await self._library_cache.get_album_by_mbid(release_group_id)
+            in_library = cached_album is not None
+            
+            if in_library:
+                logger.info(f"Cache HIT (library DB): Album {release_group_id[:8]}... is in library - fetching full details")
+            else:
+                logger.debug(f"Cache MISS (library DB): Album {release_group_id[:8]}... not in library")
+            
+            logger.info(f"API CALL (MusicBrainz): Fetching album {release_group_id[:8]}...")
             release_group = await self._fetch_release_group(release_group_id)
             primary_release = self._find_primary_release(release_group)
             artist_name, artist_id = self._extract_artist_info(release_group)
-            in_library = await self._check_in_library(release_group_id)
+            
+            if not in_library:
+                in_library = await self._check_in_library(release_group_id, monitored_mbids)
             
             basic_info = self._build_basic_info(
                 release_group, release_group_id, artist_name, artist_id, in_library
@@ -39,14 +94,27 @@ class AlbumService:
             if primary_release:
                 await self._enrich_with_release_details(basic_info, primary_release)
             
+            advanced_settings = self._preferences_service.get_advanced_settings()
+            ttl = advanced_settings.cache_ttl_album_library if in_library else advanced_settings.cache_ttl_album_non_library
+            
+            await self._cache.set(cache_key, basic_info, ttl_seconds=ttl)
+            
+            await self._disk_cache.set_album(release_group_id, basic_info, is_monitored=in_library, ttl_seconds=ttl if not in_library else None)
+            
+            if in_library:
+                logger.info(f"Cached library album {release_group_id[:8]}... for {ttl // 3600} hours")
+            else:
+                logger.info(f"Cached non-library album {release_group_id[:8]}... for {ttl // 3600} hours")
+            
             return basic_info
         
+        except ValueError:
+            raise
         except Exception as e:
-            logger.error(f"Failed to get album info for {release_group_id}: {e}")
+            logger.error(f"API call failed for album {release_group_id}: {e}")
             raise ResourceNotFoundError(f"Failed to get album info: {e}")
     
     async def _fetch_release_group(self, release_group_id: str) -> dict:
-        """Fetch release group data from MusicBrainz."""
         rg_result = await self._mb_repo.get_release_group_by_id(
             release_group_id,
             includes=["artists", "releases", "tags"]
@@ -59,7 +127,6 @@ class AlbumService:
     
     @staticmethod
     def _find_primary_release(release_group: dict) -> Optional[dict]:
-        """Find the official/primary release from the release group."""
         releases = release_group.get("release-list", [])
         
         for release in releases:
@@ -70,7 +137,6 @@ class AlbumService:
     
     @staticmethod
     def _extract_artist_info(release_group: dict) -> tuple[str, str]:
-        """Extract artist name and ID from release group."""
         artist_credit = release_group.get("artist-credit", [])
         artist_name = "Unknown Artist"
         artist_id = ""
@@ -84,8 +150,10 @@ class AlbumService:
         
         return artist_name, artist_id
     
-    async def _check_in_library(self, release_group_id: str) -> bool:
-        """Check if album is in Lidarr library."""
+    async def _check_in_library(self, release_group_id: str, monitored_mbids: set[str] = None) -> bool:
+        if monitored_mbids is not None:
+            return release_group_id.lower() in monitored_mbids
+        
         library_mbids = await self._lidarr_repo.get_library_mbids(include_release_ids=True)
         return release_group_id.lower() in library_mbids
     
@@ -97,7 +165,6 @@ class AlbumService:
         artist_id: str,
         in_library: bool
     ) -> AlbumInfo:
-        """Build basic album info from release group data."""
         return AlbumInfo(
             title=release_group.get("title", "Unknown Album"),
             musicbrainz_id=release_group_id,
@@ -117,7 +184,6 @@ class AlbumService:
         album_info: AlbumInfo,
         primary_release: dict
     ) -> None:
-        """Enrich album info with detailed release data."""
         try:
             release_id = primary_release.get("id")
             release_data = await self._mb_repo.get_release_by_id(
@@ -144,7 +210,6 @@ class AlbumService:
     
     @staticmethod
     def _extract_tracks(release_data: dict) -> tuple[list[Track], int]:
-        """Extract tracks and total length from release data."""
         tracks = []
         total_length = 0
         
@@ -174,7 +239,6 @@ class AlbumService:
     
     @staticmethod
     def _extract_label(release_data: dict) -> Optional[str]:
-        """Extract label name from release data."""
         label_info_list = release_data.get("label-info-list", [])
         if label_info_list:
             label_obj = label_info_list[0].get("label")

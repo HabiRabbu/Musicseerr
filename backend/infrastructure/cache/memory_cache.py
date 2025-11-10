@@ -107,7 +107,6 @@ class InMemoryCache(CacheInterface):
         return len(keys_to_remove)
 
     async def cleanup_expired(self) -> int:
-        """Clean up expired entries. Snapshot keys to avoid iteration issues."""
         now = time.time()
         
         snapshot_keys = list(self._cache.keys())
@@ -130,10 +129,6 @@ class InMemoryCache(CacheInterface):
         return len(self._cache)
     
     def estimate_memory_bytes(self) -> int:
-        """
-        Estimate the memory usage of the cache in bytes.
-        This is an approximation and may not be 100% accurate.
-        """
         total_size = 0
         
         total_size += sys.getsizeof(self._cache)

@@ -1,7 +1,8 @@
 import json
 import logging
 from typing import Optional
-from api.v1.schemas.settings import UserPreferences
+from api.v1.schemas.settings import UserPreferences, LidarrSettings
+from api.v1.schemas.advanced_settings import AdvancedSettings
 from core.config import Settings
 from core.exceptions import ConfigurationError
 from infrastructure.file_utils import atomic_write_json
@@ -14,11 +15,11 @@ class PreferencesService:
         self._settings = settings
         self._config_path = settings.config_file_path
         self._cached_preferences: Optional[UserPreferences] = None
+        self._cached_lidarr_settings: Optional[LidarrSettings] = None
         self._cache_timestamp: float = 0
-        self._cache_ttl: float = 60.0  # Cache for 60 seconds
+        self._cache_ttl: float = 60.0
     
     def get_preferences(self) -> UserPreferences:
-        """Get preferences with memoization to avoid repeated file I/O."""
         import time
         
         now = time.time()
@@ -36,7 +37,6 @@ class PreferencesService:
                 prefs_data = config.get("user_preferences", {})
                 prefs = UserPreferences(**prefs_data)
             
-            # Cache the result
             self._cached_preferences = prefs
             self._cache_timestamp = now
             return prefs
@@ -66,3 +66,73 @@ class PreferencesService:
         except Exception as e:
             logger.error(f"Failed to save preferences: {e}")
             raise ConfigurationError(f"Failed to save preferences: {e}")
+    
+    def get_lidarr_settings(self) -> LidarrSettings:
+        try:
+            if not self._config_path.exists():
+                return LidarrSettings()
+            
+            with open(self._config_path, encoding='utf-8') as f:
+                config = json.load(f)
+            
+            lidarr_data = config.get("lidarr_settings", {})
+            return LidarrSettings(**lidarr_data)
+        
+        except Exception as e:
+            logger.error(f"Failed to get Lidarr settings: {e}")
+            return LidarrSettings()
+    
+    def save_lidarr_settings(self, lidarr_settings: LidarrSettings) -> None:
+        try:
+            self._config_path.parent.mkdir(parents=True, exist_ok=True)
+            
+            config = {}
+            if self._config_path.exists():
+                with open(self._config_path, encoding='utf-8') as f:
+                    config = json.load(f)
+            
+            config["lidarr_settings"] = lidarr_settings.model_dump()
+            
+            atomic_write_json(self._config_path, config)
+            
+            self._cached_lidarr_settings = lidarr_settings
+            
+            logger.info(f"Saved Lidarr settings to {self._config_path}")
+        
+        except Exception as e:
+            logger.error(f"Failed to save Lidarr settings: {e}")
+            raise ConfigurationError(f"Failed to save Lidarr settings: {e}")
+    
+    def get_advanced_settings(self) -> AdvancedSettings:
+        try:
+            if not self._config_path.exists():
+                return AdvancedSettings()
+            
+            with open(self._config_path, encoding='utf-8') as f:
+                config = json.load(f)
+            
+            advanced_data = config.get("advanced_settings", {})
+            return AdvancedSettings(**advanced_data)
+        
+        except Exception as e:
+            logger.error(f"Failed to get advanced settings: {e}")
+            return AdvancedSettings()
+    
+    def save_advanced_settings(self, advanced_settings: AdvancedSettings) -> None:
+        try:
+            self._config_path.parent.mkdir(parents=True, exist_ok=True)
+            
+            config = {}
+            if self._config_path.exists():
+                with open(self._config_path, encoding='utf-8') as f:
+                    config = json.load(f)
+            
+            config["advanced_settings"] = advanced_settings.model_dump()
+            
+            atomic_write_json(self._config_path, config)
+            
+            logger.info(f"Saved advanced settings to {self._config_path}")
+        
+        except Exception as e:
+            logger.error(f"Failed to save advanced settings: {e}")
+            raise ConfigurationError(f"Failed to save advanced settings: {e}")

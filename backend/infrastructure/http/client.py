@@ -18,7 +18,7 @@ class HttpClientFactory:
         timeout: float = 10.0,
         connect_timeout: float = 5.0,
         max_connections: int = 200,
-        max_keepalive: int = 50,
+        max_keepalive: int = 200,
         **kwargs
     ) -> httpx.AsyncClient:
         if name not in cls._clients:
@@ -28,7 +28,7 @@ class HttpClientFactory:
                 limits=httpx.Limits(
                     max_connections=max_connections,
                     max_keepalive_connections=max_keepalive,
-                    keepalive_expiry=30.0,
+                    keepalive_expiry=60.0,
                 ),
                 follow_redirects=True,
                 transport=httpx.AsyncHTTPTransport(http2=True, retries=0),

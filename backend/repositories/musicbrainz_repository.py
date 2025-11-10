@@ -3,6 +3,7 @@ import logging
 from typing import Any, Optional
 import musicbrainzngs
 from api.v1.schemas.search import SearchResult
+from services.preferences_service import PreferencesService
 from infrastructure.cache.memory_cache import CacheInterface
 from infrastructure.cache.cache_keys import (
     mb_artist_search_key,
@@ -12,6 +13,8 @@ from infrastructure.cache.cache_keys import (
     mb_release_key,
 )
 from infrastructure.resilience.retry import with_retry, CircuitBreaker
+from infrastructure.resilience.rate_limiter import TokenBucketRateLimiter
+from infrastructure.queue.priority_queue import RequestPriority, get_priority_queue
 
 logger = logging.getLogger(__name__)
 
@@ -25,18 +28,21 @@ _mb_circuit_breaker = CircuitBreaker(
     name="musicbrainz"
 )
 
-_mb_semaphore = asyncio.Semaphore(10)
+_mb_rate_limiter = TokenBucketRateLimiter(rate=1.0, capacity=2)
 
 
 class MusicBrainzRepository:
-    def __init__(self, cache: CacheInterface):
+    def __init__(self, cache: CacheInterface, preferences_service: PreferencesService):
         self._cache = cache
+        self._preferences_service = preferences_service
     
     @staticmethod
     @with_retry(max_attempts=3, circuit_breaker=_mb_circuit_breaker)
-    async def _mb_call(func, *args, **kwargs):
-        """Execute MusicBrainz call with semaphore, retry, and circuit breaker."""
-        async with _mb_semaphore:
+    async def _mb_call(func, *args, priority: RequestPriority = RequestPriority.USER_INITIATED, **kwargs):
+        await _mb_rate_limiter.acquire()
+        priority_mgr = get_priority_queue()
+        semaphore = await priority_mgr.acquire_slot(priority)
+        async with semaphore:
             return await asyncio.to_thread(func, *args, **kwargs)
     
     @staticmethod
@@ -137,7 +143,8 @@ class MusicBrainzRepository:
                 musicbrainzngs.search_artists,
                 query=search_query,
                 limit=min(100, max(limit * 2, 25)),
-                offset=offset
+                offset=offset,
+                priority=RequestPriority.USER_INITIATED
             )
             artists = result.get("artist-list", [])
             artists = self._dedupe_by_id(artists)
@@ -145,7 +152,8 @@ class MusicBrainzRepository:
             
             results = [self._map_artist_to_result(a) for a in artists]
             
-            await self._cache.set(cache_key, results, ttl_seconds=1800)
+            advanced_settings = self._preferences_service.get_advanced_settings()
+            await self._cache.set(cache_key, results, ttl_seconds=advanced_settings.cache_ttl_search)
             return results
         except Exception as e:
             logger.error(f"MusicBrainz artist search failed: {e}")
@@ -171,7 +179,8 @@ class MusicBrainzRepository:
                 musicbrainzngs.search_release_groups,
                 query=f'releasegroup:"{query}"^3 OR release:"{query}"^2 OR {query}',
                 limit=internal_limit,
-                offset=offset
+                offset=offset,
+                priority=RequestPriority.USER_INITIATED
             )
             release_groups = result.get("release-group-list", [])
             release_groups = self._dedupe_by_id(release_groups)
@@ -184,7 +193,8 @@ class MusicBrainzRepository:
                 if len(results) >= limit:
                     break
             
-            await self._cache.set(cache_key, results, ttl_seconds=1800)
+            advanced_settings = self._preferences_service.get_advanced_settings()
+            await self._cache.set(cache_key, results, ttl_seconds=advanced_settings.cache_ttl_search)
             return results
         except Exception as e:
             logger.error(f"MusicBrainz album search failed: {e}")
@@ -224,7 +234,8 @@ class MusicBrainzRepository:
             result = await self._mb_call(
                 musicbrainzngs.get_artist_by_id,
                 mbid,
-                includes=["tags", "aliases", "url-rels"]
+                includes=["tags", "aliases", "url-rels"],
+                priority=RequestPriority.USER_INITIATED
             )
             artist = result.get("artist")
             
@@ -237,7 +248,8 @@ class MusicBrainzRepository:
                 musicbrainzngs.browse_release_groups,
                 artist=mbid,
                 limit=limit,
-                offset=0
+                offset=0,
+                priority=RequestPriority.USER_INITIATED
             )
             
             all_release_groups = []
@@ -268,7 +280,8 @@ class MusicBrainzRepository:
                 musicbrainzngs.browse_release_groups,
                 artist=artist_mbid,
                 limit=limit,
-                offset=offset
+                offset=offset,
+                priority=RequestPriority.BACKGROUND_SYNC
             )
             
             release_groups = []
@@ -288,7 +301,6 @@ class MusicBrainzRepository:
         mbid: str,
         includes: Optional[list[str]] = None
     ) -> Optional[dict]:
-        """Get release group by ID with optional includes."""
         if includes is None:
             includes = ["artist-credits", "releases"]
         
@@ -302,7 +314,8 @@ class MusicBrainzRepository:
             result = await self._mb_call(
                 musicbrainzngs.get_release_group_by_id,
                 mbid,
-                includes=includes
+                includes=includes,
+                priority=RequestPriority.USER_INITIATED
             )
             release_group = result.get("release-group")
             await self._cache.set(cache_key, release_group, ttl_seconds=3600)
@@ -316,7 +329,6 @@ class MusicBrainzRepository:
         release_id: str,
         includes: Optional[list[str]] = None
     ) -> Optional[dict]:
-        """Get release details with recordings and labels."""
         if includes is None:
             includes = ["recordings", "labels"]
         
@@ -330,7 +342,8 @@ class MusicBrainzRepository:
             result = await self._mb_call(
                 musicbrainzngs.get_release_by_id,
                 release_id,
-                includes=includes
+                includes=includes,
+                priority=RequestPriority.USER_INITIATED
             )
             release = result.get("release")
             await self._cache.set(cache_key, release, ttl_seconds=3600)
