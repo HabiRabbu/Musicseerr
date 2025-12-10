@@ -2,9 +2,15 @@
 	import "../app.css";
 	import { goto } from '$app/navigation';
 	import { errorModal } from '$lib/stores/errorModal';
+	import { libraryStore } from '$lib/stores/library';
+	import { onMount } from 'svelte';
 	
 	let query = '';
 	let modalQuery = '';
+
+	onMount(() => {
+		libraryStore.initialize();
+	});
 
 	function handleSearch(e: Event) {
 		e.preventDefault();

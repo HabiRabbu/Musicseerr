@@ -13,6 +13,7 @@ from infrastructure.cache.memory_cache import CacheInterface
 from infrastructure.resilience.retry import with_retry, CircuitBreaker
 from infrastructure.validators import validate_mbid
 from infrastructure.queue.priority_queue import RequestPriority, get_priority_queue
+from infrastructure.http.deduplication import RequestDeduplicator
 
 if TYPE_CHECKING:
     from repositories.musicbrainz_repository import MusicBrainzRepository
@@ -28,6 +29,8 @@ _coverart_circuit_breaker = CircuitBreaker(
     timeout=60.0,
     name="coverart"
 )
+
+_deduplicator = RequestDeduplicator()
 
 
 def _get_cache_filename(identifier: str, suffix: str = "") -> str:
@@ -62,9 +65,6 @@ class CoverArtRepository:
             import json
             from datetime import datetime
             
-            async with aiofiles.open(file_path, "wb") as f:
-                await f.write(content)
-            
             now = datetime.now().timestamp()
             ttl = None if is_monitored else 24 * 3600
             
@@ -82,12 +82,20 @@ class CoverArtRepository:
             if extra_meta:
                 meta.update(extra_meta)
             
-            async with aiofiles.open(f"{file_path}.meta", "w") as m:
-                await m.write(json.dumps(meta))
+            async def write_content():
+                async with aiofiles.open(file_path, "wb") as f:
+                    await f.write(content)
             
-            if extra_meta and 'wikidata_id' in extra_meta:
-                async with aiofiles.open(f"{file_path}.wikidata_id", "w") as wf:
-                    await wf.write(extra_meta['wikidata_id'])
+            async def write_meta():
+                async with aiofiles.open(f"{file_path}.meta", "w") as m:
+                    await m.write(json.dumps(meta))
+            
+            async def write_wikidata():
+                if extra_meta and 'wikidata_id' in extra_meta:
+                    async with aiofiles.open(f"{file_path}.wikidata_id", "w") as wf:
+                        await wf.write(extra_meta['wikidata_id'])
+            
+            await asyncio.gather(write_content(), write_meta(), write_wikidata())
         
         except Exception as e:
             logger.warning(f"Failed to write disk cache: {e}")
@@ -101,15 +109,19 @@ class CoverArtRepository:
             import json
             from datetime import datetime
             
-            async with aiofiles.open(file_path, "rb") as f:
-                content = await f.read()
-            
             meta_file = Path(f"{file_path}.meta")
-            if not meta_file.exists():
+            if not file_path.exists() or not meta_file.exists():
                 return None
             
-            async with aiofiles.open(meta_file, "r") as m:
-                meta_content = await m.read()
+            async def read_content():
+                async with aiofiles.open(file_path, "rb") as f:
+                    return await f.read()
+            
+            async def read_meta():
+                async with aiofiles.open(meta_file, "r") as m:
+                    return await m.read()
+            
+            content, meta_content = await asyncio.gather(read_content(), read_meta())
             
             try:
                 meta = json.loads(meta_content)
@@ -120,8 +132,7 @@ class CoverArtRepository:
                     return None
                 
                 meta['last_accessed'] = datetime.now().timestamp()
-                async with aiofiles.open(meta_file, "w") as m:
-                    await m.write(json.dumps(meta))
+                asyncio.create_task(self._update_meta_access(meta_file, meta))
                     
             except (json.JSONDecodeError, ValueError):
                 content_type = meta_content.strip()
@@ -129,12 +140,15 @@ class CoverArtRepository:
             result = [content, content_type]
             
             if extra_keys:
-                for key in extra_keys:
+                async def read_extra_key(key: str):
                     try:
-                        async with aiofiles.open(f"{file_path}.{key}", "r") as meta_file:
-                            result.append((await meta_file.read()).strip())
+                        async with aiofiles.open(f"{file_path}.{key}", "r") as f:
+                            return (await f.read()).strip()
                     except FileNotFoundError:
-                        result.append(None)
+                        return None
+                
+                extra_values = await asyncio.gather(*[read_extra_key(k) for k in extra_keys])
+                result.extend(extra_values)
             
             return tuple(result)
         
@@ -143,6 +157,14 @@ class CoverArtRepository:
         except Exception as e:
             logger.warning(f"Disk cache read error: {e}")
             return None
+    
+    async def _update_meta_access(self, meta_file: Path, meta: dict) -> None:
+        try:
+            import json
+            async with aiofiles.open(meta_file, "w") as m:
+                await m.write(json.dumps(meta))
+        except Exception:
+            pass
     
     @with_retry(max_attempts=3, circuit_breaker=_coverart_circuit_breaker)
     async def _http_get(self, url: str, priority: RequestPriority, **kwargs) -> httpx.Response:
@@ -175,6 +197,18 @@ class CoverArtRepository:
         
         logger.debug(f"Cache MISS (disk): Artist image {artist_id[:8]}... - fetching from Wikidata")
         
+        dedupe_key = f"artist:img:{artist_id}:{size}"
+        return await _deduplicator.dedupe(
+            dedupe_key,
+            lambda: self._fetch_artist_image(artist_id, size, file_path)
+        )
+    
+    async def _fetch_artist_image(
+        self,
+        artist_id: str,
+        size: Optional[int],
+        file_path: Path
+    ) -> Optional[tuple[bytes, str, str]]:
         cache_key = f"artist_wikidata:{artist_id}"
         wikidata_url = await self._cache.get(cache_key)
         
@@ -312,6 +346,18 @@ class CoverArtRepository:
         
         logger.debug(f"Cache MISS (disk): Album cover {release_group_id[:8]}... - fetching from CoverArtArchive")
         
+        dedupe_key = f"cover:rg:{release_group_id}:{size}"
+        return await _deduplicator.dedupe(
+            dedupe_key,
+            lambda: self._fetch_release_group_cover(release_group_id, size, file_path)
+        )
+    
+    async def _fetch_release_group_cover(
+        self,
+        release_group_id: str,
+        size: Optional[str],
+        file_path: Path
+    ) -> Optional[tuple[bytes, str]]:
         size_suffix = f"-{size}" if size else ""
         front_url = f"{COVER_ART_ARCHIVE_BASE}/release-group/{release_group_id}/front{size_suffix}"
         

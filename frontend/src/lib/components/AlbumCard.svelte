@@ -2,20 +2,21 @@
   import type { Album } from '$lib/types';
   import { colors } from '$lib/colors';
   import { goto } from '$app/navigation';
-  import { onMount, onDestroy } from 'svelte';
-  import { browser } from '$app/environment';
+  import { lazyImage, resetLazyImage } from '$lib/utils/lazyImage';
+  import { libraryStore } from '$lib/stores/library';
 
   export let album: Album;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   export let index: number = 0;
   export let onadded: (() => void) | undefined = undefined;
   
   let requesting = false;
-  let inLibrary = album.in_library;
   let coverUrl = album.cover_url ?? `/api/covers/release-group/${album.musicbrainz_id}?size=250`;
   let imgError = false;
   let imgLoaded = false;
-  let imageObserver: IntersectionObserver | null = null;
   let imgElement: HTMLImageElement | null = null;
+
+  $: inLibrary = album.in_library || libraryStore.isInLibrary(album.musicbrainz_id);
 
   function onImgError() {
     imgError = true;
@@ -28,18 +29,10 @@
 
   $: coverUrl = album.cover_url ?? `/api/covers/release-group/${album.musicbrainz_id}?size=250`;
   
-  $: if (album) {
+  $: if (album && imgElement) {
     imgError = false;
     imgLoaded = false;
-    if (imgElement) {
-      imgElement.classList.add('opacity-0');
-      imgElement.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
-      imgElement.dataset.src = coverUrl;
-      if (imageObserver) {
-        imageObserver.unobserve(imgElement);
-        imageObserver.observe(imgElement);
-      }
-    }
+    resetLazyImage(imgElement, coverUrl);
   }
 
   async function handleRequest(e: Event) {
@@ -51,7 +44,7 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ musicbrainz_id: album.musicbrainz_id })
       });
-      inLibrary = true;
+      libraryStore.addMbid(album.musicbrainz_id);
       onadded?.();
     } catch (error) {
       console.error('Failed to request album:', error);
@@ -66,66 +59,16 @@
 
   $: displayYear = album.year ?? 'Unknown';
 
-  function setupImageObserver(img: HTMLImageElement) {
-    if (!img) return;
-    
+  function bindImgElement(img: HTMLImageElement) {
     imgElement = img;
-    
-    if (imageObserver) {
-      imageObserver.observe(img);
-    } else {
-      const checkObserver = setInterval(() => {
-        if (imageObserver) {
-          imageObserver.observe(img);
-          clearInterval(checkObserver);
-        }
-      }, 50);
-      
-      setTimeout(() => clearInterval(checkObserver), 1000);
-    }
-    
     return {
       destroy() {
-        if (imageObserver && img) {
-          imageObserver.unobserve(img);
-        }
         if (imgElement === img) {
           imgElement = null;
         }
       }
     };
   }
-
-  onMount(() => {
-    if (browser) {
-      imageObserver = new IntersectionObserver(
-        (entries) => {
-          entries.forEach((entry) => {
-            if (entry.isIntersecting) {
-              const img = entry.target as HTMLImageElement;
-              const src = img.dataset.src;
-              if (src && img.src !== src) {
-                console.log('Loading album image:', src);
-                img.src = src;
-                imageObserver?.unobserve(img);
-              }
-            }
-          });
-        },
-        {
-          rootMargin: '200px',
-          threshold: 0.01
-        }
-      );
-    }
-  });
-
-  onDestroy(() => {
-    if (imageObserver) {
-      imageObserver.disconnect();
-      imageObserver = null;
-    }
-  });
 
 </script>
 
@@ -151,7 +94,8 @@
         alt={album.title}
         class="w-full h-full object-cover opacity-0 transition-opacity duration-300"
         decoding="async"
-        use:setupImageObserver
+        use:lazyImage
+        use:bindImgElement
         on:error={onImgError}
         on:load={onImgLoad}
       />

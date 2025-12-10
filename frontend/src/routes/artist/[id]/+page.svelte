@@ -9,6 +9,7 @@
 	import { errorModal } from '$lib/stores/errorModal';
 	import ArtistHeaderSkeleton from '$lib/components/ArtistHeaderSkeleton.svelte';
 	import AlbumGridSkeleton from '$lib/components/AlbumGridSkeleton.svelte';
+	import { lazyImage } from '$lib/utils/lazyImage';
 
 	export let data: { artistId: string };
 
@@ -29,12 +30,12 @@
 	let epsCollapsed = false;
 	let singlesCollapsed = false;
 	let loadingMoreReleases = false;
-	let currentOffset = 50; // Start after initial 50
+	let currentOffset = 50;
 	let hasMoreReleases = false;
 	let totalReleaseCount = 0;
 	let loadedReleaseCount = 0;
 	const BATCH_SIZE = 50;
-	let imageObserver: IntersectionObserver | null = null;
+	let fetchMoreTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
 	function checkDescriptionHeight() {
 		if (descriptionElement && !descriptionExpanded) {
@@ -60,19 +61,6 @@
 	function handleImageLoad(id: string) {
 		loadedImages.add(id);
 		loadedImages = loadedImages;
-	}
-	
-	function setupImageObserver(img: HTMLImageElement) {
-		if (imageObserver && img) {
-			imageObserver.observe(img);
-		}
-		return {
-			destroy() {
-				if (imageObserver && img) {
-					imageObserver.unobserve(img);
-				}
-			}
-		};
 	}
 	
 	$: validLinks = artist?.external_links.filter(link => link.url && link.url.trim() !== '') || [];
@@ -119,35 +107,17 @@
 					artist.eps = sortReleasesByYear(artist.eps);
 					loadedReleaseCount = artist.albums.length + artist.singles.length + artist.eps.length;
 					
-
-					if ((!artist.release_group_count || artist.release_group_count === 0) && loadedReleaseCount === BATCH_SIZE) {
-						console.warn('release_group_count is 0 but we have exactly 50 releases - old cache? Trying to fetch more...');
+					const releaseGroupCount = artist.release_group_count || 0;
+					
+					if (releaseGroupCount > loadedReleaseCount || 
+					    (releaseGroupCount === 0 && loadedReleaseCount >= BATCH_SIZE)) {
 						hasMoreReleases = true;
-						totalReleaseCount = loadedReleaseCount;
+						totalReleaseCount = releaseGroupCount || loadedReleaseCount;
 						currentOffset = BATCH_SIZE;
 						fetchMoreReleases();
-					} else if (artist.release_group_count && artist.release_group_count > BATCH_SIZE) {
-						console.log('Triggering fetchMoreReleases - has more releases');
-						hasMoreReleases = true;
-						totalReleaseCount = artist.release_group_count;
-						fetchMoreReleases();
 					} else {
-						console.log('No more releases to fetch', {
-							releaseGroupCount: artist?.release_group_count,
-							loadedReleaseCount,
-							batchSize: BATCH_SIZE
-						});
+						hasMoreReleases = false;
 					}
-					
-					console.log('Artist loaded:', {
-						name: artist.name,
-						totalReleaseGroupCount: artist.release_group_count,
-						currentlyLoaded: loadedReleaseCount,
-						albums: artist.albums.length,
-						singles: artist.singles.length,
-						eps: artist.eps.length,
-						batchSize: BATCH_SIZE
-					});
 				}
 			} else {
 				error = 'Failed to load artist';
@@ -202,71 +172,50 @@
 	
 	async function fetchMoreReleases() {
 		if (!artist || loadingMoreReleases || !hasMoreReleases) {
-			console.log('fetchMoreReleases skipped:', {
-				hasArtist: !!artist,
-				loadingMoreReleases,
-				hasMoreReleases
-			});
 			return;
 		}
-		
-		console.log('fetchMoreReleases starting:', {
-			currentOffset,
-			batchSize: BATCH_SIZE,
-			currentlyLoaded: loadedReleaseCount
-		});
 		
 		loadingMoreReleases = true;
 		
 		try {
 			const url = `/api/artist/${data.artistId}/releases?offset=${currentOffset}&limit=${BATCH_SIZE}`;
-			console.log('Fetching:', url);
-			
 			const res = await fetch(url, { signal: abortController?.signal });
 			
 			if (res.ok) {
 				const moreReleases: ArtistReleases = await res.json();
 				
-				console.log('Received more releases:', {
-					albums: moreReleases.albums.length,
-					singles: moreReleases.singles.length,
-					eps: moreReleases.eps.length,
-					hasMore: moreReleases.has_more,
-					totalCount: moreReleases.total_count
-				});
-				
 				if (artist) {
-					artist.albums = sortReleasesByYear([...artist.albums, ...moreReleases.albums]);
-					artist.singles = sortReleasesByYear([...artist.singles, ...moreReleases.singles]);
-					artist.eps = sortReleasesByYear([...artist.eps, ...moreReleases.eps]);
+					const newAlbums = moreReleases.albums.filter(
+						(a: any) => !artist!.albums.some((existing: any) => existing.id === a.id)
+					);
+					const newSingles = moreReleases.singles.filter(
+						(s: any) => !artist!.singles.some((existing: any) => existing.id === s.id)
+					);
+					const newEps = moreReleases.eps.filter(
+						(e: any) => !artist!.eps.some((existing: any) => existing.id === e.id)
+					);
+					
+					artist.albums = sortReleasesByYear([...artist.albums, ...newAlbums]);
+					artist.singles = sortReleasesByYear([...artist.singles, ...newSingles]);
+					artist.eps = sortReleasesByYear([...artist.eps, ...newEps]);
 					artist = artist;
 					
 					currentOffset += BATCH_SIZE;
 					hasMoreReleases = moreReleases.has_more;
 					loadedReleaseCount = artist.albums.length + artist.singles.length + artist.eps.length;
 					
-					console.log('After merging:', {
-						totalLoaded: loadedReleaseCount,
-						hasMoreReleases,
-						nextOffset: currentOffset
-					});
-					
 					if (hasMoreReleases) {
-						console.log('Scheduling next batch in 1 second...');
-						setTimeout(() => fetchMoreReleases(), 1000);
-					} else {
-						console.log('All releases loaded!');
+						if (fetchMoreTimeoutId) clearTimeout(fetchMoreTimeoutId);
+						fetchMoreTimeoutId = setTimeout(() => fetchMoreReleases(), 500);
 					}
 				}
-			} else {
-				console.error('Failed to fetch more releases:', res.status, res.statusText);
 			}
 		} catch (e) {
 			if (e instanceof Error && e.name === 'AbortError') {
 				return;
 			}
 			console.error('Error loading more releases:', e);
-			hasMoreReleases = false; // Stop trying on error
+			hasMoreReleases = false;
 		} finally {
 			loadingMoreReleases = false;
 		}
@@ -275,35 +224,12 @@
 	onMount(() => {
 		fetchArtist();
 
-		
 		if (browser) {
-			imageObserver = new IntersectionObserver(
-				(entries) => {
-					entries.forEach((entry) => {
-						if (entry.isIntersecting) {
-							const img = entry.target as HTMLImageElement;
-							const src = img.dataset.src;
-							if (src && img.src !== src) {
-								img.src = src;
-								imageObserver?.unobserve(img);
-							}
-						}
-					});
-				},
-				{
-					rootMargin: '200px',
-					threshold: 0.01
-				}
-			);
-
 			const handleRefresh = () => fetchArtist(true);
 			window.addEventListener('artist-refresh', handleRefresh);
 			
 			return () => {
 				window.removeEventListener('artist-refresh', handleRefresh);
-				if (imageObserver) {
-					imageObserver.disconnect();
-				}
 			};
 		}
 	});
@@ -313,9 +239,9 @@
 			abortController.abort();
 			abortController = null;
 		}
-		if (imageObserver) {
-			imageObserver.disconnect();
-			imageObserver = null;
+		if (fetchMoreTimeoutId) {
+			clearTimeout(fetchMoreTimeoutId);
+			fetchMoreTimeoutId = null;
 		}
 	});
 
@@ -675,9 +601,9 @@
 											alt="{rg.title} cover"
 											class="w-full h-full object-cover"
 											decoding="async"
-											use:setupImageObserver
+											use:lazyImage
 											on:load={() => handleImageLoad(rg.id)}
-											on:error={(e) => {
+											on:error={(e: Event) => {
 												handleImageLoad(rg.id);
 												const target = e.currentTarget as HTMLImageElement;
 												target.style.display = 'none';
@@ -770,9 +696,9 @@
 											alt="{rg.title} cover"
 											class="w-full h-full object-cover"
 											decoding="async"
-											use:setupImageObserver
+											use:lazyImage
 											on:load={() => handleImageLoad(rg.id)}
-											on:error={(e) => {
+											on:error={(e: Event) => {
 												handleImageLoad(rg.id);
 												const target = e.currentTarget as HTMLImageElement;
 												target.style.display = 'none';
@@ -865,9 +791,9 @@
 											alt="{rg.title} cover"
 											class="w-full h-full object-cover"
 											decoding="async"
-											use:setupImageObserver
+											use:lazyImage
 											on:load={() => handleImageLoad(rg.id)}
-											on:error={(e) => {
+											on:error={(e: Event) => {
 												handleImageLoad(rg.id);
 												const target = e.currentTarget as HTMLImageElement;
 												target.style.display = 'none';

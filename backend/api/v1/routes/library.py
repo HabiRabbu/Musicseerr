@@ -97,6 +97,18 @@ async def get_library_stats(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/mbids")
+async def get_library_mbids(
+    library_service: LibraryService = Depends(get_library_service)
+):
+    try:
+        mbids = await library_service.get_library_mbids()
+        return {"mbids": mbids}
+    except Exception as e:
+        logger.error(f"Failed to get library mbids: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.get("/grouped")
 async def get_library_grouped(
     library_service: LibraryService = Depends(get_library_service)

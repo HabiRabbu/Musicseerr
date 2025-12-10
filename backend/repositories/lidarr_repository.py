@@ -681,10 +681,25 @@ class LidarrRepository:
             
             if len(album_dates) < limit * 2:
                 try:
-                    albums_data = await self._get("/api/v1/album")
+                    albums_data, all_track_files = await asyncio.gather(
+                        self._get("/api/v1/album"),
+                        self._get("/api/v1/trackfile")
+                    )
+                    
+                    trackfile_dates_by_album: dict[int, datetime] = {}
+                    for track_file in all_track_files:
+                        album_id = track_file.get("albumId")
+                        date_added_str = track_file.get("dateAdded")
+                        if not album_id or not date_added_str:
+                            continue
+                        try:
+                            date_added = datetime.fromisoformat(date_added_str.replace('Z', '+00:00'))
+                            if album_id not in trackfile_dates_by_album or date_added > trackfile_dates_by_album[album_id]:
+                                trackfile_dates_by_album[album_id] = date_added
+                        except Exception:
+                            continue
                     
                     albums_with_dates = []
-                    
                     for album in albums_data:
                         if not album.get("monitored", False):
                             continue
@@ -698,29 +713,9 @@ class LidarrRepository:
                         if album_mbid in album_dates:
                             continue
                         
-                        try:
-                            track_files = await self._get("/api/v1/trackfile", params={"albumId": [album_id]})
-                            
-                            if not track_files:
-                                continue
-                            
-                            most_recent = None
-                            for track_file in track_files:
-                                date_added_str = track_file.get("dateAdded")
-                                if not date_added_str:
-                                    continue
-                                
-                                try:
-                                    date_added = datetime.fromisoformat(date_added_str.replace('Z', '+00:00'))
-                                    if most_recent is None or date_added > most_recent:
-                                        most_recent = date_added
-                                except Exception:
-                                    continue
-                            
-                            if most_recent:
-                                albums_with_dates.append((album, most_recent, album_mbid))
-                        except Exception:
-                            continue
+                        most_recent = trackfile_dates_by_album.get(album_id)
+                        if most_recent:
+                            albums_with_dates.append((album, most_recent, album_mbid))
                     
                     albums_with_dates.sort(key=lambda x: x[1], reverse=True)
                     

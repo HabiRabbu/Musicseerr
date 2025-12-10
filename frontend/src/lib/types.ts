@@ -14,6 +14,18 @@ export type Album = {
 	cover_url?: string | null;
 };
 
+export type LibraryAlbum = {
+	artist: string;
+	album: string;
+	year?: number | null;
+	monitored: boolean;
+	quality?: string | null;
+	cover_url?: string | null;
+	musicbrainz_id?: string | null;
+	artist_mbid?: string | null;
+	date_added?: number | null;
+};
+
 export type SearchResults = {
 	artists: Artist[];
 	albums: Album[];

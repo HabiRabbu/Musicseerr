@@ -63,6 +63,14 @@ class LibraryService:
             logger.error(f"Failed to fetch library: {e}")
             raise ExternalServiceError(f"Failed to fetch library: {e}")
     
+    async def get_library_mbids(self) -> list[str]:
+        try:
+            mbids_set = await self._lidarr_repo.get_library_mbids(include_release_ids=False)
+            return list(mbids_set)
+        except Exception as e:
+            logger.error(f"Failed to fetch library mbids: {e}")
+            raise ExternalServiceError(f"Failed to fetch library mbids: {e}")
+    
     async def get_artists(self, limit: int | None = None) -> list[LibraryArtist]:
         try:
             artists_data = await self._library_cache.get_artists(limit=limit)
