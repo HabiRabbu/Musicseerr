@@ -335,7 +335,7 @@
 		{:else if allAlbums.length > 0}
 			<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4" in:fade={{ duration: 300 }}>
 				{#each displayedAlbums as album, index (album.foreignAlbumId || `${album.album}-${album.artist}-${index}`)}
-					<AlbumCard album={convertToAlbum(album)} index={(currentAlbumPage - 1) * albumsPerPage + index} />
+					<AlbumCard album={convertToAlbum(album)} />
 				{/each}
 			</div>
 			

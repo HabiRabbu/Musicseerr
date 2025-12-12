@@ -15,7 +15,6 @@
 	let requesting = false;
 	let imageLoaded = false;
 
-	// Fetch album data in the background after component mounts
 	onMount(async () => {
 		if (!album) {
 			try {

@@ -1,8 +1,9 @@
 import logging
 import asyncio
+import time
 from typing import Any, TYPE_CHECKING
-from repositories.lidarr_repository import LidarrRepository
-from repositories.coverart_repository import CoverArtRepository, _get_cache_filename, DEFAULT_CACHE_DIR
+from repositories.protocols import LidarrRepositoryProtocol, CoverArtRepositoryProtocol
+from repositories.coverart_repository import _get_cache_filename, DEFAULT_CACHE_DIR
 from api.v1.schemas.library import LibraryAlbum, LibraryArtist, LibraryStatsResponse
 from infrastructure.cache.persistent_cache import LibraryCache
 from core.exceptions import ExternalServiceError
@@ -19,9 +20,9 @@ logger = logging.getLogger(__name__)
 class LibraryService:
     def __init__(
         self, 
-        lidarr_repo: LidarrRepository, 
+        lidarr_repo: LidarrRepositoryProtocol, 
         library_cache: LibraryCache,
-        cover_repo: CoverArtRepository,
+        cover_repo: CoverArtRepositoryProtocol,
         preferences_service: 'PreferencesService'
     ):
         self._lidarr_repo = lidarr_repo
@@ -126,8 +127,7 @@ class LibraryService:
     
     async def sync_library(self, is_manual: bool = False) -> dict:
         from services.cache_status_service import CacheStatusService
-        import time
-        
+
         try:
             status_service = CacheStatusService()
             
@@ -389,6 +389,33 @@ class LibraryService:
             await asyncio.sleep(advanced_settings.delay_artist)
 
         logger.info("Artist metadata+image pre-caching complete")
+        
+        await self._cache_artist_genres(artists)
+    
+    async def _cache_artist_genres(self, artists: list[dict]) -> None:
+        from core.dependencies import get_artist_service
+        
+        artist_service = get_artist_service()
+        artist_genres: dict[str, list[str]] = {}
+        
+        logger.info(f"Extracting genre tags for {len(artists)} library artists")
+        
+        for artist in artists:
+            mbid = artist.get('mbid')
+            if not mbid:
+                continue
+            
+            cache_key = f"artist_info:{mbid}"
+            cached_info = await artist_service._cache.get(cache_key)
+            
+            if cached_info and hasattr(cached_info, 'tags') and cached_info.tags:
+                artist_genres[mbid] = cached_info.tags[:10]
+        
+        if artist_genres:
+            await self._library_cache.save_artist_genres(artist_genres)
+            logger.info(f"Cached genres for {len(artist_genres)} artists")
+        else:
+            logger.info("No artist genres found to cache")
     
     async def _precache_album_data(
         self, 
@@ -444,15 +471,13 @@ class LibraryService:
         metadata_fetched = 0
         covers_fetched = 0
         consecutive_slow_batches = 0
-        
-        import time as time_module
 
         for i in range(0, len(release_group_ids), batch_size):
             if status_service.is_cancelled():
                 logger.info("Album pre-caching cancelled by user")
                 break
                 
-            batch_start = time_module.time()
+            batch_start = time.time()
             
             batch = release_group_ids[i:i + batch_size]
             tasks = [cache_rg(rg, i + idx) for idx, rg in enumerate(batch)]
@@ -467,8 +492,8 @@ class LibraryService:
                 elif isinstance(result, Exception):
                     rgid = batch[idx] if idx < len(batch) else 'Unknown'
                     logger.error(f"Batch error caching album {rgid[:8] if isinstance(rgid, str) else rgid}: {result}")
-            
-            batch_duration = time_module.time() - batch_start
+
+            batch_duration = time.time() - batch_start
             avg_time_per_item = batch_duration / len(batch) if batch else 1.0
             
             if avg_time_per_item > 1.5:

@@ -23,7 +23,7 @@ from infrastructure.resilience.retry import CircuitOpenError
 from middleware import PerformanceMiddleware
 from static_server import mount_frontend
 from api.v1.routes import (
-    search, requests, library, status, queue, covers, artists, albums, settings
+    search, requests, library, status, queue, covers, artists, albums, settings, home
 )
 from api.v1.routes import cache as cache_routes
 from api.v1.routes import cache_status as cache_status_routes
@@ -128,6 +128,7 @@ app.include_router(covers.router)
 app.include_router(artists.router)
 app.include_router(albums.router)
 app.include_router(settings.router)
+app.include_router(home.router)
 app.include_router(cache_routes.router)
 app.include_router(cache_status_routes.router)
 

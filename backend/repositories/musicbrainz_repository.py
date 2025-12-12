@@ -200,6 +200,79 @@ class MusicBrainzRepository:
             logger.error(f"MusicBrainz album search failed: {e}")
             return []
     
+    async def search_artists_by_tag(
+        self,
+        tag: str,
+        limit: int = 50,
+        offset: int = 0
+    ) -> list[SearchResult]:
+        cache_key = f"mb_artists_by_tag:{tag.lower()}:{limit}:{offset}"
+        
+        cached = await self._cache.get(cache_key)
+        if cached is not None:
+            return cached
+        
+        try:
+            result = await self._mb_call(
+                musicbrainzngs.search_artists,
+                tag=tag.lower(),
+                limit=min(100, limit),
+                offset=offset,
+                priority=RequestPriority.BACKGROUND_SYNC
+            )
+            artists = result.get("artist-list", [])
+            artists = self._dedupe_by_id(artists)
+            
+            results = [self._map_artist_to_result(a) for a in artists[:limit]]
+            
+            advanced_settings = self._preferences_service.get_advanced_settings()
+            await self._cache.set(cache_key, results, ttl_seconds=advanced_settings.cache_ttl_search * 2)
+            return results
+        except Exception as e:
+            logger.error(f"MusicBrainz artist tag search failed for '{tag}': {e}")
+            return []
+    
+    async def search_release_groups_by_tag(
+        self,
+        tag: str,
+        limit: int = 50,
+        offset: int = 0,
+        included_secondary_types: Optional[set[str]] = None
+    ) -> list[SearchResult]:
+        cache_key = f"mb_rg_by_tag:{tag.lower()}:{limit}:{offset}"
+        
+        cached = await self._cache.get(cache_key)
+        if cached is not None:
+            return cached
+        
+        try:
+            internal_limit = min(100, max(int(limit * 1.5), 25))
+            
+            result = await self._mb_call(
+                musicbrainzngs.search_release_groups,
+                tag=tag.lower(),
+                limit=internal_limit,
+                offset=offset,
+                priority=RequestPriority.BACKGROUND_SYNC
+            )
+            release_groups = result.get("release-group-list", [])
+            release_groups = self._dedupe_by_id(release_groups)
+            
+            results = []
+            for rg in release_groups:
+                mapped = self._map_release_group_to_result(rg, included_secondary_types)
+                if mapped:
+                    results.append(mapped)
+                if len(results) >= limit:
+                    break
+            
+            advanced_settings = self._preferences_service.get_advanced_settings()
+            await self._cache.set(cache_key, results, ttl_seconds=advanced_settings.cache_ttl_search * 2)
+            return results
+        except Exception as e:
+            logger.error(f"MusicBrainz release group tag search failed for '{tag}': {e}")
+            return []
+    
     async def search_grouped(
         self,
         query: str,

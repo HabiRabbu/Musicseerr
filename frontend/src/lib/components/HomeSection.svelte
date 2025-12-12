@@ -1,0 +1,335 @@
+<script lang="ts">
+	import type { HomeSection, HomeArtist, HomeAlbum, HomeTrack, HomeGenre } from '$lib/types';
+	import { goto } from '$app/navigation';
+	import { browser } from '$app/environment';
+
+	export let section: HomeSection;
+	export let showConnectCard = true;
+	export let headerLink: string | null = null;
+
+	let scrollContainer: HTMLDivElement;
+	let showLeftArrow = false;
+	let showRightArrow = true;
+
+	function updateArrowVisibility() {
+		if (!scrollContainer) return;
+		const { scrollLeft, scrollWidth, clientWidth } = scrollContainer;
+		showLeftArrow = scrollLeft > 10;
+		showRightArrow = scrollLeft < scrollWidth - clientWidth - 10;
+	}
+
+	function scrollLeft() {
+		if (!scrollContainer) return;
+		const scrollAmount = scrollContainer.clientWidth * 0.8;
+		scrollContainer.scrollBy({ left: -scrollAmount, behavior: 'smooth' });
+	}
+
+	function scrollRight() {
+		if (!scrollContainer) return;
+		const scrollAmount = scrollContainer.clientWidth * 0.8;
+		scrollContainer.scrollBy({ left: scrollAmount, behavior: 'smooth' });
+	}
+
+	$: if (browser && scrollContainer) {
+		updateArrowVisibility();
+	}
+
+	function handleArtistClick(artist: HomeArtist) {
+		if (artist.mbid) {
+			goto(`/artist/${artist.mbid}`);
+		}
+	}
+
+	function handleAlbumClick(album: HomeAlbum) {
+		if (album.mbid) {
+			goto(`/album/${album.mbid}`);
+		}
+	}
+
+	function handleTrackClick(track: HomeTrack) {
+		if (track.artist_mbid) {
+			goto(`/artist/${track.artist_mbid}`);
+		}
+	}
+
+	function handleGenreClick(genre: HomeGenre) {
+		goto(`/genre?name=${encodeURIComponent(genre.name)}`);
+	}
+
+	function getArtistCoverUrl(artist: HomeArtist): string {
+		if (artist.image_url) return artist.image_url;
+		if (artist.mbid) return `/api/covers/artist/${artist.mbid}?size=250`;
+		return '';
+	}
+
+	function getAlbumCoverUrl(album: HomeAlbum): string {
+		if (album.image_url) return album.image_url;
+		if (album.mbid) return `/api/covers/release-group/${album.mbid}?size=250`;
+		return '';
+	}
+
+	function formatListenCount(count: number | null): string {
+		if (!count) return '';
+		if (count >= 1000000) return `${(count / 1000000).toFixed(1)}M plays`;
+		if (count >= 1000) return `${(count / 1000).toFixed(1)}K plays`;
+		return `${count} plays`;
+	}
+
+	function formatListenedAt(timestamp: string | null): string {
+		if (!timestamp) return '';
+		const date = new Date(timestamp);
+		const now = new Date();
+		const diffMs = now.getTime() - date.getTime();
+		const diffMins = Math.floor(diffMs / 60000);
+		const diffHours = Math.floor(diffMins / 60);
+		const diffDays = Math.floor(diffHours / 24);
+
+		if (diffMins < 1) return 'Just now';
+		if (diffMins < 60) return `${diffMins}m ago`;
+		if (diffHours < 24) return `${diffHours}h ago`;
+		if (diffDays < 7) return `${diffDays}d ago`;
+		return date.toLocaleDateString();
+	}
+
+	function isArtist(item: HomeArtist | HomeAlbum | HomeTrack | HomeGenre): item is HomeArtist {
+		return section.type === 'artists';
+	}
+
+	function isAlbum(item: HomeArtist | HomeAlbum | HomeTrack | HomeGenre): item is HomeAlbum {
+		return section.type === 'albums';
+	}
+
+	function isTrack(item: HomeArtist | HomeAlbum | HomeTrack | HomeGenre): item is HomeTrack {
+		return section.type === 'tracks';
+	}
+
+	function isGenre(item: HomeArtist | HomeAlbum | HomeTrack | HomeGenre): item is HomeGenre {
+		return section.type === 'genres';
+	}
+
+	let imgErrors: Record<number, boolean> = {};
+	let imgLoaded: Record<number, boolean> = {};
+
+	function handleImgError(idx: number) {
+		imgErrors[idx] = true;
+	}
+
+	function handleImgLoad(idx: number, e: Event) {
+		imgLoaded[idx] = true;
+		(e.currentTarget as HTMLImageElement).classList.remove('opacity-0');
+	}
+</script>
+
+<section class="mb-6 sm:mb-8">
+	<div class="flex items-center justify-between mb-3 sm:mb-4">
+		{#if headerLink}
+			<a href={headerLink} class="text-lg sm:text-xl font-bold hover:text-primary transition-colors flex items-center gap-2 group">
+				{section.title}
+				<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity">
+					<path fill-rule="evenodd" d="M3 10a.75.75 0 01.75-.75h10.638L10.23 5.29a.75.75 0 111.04-1.08l5.5 5.25a.75.75 0 010 1.08l-5.5 5.25a.75.75 0 11-1.04-1.08l4.158-3.96H3.75A.75.75 0 013 10z" clip-rule="evenodd" />
+				</svg>
+			</a>
+		{:else}
+			<h2 class="text-lg sm:text-xl font-bold">{section.title}</h2>
+		{/if}
+		{#if section.source}
+			<span class="badge badge-ghost badge-xs sm:badge-sm capitalize">{section.source}</span>
+		{/if}
+	</div>
+
+	{#if section.items.length === 0 && section.fallback_message && showConnectCard}
+		<div class="card bg-base-200 border border-dashed border-base-300">
+			<div class="card-body items-center text-center py-6 sm:py-8">
+				<div class="text-3xl sm:text-4xl mb-2">
+					{#if section.connect_service === 'listenbrainz'}
+						🎵
+					{:else if section.connect_service === 'jellyfin'}
+						📺
+					{:else}
+						✨
+					{/if}
+				</div>
+				<p class="text-base-content/70 text-sm">{section.fallback_message}</p>
+				{#if section.connect_service}
+					<a href="/settings" class="btn btn-primary btn-sm mt-2">
+						Connect {section.connect_service === 'listenbrainz' ? 'ListenBrainz' : 'Jellyfin'}
+					</a>
+				{/if}
+			</div>
+		</div>
+	{:else if section.type === 'genres'}
+		<div class="flex flex-wrap gap-2">
+			{#each section.items as item, idx}
+				{#if isGenre(item)}
+					<button
+						class="btn btn-sm btn-outline"
+						on:click={() => handleGenreClick(item)}
+					>
+						{item.name}
+						{#if item.listen_count}
+							<span class="badge badge-ghost badge-xs ml-1">{formatListenCount(item.listen_count)}</span>
+						{/if}
+					</button>
+				{/if}
+			{/each}
+		</div>
+	{:else}
+		<div class="relative group">
+			<!-- Left Arrow -->
+			{#if showLeftArrow}
+				<button
+					class="absolute left-0 top-1/2 -translate-y-1/2 z-10 btn btn-circle btn-sm bg-base-100/90 shadow-lg opacity-0 group-hover:opacity-100 transition-opacity hidden sm:flex"
+					on:click={scrollLeft}
+					aria-label="Scroll left"
+				>
+					<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5">
+						<path fill-rule="evenodd" d="M12.79 5.23a.75.75 0 01-.02 1.06L8.832 10l3.938 3.71a.75.75 0 11-1.04 1.08l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 011.06.02z" clip-rule="evenodd" />
+					</svg>
+				</button>
+			{/if}
+			
+			<!-- Carousel -->
+			<div 
+				bind:this={scrollContainer}
+				on:scroll={updateArrowVisibility}
+				class="flex gap-3 sm:gap-4 overflow-x-auto pb-2 -mx-4 px-4 sm:mx-0 sm:px-0 scrollbar-hide"
+			>
+			{#each section.items as item, idx}
+				{#if isArtist(item)}
+					<div class="w-32 sm:w-36 md:w-44 flex-shrink-0">
+						<div 
+							class="card bg-base-100 w-full shadow-sm cursor-pointer transition-transform hover:scale-105 active:scale-95 hover:shadow-lg"
+							on:click={() => handleArtistClick(item)}
+							on:keydown={(e) => e.key === 'Enter' && handleArtistClick(item)}
+							role="button"
+							tabindex="0"
+						>
+							<figure class="aspect-square overflow-hidden relative">
+								{#if imgErrors[idx] || !item.mbid}
+									<div class="w-full h-full flex items-center justify-center text-4xl opacity-50 bg-base-200">
+										🎤
+									</div>
+								{:else}
+									{#if !imgLoaded[idx]}
+										<div class="skeleton w-full h-full absolute inset-0"></div>
+									{/if}
+									<img
+										src={getArtistCoverUrl(item)}
+										alt={item.name}
+										class="w-full h-full object-cover opacity-0 transition-opacity duration-300"
+										on:error={() => handleImgError(idx)}
+										on:load={(e) => handleImgLoad(idx, e)}
+									/>
+								{/if}
+								{#if item.in_library}
+									<div class="absolute top-2 right-2 badge badge-success badge-sm">
+										<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3 h-3">
+											<path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
+										</svg>
+									</div>
+								{/if}
+							</figure>
+							<div class="card-body p-2">
+								<h3 class="card-title text-xs line-clamp-1">{item.name}</h3>
+								{#if item.listen_count}
+									<p class="text-xs text-base-content/50">{formatListenCount(item.listen_count)}</p>
+								{/if}
+							</div>
+						</div>
+					</div>
+				{:else if isAlbum(item)}
+					<div class="w-32 sm:w-36 md:w-44 flex-shrink-0">
+						<div 
+							class="card bg-base-100 w-full shadow-sm cursor-pointer transition-transform hover:scale-105 active:scale-95 hover:shadow-lg"
+							on:click={() => handleAlbumClick(item)}
+							on:keydown={(e) => e.key === 'Enter' && handleAlbumClick(item)}
+							role="button"
+							tabindex="0"
+						>
+							<figure class="aspect-square overflow-hidden relative">
+								{#if imgErrors[idx] || !item.mbid}
+									<div class="w-full h-full flex items-center justify-center text-4xl opacity-50 bg-base-200">
+										💿
+									</div>
+								{:else}
+									{#if !imgLoaded[idx]}
+										<div class="skeleton w-full h-full absolute inset-0"></div>
+									{/if}
+									<img
+										src={getAlbumCoverUrl(item)}
+										alt={item.name}
+										class="w-full h-full object-cover opacity-0 transition-opacity duration-300"
+										on:error={() => handleImgError(idx)}
+										on:load={(e) => handleImgLoad(idx, e)}
+									/>
+								{/if}
+								{#if item.in_library}
+									<div class="absolute top-2 right-2 badge badge-success badge-sm">
+										<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3 h-3">
+											<path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
+										</svg>
+									</div>
+								{/if}
+							</figure>
+							<div class="card-body p-2">
+								<h3 class="card-title text-xs line-clamp-1">{item.name}</h3>
+								{#if item.artist_name}
+									<p class="text-xs text-base-content/50 line-clamp-1">{item.artist_name}</p>
+								{/if}
+							</div>
+						</div>
+					</div>
+				{:else if isTrack(item)}
+					<div class="w-56 sm:w-64 md:w-72 flex-shrink-0">
+						<div 
+							class="card card-side bg-base-100 w-full shadow-sm cursor-pointer hover:shadow-lg active:scale-95 transition-all"
+							on:click={() => handleTrackClick(item)}
+							on:keydown={(e) => e.key === 'Enter' && handleTrackClick(item)}
+							role="button"
+							tabindex="0"
+						>
+							<figure class="w-16 h-16 flex-shrink-0">
+								<div class="w-full h-full flex items-center justify-center text-2xl bg-base-200">
+									🎵
+								</div>
+							</figure>
+							<div class="card-body p-2 justify-center">
+								<h3 class="card-title text-xs line-clamp-1">{item.name}</h3>
+								{#if item.artist_name}
+									<p class="text-xs text-base-content/50 line-clamp-1">{item.artist_name}</p>
+								{/if}
+								{#if item.listened_at}
+									<p class="text-xs text-base-content/40">{formatListenedAt(item.listened_at)}</p>
+								{/if}
+							</div>
+						</div>
+					</div>
+				{/if}
+			{/each}
+			</div>
+			
+			<!-- Right Arrow -->
+			{#if showRightArrow}
+				<button
+					class="absolute right-0 top-1/2 -translate-y-1/2 z-10 btn btn-circle btn-sm bg-base-100/90 shadow-lg opacity-0 group-hover:opacity-100 transition-opacity hidden sm:flex"
+					on:click={scrollRight}
+					aria-label="Scroll right"
+				>
+					<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5">
+						<path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" />
+					</svg>
+				</button>
+			{/if}
+		</div>
+	{/if}
+</section>
+
+<style>
+	.scrollbar-hide {
+		-ms-overflow-style: none;
+		scrollbar-width: none;
+	}
+	.scrollbar-hide::-webkit-scrollbar {
+		display: none;
+	}
+</style>

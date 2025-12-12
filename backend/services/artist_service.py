@@ -2,9 +2,7 @@ import asyncio
 import logging
 from typing import Any, Optional
 from api.v1.schemas.artist import ArtistInfo, ArtistExtendedInfo, ArtistReleases, ExternalLink
-from repositories.musicbrainz_repository import MusicBrainzRepository
-from repositories.lidarr_repository import LidarrRepository
-from repositories.wikidata_repository import WikidataRepository
+from repositories.protocols import MusicBrainzRepositoryProtocol, LidarrRepositoryProtocol, WikidataRepositoryProtocol
 from services.preferences_service import PreferencesService
 from infrastructure.cache.memory_cache import CacheInterface
 from infrastructure.cache.disk_cache import DiskMetadataCache
@@ -48,9 +46,9 @@ _LINK_TYPE_LABELS = {
 class ArtistService:
     def __init__(
         self,
-        mb_repo: MusicBrainzRepository,
-        lidarr_repo: LidarrRepository,
-        wikidata_repo: WikidataRepository,
+        mb_repo: MusicBrainzRepositoryProtocol,
+        lidarr_repo: LidarrRepositoryProtocol,
+        wikidata_repo: WikidataRepositoryProtocol,
         preferences_service: PreferencesService,
         memory_cache: CacheInterface,
         disk_cache: DiskMetadataCache

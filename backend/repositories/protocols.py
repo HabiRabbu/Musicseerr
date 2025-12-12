@@ -5,6 +5,42 @@ from api.v1.schemas.album import AlbumInfo
 from api.v1.schemas.library import LibraryAlbum
 from api.v1.schemas.request import QueueItem
 from api.v1.schemas.common import ServiceStatus
+from dataclasses import dataclass
+
+
+@dataclass
+class ListenBrainzArtist:
+    artist_name: str
+    listen_count: int
+    artist_mbids: list[str] | None = None
+
+
+@dataclass
+class ListenBrainzReleaseGroup:
+    release_group_name: str
+    artist_name: str
+    listen_count: int
+    release_group_mbid: str | None = None
+    artist_mbids: list[str] | None = None
+    caa_id: int | None = None
+    caa_release_mbid: str | None = None
+
+
+@dataclass
+class JellyfinItem:
+    id: str
+    name: str
+    type: str
+    artist_name: str | None = None
+    album_name: str | None = None
+    play_count: int = 0
+    is_favorite: bool = False
+    last_played: str | None = None
+    image_tag: str | None = None
+    parent_id: str | None = None
+    album_id: str | None = None
+    artist_id: str | None = None
+    provider_ids: dict[str, str] | None = None
 
 
 class MusicBrainzRepositoryProtocol(Protocol):
@@ -93,4 +129,61 @@ class CoverArtRepositoryProtocol(Protocol):
         album_mbids: list[str],
         size: str = "250"
     ) -> None:
+        ...
+
+
+class ListenBrainzRepositoryProtocol(Protocol):
+    
+    async def get_trending_artists(
+        self,
+        time_range: str = "this_week",
+        limit: int = 20,
+        offset: int = 0
+    ) -> list[ListenBrainzArtist]:
+        ...
+    
+    async def get_popular_release_groups(
+        self,
+        time_range: str = "this_week",
+        limit: int = 20,
+        offset: int = 0
+    ) -> list[ListenBrainzReleaseGroup]:
+        ...
+    
+    async def get_fresh_releases(
+        self,
+        limit: int = 20
+    ) -> list[ListenBrainzReleaseGroup]:
+        ...
+    
+    async def get_similar_artists(
+        self,
+        artist_mbid: str,
+        limit: int = 10
+    ) -> list[ListenBrainzArtist]:
+        ...
+    
+    async def check_connection(self) -> ServiceStatus:
+        ...
+
+
+class JellyfinRepositoryProtocol(Protocol):
+    
+    def is_configured(self) -> bool:
+        ...
+    
+    async def get_recently_played(
+        self,
+        limit: int = 20
+    ) -> list[JellyfinItem]:
+        ...
+    
+    async def get_favorites(
+        self,
+        item_type: str = "MusicArtist",
+        limit: int = 20
+    ) -> list[JellyfinItem]:
+        ...
+    
+    async def check_connection(self) -> ServiceStatus:
         ...

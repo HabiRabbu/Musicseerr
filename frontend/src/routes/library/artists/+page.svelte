@@ -41,7 +41,6 @@
 		};
 	}
 
-	// Group artists alphabetically
 	$: artistsByLetter = allArtists.reduce((acc, artist) => {
 		const firstLetter = artist.name.charAt(0).toUpperCase();
 		const letter = /[A-Z]/.test(firstLetter) ? firstLetter : '#';

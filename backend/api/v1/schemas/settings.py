@@ -72,11 +72,53 @@ class JellyfinConnectionSettings(BaseModel):
         default="http://jellyfin:8096",
         description="Jellyfin server URL"
     )
+    api_key: str = Field(
+        default="",
+        description="Jellyfin API key for authentication"
+    )
+    user_id: str = Field(
+        default="",
+        description="Jellyfin user ID for user-specific data"
+    )
+    enabled: bool = Field(
+        default=False,
+        description="Whether Jellyfin integration is enabled"
+    )
     
     @field_validator("jellyfin_url")
     @classmethod
     def validate_url(cls, v: str) -> str:
         return v.rstrip("/")
+
+
+class ListenBrainzConnectionSettings(BaseModel):
+    username: str = Field(
+        default="",
+        description="ListenBrainz username"
+    )
+    user_token: str = Field(
+        default="",
+        description="ListenBrainz user token for authenticated requests"
+    )
+    enabled: bool = Field(
+        default=False,
+        description="Whether ListenBrainz integration is enabled"
+    )
+
+
+class HomeSettings(BaseModel):
+    cache_ttl_trending: int = Field(
+        default=3600,
+        ge=300,
+        le=86400,
+        description="Cache TTL for trending/popular data in seconds (default: 1 hour)"
+    )
+    cache_ttl_personal: int = Field(
+        default=300,
+        ge=60,
+        le=3600,
+        description="Cache TTL for personalized data in seconds (default: 5 minutes)"
+    )
 
 
 class LidarrSettings(BaseModel):

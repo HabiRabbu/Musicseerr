@@ -1,8 +1,7 @@
 import logging
 from typing import Optional
 from api.v1.schemas.album import AlbumInfo, Track
-from repositories.lidarr_repository import LidarrRepository
-from repositories.musicbrainz_repository import MusicBrainzRepository
+from repositories.protocols import LidarrRepositoryProtocol, MusicBrainzRepositoryProtocol
 from services.preferences_service import PreferencesService
 from infrastructure.cache.persistent_cache import LibraryCache
 from infrastructure.cache.memory_cache import CacheInterface
@@ -16,8 +15,8 @@ logger = logging.getLogger(__name__)
 class AlbumService:
     def __init__(
         self, 
-        lidarr_repo: LidarrRepository, 
-        mb_repo: MusicBrainzRepository,
+        lidarr_repo: LidarrRepositoryProtocol, 
+        mb_repo: MusicBrainzRepositoryProtocol,
         library_cache: LibraryCache,
         memory_cache: CacheInterface,
         disk_cache: DiskMetadataCache,

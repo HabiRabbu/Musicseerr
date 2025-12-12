@@ -1,5 +1,8 @@
 import asyncio
 import logging
+import shutil
+import subprocess
+import time
 from pathlib import Path
 
 from infrastructure.cache.memory_cache import CacheInterface
@@ -24,10 +27,6 @@ class CacheService:
         self._stats_lock = asyncio.Lock()
     
     async def get_stats(self) -> CacheStats:
-        import time
-        import subprocess
-        import shutil
-        
         async with self._stats_lock:
             now = time.time()
             if self._cached_stats and (now - self._stats_cache_time) < self._stats_cache_ttl:

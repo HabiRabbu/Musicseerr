@@ -8,6 +8,7 @@
 		LidarrConnectionSettings,
 		SoularrConnectionSettings,
 		JellyfinConnectionSettings,
+		ListenBrainzConnectionSettings,
 		LidarrVerifyResponse
 	} from '$lib/types';
 
@@ -49,6 +50,17 @@
 	let loadingJellyfin = false;
 	let savingJellyfin = false;
 	let jellyfinMessage = '';
+	let showJellyfinApiKey = false;
+	let testingJellyfin = false;
+	let jellyfinTestResult: { success: boolean; message: string } | null = null;
+	
+	let listenbrainzConnection: ListenBrainzConnectionSettings | null = null;
+	let loadingListenbrainz = false;
+	let savingListenbrainz = false;
+	let listenbrainzMessage = '';
+	let showListenbrainzToken = false;
+	let testingListenbrainz = false;
+	let listenbrainzTestResult: { valid: boolean; message: string } | null = null;
 	
 	let advancedSettings: any = null;
 	let loadingAdvanced = false;
@@ -189,6 +201,9 @@
 		if (tab === 'jellyfin' && !jellyfinConnection) {
 			loadJellyfinConnection();
 		}
+		if (tab === 'listenbrainz' && !listenbrainzConnection) {
+			loadListenbrainzConnection();
+		}
 		if (tab === 'advanced' && !advancedSettings) {
 			loadAdvancedSettings();
 		}
@@ -252,7 +267,6 @@
 			
 			if (response.ok) {
 				lidarrMessage = 'Library sync started successfully!';
-				// Reload settings to get updated last_sync timestamp
 				await loadLidarrSettings();
 				
 				setTimeout(() => {
@@ -491,6 +505,105 @@
 			savingJellyfin = false;
 		}
 	}
+	
+	async function testJellyfinConnection() {
+		if (!jellyfinConnection) return;
+		
+		testingJellyfin = true;
+		jellyfinTestResult = null;
+		try {
+			const response = await fetch('/api/settings/jellyfin/verify', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify(jellyfinConnection)
+			});
+			
+			if (response.ok) {
+				jellyfinTestResult = await response.json();
+			} else {
+				const error = await response.json();
+				jellyfinTestResult = { success: false, message: error.detail || 'Connection failed' };
+			}
+		} catch (error) {
+			console.error('Failed to test Jellyfin connection:', error);
+			jellyfinTestResult = { success: false, message: 'Failed to test connection' };
+		} finally {
+			testingJellyfin = false;
+		}
+	}
+	
+	async function loadListenbrainzConnection() {
+		loadingListenbrainz = true;
+		listenbrainzMessage = '';
+		try {
+			const response = await fetch('/api/settings/listenbrainz');
+			if (response.ok) {
+				listenbrainzConnection = await response.json();
+			} else {
+				listenbrainzMessage = 'Failed to load ListenBrainz settings';
+			}
+		} catch (error) {
+			console.error('Failed to load ListenBrainz settings:', error);
+			listenbrainzMessage = 'Failed to load ListenBrainz settings';
+		} finally {
+			loadingListenbrainz = false;
+		}
+	}
+	
+	async function saveListenbrainzConnection() {
+		savingListenbrainz = true;
+		listenbrainzMessage = '';
+		try {
+			const response = await fetch('/api/settings/listenbrainz', {
+				method: 'PUT',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify(listenbrainzConnection)
+			});
+			
+			if (response.ok) {
+				listenbrainzMessage = 'ListenBrainz settings saved successfully!';
+				listenbrainzConnection = await response.json();
+				
+				setTimeout(() => {
+					listenbrainzMessage = '';
+				}, 5000);
+			} else {
+				const error = await response.json();
+				listenbrainzMessage = error.detail || 'Failed to save settings';
+			}
+		} catch (error) {
+			console.error('Failed to save ListenBrainz settings:', error);
+			listenbrainzMessage = 'Failed to save settings';
+		} finally {
+			savingListenbrainz = false;
+		}
+	}
+	
+	async function testListenbrainzConnection() {
+		if (!listenbrainzConnection) return;
+		
+		testingListenbrainz = true;
+		listenbrainzTestResult = null;
+		try {
+			const response = await fetch('/api/settings/listenbrainz/verify', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify(listenbrainzConnection)
+			});
+			
+			if (response.ok) {
+				listenbrainzTestResult = await response.json();
+			} else {
+				const error = await response.json();
+				listenbrainzTestResult = { valid: false, message: error.detail || 'Validation failed' };
+			}
+		} catch (error) {
+			console.error('Failed to test ListenBrainz connection:', error);
+			listenbrainzTestResult = { valid: false, message: 'Failed to test connection' };
+		} finally {
+			testingListenbrainz = false;
+		}
+	}
 
 	onMount(async () => {
 		await preferencesStore.load();
@@ -637,6 +750,27 @@
 									<polyline points="17 2 12 7 7 2"></polyline>
 								</svg>
 								<span>Jellyfin</span>
+							</button>
+						</li>
+						<li>
+							<button
+								class="text-base justify-start"
+								class:btn-active={activeTab === 'listenbrainz'}
+								on:click={() => switchTab('listenbrainz')}
+							>
+								<svg
+									xmlns="http://www.w3.org/2000/svg"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="2"
+									class="w-5 h-5"
+								>
+									<path d="M9 18V5l12-2v13"></path>
+									<circle cx="6" cy="18" r="3"></circle>
+									<circle cx="18" cy="16" r="3"></circle>
+								</svg>
+								<span>ListenBrainz</span>
 							</button>
 						</li>
 					</ul>
@@ -1390,7 +1524,7 @@
 						<div class="card-body">
 							<h2 class="card-title text-2xl mb-4">Jellyfin Connection</h2>
 							<p class="text-base-content/70 mb-6">
-								Configure your Jellyfin media server URL for integration features.
+								Connect to Jellyfin for personalized recommendations based on your listening history, favorites, and play counts.
 							</p>
 
 							{#if loadingJellyfin}
@@ -1398,25 +1532,119 @@
 									<span class="loading loading-spinner loading-lg"></span>
 								</div>
 							{:else if jellyfinConnection}
+								<!-- Enable Toggle -->
+								<div class="mb-6">
+									<label class="label cursor-pointer justify-start gap-4">
+										<input 
+											type="checkbox" 
+											class="toggle toggle-primary" 
+											bind:checked={jellyfinConnection.enabled}
+										/>
+										<span class="label-text font-medium">Enable Jellyfin Integration</span>
+									</label>
+									<p class="text-sm text-base-content/50 ml-14">
+										When enabled, your Jellyfin data will power personalized home page recommendations
+									</p>
+								</div>
+
 								<div class="mb-8">
 									<h3 class="text-xl font-semibold mb-4">Server Connection</h3>
 									
-									<label class="form-control">
-										<div class="label">
-											<span class="label-text font-medium">Jellyfin URL</span>
-										</div>
-										<input 
-											type="url" 
-											bind:value={jellyfinConnection.jellyfin_url}
-											class="input input-bordered"
-											placeholder="http://jellyfin:8096"
-										/>
-										<div class="label">
-											<span class="label-text-alt text-base-content/50">
-												Full URL including http:// or https://
-											</span>
-										</div>
-									</label>
+									<div class="grid grid-cols-1 gap-4">
+										<label class="form-control">
+											<div class="label">
+												<span class="label-text font-medium">Jellyfin URL</span>
+												<span class="label-text-alt text-base-content/50">Required</span>
+											</div>
+											<input 
+												type="url" 
+												bind:value={jellyfinConnection.jellyfin_url}
+												class="input input-bordered"
+												placeholder="http://jellyfin:8096"
+											/>
+											<div class="label">
+												<span class="label-text-alt text-base-content/50">
+													Full URL including http:// or https://
+												</span>
+											</div>
+										</label>
+
+										<label class="form-control">
+											<div class="label">
+												<span class="label-text font-medium">API Key</span>
+												<span class="label-text-alt text-base-content/50">Required</span>
+											</div>
+											<div class="join w-full">
+												<input 
+													type={showJellyfinApiKey ? 'text' : 'password'}
+													bind:value={jellyfinConnection.api_key}
+													class="input input-bordered join-item flex-1"
+													placeholder="Enter your Jellyfin API key"
+												/>
+												<button 
+													class="btn btn-square join-item"
+													on:click={() => showJellyfinApiKey = !showJellyfinApiKey}
+													type="button"
+												>
+													{#if showJellyfinApiKey}
+														<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-5 h-5">
+															<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+															<line x1="1" y1="1" x2="23" y2="23"></line>
+														</svg>
+													{:else}
+														<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-5 h-5">
+															<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+															<circle cx="12" cy="12" r="3"></circle>
+														</svg>
+													{/if}
+												</button>
+											</div>
+											<div class="label">
+												<span class="label-text-alt text-base-content/50">
+													Found in Jellyfin → Dashboard → API Keys
+												</span>
+											</div>
+										</label>
+
+										<label class="form-control">
+											<div class="label">
+												<span class="label-text font-medium">User ID</span>
+												<span class="label-text-alt text-base-content/50">Optional</span>
+											</div>
+											<input 
+												type="text"
+												bind:value={jellyfinConnection.user_id}
+												class="input input-bordered"
+												placeholder="Leave empty to use API key's user"
+											/>
+											<div class="label">
+												<span class="label-text-alt text-base-content/50">
+													Jellyfin user ID for listening history. Leave empty to detect automatically.
+												</span>
+											</div>
+										</label>
+									</div>
+								</div>
+
+								<!-- Test Connection -->
+								<div class="mb-6">
+									<button 
+										class="btn btn-secondary"
+										on:click={testJellyfinConnection}
+										disabled={testingJellyfin || !jellyfinConnection.jellyfin_url || !jellyfinConnection.api_key}
+									>
+										{#if testingJellyfin}
+											<span class="loading loading-spinner loading-sm"></span>
+											Testing...
+										{:else}
+											Test Connection
+										{/if}
+									</button>
+									{#if jellyfinTestResult}
+										<p class="text-sm mt-2" class:text-success={jellyfinTestResult.success} class:text-error={!jellyfinTestResult.success}>
+											{jellyfinTestResult.message}
+										</p>
+									{/if}
 								</div>
 
 								{#if jellyfinMessage}
@@ -1468,6 +1696,165 @@
 							{/if}
 						</div>
 					</div>
+				{:else if activeTab === 'listenbrainz'}
+					<div class="card bg-base-200">
+						<div class="card-body">
+							<h2 class="card-title text-2xl mb-4">ListenBrainz Connection</h2>
+							<p class="text-base-content/70 mb-6">
+								Connect to ListenBrainz for personalized music recommendations based on your listening history, trending artists worldwide, and genre insights.
+							</p>
+
+							{#if loadingListenbrainz}
+								<div class="flex justify-center items-center py-12">
+									<span class="loading loading-spinner loading-lg"></span>
+								</div>
+							{:else if listenbrainzConnection}
+								<!-- Enable Toggle -->
+								<div class="mb-6">
+									<label class="label cursor-pointer justify-start gap-4">
+										<input 
+											type="checkbox" 
+											class="toggle toggle-primary" 
+											bind:checked={listenbrainzConnection.enabled}
+										/>
+										<span class="label-text font-medium">Enable ListenBrainz Integration</span>
+									</label>
+									<p class="text-sm text-base-content/50 ml-14">
+										When enabled, your ListenBrainz data will power personalized home page recommendations
+									</p>
+								</div>
+
+								<div class="mb-8">
+									<h3 class="text-xl font-semibold mb-4">Account Settings</h3>
+									
+									<div class="grid grid-cols-1 gap-4">
+										<label class="form-control">
+											<div class="label">
+												<span class="label-text font-medium">Username</span>
+												<span class="label-text-alt text-base-content/50">Required</span>
+											</div>
+											<input 
+												type="text" 
+												bind:value={listenbrainzConnection.username}
+												class="input input-bordered"
+												placeholder="Your ListenBrainz username"
+											/>
+											<div class="label">
+												<span class="label-text-alt text-base-content/50">
+													Your ListenBrainz username (case-sensitive)
+												</span>
+											</div>
+										</label>
+
+										<label class="form-control">
+											<div class="label">
+												<span class="label-text font-medium">User Token</span>
+												<span class="label-text-alt text-base-content/50">Optional</span>
+											</div>
+											<div class="join w-full">
+												<input 
+													type={showListenbrainzToken ? 'text' : 'password'}
+													bind:value={listenbrainzConnection.user_token}
+													class="input input-bordered join-item flex-1"
+													placeholder="Enter your ListenBrainz user token"
+												/>
+												<button 
+													class="btn btn-square join-item"
+													on:click={() => showListenbrainzToken = !showListenbrainzToken}
+													type="button"
+												>
+													{#if showListenbrainzToken}
+														<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-5 h-5">
+															<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+															<line x1="1" y1="1" x2="23" y2="23"></line>
+														</svg>
+													{:else}
+														<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-5 h-5">
+															<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+															<circle cx="12" cy="12" r="3"></circle>
+														</svg>
+													{/if}
+												</button>
+											</div>
+											<div class="label">
+												<span class="label-text-alt text-base-content/50">
+													Found at <a href="https://listenbrainz.org/settings/" target="_blank" class="link link-primary">listenbrainz.org/settings</a> - needed for private data access
+												</span>
+											</div>
+										</label>
+									</div>
+								</div>
+
+								<!-- Test Connection -->
+								<div class="mb-6">
+									<button 
+										class="btn btn-secondary"
+										on:click={testListenbrainzConnection}
+										disabled={testingListenbrainz || !listenbrainzConnection.username}
+									>
+										{#if testingListenbrainz}
+											<span class="loading loading-spinner loading-sm"></span>
+											Testing...
+										{:else}
+											Test Connection
+										{/if}
+									</button>
+									{#if listenbrainzTestResult}
+										<p class="text-sm mt-2" class:text-success={listenbrainzTestResult.valid} class:text-error={!listenbrainzTestResult.valid}>
+											{listenbrainzTestResult.message}
+										</p>
+									{/if}
+								</div>
+
+								{#if listenbrainzMessage}
+									<div 
+										class="alert mb-6"
+										class:alert-success={listenbrainzMessage.includes('success')}
+										class:alert-error={listenbrainzMessage.includes('Failed')}
+									>
+										<svg
+											xmlns="http://www.w3.org/2000/svg"
+											class="h-6 w-6 shrink-0 stroke-current"
+											fill="none"
+											viewBox="0 0 24 24"
+										>
+											<path
+												stroke-linecap="round"
+												stroke-linejoin="round"
+												stroke-width="2"
+												d={listenbrainzMessage.includes('success') 
+													? "M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" 
+													: "M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"}
+											/>
+										</svg>
+										<span>{listenbrainzMessage}</span>
+									</div>
+								{/if}
+
+								<div class="card-actions justify-end gap-2">
+									<button 
+										class="btn btn-ghost" 
+										on:click={loadListenbrainzConnection}
+										disabled={savingListenbrainz}
+									>
+										Reset
+									</button>
+									<button 
+										class="btn btn-primary" 
+										on:click={saveListenbrainzConnection}
+										disabled={savingListenbrainz || !listenbrainzConnection.username}
+									>
+										{#if savingListenbrainz}
+											<span class="loading loading-spinner loading-sm"></span>
+											Saving...
+										{:else}
+											Save Settings
+										{/if}
+									</button>
+								</div>
+							{/if}
+						</div>
+					</div>
 				{:else if activeTab === 'lidarr'}
 					<div class="card bg-base-200">
 						<div class="card-body">
@@ -1483,9 +1870,9 @@
 							{:else if lidarrSettings}
 								<!-- Sync Frequency Setting -->
 								<div class="form-control mb-6">
-									<label class="label">
+									<div class="label">
 										<span class="label-text font-semibold">Sync Frequency</span>
-									</label>
+									</div>
 									<select 
 										class="select select-bordered w-full max-w-xs"
 										bind:value={lidarrSettings.sync_frequency}
@@ -1496,11 +1883,11 @@
 										<option value="30min">Every 30 Minutes</option>
 										<option value="1hr">Every Hour</option>
 									</select>
-									<label class="label">
+									<div class="label">
 										<span class="label-text-alt text-base-content/70">
 											How often to automatically sync your library from Lidarr. Manual sync is always available.
 										</span>
-									</label>
+									</div>
 								</div>
 
 								<!-- Last Sync Display -->

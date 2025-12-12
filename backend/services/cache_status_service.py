@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import threading
+import time
 from typing import Optional
 from dataclasses import dataclass
 
@@ -49,7 +50,6 @@ class CacheStatusService:
         self._state_lock = asyncio.Lock()
     
     async def start_sync(self, phase: str, total_items: int):
-        import time
         async with self._state_lock:
             self._cancel_event.clear()
             self._progress = CacheSyncProgress(

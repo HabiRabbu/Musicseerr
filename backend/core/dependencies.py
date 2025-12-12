@@ -1,4 +1,10 @@
-from core.config import get_settings
+from functools import lru_cache
+import logging
+from typing import Annotated
+
+from fastapi import Depends
+
+from core.config import Settings, get_settings
 from infrastructure.cache.memory_cache import InMemoryCache, CacheInterface
 from infrastructure.cache.persistent_cache import LibraryCache
 from infrastructure.cache.disk_cache import DiskMetadataCache
@@ -8,6 +14,8 @@ from repositories.lidarr_repository import LidarrRepository
 from repositories.musicbrainz_repository import MusicBrainzRepository
 from repositories.wikidata_repository import WikidataRepository
 from repositories.coverart_repository import CoverArtRepository
+from repositories.listenbrainz_repository import ListenBrainzRepository
+from repositories.jellyfin_repository import JellyfinRepository
 from services.preferences_service import PreferencesService
 from services.search_service import SearchService
 from services.artist_service import ArtistService
@@ -16,223 +24,244 @@ from services.request_service import RequestService
 from services.library_service import LibraryService
 from services.status_service import StatusService
 from services.cache_service import CacheService
-import logging
+from services.home_service import HomeService
 
 logger = logging.getLogger(__name__)
 
-
-_cache_instance: CacheInterface | None = None
-_library_cache_instance: LibraryCache | None = None
-_disk_cache_instance: DiskMetadataCache | None = None
-_request_queue_instance: RequestQueue | None = None
-
-_preferences_service_instance: PreferencesService | None = None
-_lidarr_repository_instance: LidarrRepository | None = None
-_musicbrainz_repository_instance: MusicBrainzRepository | None = None
-_wikidata_repository_instance: WikidataRepository | None = None
-_coverart_repository_instance: CoverArtRepository | None = None
+SettingsDep = Annotated[Settings, Depends(get_settings)]
 
 
+@lru_cache(maxsize=1)
 def get_cache() -> CacheInterface:
-    global _cache_instance
-    if _cache_instance is None:
-        settings = get_settings()
-        max_entries = settings.metadata_cache_max_entries
-        _cache_instance = InMemoryCache(max_entries=max_entries)
-        logger.info(f"Initialized RAM cache with max {max_entries} entries (hot items only)")
-    return _cache_instance
+    settings = get_settings()
+    max_entries = settings.metadata_cache_max_entries
+    logger.info(f"Initialized RAM cache with max {max_entries} entries")
+    return InMemoryCache(max_entries=max_entries)
 
 
+@lru_cache(maxsize=1)
 def get_disk_cache() -> DiskMetadataCache:
-    global _disk_cache_instance
-    if _disk_cache_instance is None:
-        settings = get_settings()
-        cache_dir = settings.cache_dir / "metadata"
-        _disk_cache_instance = DiskMetadataCache(base_path=cache_dir)
-        logger.info(f"Initialized disk metadata cache at {cache_dir}")
-    return _disk_cache_instance
+    settings = get_settings()
+    cache_dir = settings.cache_dir / "metadata"
+    logger.info(f"Initialized disk metadata cache at {cache_dir}")
+    return DiskMetadataCache(base_path=cache_dir)
 
 
+@lru_cache(maxsize=1)
 def get_library_cache() -> LibraryCache:
-    global _library_cache_instance
-    if _library_cache_instance is None:
-        settings = get_settings()
-        _library_cache_instance = LibraryCache(db_path=settings.library_db_path)
-        logger.info(f"Initialized library cache at {settings.library_db_path}")
-    return _library_cache_instance
+    settings = get_settings()
+    logger.info(f"Initialized library cache at {settings.library_db_path}")
+    return LibraryCache(db_path=settings.library_db_path)
 
 
+@lru_cache(maxsize=1)
 def get_preferences_service() -> PreferencesService:
-    global _preferences_service_instance
-    if _preferences_service_instance is None:
-        settings = get_settings()
-        _preferences_service_instance = PreferencesService(settings)
-    return _preferences_service_instance
+    settings = get_settings()
+    return PreferencesService(settings)
 
 
+@lru_cache(maxsize=1)
 def get_lidarr_repository() -> LidarrRepository:
-    global _lidarr_repository_instance
-    if _lidarr_repository_instance is None:
-        settings = get_settings()
-        cache = get_cache()
-        http_client = get_http_client(settings)
-        _lidarr_repository_instance = LidarrRepository(settings, http_client, cache)
-    return _lidarr_repository_instance
+    settings = get_settings()
+    cache = get_cache()
+    http_client = get_http_client(settings)
+    return LidarrRepository(settings, http_client, cache)
 
 
+@lru_cache(maxsize=1)
 def get_musicbrainz_repository() -> MusicBrainzRepository:
-    global _musicbrainz_repository_instance
-    if _musicbrainz_repository_instance is None:
-        cache = get_cache()
-        preferences_service = get_preferences_service()
-        _musicbrainz_repository_instance = MusicBrainzRepository(cache, preferences_service)
-    return _musicbrainz_repository_instance
+    cache = get_cache()
+    preferences_service = get_preferences_service()
+    return MusicBrainzRepository(cache, preferences_service)
 
 
+@lru_cache(maxsize=1)
 def get_wikidata_repository() -> WikidataRepository:
-    global _wikidata_repository_instance
-    if _wikidata_repository_instance is None:
-        settings = get_settings()
-        cache = get_cache()
-        http_client = get_http_client(settings)
-        _wikidata_repository_instance = WikidataRepository(http_client, cache)
-    return _wikidata_repository_instance
+    settings = get_settings()
+    cache = get_cache()
+    http_client = get_http_client(settings)
+    return WikidataRepository(http_client, cache)
 
 
-_search_service_instance: SearchService | None = None
-_artist_service_instance: ArtistService | None = None
-_album_service_instance: AlbumService | None = None
-_library_service_instance: LibraryService | None = None
-_status_service_instance: StatusService | None = None
-_cache_service_instance: CacheService | None = None
-_request_service_instance: RequestService | None = None
+@lru_cache(maxsize=1)
+def get_listenbrainz_repository() -> ListenBrainzRepository:
+    settings = get_settings()
+    cache = get_cache()
+    http_client = get_http_client(settings)
+    preferences = get_preferences_service()
+    lb_settings = preferences.get_listenbrainz_connection()
+    return ListenBrainzRepository(
+        http_client=http_client,
+        cache=cache,
+        username=lb_settings.username if lb_settings.enabled else "",
+        user_token=lb_settings.user_token if lb_settings.enabled else "",
+    )
 
 
+@lru_cache(maxsize=1)
+def get_jellyfin_repository() -> JellyfinRepository:
+    settings = get_settings()
+    cache = get_cache()
+    http_client = get_http_client(settings)
+    preferences = get_preferences_service()
+    jf_settings = preferences.get_jellyfin_connection()
+    return JellyfinRepository(
+        http_client=http_client,
+        cache=cache,
+        base_url=jf_settings.jellyfin_url if jf_settings.enabled else "",
+        api_key=jf_settings.api_key if jf_settings.enabled else "",
+        user_id=jf_settings.user_id if jf_settings.enabled else "",
+    )
+
+
+@lru_cache(maxsize=1)
 def get_coverart_repository() -> CoverArtRepository:
-    global _coverart_repository_instance
-    if _coverart_repository_instance is None:
-        settings = get_settings()
-        cache = get_cache()
-        mb_repo = get_musicbrainz_repository()
-        http_client = get_http_client(settings)
-        cache_dir = settings.cache_dir / "covers"
-        _coverart_repository_instance = CoverArtRepository(http_client, cache, mb_repo, cache_dir=cache_dir)
-    return _coverart_repository_instance
+    settings = get_settings()
+    cache = get_cache()
+    mb_repo = get_musicbrainz_repository()
+    http_client = get_http_client(settings)
+    cache_dir = settings.cache_dir / "covers"
+    return CoverArtRepository(http_client, cache, mb_repo, cache_dir=cache_dir)
 
 
+@lru_cache(maxsize=1)
 def get_search_service() -> SearchService:
-    global _search_service_instance
-    if _search_service_instance is None:
-        mb_repo = get_musicbrainz_repository()
-        lidarr_repo = get_lidarr_repository()
-        coverart_repo = get_coverart_repository()
-        preferences_service = get_preferences_service()
-        _search_service_instance = SearchService(mb_repo, lidarr_repo, coverart_repo, preferences_service)
-    return _search_service_instance
+    mb_repo = get_musicbrainz_repository()
+    lidarr_repo = get_lidarr_repository()
+    coverart_repo = get_coverart_repository()
+    preferences_service = get_preferences_service()
+    return SearchService(mb_repo, lidarr_repo, coverart_repo, preferences_service)
 
 
+@lru_cache(maxsize=1)
 def get_artist_service() -> ArtistService:
-    global _artist_service_instance
-    if _artist_service_instance is None:
-        mb_repo = get_musicbrainz_repository()
-        lidarr_repo = get_lidarr_repository()
-        wikidata_repo = get_wikidata_repository()
-        preferences_service = get_preferences_service()
-        memory_cache = get_cache()
-        disk_cache = get_disk_cache()
-        _artist_service_instance = ArtistService(mb_repo, lidarr_repo, wikidata_repo, preferences_service, memory_cache, disk_cache)
-    return _artist_service_instance
+    mb_repo = get_musicbrainz_repository()
+    lidarr_repo = get_lidarr_repository()
+    wikidata_repo = get_wikidata_repository()
+    preferences_service = get_preferences_service()
+    memory_cache = get_cache()
+    disk_cache = get_disk_cache()
+    return ArtistService(mb_repo, lidarr_repo, wikidata_repo, preferences_service, memory_cache, disk_cache)
 
 
+@lru_cache(maxsize=1)
 def get_album_service() -> AlbumService:
-    global _album_service_instance
-    if _album_service_instance is None:
-        lidarr_repo = get_lidarr_repository()
-        mb_repo = get_musicbrainz_repository()
-        library_cache = get_library_cache()
-        memory_cache = get_cache()
-        disk_cache = get_disk_cache()
-        preferences_service = get_preferences_service()
-        _album_service_instance = AlbumService(lidarr_repo, mb_repo, library_cache, memory_cache, disk_cache, preferences_service)
-    return _album_service_instance
+    lidarr_repo = get_lidarr_repository()
+    mb_repo = get_musicbrainz_repository()
+    library_cache = get_library_cache()
+    memory_cache = get_cache()
+    disk_cache = get_disk_cache()
+    preferences_service = get_preferences_service()
+    return AlbumService(lidarr_repo, mb_repo, library_cache, memory_cache, disk_cache, preferences_service)
 
 
+@lru_cache(maxsize=1)
 def get_request_queue() -> RequestQueue:
-    global _request_queue_instance
-    if _request_queue_instance is None:
-        lidarr_repo = get_lidarr_repository()
-        disk_cache = get_disk_cache()
-        cover_repo = get_coverart_repository()
-        
-        async def processor(album_mbid: str) -> dict:
-            result = await lidarr_repo.add_album(album_mbid)
-            
-            payload = result.get("payload", {})
-            if payload and isinstance(payload, dict):
-                is_monitored = payload.get("monitored", False)
-                
-                if is_monitored:
-                    logger.info(f"Album {album_mbid[:8]}... successfully monitored - promoting cache entries to persistent")
-                    
-                    try:
-                        await disk_cache.promote_album_to_persistent(album_mbid)
-                        await cover_repo.promote_cover_to_persistent(album_mbid, identifier_type="album")
-                        
-                        artist_data = payload.get("artist", {})
-                        if artist_data:
-                            artist_mbid = artist_data.get("foreignArtistId") or artist_data.get("mbId")
-                            if artist_mbid:
-                                await disk_cache.promote_artist_to_persistent(artist_mbid)
-                                await cover_repo.promote_cover_to_persistent(artist_mbid, identifier_type="artist")
-                        
-                        logger.info(f"Cache promotion complete for album {album_mbid[:8]}...")
-                    except Exception as e:
-                        logger.error(f"Failed to promote cache entries for album {album_mbid[:8]}...: {e}")
-                else:
-                    logger.warning(f"Album {album_mbid[:8]}... added but not monitored - skipping cache promotion")
-            
-            return result
-        
-        _request_queue_instance = RequestQueue(processor)
-    return _request_queue_instance
+    lidarr_repo = get_lidarr_repository()
+    disk_cache = get_disk_cache()
+    cover_repo = get_coverart_repository()
+
+    async def processor(album_mbid: str) -> dict:
+        result = await lidarr_repo.add_album(album_mbid)
+
+        payload = result.get("payload", {})
+        if payload and isinstance(payload, dict):
+            is_monitored = payload.get("monitored", False)
+
+            if is_monitored:
+                logger.info(f"Album {album_mbid[:8]}... successfully monitored - promoting cache entries to persistent")
+
+                try:
+                    await disk_cache.promote_album_to_persistent(album_mbid)
+                    await cover_repo.promote_cover_to_persistent(album_mbid, identifier_type="album")
+
+                    artist_data = payload.get("artist", {})
+                    if artist_data:
+                        artist_mbid = artist_data.get("foreignArtistId") or artist_data.get("mbId")
+                        if artist_mbid:
+                            await disk_cache.promote_artist_to_persistent(artist_mbid)
+                            await cover_repo.promote_cover_to_persistent(artist_mbid, identifier_type="artist")
+
+                    logger.info(f"Cache promotion complete for album {album_mbid[:8]}...")
+                except Exception as e:
+                    logger.error(f"Failed to promote cache entries for album {album_mbid[:8]}...: {e}")
+            else:
+                logger.warning(f"Album {album_mbid[:8]}... added but not monitored - skipping cache promotion")
+
+        return result
+
+    return RequestQueue(processor)
 
 
+@lru_cache(maxsize=1)
 def get_request_service() -> RequestService:
-    global _request_service_instance
-    if _request_service_instance is None:
-        lidarr_repo = get_lidarr_repository()
-        request_queue = get_request_queue()
-        _request_service_instance = RequestService(lidarr_repo, request_queue)
-    return _request_service_instance
+    lidarr_repo = get_lidarr_repository()
+    request_queue = get_request_queue()
+    return RequestService(lidarr_repo, request_queue)
 
 
+@lru_cache(maxsize=1)
 def get_library_service() -> LibraryService:
-    global _library_service_instance
-    if _library_service_instance is None:
-        lidarr_repo = get_lidarr_repository()
-        library_cache = get_library_cache()
-        cover_repo = get_coverart_repository()
-        preferences_service = get_preferences_service()
-        _library_service_instance = LibraryService(lidarr_repo, library_cache, cover_repo, preferences_service)
-    return _library_service_instance
+    lidarr_repo = get_lidarr_repository()
+    library_cache = get_library_cache()
+    cover_repo = get_coverart_repository()
+    preferences_service = get_preferences_service()
+    return LibraryService(lidarr_repo, library_cache, cover_repo, preferences_service)
 
 
+@lru_cache(maxsize=1)
 def get_status_service() -> StatusService:
-    global _status_service_instance
-    if _status_service_instance is None:
-        lidarr_repo = get_lidarr_repository()
-        _status_service_instance = StatusService(lidarr_repo)
-    return _status_service_instance
+    lidarr_repo = get_lidarr_repository()
+    return StatusService(lidarr_repo)
 
 
+@lru_cache(maxsize=1)
 def get_cache_service() -> CacheService:
-    global _cache_service_instance
-    if _cache_service_instance is None:
-        cache = get_cache()
-        library_cache = get_library_cache()
-        disk_cache = get_disk_cache()
-        _cache_service_instance = CacheService(cache, library_cache, disk_cache)
-    return _cache_service_instance
+    cache = get_cache()
+    library_cache = get_library_cache()
+    disk_cache = get_disk_cache()
+    return CacheService(cache, library_cache, disk_cache)
+
+
+@lru_cache(maxsize=1)
+def get_home_service() -> HomeService:
+    listenbrainz_repo = get_listenbrainz_repository()
+    jellyfin_repo = get_jellyfin_repository()
+    lidarr_repo = get_lidarr_repository()
+    musicbrainz_repo = get_musicbrainz_repository()
+    preferences_service = get_preferences_service()
+    library_cache = get_library_cache()
+    memory_cache = get_cache()
+    return HomeService(
+        listenbrainz_repo=listenbrainz_repo,
+        jellyfin_repo=jellyfin_repo,
+        lidarr_repo=lidarr_repo,
+        musicbrainz_repo=musicbrainz_repo,
+        preferences_service=preferences_service,
+        library_cache=library_cache,
+        memory_cache=memory_cache,
+    )
+
+
+CacheDep = Annotated[CacheInterface, Depends(get_cache)]
+DiskCacheDep = Annotated[DiskMetadataCache, Depends(get_disk_cache)]
+LibraryCacheDep = Annotated[LibraryCache, Depends(get_library_cache)]
+PreferencesServiceDep = Annotated[PreferencesService, Depends(get_preferences_service)]
+LidarrRepositoryDep = Annotated[LidarrRepository, Depends(get_lidarr_repository)]
+MusicBrainzRepositoryDep = Annotated[MusicBrainzRepository, Depends(get_musicbrainz_repository)]
+WikidataRepositoryDep = Annotated[WikidataRepository, Depends(get_wikidata_repository)]
+ListenBrainzRepositoryDep = Annotated[ListenBrainzRepository, Depends(get_listenbrainz_repository)]
+JellyfinRepositoryDep = Annotated[JellyfinRepository, Depends(get_jellyfin_repository)]
+CoverArtRepositoryDep = Annotated[CoverArtRepository, Depends(get_coverart_repository)]
+SearchServiceDep = Annotated[SearchService, Depends(get_search_service)]
+ArtistServiceDep = Annotated[ArtistService, Depends(get_artist_service)]
+AlbumServiceDep = Annotated[AlbumService, Depends(get_album_service)]
+RequestQueueDep = Annotated[RequestQueue, Depends(get_request_queue)]
+RequestServiceDep = Annotated[RequestService, Depends(get_request_service)]
+LibraryServiceDep = Annotated[LibraryService, Depends(get_library_service)]
+StatusServiceDep = Annotated[StatusService, Depends(get_status_service)]
+CacheServiceDep = Annotated[CacheService, Depends(get_cache_service)]
+HomeServiceDep = Annotated[HomeService, Depends(get_home_service)]
 
 
 async def init_app_state(app) -> None:
@@ -241,4 +270,25 @@ async def init_app_state(app) -> None:
 
 async def cleanup_app_state() -> None:
     await close_http_clients()
+
+    get_cache.cache_clear()
+    get_disk_cache.cache_clear()
+    get_library_cache.cache_clear()
+    get_preferences_service.cache_clear()
+    get_lidarr_repository.cache_clear()
+    get_musicbrainz_repository.cache_clear()
+    get_wikidata_repository.cache_clear()
+    get_listenbrainz_repository.cache_clear()
+    get_jellyfin_repository.cache_clear()
+    get_coverart_repository.cache_clear()
+    get_search_service.cache_clear()
+    get_artist_service.cache_clear()
+    get_album_service.cache_clear()
+    get_request_queue.cache_clear()
+    get_request_service.cache_clear()
+    get_library_service.cache_clear()
+    get_status_service.cache_clear()
+    get_cache_service.cache_clear()
+    get_home_service.cache_clear()
+
     logger.info("Application state cleaned up")

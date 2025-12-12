@@ -6,6 +6,8 @@ from api.v1.schemas.settings import (
     LidarrConnectionSettings,
     SoularrConnectionSettings,
     JellyfinConnectionSettings,
+    ListenBrainzConnectionSettings,
+    HomeSettings,
     LidarrVerifyResponse
 )
 from api.v1.schemas.advanced_settings import AdvancedSettingsFrontend
@@ -244,3 +246,94 @@ async def update_jellyfin_settings(settings: JellyfinConnectionSettings):
     except Exception as e:
         logger.error(f"Failed to save Jellyfin settings: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to save Jellyfin settings: {e}")
+
+
+@router.post("/jellyfin/verify")
+async def verify_jellyfin_connection(settings: JellyfinConnectionSettings):
+    try:
+        from core.dependencies import get_jellyfin_repository
+        jellyfin_repo = get_jellyfin_repository()
+        
+        jellyfin_repo.configure(
+            base_url=settings.jellyfin_url,
+            api_key=settings.api_key,
+            user_id=settings.user_id
+        )
+        
+        success, message = await jellyfin_repo.validate_connection()
+        return {"success": success, "message": message}
+    except Exception as e:
+        logger.error(f"Failed to verify Jellyfin connection: {e}")
+        return {"success": False, "message": f"Verification error: {str(e)}"}
+
+
+@router.get("/listenbrainz", response_model=ListenBrainzConnectionSettings)
+async def get_listenbrainz_settings():
+    try:
+        preferences_service = get_preferences_service()
+        return preferences_service.get_listenbrainz_connection()
+    except Exception as e:
+        logger.error(f"Failed to get ListenBrainz settings: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get ListenBrainz settings: {e}")
+
+
+@router.put("/listenbrainz", response_model=ListenBrainzConnectionSettings)
+async def update_listenbrainz_settings(settings: ListenBrainzConnectionSettings):
+    try:
+        preferences_service = get_preferences_service()
+        preferences_service.save_listenbrainz_connection(settings)
+        logger.info("Updated ListenBrainz connection settings")
+        return settings
+    except ConfigurationError as e:
+        logger.warning(f"Configuration error updating ListenBrainz settings: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Failed to save ListenBrainz settings: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to save ListenBrainz settings: {e}")
+
+
+@router.post("/listenbrainz/verify")
+async def verify_listenbrainz_connection(settings: ListenBrainzConnectionSettings):
+    try:
+        from core.dependencies import get_listenbrainz_repository
+        lb_repo = get_listenbrainz_repository()
+        
+        lb_repo.configure(
+            username=settings.username,
+            user_token=settings.user_token
+        )
+        
+        if settings.user_token:
+            valid, message = await lb_repo.validate_token()
+        else:
+            valid, message = await lb_repo.validate_username(settings.username)
+        
+        return {"valid": valid, "message": message}
+    except Exception as e:
+        logger.error(f"Failed to verify ListenBrainz connection: {e}")
+        return {"valid": False, "message": f"Verification error: {str(e)}"}
+
+
+@router.get("/home", response_model=HomeSettings)
+async def get_home_settings():
+    try:
+        preferences_service = get_preferences_service()
+        return preferences_service.get_home_settings()
+    except Exception as e:
+        logger.error(f"Failed to get home settings: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get home settings: {e}")
+
+
+@router.put("/home", response_model=HomeSettings)
+async def update_home_settings(settings: HomeSettings):
+    try:
+        preferences_service = get_preferences_service()
+        preferences_service.save_home_settings(settings)
+        logger.info("Updated home settings")
+        return settings
+    except ConfigurationError as e:
+        logger.warning(f"Configuration error updating home settings: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Failed to save home settings: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to save home settings: {e}")

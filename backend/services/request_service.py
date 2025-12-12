@@ -1,5 +1,5 @@
 import logging
-from repositories.lidarr_repository import LidarrRepository
+from repositories.protocols import LidarrRepositoryProtocol
 from infrastructure.queue.request_queue import RequestQueue
 from api.v1.schemas.request import QueueStatusResponse
 from core.exceptions import ExternalServiceError
@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 class RequestService:
     def __init__(
         self,
-        lidarr_repo: LidarrRepository,
+        lidarr_repo: LidarrRepositoryProtocol,
         request_queue: RequestQueue
     ):
         self._lidarr_repo = lidarr_repo

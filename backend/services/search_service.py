@@ -2,9 +2,7 @@ import asyncio
 import logging
 from typing import Optional
 from api.v1.schemas.search import SearchResult, SearchResponse
-from repositories.musicbrainz_repository import MusicBrainzRepository
-from repositories.lidarr_repository import LidarrRepository
-from repositories.coverart_repository import CoverArtRepository
+from repositories.protocols import MusicBrainzRepositoryProtocol, LidarrRepositoryProtocol, CoverArtRepositoryProtocol
 from services.preferences_service import PreferencesService
 
 logger = logging.getLogger(__name__)
@@ -15,9 +13,9 @@ COVER_PREFETCH_LIMIT = 12
 class SearchService:
     def __init__(
         self,
-        mb_repo: MusicBrainzRepository,
-        lidarr_repo: LidarrRepository,
-        coverart_repo: CoverArtRepository,
+        mb_repo: MusicBrainzRepositoryProtocol,
+        lidarr_repo: LidarrRepositoryProtocol,
+        coverart_repo: CoverArtRepositoryProtocol,
         preferences_service: PreferencesService
     ):
         self._mb_repo = mb_repo

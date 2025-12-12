@@ -1,12 +1,12 @@
 import logging
-from repositories.lidarr_repository import LidarrRepository
+from repositories.protocols import LidarrRepositoryProtocol
 from api.v1.schemas.common import StatusReport, ServiceStatus
 
 logger = logging.getLogger(__name__)
 
 
 class StatusService:
-    def __init__(self, lidarr_repo: LidarrRepository):
+    def __init__(self, lidarr_repo: LidarrRepositoryProtocol):
         self._lidarr_repo = lidarr_repo
     
     async def get_status(self) -> StatusReport:

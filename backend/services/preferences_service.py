@@ -1,12 +1,15 @@
 import json
 import logging
+import time
 from typing import Optional
 from api.v1.schemas.settings import (
     UserPreferences, 
     LidarrSettings,
     LidarrConnectionSettings,
     SoularrConnectionSettings,
-    JellyfinConnectionSettings
+    JellyfinConnectionSettings,
+    ListenBrainzConnectionSettings,
+    HomeSettings
 )
 from api.v1.schemas.advanced_settings import AdvancedSettings
 from core.config import Settings
@@ -26,8 +29,6 @@ class PreferencesService:
         self._cache_ttl: float = 60.0
     
     def get_preferences(self) -> UserPreferences:
-        import time
-        
         now = time.time()
         
         if self._cached_preferences is not None and (now - self._cache_timestamp) < self._cache_ttl:
@@ -259,8 +260,12 @@ class PreferencesService:
             with open(self._config_path, encoding='utf-8') as f:
                 config = json.load(f)
             
+            jellyfin_data = config.get("jellyfin_settings", {})
             return JellyfinConnectionSettings(
-                jellyfin_url=config.get("jellyfin_url", self._settings.jellyfin_url),
+                jellyfin_url=jellyfin_data.get("jellyfin_url", config.get("jellyfin_url", self._settings.jellyfin_url)),
+                api_key=jellyfin_data.get("api_key", ""),
+                user_id=jellyfin_data.get("user_id", ""),
+                enabled=jellyfin_data.get("enabled", False),
             )
         
         except Exception as e:
@@ -277,6 +282,12 @@ class PreferencesService:
                     config = json.load(f)
             
             config["jellyfin_url"] = settings.jellyfin_url
+            config["jellyfin_settings"] = {
+                "jellyfin_url": settings.jellyfin_url,
+                "api_key": settings.api_key,
+                "user_id": settings.user_id,
+                "enabled": settings.enabled,
+            }
             
             atomic_write_json(self._config_path, config)
             
@@ -287,3 +298,79 @@ class PreferencesService:
         except Exception as e:
             logger.error(f"Failed to save Jellyfin connection settings: {e}")
             raise ConfigurationError(f"Failed to save Jellyfin connection settings: {e}")
+    
+    def get_listenbrainz_connection(self) -> ListenBrainzConnectionSettings:
+        try:
+            if not self._config_path.exists():
+                return ListenBrainzConnectionSettings()
+            
+            with open(self._config_path, encoding='utf-8') as f:
+                config = json.load(f)
+            
+            lb_data = config.get("listenbrainz_settings", {})
+            return ListenBrainzConnectionSettings(
+                username=lb_data.get("username", ""),
+                user_token=lb_data.get("user_token", ""),
+                enabled=lb_data.get("enabled", False),
+            )
+        
+        except Exception as e:
+            logger.error(f"Failed to get ListenBrainz connection settings: {e}")
+            return ListenBrainzConnectionSettings()
+    
+    def save_listenbrainz_connection(self, settings: ListenBrainzConnectionSettings) -> None:
+        try:
+            self._config_path.parent.mkdir(parents=True, exist_ok=True)
+            
+            config = {}
+            if self._config_path.exists():
+                with open(self._config_path, encoding='utf-8') as f:
+                    config = json.load(f)
+            
+            config["listenbrainz_settings"] = {
+                "username": settings.username,
+                "user_token": settings.user_token,
+                "enabled": settings.enabled,
+            }
+            
+            atomic_write_json(self._config_path, config)
+            
+            logger.info(f"Saved ListenBrainz connection settings to {self._config_path}")
+        
+        except Exception as e:
+            logger.error(f"Failed to save ListenBrainz connection settings: {e}")
+            raise ConfigurationError(f"Failed to save ListenBrainz connection settings: {e}")
+    
+    def get_home_settings(self) -> HomeSettings:
+        try:
+            if not self._config_path.exists():
+                return HomeSettings()
+            
+            with open(self._config_path, encoding='utf-8') as f:
+                config = json.load(f)
+            
+            home_data = config.get("home_settings", {})
+            return HomeSettings(**home_data)
+        
+        except Exception as e:
+            logger.error(f"Failed to get home settings: {e}")
+            return HomeSettings()
+    
+    def save_home_settings(self, settings: HomeSettings) -> None:
+        try:
+            self._config_path.parent.mkdir(parents=True, exist_ok=True)
+            
+            config = {}
+            if self._config_path.exists():
+                with open(self._config_path, encoding='utf-8') as f:
+                    config = json.load(f)
+            
+            config["home_settings"] = settings.model_dump()
+            
+            atomic_write_json(self._config_path, config)
+            
+            logger.info(f"Saved home settings to {self._config_path}")
+        
+        except Exception as e:
+            logger.error(f"Failed to save home settings: {e}")
+            raise ConfigurationError(f"Failed to save home settings: {e}")

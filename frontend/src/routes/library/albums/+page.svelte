@@ -48,7 +48,6 @@
 		};
 	}
 
-	// Group albums by artist name (alphabetically)
 	$: albumsByArtist = allAlbums.reduce((acc, album) => {
 		const artistName = album.artist || 'Unknown Artist';
 		if (!acc[artistName]) acc[artistName] = [];
@@ -105,8 +104,8 @@
 				<div>
 					<div class="divider divider-start text-xl font-bold text-secondary">{artistName}</div>
 					<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-						{#each albumsByArtist[artistName] as album, index}
-							<AlbumCard album={convertToAlbum(album)} index={index} />
+						{#each albumsByArtist[artistName] as album}
+							<AlbumCard album={convertToAlbum(album)} />
 						{/each}
 					</div>
 				</div>

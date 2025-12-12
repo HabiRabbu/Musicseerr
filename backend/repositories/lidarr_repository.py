@@ -1,6 +1,7 @@
 import asyncio
 import httpx
 import logging
+import time
 from typing import Any, Optional
 from datetime import datetime
 from core.config import Settings
@@ -440,7 +441,6 @@ class LidarrRepository:
         return await self._get(f"/api/v1/command/{cmd_id}")
 
     async def _await_command(self, body: dict[str, Any], timeout: float = 60.0, poll: float = 0.5) -> dict[str, Any] | None:
-        import time
         try:
             cmd = await self._post_command(body)
             if not cmd or "id" not in cmd:
@@ -474,7 +474,6 @@ class LidarrRepository:
         timeout: float = 30.0,
         poll: float = 0.5
     ):
-        import time
         deadline = time.monotonic() + timeout
         last = None
         while time.monotonic() < deadline:
@@ -488,7 +487,6 @@ class LidarrRepository:
         return last
 
     async def _wait_for_artist_commands_to_complete(self, artist_id: int, timeout: float = 600.0) -> None:
-        import time
         deadline = time.monotonic() + timeout
         
         while time.monotonic() < deadline:
@@ -643,7 +641,7 @@ class LidarrRepository:
                     "sortDirection": "descending",
                     "includeAlbum": True,
                     "includeArtist": True,
-                    "eventType": [2, 3, 8]  # artistFolderImported, trackFileImported, downloadImported
+                    "eventType": [2, 3, 8]
                 }
                 
                 history_data = await self._get("/api/v1/history", params=params)
