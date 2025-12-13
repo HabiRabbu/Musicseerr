@@ -70,6 +70,23 @@ async def clear_all_cache():
         raise HTTPException(status_code=500, detail=f"Failed to clear all cache: {e}")
 
 
+@router.post("/clear/covers", response_model=CacheClearResponse)
+async def clear_covers_cache():
+    try:
+        cache_service = get_cache_service()
+        result = await cache_service.clear_covers_cache()
+        
+        if not result.success:
+            raise HTTPException(status_code=500, detail=result.message)
+        
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to clear covers cache: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to clear covers cache: {e}")
+
+
 @router.post("/clear/library", response_model=CacheClearResponse)
 async def clear_library_cache():
     try:

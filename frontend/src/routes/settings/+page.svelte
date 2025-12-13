@@ -126,8 +126,8 @@
 		}
 	}
 	
-	async function clearCache(type: 'all' | 'memory' | 'disk' | 'library') {
-		const typeLabel = type === 'library' ? 'library database' : type === 'all' ? 'entire' : type;
+	async function clearCache(type: 'all' | 'memory' | 'disk' | 'library' | 'covers') {
+		const typeLabel = type === 'library' ? 'library database' : type === 'covers' ? 'cover images' : type === 'all' ? 'entire' : type;
 		if (!confirm(`Are you sure you want to clear the ${typeLabel} cache?`)) {
 			return;
 		}
@@ -1052,7 +1052,7 @@
 								<!-- Clear Cache Actions -->
 								<div class="divider">Clear Cache</div>
 								
-								<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+								<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 mb-6">
 									<div class="card bg-base-100">
 										<div class="card-body">
 											<h3 class="card-title text-lg">Memory Cache</h3>
@@ -1084,6 +1084,24 @@
 													disabled={clearingCache}
 												>
 													Clear Metadata
+												</button>
+											</div>
+										</div>
+									</div>
+									
+									<div class="card bg-base-100">
+										<div class="card-body">
+											<h3 class="card-title text-lg">Cover Images</h3>
+											<p class="text-sm text-base-content/70">
+												Clear artist/album cover images. Will re-fetch from Lidarr/Wikidata.
+											</p>
+											<div class="card-actions justify-end">
+												<button 
+													class="btn btn-warning btn-sm" 
+													on:click={() => clearCache('covers')}
+													disabled={clearingCache}
+												>
+													Clear Covers
 												</button>
 											</div>
 										</div>
@@ -2242,6 +2260,24 @@
 											<div class="label">
 												<span class="label-text-alt text-base-content/50">
 													Delay between album batches (default: 1.0s)
+												</span>
+											</div>
+										</label>
+
+										<label class="form-control">
+											<div class="label">
+												<span class="label-text">MusicBrainz Concurrent Searches</span>
+											</div>
+											<input 
+												type="number" 
+												bind:value={advancedSettings.musicbrainz_concurrent_searches}
+												class="input input-bordered"
+												min="2"
+												max="5"
+											/>
+											<div class="label">
+												<span class="label-text-alt text-base-content/50">
+													Parallel API requests during search (default: 3)
 												</span>
 											</div>
 										</label>

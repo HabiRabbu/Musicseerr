@@ -2,50 +2,34 @@
 	import type { Album } from '$lib/types';
 	import { colors } from '$lib/colors';
 	import { goto } from '$app/navigation';
-	import { lazyImage, resetLazyImage } from '$lib/utils/lazyImage';
 	import { libraryStore } from '$lib/stores/library';
+	import AlbumImage from './AlbumImage.svelte';
 
 	export let album: Album;
 	export let onadded: (() => void) | undefined = undefined;
 
 	let requesting = false;
-	let coverUrl = album.cover_url ?? `/api/covers/release-group/${album.musicbrainz_id}?size=250`;
-	let imgError = false;
-	let imgLoaded = false;
-	let imgElement: HTMLImageElement | null = null;
 
 	$: inLibrary = album.in_library || libraryStore.isInLibrary(album.musicbrainz_id);
-
-	function onImgError() {
-		imgError = true;
-	}
-
-	function onImgLoad(e: Event) {
-		imgLoaded = true;
-		(e.currentTarget as HTMLImageElement).classList.remove('opacity-0');
-	}
-
-	$: coverUrl = album.cover_url ?? `/api/covers/release-group/${album.musicbrainz_id}?size=250`;
-
-	$: if (album && imgElement) {
-		imgError = false;
-		imgLoaded = false;
-		resetLazyImage(imgElement, coverUrl);
-	}
 
 	async function handleRequest(e: Event) {
 		e.stopPropagation();
 		requesting = true;
 		try {
-			await fetch('/api/request', {
+			const res = await fetch('/api/request', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ musicbrainz_id: album.musicbrainz_id })
 			});
-			libraryStore.addMbid(album.musicbrainz_id);
-			onadded?.();
-		} catch (error) {
-			console.error('Failed to request album:', error);
+			
+			if (res.ok) {
+				libraryStore.addMbid(album.musicbrainz_id);
+				onadded?.();
+			} else {
+				console.error('Failed to request album: server returned', res.status);
+			}
+		} catch (err) {
+			console.error('Failed to request album:', err);
 		} finally {
 			requesting = false;
 		}
@@ -53,19 +37,6 @@
 
 	function handleClick() {
 		goto(`/album/${album.musicbrainz_id}`);
-	}
-
-	$: displayYear = album.year ?? 'Unknown';
-
-	function bindImgElement(img: HTMLImageElement) {
-		imgElement = img;
-		return {
-			destroy() {
-				if (imgElement === img) {
-					imgElement = null;
-				}
-			}
-		};
 	}
 </script>
 
@@ -77,26 +48,14 @@
 	tabindex="0"
 >
 	<figure class="aspect-square overflow-hidden relative">
-		{#if imgError}
-			<div class="w-full h-full flex items-center justify-center text-6xl opacity-50 bg-base-200">
-				💿
-			</div>
-		{:else}
-			{#if !imgLoaded}
-				<div class="skeleton w-full h-full absolute inset-0"></div>
-			{/if}
-			<img
-				src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
-				data-src={coverUrl}
-				alt={album.title}
-				class="w-full h-full object-cover opacity-0 transition-opacity duration-300"
-				decoding="async"
-				use:lazyImage
-				use:bindImgElement
-				on:error={onImgError}
-				on:load={onImgLoad}
-			/>
-		{/if}
+		<AlbumImage
+			mbid={album.musicbrainz_id}
+			customUrl={album.cover_url}
+			alt={album.title}
+			size="full"
+			rounded="none"
+			className="w-full h-full"
+		/>
 	</figure>
 
 	{#if inLibrary}

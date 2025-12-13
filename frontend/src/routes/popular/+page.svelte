@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
+	import AlbumImage from '$lib/components/AlbumImage.svelte';
 	import type { PopularAlbumsResponse, PopularAlbumsRangeResponse, HomeAlbum } from '$lib/types';
 
 	type TimeRangeKey = 'this_week' | 'this_month' | 'this_year' | 'all_time';
@@ -17,8 +18,6 @@
 	let expandedData: PopularAlbumsRangeResponse | null = null;
 	let loading = true;
 	let loadingMore = false;
-	let imgErrors: Record<string, boolean> = {};
-	let imgLoaded: Record<string, boolean> = {};
 
 	onMount(async () => {
 		await loadOverview();
@@ -88,26 +87,11 @@
 		}
 	}
 
-	function getAlbumCoverUrl(album: HomeAlbum, size: number = 250): string {
-		if (album.image_url) return album.image_url;
-		if (album.mbid) return `/api/covers/release-group/${album.mbid}?size=${size}`;
-		return '';
-	}
-
 	function formatListenCount(count: number | null): string {
 		if (!count) return '';
 		if (count >= 1000000) return `${(count / 1000000).toFixed(1)}M`;
 		if (count >= 1000) return `${(count / 1000).toFixed(1)}K`;
 		return `${count}`;
-	}
-
-	function handleImgError(id: string) {
-		imgErrors[id] = true;
-	}
-
-	function handleImgLoad(id: string, e: Event) {
-		imgLoaded[id] = true;
-		(e.currentTarget as HTMLImageElement).classList.remove('opacity-0');
 	}
 
 	function getItemsForRange(rangeKey: TimeRangeKey): HomeAlbum[] {
@@ -205,24 +189,14 @@
 									tabindex="0"
 								>
 									<figure class="relative aspect-square w-full">
-										{#if imgErrors[`featured-${range.key}`] || !featured.mbid}
-											<div
-												class="flex h-full w-full items-center justify-center bg-base-200 text-6xl opacity-50"
-											>
-												💿
-											</div>
-										{:else}
-											{#if !imgLoaded[`featured-${range.key}`]}
-												<div class="skeleton absolute inset-0 h-full w-full"></div>
-											{/if}
-											<img
-												src={getAlbumCoverUrl(featured, 500)}
-												alt={featured.name}
-												class="h-full w-full object-cover opacity-0 transition-opacity duration-300"
-												on:error={() => handleImgError(`featured-${range.key}`)}
-												on:load={(e) => handleImgLoad(`featured-${range.key}`, e)}
-											/>
-										{/if}
+										<AlbumImage 
+											mbid={featured.mbid || ''} 
+											alt={featured.name} 
+											size="xl" 
+											rounded="none" 
+											className="w-full h-full" 
+											customUrl={featured.image_url || null} 
+										/>
 										<!-- Gradient overlay -->
 										<div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
 										<!-- Rank badge -->
@@ -280,24 +254,14 @@
 										tabindex="0"
 									>
 										<figure class="relative aspect-square overflow-hidden">
-											{#if imgErrors[`${range.key}-${idx}`] || !album.mbid}
-												<div
-													class="flex h-full w-full items-center justify-center bg-base-200 text-4xl opacity-50"
-												>
-													💿
-												</div>
-											{:else}
-												{#if !imgLoaded[`${range.key}-${idx}`]}
-													<div class="skeleton absolute inset-0 h-full w-full"></div>
-												{/if}
-												<img
-													src={getAlbumCoverUrl(album)}
-													alt={album.name}
-													class="h-full w-full object-cover opacity-0 transition-opacity duration-300"
-													on:error={() => handleImgError(`${range.key}-${idx}`)}
-													on:load={(e) => handleImgLoad(`${range.key}-${idx}`, e)}
-												/>
-											{/if}
+											<AlbumImage 
+												mbid={album.mbid || ''} 
+												alt={album.name} 
+												size="md" 
+												rounded="none" 
+												className="w-full h-full" 
+												customUrl={album.image_url || null} 
+											/>
 											{#if album.in_library}
 												<div class="badge badge-success badge-sm absolute right-1 top-1">
 													<svg
@@ -353,24 +317,14 @@
 										tabindex="0"
 									>
 										<figure class="relative aspect-square overflow-hidden">
-											{#if imgErrors[`expanded-${idx}`] || !album.mbid}
-												<div
-													class="flex h-full w-full items-center justify-center bg-base-200 text-4xl opacity-50"
-												>
-													💿
-												</div>
-											{:else}
-												{#if !imgLoaded[`expanded-${idx}`]}
-													<div class="skeleton absolute inset-0 h-full w-full"></div>
-												{/if}
-												<img
-													src={getAlbumCoverUrl(album)}
-													alt={album.name}
-													class="h-full w-full object-cover opacity-0 transition-opacity duration-300"
-													on:error={() => handleImgError(`expanded-${idx}`)}
-													on:load={(e) => handleImgLoad(`expanded-${idx}`, e)}
-												/>
-											{/if}
+											<AlbumImage 
+												mbid={album.mbid || ''} 
+												alt={album.name} 
+												size="md" 
+												rounded="none" 
+												className="w-full h-full" 
+												customUrl={album.image_url || null} 
+											/>
 											{#if album.in_library}
 												<div class="badge badge-success badge-sm absolute right-1 top-1">
 													<svg

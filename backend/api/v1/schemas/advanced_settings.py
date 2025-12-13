@@ -125,6 +125,13 @@ class AdvancedSettings(BaseModel):
         le=48,
         description="TTL for recent metadata cache in hours"
     )
+    
+    musicbrainz_concurrent_searches: int = Field(
+        default=3,
+        ge=2,
+        le=5,
+        description="Max concurrent MusicBrainz API requests for parallel search"
+    )
 
 
 class AdvancedSettingsFrontend(BaseModel):
@@ -252,6 +259,13 @@ class AdvancedSettingsFrontend(BaseModel):
         description="TTL for recent metadata cache in hours"
     )
     
+    musicbrainz_concurrent_searches: int = Field(
+        default=3,
+        ge=2,
+        le=5,
+        description="Max concurrent MusicBrainz API requests for parallel search"
+    )
+    
     @field_validator(
         'cache_ttl_album_library', 
         'cache_ttl_album_non_library', 
@@ -294,6 +308,7 @@ class AdvancedSettingsFrontend(BaseModel):
             recent_covers_max_size_mb=settings.recent_covers_max_size_mb,
             persistent_metadata_ttl_hours=settings.persistent_metadata_ttl_hours,
             recent_metadata_ttl_hours=settings.recent_metadata_ttl_hours,
+            musicbrainz_concurrent_searches=settings.musicbrainz_concurrent_searches,
         )
     
     def to_backend(self) -> AdvancedSettings:
@@ -317,4 +332,5 @@ class AdvancedSettingsFrontend(BaseModel):
             recent_covers_max_size_mb=self.recent_covers_max_size_mb,
             persistent_metadata_ttl_hours=self.persistent_metadata_ttl_hours,
             recent_metadata_ttl_hours=self.recent_metadata_ttl_hours,
+            musicbrainz_concurrent_searches=self.musicbrainz_concurrent_searches,
         )

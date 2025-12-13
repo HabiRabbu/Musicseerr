@@ -856,3 +856,423 @@ class LidarrRepository:
     
     async def get_root_folders(self) -> list[dict[str, Any]]:
         return await self._get("/api/v1/rootfolder")
+
+    def _build_api_media_cover_url(self, artist_id: int, url_path: str, size: Optional[int]) -> str:
+        """Build API-authenticated URL for MediaCover.
+        
+        Lidarr's /MediaCover/ static endpoints don't accept API key auth,
+        but /api/v1/MediaCover/artist/{id}/ does. This extracts the filename
+        from the path and constructs the proper API URL.
+        """
+        path_part = url_path.split("?")[0]
+        filename = path_part.rsplit("/", 1)[-1] if "/" in path_part else path_part
+        
+        if size and "." in filename:
+            base, ext = filename.rsplit(".", 1)
+            if not base.endswith(f"-{size}"):
+                filename = f"{base}-{size}.{ext}"
+        
+        return f"{self._base_url}/api/v1/MediaCover/artist/{artist_id}/{filename}?apikey={self._settings.lidarr_api_key}"
+
+    async def get_artist_image_url(self, artist_mbid: str, size: Optional[int] = 250) -> Optional[str]:
+        cache_key = f"lidarr_artist_image:{artist_mbid}:{size or 'orig'}"
+        cached_url = await self._cache.get(cache_key)
+        if cached_url is not None:
+            if cached_url:
+                logger.debug(f"[Lidarr:Image] Cache HIT for {artist_mbid[:8]}")
+            else:
+                logger.debug(f"[Lidarr:Image] Cache HIT (negative) for {artist_mbid[:8]}")
+            return cached_url if cached_url else None
+
+        logger.info(f"[Lidarr:Image] Cache MISS - querying Lidarr for {artist_mbid[:8]}")
+        try:
+            data = await self._get("/api/v1/artist", params={"mbId": artist_mbid})
+            if not data or not isinstance(data, list) or len(data) == 0:
+                logger.info(f"[Lidarr:Image] Artist not found in Lidarr for {artist_mbid[:8]}")
+                await self._cache.set(cache_key, "", ttl_seconds=300)
+                return None
+
+            artist = data[0]
+            artist_id = artist.get("id")
+            artist_name = artist.get("artistName", "Unknown")
+            images = artist.get("images", [])
+            logger.debug(f"[Lidarr:Image] Found artist '{artist_name}' (id={artist_id}) with {len(images)} images")
+            
+            if not artist_id or not images:
+                logger.info(f"[Lidarr:Image] No images for {artist_mbid[:8]} ({artist_name})")
+                await self._cache.set(cache_key, "", ttl_seconds=300)
+                return None
+
+            poster_url = None
+            fanart_url = None
+            for img in images:
+                cover_type = img.get("coverType", "").lower()
+                url_path = img.get("url", "")
+                
+                if not url_path:
+                    continue
+                
+                if url_path.startswith("http"):
+                    constructed_url = url_path
+                else:
+                    constructed_url = self._build_api_media_cover_url(artist_id, url_path, size)
+                
+                if cover_type == "poster":
+                    poster_url = constructed_url
+                    break
+                elif cover_type == "fanart" and not fanart_url:
+                    fanart_url = constructed_url
+
+            image_url = poster_url or fanart_url
+            if image_url:
+                logger.info(f"[Lidarr:Image] Found image for {artist_mbid[:8]} ({artist_name}): {image_url[:60]}...")
+                await self._cache.set(cache_key, image_url, ttl_seconds=3600)
+                return image_url
+
+            logger.info(f"[Lidarr:Image] No poster/fanart for {artist_mbid[:8]} ({artist_name})")
+            await self._cache.set(cache_key, "", ttl_seconds=300)
+            return None
+
+        except Exception as e:
+            logger.warning(f"[Lidarr:Image] Exception for {artist_mbid[:8]}: {e}")
+            return None
+
+    def _build_api_media_cover_url_album(self, album_id: int, url_path: str, size: Optional[int]) -> str:
+        """Build API-authenticated URL for album MediaCover."""
+        path_part = url_path.split("?")[0]
+        filename = path_part.rsplit("/", 1)[-1] if "/" in path_part else path_part
+        
+        if size and "." in filename:
+            base, ext = filename.rsplit(".", 1)
+            if not base.endswith(f"-{size}"):
+                filename = f"{base}-{size}.{ext}"
+        
+        return f"{self._base_url}/api/v1/MediaCover/album/{album_id}/{filename}?apikey={self._settings.lidarr_api_key}"
+
+    async def get_album_image_url(self, album_mbid: str, size: Optional[int] = 500) -> Optional[str]:
+        cache_key = f"lidarr_album_image:{album_mbid}:{size or 'orig'}"
+        cached_url = await self._cache.get(cache_key)
+        if cached_url is not None:
+            return cached_url if cached_url else None
+
+        try:
+            data = await self._get("/api/v1/album", params={"foreignAlbumId": album_mbid})
+            if not data or not isinstance(data, list) or len(data) == 0:
+                await self._cache.set(cache_key, "", ttl_seconds=300)
+                return None
+
+            album = data[0]
+            album_id = album.get("id")
+            images = album.get("images", [])
+            
+            if not album_id or not images:
+                await self._cache.set(cache_key, "", ttl_seconds=300)
+                return None
+
+            cover_url = None
+            for img in images:
+                cover_type = img.get("coverType", "").lower()
+                url_path = img.get("url", "")
+                
+                if not url_path:
+                    continue
+                
+                if url_path.startswith("http"):
+                    constructed_url = url_path
+                else:
+                    constructed_url = self._build_api_media_cover_url_album(album_id, url_path, size)
+                
+                if cover_type == "cover":
+                    cover_url = constructed_url
+                    break
+                elif not cover_url:
+                    cover_url = constructed_url
+
+            if cover_url:
+                logger.debug(f"[Lidarr:Album] Found cover for {album_mbid[:8]}: {cover_url[:60]}...")
+                await self._cache.set(cache_key, cover_url, ttl_seconds=3600)
+                return cover_url
+
+            await self._cache.set(cache_key, "", ttl_seconds=300)
+            return None
+
+        except Exception as e:
+            logger.debug(f"Failed to get album image from Lidarr for {album_mbid}: {e}")
+            return None
+    async def get_artist_details(self, artist_mbid: str) -> Optional[dict[str, Any]]:
+        """
+        Fetch full artist details from Lidarr by MBID.
+        
+        Returns rich data including overview, genres, links, images, statistics.
+        Returns None if artist is not in Lidarr.
+        """
+        cache_key = f"lidarr_artist_details:{artist_mbid}"
+        cached = await self._cache.get(cache_key)
+        if cached is not None:
+            return cached if cached else None
+
+        try:
+            data = await self._get("/api/v1/artist", params={"mbId": artist_mbid})
+            if not data or not isinstance(data, list) or len(data) == 0:
+                await self._cache.set(cache_key, "", ttl_seconds=300)
+                return None
+
+            artist = data[0]
+            artist_id = artist.get("id")
+            
+            images = artist.get("images", [])
+            poster_url = None
+            fanart_url = None
+            for img in images:
+                cover_type = img.get("coverType", "").lower()
+                url_path = img.get("url", "")
+                if not url_path:
+                    continue
+                if url_path.startswith("http"):
+                    constructed_url = url_path
+                else:
+                    constructed_url = self._build_api_media_cover_url(artist_id, url_path, 500)
+                if cover_type == "poster" and not poster_url:
+                    poster_url = constructed_url
+                elif cover_type == "fanart" and not fanart_url:
+                    fanart_url = constructed_url
+
+            links = []
+            for link in artist.get("links", []):
+                link_name = link.get("name", "")
+                link_url = link.get("url", "")
+                if link_url:
+                    links.append({"name": link_name, "url": link_url})
+
+            result = {
+                "id": artist_id,
+                "name": artist.get("artistName", "Unknown"),
+                "mbid": artist.get("foreignArtistId"),
+                "overview": artist.get("overview"),
+                "disambiguation": artist.get("disambiguation"),
+                "artist_type": artist.get("artistType"),
+                "status": artist.get("status"),
+                "genres": artist.get("genres", []),
+                "links": links,
+                "poster_url": poster_url,
+                "fanart_url": fanart_url,
+                "monitored": artist.get("monitored", False),
+                "statistics": artist.get("statistics", {}),
+                "ratings": artist.get("ratings", {}),
+            }
+
+            await self._cache.set(cache_key, result, ttl_seconds=300)
+            logger.debug(f"[Lidarr] Fetched artist details for {artist_mbid[:8]}")
+            return result
+
+        except Exception as e:
+            logger.debug(f"Failed to get artist details from Lidarr for {artist_mbid}: {e}")
+            return None
+
+    async def get_album_details(self, album_mbid: str) -> Optional[dict[str, Any]]:
+        """
+        Fetch full album details from Lidarr by MBID.
+        
+        Returns rich data including overview, genres, album type, tracks, links.
+        Returns None if album is not in Lidarr.
+        """
+        cache_key = f"lidarr_album_details:{album_mbid}"
+        cached = await self._cache.get(cache_key)
+        if cached is not None:
+            return cached if cached else None
+
+        try:
+            data = await self._get("/api/v1/album", params={"foreignAlbumId": album_mbid})
+            if not data or not isinstance(data, list) or len(data) == 0:
+                await self._cache.set(cache_key, "", ttl_seconds=300)
+                return None
+
+            album = data[0]
+            album_id = album.get("id")
+            
+            images = album.get("images", [])
+            cover_url = None
+            for img in images:
+                cover_type = img.get("coverType", "").lower()
+                url_path = img.get("url", "")
+                if not url_path:
+                    continue
+                if url_path.startswith("http"):
+                    constructed_url = url_path
+                else:
+                    constructed_url = self._build_api_media_cover_url_album(album_id, url_path, 500)
+                if cover_type == "cover":
+                    cover_url = constructed_url
+                    break
+                elif not cover_url:
+                    cover_url = constructed_url
+
+            links = []
+            for link in album.get("links", []):
+                link_name = link.get("name", "")
+                link_url = link.get("url", "")
+                if link_url:
+                    links.append({"name": link_name, "url": link_url})
+
+            artist_data = album.get("artist", {})
+            
+            releases = album.get("releases", [])
+            primary_release = None
+            for rel in releases:
+                if rel.get("monitored"):
+                    primary_release = rel
+                    break
+            if not primary_release and releases:
+                primary_release = releases[0]
+
+            media = []
+            track_count = 0
+            if primary_release:
+                for medium in primary_release.get("media", []):
+                    medium_info = {
+                        "number": medium.get("mediumNumber", 1),
+                        "format": medium.get("mediumFormat", "Unknown"),
+                        "track_count": medium.get("mediumTrackCount", 0),
+                    }
+                    media.append(medium_info)
+                    track_count += medium.get("mediumTrackCount", 0)
+
+            result = {
+                "id": album_id,
+                "title": album.get("title", "Unknown"),
+                "mbid": album.get("foreignAlbumId"),
+                "overview": album.get("overview"),
+                "disambiguation": album.get("disambiguation"),
+                "album_type": album.get("albumType"),
+                "secondary_types": album.get("secondaryTypes", []),
+                "release_date": album.get("releaseDate"),
+                "genres": album.get("genres", []),
+                "links": links,
+                "cover_url": cover_url,
+                "monitored": album.get("monitored", False),
+                "statistics": album.get("statistics", {}),
+                "ratings": album.get("ratings", {}),
+                "artist_name": artist_data.get("artistName", "Unknown"),
+                "artist_mbid": artist_data.get("foreignArtistId"),
+                "media": media,
+                "track_count": track_count,
+            }
+
+            await self._cache.set(cache_key, result, ttl_seconds=300)
+            logger.debug(f"[Lidarr] Fetched album details for {album_mbid[:8]}")
+            return result
+
+        except Exception as e:
+            logger.debug(f"Failed to get album details from Lidarr for {album_mbid}: {e}")
+            return None
+
+    async def get_album_tracks(self, album_id: int) -> list[dict[str, Any]]:
+        """
+        Fetch track listing for an album from Lidarr by internal album ID.
+        
+        Returns list of tracks with position, title, duration.
+        """
+        cache_key = f"lidarr_album_tracks:{album_id}"
+        cached = await self._cache.get(cache_key)
+        if cached is not None:
+            return cached
+
+        try:
+            data = await self._get("/api/v1/track", params={"albumId": album_id})
+            if not data or not isinstance(data, list):
+                await self._cache.set(cache_key, [], ttl_seconds=300)
+                return []
+
+            tracks = []
+            for track in data:
+                track_info = {
+                    "position": track.get("absoluteTrackNumber", 0),
+                    "disc_number": track.get("mediumNumber", 1),
+                    "title": track.get("title", "Unknown"),
+                    "duration_ms": track.get("duration", 0),
+                    "track_file_id": track.get("trackFileId"),
+                    "has_file": track.get("hasFile", False),
+                }
+                tracks.append(track_info)
+
+            tracks.sort(key=lambda t: (t["disc_number"], t["position"]))
+            
+            await self._cache.set(cache_key, tracks, ttl_seconds=300)
+            logger.debug(f"[Lidarr] Fetched {len(tracks)} tracks for album ID {album_id}")
+            return tracks
+
+        except Exception as e:
+            logger.debug(f"Failed to get tracks from Lidarr for album ID {album_id}: {e}")
+            return []
+
+    async def get_artist_albums(self, artist_mbid: str) -> list[dict[str, Any]]:
+        """
+        Fetch all albums for an artist from Lidarr by artist MBID.
+        
+        Returns list of albums with basic info (for discography).
+        """
+        cache_key = f"lidarr_artist_albums:{artist_mbid}"
+        cached = await self._cache.get(cache_key)
+        if cached is not None:
+            return cached
+
+        try:
+            artist_data = await self._get("/api/v1/artist", params={"mbId": artist_mbid})
+            if not artist_data or not isinstance(artist_data, list) or len(artist_data) == 0:
+                await self._cache.set(cache_key, [], ttl_seconds=300)
+                return []
+
+            artist_id = artist_data[0].get("id")
+            if not artist_id:
+                await self._cache.set(cache_key, [], ttl_seconds=300)
+                return []
+
+            album_data = await self._get("/api/v1/album", params={"artistId": artist_id, "includeAllArtistAlbums": True})
+            if not album_data or not isinstance(album_data, list):
+                await self._cache.set(cache_key, [], ttl_seconds=300)
+                return []
+
+            albums = []
+            for album in album_data:
+                album_id = album.get("id")
+                images = album.get("images", [])
+                cover_url = None
+                for img in images:
+                    url_path = img.get("url", "")
+                    if url_path:
+                        if url_path.startswith("http"):
+                            cover_url = url_path
+                        else:
+                            cover_url = self._build_api_media_cover_url_album(album_id, url_path, 250)
+                        break
+
+                year = None
+                if release_date := album.get("releaseDate"):
+                    try:
+                        year = int(release_date.split("-")[0])
+                    except (ValueError, IndexError):
+                        pass
+
+                album_info = {
+                    "id": album_id,
+                    "title": album.get("title", "Unknown"),
+                    "mbid": album.get("foreignAlbumId"),
+                    "album_type": album.get("albumType"),
+                    "secondary_types": album.get("secondaryTypes", []),
+                    "release_date": album.get("releaseDate"),
+                    "year": year,
+                    "monitored": album.get("monitored", False),
+                    "cover_url": cover_url,
+                    "genres": album.get("genres", []),
+                }
+                albums.append(album_info)
+
+            albums.sort(key=lambda a: a.get("release_date") or "", reverse=True)
+            
+            await self._cache.set(cache_key, albums, ttl_seconds=300)
+            logger.debug(f"[Lidarr] Fetched {len(albums)} albums for artist {artist_mbid[:8]}")
+            return albums
+
+        except Exception as e:
+            logger.debug(f"Failed to get artist albums from Lidarr for {artist_mbid}: {e}")
+            return []

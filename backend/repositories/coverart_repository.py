@@ -17,6 +17,7 @@ from infrastructure.http.deduplication import RequestDeduplicator
 
 if TYPE_CHECKING:
     from repositories.musicbrainz_repository import MusicBrainzRepository
+    from repositories.lidarr_repository import LidarrRepository
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +33,23 @@ _coverart_circuit_breaker = CircuitBreaker(
 
 _deduplicator = RequestDeduplicator()
 
+VALID_IMAGE_CONTENT_TYPES = frozenset([
+    "image/jpeg",
+    "image/jpg",
+    "image/png",
+    "image/gif",
+    "image/webp",
+    "image/avif",
+    "image/svg+xml",
+])
+
+
+def _is_valid_image_content_type(content_type: str) -> bool:
+    if not content_type:
+        return False
+    base_type = content_type.split(";")[0].strip().lower()
+    return base_type in VALID_IMAGE_CONTENT_TYPES
+
 
 def _get_cache_filename(identifier: str, suffix: str = "") -> str:
     content = f"{identifier}:{suffix}"
@@ -45,11 +63,13 @@ class CoverArtRepository:
         http_client: httpx.AsyncClient,
         cache: CacheInterface,
         mb_repo: Optional['MusicBrainzRepository'] = None,
+        lidarr_repo: Optional['LidarrRepository'] = None,
         cache_dir: Path = DEFAULT_CACHE_DIR
     ):
         self._client = http_client
         self._cache = cache
         self._mb_repo = mb_repo
+        self._lidarr_repo = lidarr_repo
         self.cache_dir = cache_dir
         self.cache_dir.mkdir(parents=True, exist_ok=True)
     
@@ -126,6 +146,10 @@ class CoverArtRepository:
             try:
                 meta = json.loads(meta_content)
                 content_type = meta.get('content_type', 'image/jpeg')
+                
+                if not _is_valid_image_content_type(content_type):
+                    logger.warning(f"Disk cache contains non-image ({content_type}), treating as miss")
+                    return None
                 
                 expires_at = meta.get('expires_at')
                 if expires_at and datetime.now().timestamp() > expires_at:
@@ -209,16 +233,82 @@ class CoverArtRepository:
         size: Optional[int],
         file_path: Path
     ) -> Optional[tuple[bytes, str, str]]:
+        logger.info(f"[IMG] Fetching artist image for {artist_id[:8]}... (size={size})")
+        
+        result = await self._fetch_artist_image_from_lidarr(artist_id, size, file_path)
+        if result:
+            logger.info(f"[IMG] SUCCESS from Lidarr for {artist_id[:8]}...")
+            return result
+        
+        logger.info(f"[IMG] Lidarr failed for {artist_id[:8]}..., trying Wikidata")
+        result = await self._fetch_artist_image_from_wikidata(artist_id, size, file_path)
+        if result:
+            logger.info(f"[IMG] SUCCESS from Wikidata for {artist_id[:8]}...")
+            return result
+        
+        logger.info(f"[IMG] FAILED: No image found for {artist_id[:8]}... from any source")
+        return None
+
+    async def _fetch_artist_image_from_lidarr(
+        self,
+        artist_id: str,
+        size: Optional[int],
+        file_path: Path
+    ) -> Optional[tuple[bytes, str, str]]:
+        if not self._lidarr_repo:
+            logger.debug(f"[IMG:Lidarr] No Lidarr repo configured for {artist_id[:8]}")
+            return None
+
+        try:
+            image_url = await self._lidarr_repo.get_artist_image_url(artist_id, size=size or 250)
+            if not image_url:
+                logger.info(f"[IMG:Lidarr] No image URL returned for {artist_id[:8]}")
+                return None
+
+            logger.info(f"[IMG:Lidarr] Fetching from URL for {artist_id[:8]}...")
+            response = await self._http_get(image_url, RequestPriority.IMAGE_FETCH)
+            if response.status_code != 200:
+                logger.warning(f"[IMG:Lidarr] HTTP {response.status_code} for {artist_id[:8]}")
+                return None
+
+            content_type = response.headers.get("content-type", "")
+            if not _is_valid_image_content_type(content_type):
+                logger.warning(f"[IMG:Lidarr] Non-image content-type ({content_type}) for {artist_id[:8]}")
+                return None
+            
+            content = response.content
+
+            asyncio.create_task(self._write_disk_cache(
+                file_path,
+                content,
+                content_type,
+                {"source": "lidarr"}
+            ))
+
+            return (content, content_type, "lidarr")
+
+        except Exception as e:
+            logger.warning(f"[IMG:Lidarr] Exception for {artist_id[:8]}: {e}")
+            return None
+
+    async def _fetch_artist_image_from_wikidata(
+        self,
+        artist_id: str,
+        size: Optional[int],
+        file_path: Path
+    ) -> Optional[tuple[bytes, str, str]]:
         cache_key = f"artist_wikidata:{artist_id}"
         wikidata_url = await self._cache.get(cache_key)
         
         if wikidata_url is None:
+            logger.info(f"[IMG:Wikidata] Looking up wikidata URL for {artist_id[:8]}...")
             try:
                 if self._mb_repo:
                     artist_data = await self._mb_repo.get_artist_by_id(artist_id)
                     
                     if artist_data:
                         url_relations = artist_data.get("url-relation-list") or artist_data.get("url-rels")
+                        logger.debug(f"[IMG:Wikidata] url-rels for {artist_id[:8]}: {bool(url_relations)}")
                         if url_relations:
                             for url_rel in url_relations:
                                 if isinstance(url_rel, dict):
@@ -226,6 +316,7 @@ class CoverArtRepository:
                                     target = url_rel.get("target") or url_rel.get("url")
                                     if typ == "wikidata" and target:
                                         wikidata_url = target
+                                        logger.info(f"[IMG:Wikidata] Found URL for {artist_id[:8]}: {target}")
                                         break
 
                         if not wikidata_url:
@@ -242,16 +333,22 @@ class CoverArtRepository:
                                     if ext_type == "wikidata" and ext_url:
                                         wikidata_url = ext_url
                                         break
+                    else:
+                        logger.info(f"[IMG:Wikidata] No artist data from MB for {artist_id[:8]}")
                     
                     ttl = 86400 if wikidata_url else 3600
                     await self._cache.set(cache_key, wikidata_url, ttl_seconds=ttl)
+                    if not wikidata_url:
+                        logger.info(f"[IMG:Wikidata] No wikidata link found for {artist_id[:8]}")
                 else:
-                    logger.warning(f"MusicBrainz repository not available for artist {artist_id}")
+                    logger.warning(f"[IMG:Wikidata] MusicBrainz repository not available for {artist_id}")
                     return None
             
             except Exception as e:
-                logger.error(f"Failed to fetch artist metadata for {artist_id}: {e}")
+                logger.error(f"[IMG:Wikidata] Failed to fetch artist metadata for {artist_id}: {e}")
                 return None
+        else:
+            logger.debug(f"[IMG:Wikidata] Using cached wikidata URL for {artist_id[:8]}")
         
         if not wikidata_url:
             return None
@@ -264,7 +361,7 @@ class CoverArtRepository:
                 return None
 
             api_url = f"https://www.wikidata.org/wiki/Special:EntityData/{wikidata_id}.json"
-            response = await self._http_get(api_url, RequestPriority.USER_INITIATED)
+            response = await self._http_get(api_url, RequestPriority.IMAGE_FETCH)
             if response.status_code != 200:
                 return None
 
@@ -287,7 +384,7 @@ class CoverArtRepository:
             if size:
                 commons_api += f"&iiurlwidth={size}"
 
-            commons_response = await self._http_get(commons_api, RequestPriority.USER_INITIATED)
+            commons_response = await self._http_get(commons_api, RequestPriority.IMAGE_FETCH)
             if commons_response.status_code != 200:
                 return None
 
@@ -307,9 +404,12 @@ class CoverArtRepository:
             if not image_url:
                 return None
 
-            response = await self._http_get(image_url, RequestPriority.USER_INITIATED)
+            response = await self._http_get(image_url, RequestPriority.IMAGE_FETCH)
             if response.status_code == 200:
-                content_type = response.headers.get("content-type", "image/jpeg")
+                content_type = response.headers.get("content-type", "")
+                if not _is_valid_image_content_type(content_type):
+                    logger.warning(f"[IMG:Wikidata] Non-image content-type ({content_type})")
+                    return None
                 content = response.content
 
                 asyncio.create_task(self._write_disk_cache(
@@ -358,17 +458,24 @@ class CoverArtRepository:
         size: Optional[str],
         file_path: Path
     ) -> Optional[tuple[bytes, str]]:
+        size_int = int(size) if size and size.isdigit() else 500
+        result = await self._fetch_album_cover_from_lidarr(release_group_id, file_path, size=size_int)
+        if result:
+            return result
+
         size_suffix = f"-{size}" if size else ""
         front_url = f"{COVER_ART_ARCHIVE_BASE}/release-group/{release_group_id}/front{size_suffix}"
         
         try:
-            response = await self._http_get(front_url, RequestPriority.USER_INITIATED)
+            response = await self._http_get(front_url, RequestPriority.IMAGE_FETCH)
             if response.status_code == 200:
-                content_type = response.headers.get("content-type", "image/jpeg")
-                content = response.content
-                
-                asyncio.create_task(self._write_disk_cache(file_path, content, content_type))
-                return (content, content_type)
+                content_type = response.headers.get("content-type", "")
+                if not _is_valid_image_content_type(content_type):
+                    logger.warning(f"Non-image content-type from CoverArtArchive: {content_type}")
+                else:
+                    content = response.content
+                    asyncio.create_task(self._write_disk_cache(file_path, content, content_type))
+                    return (content, content_type)
         
         except Exception as e:
             logger.debug(f"Failed to fetch cover via release group: {e}")
@@ -383,7 +490,7 @@ class CoverArtRepository:
     ) -> Optional[tuple[bytes, str]]:
         try:
             metadata_url = f"{COVER_ART_ARCHIVE_BASE}/release-group/{release_group_id}"
-            response = await self._http_get(metadata_url, RequestPriority.USER_INITIATED, headers={"Accept": "application/json"})
+            response = await self._http_get(metadata_url, RequestPriority.IMAGE_FETCH, headers={"Accept": "application/json"})
             
             if response.status_code != 200:
                 return None
@@ -404,9 +511,12 @@ class CoverArtRepository:
             size_suffix = f"-{size}" if size else ""
             release_front_url = f"{COVER_ART_ARCHIVE_BASE}/release/{release_id}/front{size_suffix}"
             
-            response = await self._http_get(release_front_url, RequestPriority.USER_INITIATED)
+            response = await self._http_get(release_front_url, RequestPriority.IMAGE_FETCH)
             if response.status_code == 200:
-                content_type = response.headers.get("content-type", "image/jpeg")
+                content_type = response.headers.get("content-type", "")
+                if not _is_valid_image_content_type(content_type):
+                    logger.warning(f"Non-image content-type from release: {content_type}")
+                    return None
                 content = response.content
                 
                 asyncio.create_task(self._write_disk_cache(cache_path, content, content_type))
@@ -416,7 +526,46 @@ class CoverArtRepository:
             logger.warning(f"Failed to fetch cover from best release: {e}")
         
         return None
-    
+
+    async def _fetch_album_cover_from_lidarr(
+        self,
+        release_group_id: str,
+        file_path: Path,
+        size: Optional[int] = 500
+    ) -> Optional[tuple[bytes, str]]:
+        if not self._lidarr_repo:
+            return None
+
+        try:
+            image_url = await self._lidarr_repo.get_album_image_url(release_group_id, size=size)
+            if not image_url:
+                return None
+
+            logger.debug(f"Fetching album cover from Lidarr: {release_group_id[:8]}...")
+            response = await self._http_get(image_url, RequestPriority.IMAGE_FETCH)
+            if response.status_code != 200:
+                return None
+
+            content_type = response.headers.get("content-type", "")
+            if not _is_valid_image_content_type(content_type):
+                logger.warning(f"Non-image content-type from Lidarr album: {content_type}")
+                return None
+            
+            content = response.content
+
+            asyncio.create_task(self._write_disk_cache(
+                file_path,
+                content,
+                content_type,
+                {"source": "lidarr"}
+            ))
+
+            return (content, content_type)
+
+        except Exception as e:
+            logger.debug(f"Failed to fetch album cover from Lidarr for {release_group_id}: {e}")
+            return None
+
     async def get_release_cover(
         self,
         release_id: str,
@@ -438,9 +587,12 @@ class CoverArtRepository:
         front_url = f"{COVER_ART_ARCHIVE_BASE}/release/{release_id}/front{size_suffix}"
         
         try:
-            response = await self._http_get(front_url, RequestPriority.USER_INITIATED)
+            response = await self._http_get(front_url, RequestPriority.IMAGE_FETCH)
             if response.status_code == 200:
-                content_type = response.headers.get("content-type", "image/jpeg")
+                content_type = response.headers.get("content-type", "")
+                if not _is_valid_image_content_type(content_type):
+                    logger.warning(f"Non-image content-type from release cover: {content_type}")
+                    return None
                 content = response.content
                 
                 asyncio.create_task(self._write_disk_cache(file_path, content, content_type))
@@ -540,6 +692,82 @@ class CoverArtRepository:
         except Exception as e:
             logger.error(f"Failed to promote cover {identifier} to persistent: {e}")
             return False
+
+    async def debug_artist_image(self, artist_id: str, debug_info: dict) -> dict:
+        """
+        Debug method that gathers diagnostic info about an artist image without actually fetching it.
+        Returns the updated debug_info dict with cache state, Lidarr data, and MusicBrainz relations.
+        """
+        import json
+        
+        cache_filename_250 = _get_cache_filename(f"artist_{artist_id}_250", "img")
+        cache_filename_500 = _get_cache_filename(f"artist_{artist_id}_500", "img")
+        file_path_250 = self.cache_dir / f"{cache_filename_250}.bin"
+        file_path_500 = self.cache_dir / f"{cache_filename_500}.bin"
+        
+        debug_info["disk_cache"]["exists_250"] = file_path_250.exists()
+        debug_info["disk_cache"]["exists_500"] = file_path_500.exists()
+        
+        if file_path_250.exists():
+            meta_path = Path(f"{file_path_250}.meta")
+            if meta_path.exists():
+                try:
+                    async with aiofiles.open(meta_path, 'r') as f:
+                        meta = json.loads(await f.read())
+                        debug_info["disk_cache"]["meta_250"] = meta
+                except Exception as e:
+                    debug_info["disk_cache"]["meta_250"] = f"Error reading: {e}"
+        
+        if file_path_500.exists():
+            meta_path = Path(f"{file_path_500}.meta")
+            if meta_path.exists():
+                try:
+                    async with aiofiles.open(meta_path, 'r') as f:
+                        meta = json.loads(await f.read())
+                        debug_info["disk_cache"]["meta_500"] = meta
+                except Exception as e:
+                    debug_info["disk_cache"]["meta_500"] = f"Error reading: {e}"
+        
+        if self._lidarr_repo:
+            debug_info["lidarr"]["configured"] = True
+            try:
+                image_url = await self._lidarr_repo.get_artist_image_url(artist_id)
+                if image_url:
+                    debug_info["lidarr"]["has_image_url"] = True
+                    debug_info["lidarr"]["image_url"] = image_url
+            except Exception as e:
+                debug_info["lidarr"]["error"] = str(e)
+        
+        cache_key = f"artist_wikidata:{artist_id}"
+        cached_wikidata = await self._cache.get(cache_key)
+        if cached_wikidata is not None:
+            debug_info["memory_cache"]["wikidata_url_cached"] = True
+            debug_info["memory_cache"]["cached_value"] = cached_wikidata if cached_wikidata else "(negative cache - empty string)"
+        
+        if self._mb_repo and not cached_wikidata:
+            try:
+                artist_data = await self._mb_repo.get_artist_by_id(artist_id)
+                if artist_data:
+                    debug_info["musicbrainz"]["artist_found"] = True
+                    debug_info["musicbrainz"]["artist_name"] = artist_data.get("name")
+                    
+                    url_relations = artist_data.get("url-relation-list") or artist_data.get("url-rels")
+                    if url_relations:
+                        for url_rel in url_relations:
+                            if isinstance(url_rel, dict):
+                                typ = url_rel.get("type") or url_rel.get("link_type")
+                                target = url_rel.get("target") or url_rel.get("url")
+                                if typ == "wikidata" and target:
+                                    debug_info["musicbrainz"]["has_wikidata_relation"] = True
+                                    debug_info["musicbrainz"]["wikidata_url"] = target
+                                    break
+            except Exception as e:
+                debug_info["musicbrainz"]["error"] = str(e)
+        elif cached_wikidata:
+            debug_info["musicbrainz"]["has_wikidata_relation"] = True
+            debug_info["musicbrainz"]["wikidata_url"] = cached_wikidata
+        
+        return debug_info
 
 
 

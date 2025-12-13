@@ -52,3 +52,7 @@ class TokenBucketRateLimiter:
     def reset(self) -> None:
         self._tokens = float(self.capacity)
         self._last_update = time.monotonic()
+    
+    def update_capacity(self, new_capacity: int) -> None:
+        self.capacity = new_capacity
+        self._tokens = min(self._tokens, float(new_capacity))

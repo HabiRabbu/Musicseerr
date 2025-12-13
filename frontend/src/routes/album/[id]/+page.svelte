@@ -2,37 +2,55 @@
 	import { onMount, onDestroy } from 'svelte';
 	import { browser } from '$app/environment';
 	import { goto } from '$app/navigation';
-	import type { AlbumInfo } from '$lib/types';
+	import type { AlbumBasicInfo, AlbumTracksInfo, Track } from '$lib/types';
 	import { colors } from '$lib/colors';
 	import { errorModal } from '$lib/stores/errorModal';
+	import AlbumImage from '$lib/components/AlbumImage.svelte';
 
-	export let data: { albumId: string; album: AlbumInfo | null };
+	export let data: { albumId: string };
 
-	let album: AlbumInfo | null = data.album;
+	let album: AlbumBasicInfo | null = null;
+	let tracksInfo: AlbumTracksInfo | null = null;
 	let error: string | null = null;
-	let loading: boolean = true;
+	let loadingBasic: boolean = true;
+	let loadingTracks: boolean = true;
 	let showToast = false;
 	let requesting = false;
-	let imageLoaded = false;
 
 	onMount(async () => {
-		if (!album) {
-			try {
-				const res = await fetch(`/api/album/${data.albumId}`);
-				if (res.ok) {
-					album = await res.json();
-				} else {
-					error = 'Failed to load album';
-				}
-			} catch (e) {
-				error = 'Error loading album';
-			} finally {
-				loading = false;
-			}
-		} else {
-			loading = false;
+		await fetchBasicInfo();
+		if (album) {
+			fetchTracksInfo();
 		}
 	});
+
+	async function fetchBasicInfo() {
+		try {
+			const res = await fetch(`/api/album/${data.albumId}/basic`);
+			if (res.ok) {
+				album = await res.json();
+			} else {
+				error = 'Failed to load album';
+			}
+		} catch (e) {
+			error = 'Error loading album';
+		} finally {
+			loadingBasic = false;
+		}
+	}
+
+	async function fetchTracksInfo() {
+		try {
+			const res = await fetch(`/api/album/${data.albumId}/tracks`);
+			if (res.ok) {
+				tracksInfo = await res.json();
+			}
+		} catch (e) {
+			console.error('Failed to load tracks:', e);
+		} finally {
+			loadingTracks = false;
+		}
+	}
 
 	function formatDuration(ms?: number | null): string {
 		if (!ms) return '--:--';
@@ -52,10 +70,6 @@
 			return `${hours} hr ${minutes} min`;
 		}
 		return `${minutes} min`;
-	}
-
-	function handleImageLoad() {
-		imageLoaded = true;
 	}
 
 	async function handleRequest() {
@@ -139,7 +153,7 @@
 				<span>{error}</span>
 			</div>
 		</div>
-	{:else if loading || !album}
+	{:else if loadingBasic || !album}
 		<!-- Skeleton Loading State -->
 		<div class="space-y-6 sm:space-y-8">
 			<div class="flex flex-col lg:flex-row gap-6 lg:gap-8">
@@ -170,21 +184,14 @@
 		<div class="space-y-6 sm:space-y-8">
 			<!-- Album Header -->
 			<div class="flex flex-col lg:flex-row gap-6 lg:gap-8">
-				<div class="w-full lg:w-64 xl:w-80 flex-shrink-0 relative">
-					{#if !imageLoaded}
-						<div class="skeleton w-full aspect-square rounded-box absolute inset-0"></div>
-					{/if}
-					<img 
-						src="/api/covers/release-group/{album.musicbrainz_id}" 
+				<div class="w-full lg:w-64 xl:w-80 flex-shrink-0">
+					<AlbumImage 
+						mbid={album.musicbrainz_id} 
 						alt={album.title}
-						class="w-full aspect-square object-cover rounded-box shadow-2xl transition-opacity duration-300"
-						class:opacity-0={!imageLoaded}
-						on:load={handleImageLoad}
-						on:error={(e) => {
-							const target = e.currentTarget as HTMLImageElement;
-							target.src = 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 200 200%22%3E%3Crect fill=%22%23444%22 width=%22200%22 height=%22200%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22 fill=%22%23999%22 font-size=%2224%22 font-family=%22sans-serif%22%3ENo Image%3C/text%3E%3C/svg%3E';
-							imageLoaded = true;
-						}}
+						size="hero"
+						lazy={false}
+						rounded="xl"
+						className="w-full aspect-square shadow-2xl"
 					/>
 				</div>
 
@@ -216,32 +223,35 @@
 							<span>{album.year}</span>
 						{/if}
 						
-						{#if album.total_tracks > 0}
+						{#if tracksInfo && tracksInfo.total_tracks > 0}
 							<span class="opacity-50">•</span>
-							<span>{album.total_tracks} {album.total_tracks === 1 ? 'track' : 'tracks'}</span>
+							<span>{tracksInfo.total_tracks} {tracksInfo.total_tracks === 1 ? 'track' : 'tracks'}</span>
+						{:else if loadingTracks}
+							<span class="opacity-50">•</span>
+							<span class="skeleton w-16 h-4 inline-block"></span>
 						{/if}
 						
-						{#if album.total_length}
+						{#if tracksInfo?.total_length}
 							<span class="opacity-50">•</span>
-							<span>{formatTotalDuration(album.total_length)}</span>
+							<span>{formatTotalDuration(tracksInfo.total_length)}</span>
 						{/if}
 					</div>
 
 					<!-- Additional Info -->
 					<div class="flex flex-wrap gap-x-4 gap-y-2 text-xs sm:text-sm opacity-70">
-						{#if album.label}
+						{#if tracksInfo?.label}
 							<div>
-								<span class="font-semibold">Label:</span> {album.label}
+								<span class="font-semibold">Label:</span> {tracksInfo.label}
 							</div>
 						{/if}
-						{#if album.country}
+						{#if tracksInfo?.country}
 							<div>
-								<span class="font-semibold">Country:</span> {album.country}
+								<span class="font-semibold">Country:</span> {tracksInfo.country}
 							</div>
 						{/if}
-						{#if album.barcode}
+						{#if tracksInfo?.barcode}
 							<div>
-								<span class="font-semibold">Barcode:</span> {album.barcode}
+								<span class="font-semibold">Barcode:</span> {tracksInfo.barcode}
 							</div>
 						{/if}
 					</div>
@@ -278,13 +288,30 @@
 			</div>
 
 			<!-- Tracks List -->
-			{#if album.tracks.length > 0}
+			{#if loadingTracks}
+				<div class="space-y-3">
+					<h2 class="text-xl sm:text-2xl font-bold">Tracks</h2>
+					<div class="bg-base-200 rounded-box overflow-hidden">
+						<ul class="list">
+							{#each Array(8) as _, i}
+								<li class="list-row p-3 sm:p-4">
+									<div class="flex items-center gap-4 w-full">
+										<div class="skeleton w-8 h-4"></div>
+										<div class="skeleton flex-1 h-4"></div>
+										<div class="skeleton w-12 h-4"></div>
+									</div>
+								</li>
+							{/each}
+						</ul>
+					</div>
+				</div>
+			{:else if tracksInfo && tracksInfo.tracks.length > 0}
 				<div class="space-y-3">
 					<h2 class="text-xl sm:text-2xl font-bold">Tracks</h2>
 					
 					<div class="bg-base-200 rounded-box overflow-hidden">
 						<ul class="list">
-							{#each album.tracks as track, index}
+							{#each tracksInfo.tracks as track, index}
 								<li class="list-row hover:bg-base-300/50 transition-colors p-3 sm:p-4">
 									<div class="flex items-center gap-4 w-full">
 										<!-- Track Number -->

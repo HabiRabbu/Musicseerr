@@ -179,8 +179,8 @@
 	{:else}
 		<div class="bg-base-200 rounded-box p-4">
 			<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4">
-				{#each albums as album, index}
-					<AlbumCard {album} {index} onadded={handleAlbumAdded} />
+				{#each albums as album}
+					<AlbumCard {album} onadded={handleAlbumAdded} />
 				{/each}
 			</div>
 		</div>

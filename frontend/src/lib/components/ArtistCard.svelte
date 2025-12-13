@@ -1,45 +1,12 @@
 <script lang="ts">
 	import type { Artist } from '$lib/types';
 	import { goto } from '$app/navigation';
-	import { lazyImage, resetLazyImage } from '$lib/utils/lazyImage';
+	import ArtistImage from './ArtistImage.svelte';
 
 	export let artist: Artist;
 
-	let coverUrl = `/api/covers/artist/${artist.musicbrainz_id}?size=250`;
-	let imgError = false;
-	let imgLoaded = false;
-	let imgElement: HTMLImageElement | null = null;
-
-	function onImgError() {
-		imgError = true;
-	}
-
-	function onImgLoad(e: Event) {
-		imgLoaded = true;
-		(e.currentTarget as HTMLImageElement).classList.remove('opacity-0');
-	}
-
 	function handleClick() {
 		goto(`/artist/${artist.musicbrainz_id}`);
-	}
-
-	$: coverUrl = `/api/covers/artist/${artist.musicbrainz_id}?size=250`;
-
-	$: if (artist && imgElement) {
-		imgError = false;
-		imgLoaded = false;
-		resetLazyImage(imgElement, coverUrl);
-	}
-
-	function bindImgElement(img: HTMLImageElement) {
-		imgElement = img;
-		return {
-			destroy() {
-				if (imgElement === img) {
-					imgElement = null;
-				}
-			}
-		};
 	}
 </script>
 
@@ -50,30 +17,11 @@
 	role="button"
 	tabindex="0"
 >
-	<figure class="aspect-square overflow-hidden relative">
-		{#if imgError}
-			<div class="w-full h-full flex items-center justify-center text-6xl opacity-50 bg-base-200">
-				🎤
-			</div>
-		{:else}
-			{#if !imgLoaded}
-				<div class="skeleton w-full h-full absolute inset-0"></div>
-			{/if}
-			<img
-				src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
-				data-src={coverUrl}
-				alt={artist.title}
-				class="w-full h-full object-cover opacity-0 transition-opacity duration-300"
-				decoding="async"
-				use:lazyImage
-				use:bindImgElement
-				on:error={onImgError}
-				on:load={onImgLoad}
-			/>
-		{/if}
+	<figure class="aspect-square p-3">
+		<ArtistImage mbid={artist.musicbrainz_id} alt={artist.title} size="full" className="w-full h-full" />
 	</figure>
 
-	<div class="card-body p-2">
+	<div class="card-body p-2 pt-0 items-center text-center">
 		<h2 class="card-title text-xs line-clamp-1 min-h-[1.25rem]">{artist.title}</h2>
 	</div>
 </div>

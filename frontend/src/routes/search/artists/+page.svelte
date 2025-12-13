@@ -170,8 +170,8 @@
 	{:else}
 		<div class="bg-base-200 rounded-box p-4">
 			<div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-3">
-				{#each artists as artist, index}
-					<ArtistCard {artist} {index} />
+				{#each artists as artist}
+					<ArtistCard {artist} />
 				{/each}
 			</div>
 		</div>

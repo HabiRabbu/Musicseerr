@@ -2,6 +2,8 @@
 	import type { HomeSection, HomeArtist, HomeAlbum, HomeTrack, HomeGenre } from '$lib/types';
 	import { goto } from '$app/navigation';
 	import { browser } from '$app/environment';
+	import ArtistImage from './ArtistImage.svelte';
+	import AlbumImage from './AlbumImage.svelte';
 
 	export let section: HomeSection;
 	export let showConnectCard = true;
@@ -62,12 +64,6 @@
 		return '';
 	}
 
-	function getAlbumCoverUrl(album: HomeAlbum): string {
-		if (album.image_url) return album.image_url;
-		if (album.mbid) return `/api/covers/release-group/${album.mbid}?size=250`;
-		return '';
-	}
-
 	function formatListenCount(count: number | null): string {
 		if (!count) return '';
 		if (count >= 1000000) return `${(count / 1000000).toFixed(1)}M plays`;
@@ -105,18 +101,6 @@
 
 	function isGenre(item: HomeArtist | HomeAlbum | HomeTrack | HomeGenre): item is HomeGenre {
 		return section.type === 'genres';
-	}
-
-	let imgErrors: Record<number, boolean> = {};
-	let imgLoaded: Record<number, boolean> = {};
-
-	function handleImgError(idx: number) {
-		imgErrors[idx] = true;
-	}
-
-	function handleImgLoad(idx: number, e: Event) {
-		imgLoaded[idx] = true;
-		(e.currentTarget as HTMLImageElement).classList.remove('opacity-0');
 	}
 </script>
 
@@ -204,23 +188,8 @@
 							role="button"
 							tabindex="0"
 						>
-							<figure class="aspect-square overflow-hidden relative">
-								{#if imgErrors[idx] || !item.mbid}
-									<div class="w-full h-full flex items-center justify-center text-4xl opacity-50 bg-base-200">
-										🎤
-									</div>
-								{:else}
-									{#if !imgLoaded[idx]}
-										<div class="skeleton w-full h-full absolute inset-0"></div>
-									{/if}
-									<img
-										src={getArtistCoverUrl(item)}
-										alt={item.name}
-										class="w-full h-full object-cover opacity-0 transition-opacity duration-300"
-										on:error={() => handleImgError(idx)}
-										on:load={(e) => handleImgLoad(idx, e)}
-									/>
-								{/if}
+							<figure class="flex justify-center pt-4 relative">
+								<ArtistImage mbid={item.mbid ?? ''} alt={item.name} size="md" lazy={false} />
 								{#if item.in_library}
 									<div class="absolute top-2 right-2 badge badge-success badge-sm">
 										<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3 h-3">
@@ -229,7 +198,7 @@
 									</div>
 								{/if}
 							</figure>
-							<div class="card-body p-2">
+							<div class="card-body p-2 items-center text-center">
 								<h3 class="card-title text-xs line-clamp-1">{item.name}</h3>
 								{#if item.listen_count}
 									<p class="text-xs text-base-content/50">{formatListenCount(item.listen_count)}</p>
@@ -247,22 +216,7 @@
 							tabindex="0"
 						>
 							<figure class="aspect-square overflow-hidden relative">
-								{#if imgErrors[idx] || !item.mbid}
-									<div class="w-full h-full flex items-center justify-center text-4xl opacity-50 bg-base-200">
-										💿
-									</div>
-								{:else}
-									{#if !imgLoaded[idx]}
-										<div class="skeleton w-full h-full absolute inset-0"></div>
-									{/if}
-									<img
-										src={getAlbumCoverUrl(item)}
-										alt={item.name}
-										class="w-full h-full object-cover opacity-0 transition-opacity duration-300"
-										on:error={() => handleImgError(idx)}
-										on:load={(e) => handleImgLoad(idx, e)}
-									/>
-								{/if}
+								<AlbumImage mbid={item.mbid || ''} alt={item.name} size="md" rounded="none" className="w-full h-full" customUrl={item.image_url || null} />
 								{#if item.in_library}
 									<div class="absolute top-2 right-2 badge badge-success badge-sm">
 										<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3 h-3">

@@ -52,30 +52,43 @@
 		loadingArtists = true;
 		loadingAlbums = true;
 
-		try {
-			const res = await fetch(`/api/search?q=${encodeURIComponent(q)}&limit_artists=6&limit_albums=24`, {
-				signal: abortController.signal
-			});
-			
+		const fetchArtists = fetch(`/api/search?q=${encodeURIComponent(q)}&limit_artists=6&limit_albums=0&buckets=artists`, {
+			signal: abortController.signal
+		}).then(async res => {
 			if (res.ok) {
 				const data = await res.json();
 				artists = data.artists || [];
-				albums = data.albums || [];
 			} else {
 				artists = [];
+			}
+			loadingArtists = false;
+		}).catch(error => {
+			if (error instanceof Error && error.name !== 'AbortError') {
+				console.error('Artist search failed:', error);
+				artists = [];
+			}
+			loadingArtists = false;
+		});
+
+		const fetchAlbums = fetch(`/api/search?q=${encodeURIComponent(q)}&limit_artists=0&limit_albums=24&buckets=albums`, {
+			signal: abortController.signal
+		}).then(async res => {
+			if (res.ok) {
+				const data = await res.json();
+				albums = data.albums || [];
+			} else {
 				albums = [];
 			}
-		} catch (error) {
-			if (error instanceof Error && error.name === 'AbortError') {
-				return;
-			}
-			console.error('Search failed:', error);
-			artists = [];
-			albums = [];
-		} finally {
-			loadingArtists = false;
 			loadingAlbums = false;
-		}
+		}).catch(error => {
+			if (error instanceof Error && error.name !== 'AbortError') {
+				console.error('Album search failed:', error);
+				albums = [];
+			}
+			loadingAlbums = false;
+		});
+
+		await Promise.allSettled([fetchArtists, fetchAlbums]);
 	}
 
 	let lastQuery = '';
@@ -205,8 +218,8 @@
 				<div class="bg-base-200 rounded-box p-4">
 					<div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-3">
 						<ViewMoreArtistCard />
-						{#each artists as artist, index}
-							<ArtistCard {artist} {index} />
+						{#each artists as artist}
+							<ArtistCard {artist} />
 						{/each}
 					</div>
 				</div>
@@ -247,8 +260,8 @@
 				<div class="bg-base-200 rounded-box p-4">
 					<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4">
 						<ViewMoreAlbumCard />
-						{#each albums as album, index}
-							<AlbumCard {album} {index} onadded={handleAlbumAdded} />
+						{#each albums as album}
+							<AlbumCard {album} onadded={handleAlbumAdded} />
 						{/each}
 					</div>
 				</div>

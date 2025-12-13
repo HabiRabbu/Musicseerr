@@ -114,6 +114,27 @@ export type AlbumInfo = {
 	in_library: boolean;
 };
 
+export type AlbumBasicInfo = {
+	title: string;
+	musicbrainz_id: string;
+	artist_name: string;
+	artist_id: string;
+	release_date?: string | null;
+	year?: number | null;
+	type?: string | null;
+	disambiguation?: string | null;
+	in_library: boolean;
+};
+
+export type AlbumTracksInfo = {
+	tracks: Track[];
+	total_tracks: number;
+	total_length?: number | null;
+	label?: string | null;
+	barcode?: string | null;
+	country?: string | null;
+};
+
 export type LidarrConnectionSettings = {
 	lidarr_url: string;
 	lidarr_api_key: string;

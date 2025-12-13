@@ -201,6 +201,34 @@ class CacheService:
                 cleared_disk_files=0
             )
     
+    async def clear_covers_cache(self) -> CacheClearResponse:
+        try:
+            files_cleared = 0
+            if CACHE_DIR.exists():
+                for file_path in CACHE_DIR.rglob("*"):
+                    if file_path.is_file():
+                        file_path.unlink()
+                        files_cleared += 1
+            
+            self._cached_stats = None
+            
+            logger.info(f"Cleared {files_cleared} cover image files from disk")
+            
+            return CacheClearResponse(
+                success=True,
+                message=f"Successfully cleared {files_cleared} cover images",
+                cleared_memory_entries=0,
+                cleared_disk_files=files_cleared
+            )
+        except Exception as e:
+            logger.error(f"Failed to clear covers cache: {e}")
+            return CacheClearResponse(
+                success=False,
+                message=f"Failed to clear covers cache: {str(e)}",
+                cleared_memory_entries=0,
+                cleared_disk_files=0
+            )
+    
     async def clear_library_cache(self) -> CacheClearResponse:
         try:
             lib_stats = await self._library_cache.get_stats()

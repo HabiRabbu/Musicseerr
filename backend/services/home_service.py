@@ -77,9 +77,12 @@ class HomeService:
             in_library=True,
         )
     
-    def _lidarr_artist_to_home(self, artist_data: dict) -> HomeArtist:
+    def _lidarr_artist_to_home(self, artist_data: dict) -> HomeArtist | None:
+        mbid = artist_data.get("mbid")
+        if not mbid:
+            return None
         return HomeArtist(
-            mbid=artist_data.get("mbid"),
+            mbid=mbid,
             name=artist_data.get("name", "Unknown Artist"),
             image_url=None,
             listen_count=artist_data.get("album_count"),
@@ -90,14 +93,16 @@ class HomeService:
         self,
         artist: ListenBrainzArtist,
         library_mbids: set[str]
-    ) -> HomeArtist:
+    ) -> HomeArtist | None:
         mbid = artist.artist_mbids[0] if artist.artist_mbids else None
+        if not mbid:
+            return None
         return HomeArtist(
             mbid=mbid,
             name=artist.artist_name,
             image_url=None,
             listen_count=artist.listen_count,
-            in_library=(mbid or "").lower() in library_mbids,
+            in_library=mbid.lower() in library_mbids,
         )
     
     def _lb_release_to_home(
@@ -121,17 +126,20 @@ class HomeService:
         self,
         item: JellyfinItem,
         library_mbids: set[str]
-    ) -> HomeArtist:
+    ) -> HomeArtist | None:
         mbid = None
         if item.provider_ids:
             mbid = item.provider_ids.get("MusicBrainzArtist")
+        
+        if not mbid:
+            return None
         
         return HomeArtist(
             mbid=mbid,
             name=item.name,
             image_url=self._jf_repo.get_image_url(item.id, item.image_tag),
             listen_count=item.play_count,
-            in_library=(mbid or "").lower() in library_mbids,
+            in_library=mbid.lower() in library_mbids,
         )
     
     def _extract_genres_from_library(
@@ -295,7 +303,7 @@ class HomeService:
         return HomeSection(
             title="Your Artists",
             type="artists",
-            items=[self._lidarr_artist_to_home(a) for a in sorted_artists],
+            items=[a for a in (self._lidarr_artist_to_home(artist) for artist in sorted_artists) if a is not None],
             source="lidarr",
         )
     
@@ -325,7 +333,7 @@ class HomeService:
         return HomeSection(
             title="Trending Artists",
             type="artists",
-            items=[self._lb_artist_to_home(a, library_mbids) for a in artists[:15]],
+            items=[a for a in (self._lb_artist_to_home(artist, library_mbids) for artist in artists[:15]) if a is not None],
             source="listenbrainz" if artists else None,
         )
     
@@ -384,7 +392,7 @@ class HomeService:
         return HomeSection(
             title="Based on Your Listening",
             type="artists",
-            items=[self._lb_artist_to_home(a, library_mbids) for a in artists[:15]],
+            items=[a for a in (self._lb_artist_to_home(artist, library_mbids) for artist in artists[:15]) if a is not None],
             source="listenbrainz",
         )
     
@@ -400,7 +408,7 @@ class HomeService:
         return HomeSection(
             title="Recently Played",
             type="artists",
-            items=[self._jf_item_to_artist(i, library_mbids) for i in items[:15]],
+            items=[a for a in (self._jf_item_to_artist(i, library_mbids) for i in items[:15]) if a is not None],
             source="jellyfin",
         )
     
@@ -416,7 +424,7 @@ class HomeService:
         return HomeSection(
             title="Your Favorites",
             type="artists",
-            items=[self._jf_item_to_artist(f, library_mbids) for f in favorites[:15]],
+            items=[a for a in (self._jf_item_to_artist(f, library_mbids) for f in favorites[:15]) if a is not None],
             source="jellyfin",
         )
     
@@ -571,7 +579,7 @@ class HomeService:
         for r in ranges:
             lb_artists = results.get(r) or []
             artists = [
-                self._lb_artist_to_home(a, library_mbids) for a in lb_artists
+                a for a in (self._lb_artist_to_home(artist, library_mbids) for artist in lb_artists) if a is not None
             ]
             featured = artists[0] if artists else None
             items = artists[1:limit] if len(artists) > 1 else []
@@ -607,7 +615,7 @@ class HomeService:
         lb_artists = await self._lb_repo.get_sitewide_top_artists(
             range_=range_key, count=limit + 1, offset=offset
         )
-        artists = [self._lb_artist_to_home(a, library_mbids) for a in lb_artists]
+        artists = [a for a in (self._lb_artist_to_home(artist, library_mbids) for artist in lb_artists) if a is not None]
         has_more = len(artists) > limit
         items = artists[:limit]
 

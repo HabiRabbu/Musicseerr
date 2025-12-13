@@ -104,6 +104,24 @@ class LidarrRepositoryProtocol(Protocol):
     
     async def check_status(self) -> ServiceStatus:
         ...
+    
+    async def get_artist_details(self, artist_mbid: str) -> Optional[dict[str, Any]]:
+        ...
+    
+    async def get_album_details(self, album_mbid: str) -> Optional[dict[str, Any]]:
+        ...
+    
+    async def get_album_tracks(self, album_id: int) -> list[dict[str, Any]]:
+        ...
+    
+    async def get_artist_albums(self, artist_mbid: str) -> list[dict[str, Any]]:
+        ...
+    
+    async def get_artist_mbids(self) -> set[str]:
+        ...
+    
+    async def get_library_mbids(self, include_release_ids: bool = True) -> set[str]:
+        ...
 
 
 class WikidataRepositoryProtocol(Protocol):

@@ -9,9 +9,10 @@ logger = logging.getLogger(__name__)
 
 class RequestPriority(IntEnum):
     USER_INITIATED = 0
-    PREFETCH_VISIBLE = 1
-    BACKGROUND_SYNC = 2
-    OPPORTUNISTIC = 3
+    IMAGE_FETCH = 1
+    PREFETCH_VISIBLE = 2
+    BACKGROUND_SYNC = 3
+    OPPORTUNISTIC = 4
 
 
 class PriorityQueueManager:
@@ -27,7 +28,8 @@ class PriorityQueueManager:
         if self._initialized:
             return
         
-        self._user_semaphore = asyncio.Semaphore(50)
+        self._user_semaphore = asyncio.Semaphore(20)
+        self._image_semaphore = asyncio.Semaphore(10)
         self._background_semaphore = asyncio.Semaphore(5)
         self._user_activity_flag = False
         self._user_activity_timestamp = 0.0
@@ -36,12 +38,14 @@ class PriorityQueueManager:
         self._background_waiters = 0
         self._initialized = True
         
-        logger.info("PriorityQueueManager initialized: user=50, background=5")
+        logger.info("PriorityQueueManager initialized: user=20, image=10, background=5")
     
     async def acquire_slot(self, priority: RequestPriority) -> asyncio.Semaphore:
         if priority == RequestPriority.USER_INITIATED:
             self._mark_user_activity()
             return self._user_semaphore
+        elif priority == RequestPriority.IMAGE_FETCH:
+            return self._image_semaphore
         else:
             await self._wait_for_user_inactivity()
             return self._background_semaphore
@@ -83,6 +87,7 @@ class PriorityQueueManager:
     def get_stats(self) -> dict:
         return {
             'user_slots_available': self._user_semaphore._value,
+            'image_slots_available': self._image_semaphore._value,
             'background_slots_available': self._background_semaphore._value,
             'user_active': self.is_user_active(),
             'background_waiters': self._background_waiters

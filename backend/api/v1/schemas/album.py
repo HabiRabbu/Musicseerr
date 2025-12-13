@@ -25,3 +25,26 @@ class AlbumInfo(BaseModel):
     total_tracks: int = 0
     total_length: Optional[int] = None
     in_library: bool = False
+
+
+class AlbumBasicInfo(BaseModel):
+    """Minimal album info for fast initial load - no tracks."""
+    title: str
+    musicbrainz_id: str
+    artist_name: str
+    artist_id: str
+    release_date: Optional[str] = None
+    year: Optional[int] = None
+    type: Optional[str] = None
+    disambiguation: Optional[str] = None
+    in_library: bool = False
+
+
+class AlbumTracksInfo(BaseModel):
+    """Track list and extended details - loaded asynchronously."""
+    tracks: list[Track] = Field(default_factory=list)
+    total_tracks: int = 0
+    total_length: Optional[int] = None
+    label: Optional[str] = None
+    barcode: Optional[str] = None
+    country: Optional[str] = None

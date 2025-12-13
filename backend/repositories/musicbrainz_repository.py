@@ -15,11 +15,12 @@ from infrastructure.cache.cache_keys import (
 from infrastructure.resilience.retry import with_retry, CircuitBreaker
 from infrastructure.resilience.rate_limiter import TokenBucketRateLimiter
 from infrastructure.queue.priority_queue import RequestPriority, get_priority_queue
+from infrastructure.http.deduplication import RequestDeduplicator
 
 logger = logging.getLogger(__name__)
 
 musicbrainzngs.set_useragent("Musicseerr", "1.0", "https://github.com/HabiRabbu/musicseerr")
-musicbrainzngs.set_rate_limit(limit_or_interval=1.0)
+musicbrainzngs.set_rate_limit(limit_or_interval=False)
 
 _mb_circuit_breaker = CircuitBreaker(
     failure_threshold=5,
@@ -28,7 +29,9 @@ _mb_circuit_breaker = CircuitBreaker(
     name="musicbrainz"
 )
 
-_mb_rate_limiter = TokenBucketRateLimiter(rate=1.0, capacity=2)
+_mb_rate_limiter = TokenBucketRateLimiter(rate=1.0, capacity=3)
+
+_mb_deduplicator = RequestDeduplicator()
 
 
 class MusicBrainzRepository:
@@ -39,10 +42,10 @@ class MusicBrainzRepository:
     @staticmethod
     @with_retry(max_attempts=3, circuit_breaker=_mb_circuit_breaker)
     async def _mb_call(func, *args, priority: RequestPriority = RequestPriority.USER_INITIATED, **kwargs):
-        await _mb_rate_limiter.acquire()
         priority_mgr = get_priority_queue()
         semaphore = await priority_mgr.acquire_slot(priority)
         async with semaphore:
+            await _mb_rate_limiter.acquire()
             return await asyncio.to_thread(func, *args, **kwargs)
     
     @staticmethod
@@ -280,19 +283,36 @@ class MusicBrainzRepository:
         buckets: Optional[list[str]] = None,
         included_secondary_types: Optional[set[str]] = None
     ) -> dict[str, list[SearchResult]]:
-        results = {}
+        advanced_settings = self._preferences_service.get_advanced_settings()
+        _mb_rate_limiter.update_capacity(advanced_settings.musicbrainz_concurrent_searches)
+        
+        tasks = []
+        task_keys = []
         
         if not buckets or "artists" in buckets:
-            artists_limit = limits.get("artists", 10)
-            results["artists"] = await self.search_artists(query, limit=artists_limit)
+            tasks.append(self.search_artists(query, limit=limits.get("artists", 10)))
+            task_keys.append("artists")
         
         if not buckets or "albums" in buckets:
-            albums_limit = limits.get("albums", 10)
-            results["albums"] = await self.search_albums(
+            tasks.append(self.search_albums(
                 query,
-                limit=albums_limit,
+                limit=limits.get("albums", 10),
                 included_secondary_types=included_secondary_types
-            )
+            ))
+            task_keys.append("albums")
+        
+        if not tasks:
+            return {}
+        
+        results_list = await asyncio.gather(*tasks, return_exceptions=True)
+        
+        results = {}
+        for key, result in zip(task_keys, results_list):
+            if isinstance(result, Exception):
+                logger.error(f"Search {key} failed: {result}")
+                results[key] = []
+            else:
+                results[key] = result
         
         return results
     
@@ -303,6 +323,10 @@ class MusicBrainzRepository:
         if cached is not None:
             return cached
         
+        dedupe_key = f"mb:artist:{mbid}"
+        return await _mb_deduplicator.dedupe(dedupe_key, lambda: self._fetch_artist_by_id(mbid, cache_key))
+    
+    async def _fetch_artist_by_id(self, mbid: str, cache_key: str) -> Optional[dict]:
         try:
             result = await self._mb_call(
                 musicbrainzngs.get_artist_by_id,
@@ -383,6 +407,16 @@ class MusicBrainzRepository:
         if cached is not None:
             return cached
         
+        includes_str = ",".join(sorted(includes))
+        dedupe_key = f"mb:rg:{mbid}:{includes_str}"
+        return await _mb_deduplicator.dedupe(dedupe_key, lambda: self._fetch_release_group_by_id(mbid, includes, cache_key))
+    
+    async def _fetch_release_group_by_id(
+        self,
+        mbid: str,
+        includes: list[str],
+        cache_key: str
+    ) -> Optional[dict]:
         try:
             result = await self._mb_call(
                 musicbrainzngs.get_release_group_by_id,
@@ -411,6 +445,16 @@ class MusicBrainzRepository:
         if cached is not None:
             return cached
         
+        includes_str = ",".join(sorted(includes))
+        dedupe_key = f"mb:release:{release_id}:{includes_str}"
+        return await _mb_deduplicator.dedupe(dedupe_key, lambda: self._fetch_release_by_id(release_id, includes, cache_key))
+    
+    async def _fetch_release_by_id(
+        self,
+        release_id: str,
+        includes: list[str],
+        cache_key: str
+    ) -> Optional[dict]:
         try:
             result = await self._mb_call(
                 musicbrainzngs.get_release_by_id,

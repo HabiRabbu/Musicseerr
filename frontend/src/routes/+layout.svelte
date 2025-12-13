@@ -1,12 +1,17 @@
 <script lang="ts">
 	import "../app.css";
-	import { goto } from '$app/navigation';
+	import { goto, beforeNavigate } from '$app/navigation';
 	import { errorModal } from '$lib/stores/errorModal';
 	import { libraryStore } from '$lib/stores/library';
 	import { onMount } from 'svelte';
+	import { cancelPendingImages } from '$lib/utils/lazyImage';
 	
 	let query = '';
 	let modalQuery = '';
+
+	beforeNavigate(() => {
+		cancelPendingImages();
+	});
 
 	onMount(() => {
 		libraryStore.initialize();
@@ -105,7 +110,7 @@
 				
 				<li>
 					<button 
-						on:click={() => document.getElementById('search_modal')?.showModal()} 
+						on:click={() => (document.getElementById('search_modal') as HTMLDialogElement)?.showModal()} 
 						class="is-drawer-close:tooltip is-drawer-close:tooltip-right" 
 						data-tip="Search"
 					>

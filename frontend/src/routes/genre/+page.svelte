@@ -2,6 +2,8 @@
 	import { page } from '$app/stores';
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
+	import ArtistImage from '$lib/components/ArtistImage.svelte';
+	import AlbumImage from '$lib/components/AlbumImage.svelte';
 	import type { HomeArtist, HomeAlbum, GenreDetailResponse } from '$lib/types';
 
 	let genreName = '';
@@ -127,18 +129,6 @@
 
 	function handleAlbumClick(mbid: string) {
 		goto(`/album/${mbid}`);
-	}
-
-	let imgErrors: Record<string, boolean> = {};
-	let imgLoaded: Record<string, boolean> = {};
-
-	function handleImgError(id: string) {
-		imgErrors[id] = true;
-	}
-
-	function handleImgLoad(id: string, e: Event) {
-		imgLoaded[id] = true;
-		(e.currentTarget as HTMLImageElement).classList.remove('opacity-0');
 	}
 
 	$: hasLibraryContent =
@@ -302,27 +292,8 @@
 									class="card bg-base-200/50 hover:bg-base-200 transition-all duration-200 cursor-pointer group"
 									on:click={() => artist.mbid && handleArtistClick(artist.mbid)}
 								>
-									<figure class="aspect-square overflow-hidden relative rounded-t-2xl">
-										{#if imgErrors[`lib-artist-${artist.mbid}`] || !artist.mbid}
-											<div
-												class="w-full h-full flex items-center justify-center text-5xl opacity-30 bg-base-300"
-											>
-												🎤
-											</div>
-										{:else}
-											{#if !imgLoaded[`lib-artist-${artist.mbid}`]}
-												<div class="skeleton w-full h-full absolute inset-0"></div>
-											{/if}
-											<img
-												src={artist.image_url || `/api/covers/artist/${artist.mbid}?size=250`}
-												alt={artist.name}
-												class="w-full h-full object-cover opacity-0 transition-all duration-300 group-hover:scale-105"
-												on:error={() =>
-													artist.mbid && handleImgError(`lib-artist-${artist.mbid}`)}
-												on:load={(e) =>
-													artist.mbid && handleImgLoad(`lib-artist-${artist.mbid}`, e)}
-											/>
-										{/if}
+									<figure class="flex justify-center pt-4 relative">
+										<ArtistImage mbid={artist.mbid || ''} alt={artist.name} size="md" lazy={false} />
 										<div
 											class="absolute top-2 right-2 badge badge-success badge-sm gap-1 opacity-90"
 										>
@@ -340,7 +311,7 @@
 											</svg>
 										</div>
 									</figure>
-									<div class="card-body p-3">
+									<div class="card-body p-3 items-center text-center">
 										<h3 class="font-semibold text-sm line-clamp-1">{artist.name}</h3>
 										{#if artist.listen_count}
 											<p class="text-xs text-base-content/50">
@@ -365,26 +336,16 @@
 									class="card bg-base-200/50 hover:bg-base-200 transition-all duration-200 cursor-pointer group"
 									on:click={() => album.mbid && handleAlbumClick(album.mbid)}
 								>
-									<figure class="aspect-square overflow-hidden relative rounded-t-2xl">
-										{#if imgErrors[`lib-album-${album.mbid}`] || !album.mbid}
-											<div
-												class="w-full h-full flex items-center justify-center text-5xl opacity-30 bg-base-300"
-											>
-												💿
-											</div>
-										{:else}
-											{#if !imgLoaded[`lib-album-${album.mbid}`]}
-												<div class="skeleton w-full h-full absolute inset-0"></div>
-											{/if}
-											<img
-												src={album.image_url || `/api/covers/release-group/${album.mbid}?size=250`}
-												alt={album.name}
-												class="w-full h-full object-cover opacity-0 transition-all duration-300 group-hover:scale-105"
-												on:error={() => album.mbid && handleImgError(`lib-album-${album.mbid}`)}
-												on:load={(e) => album.mbid && handleImgLoad(`lib-album-${album.mbid}`, e)}
-											/>
-										{/if}
-										<div
+								<figure class="aspect-square overflow-hidden relative rounded-t-2xl">
+									<AlbumImage 
+										mbid={album.mbid || ''} 
+										alt={album.name} 
+										size="md" 
+										rounded="none" 
+										className="w-full h-full" 
+										customUrl={album.image_url || null} 
+									/>
+									<div
 											class="absolute top-2 right-2 badge badge-success badge-sm gap-1 opacity-90"
 										>
 											<svg
@@ -505,27 +466,8 @@
 									class="card bg-base-200/50 hover:bg-base-200 transition-all duration-200 cursor-pointer group"
 									on:click={() => artist.mbid && handleArtistClick(artist.mbid)}
 								>
-									<figure class="aspect-square overflow-hidden relative rounded-t-2xl">
-										{#if imgErrors[`pop-artist-${artist.mbid}`] || !artist.mbid}
-											<div
-												class="w-full h-full flex items-center justify-center text-5xl opacity-30 bg-base-300"
-											>
-												🎤
-											</div>
-										{:else}
-											{#if !imgLoaded[`pop-artist-${artist.mbid}`]}
-												<div class="skeleton w-full h-full absolute inset-0"></div>
-											{/if}
-											<img
-												src={artist.image_url || `/api/covers/artist/${artist.mbid}?size=250`}
-												alt={artist.name}
-												class="w-full h-full object-cover opacity-0 transition-all duration-300 group-hover:scale-105"
-												on:error={() =>
-													artist.mbid && handleImgError(`pop-artist-${artist.mbid}`)}
-												on:load={(e) =>
-													artist.mbid && handleImgLoad(`pop-artist-${artist.mbid}`, e)}
-											/>
-										{/if}
+									<figure class="flex justify-center pt-4 relative">
+										<ArtistImage mbid={artist.mbid || ''} alt={artist.name} size="md" lazy={false} />
 										{#if artist.in_library}
 											<div
 												class="absolute top-2 right-2 badge badge-success badge-sm gap-1 opacity-90"
@@ -545,7 +487,7 @@
 											</div>
 										{/if}
 									</figure>
-									<div class="card-body p-3">
+									<div class="card-body p-3 items-center text-center">
 										<h3 class="font-semibold text-sm line-clamp-1">{artist.name}</h3>
 									</div>
 								</button>
@@ -598,26 +540,16 @@
 									class="card bg-base-200/50 hover:bg-base-200 transition-all duration-200 cursor-pointer group"
 									on:click={() => album.mbid && handleAlbumClick(album.mbid)}
 								>
-									<figure class="aspect-square overflow-hidden relative rounded-t-2xl">
-										{#if imgErrors[`pop-album-${album.mbid}`] || !album.mbid}
-											<div
-												class="w-full h-full flex items-center justify-center text-5xl opacity-30 bg-base-300"
-											>
-												💿
-											</div>
-										{:else}
-											{#if !imgLoaded[`pop-album-${album.mbid}`]}
-												<div class="skeleton w-full h-full absolute inset-0"></div>
-											{/if}
-											<img
-												src={album.image_url || `/api/covers/release-group/${album.mbid}?size=250`}
-												alt={album.name}
-												class="w-full h-full object-cover opacity-0 transition-all duration-300 group-hover:scale-105"
-												on:error={() => album.mbid && handleImgError(`pop-album-${album.mbid}`)}
-												on:load={(e) => album.mbid && handleImgLoad(`pop-album-${album.mbid}`, e)}
-											/>
-										{/if}
-										{#if album.in_library}
+								<figure class="aspect-square overflow-hidden relative rounded-t-2xl">
+									<AlbumImage 
+										mbid={album.mbid || ''} 
+										alt={album.name} 
+										size="md" 
+										rounded="none" 
+										className="w-full h-full" 
+										customUrl={album.image_url || null} 
+									/>
+									{#if album.in_library}
 											<div
 												class="absolute top-2 right-2 badge badge-success badge-sm gap-1 opacity-90"
 											>

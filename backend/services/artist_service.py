@@ -92,46 +92,26 @@ class ArtistService:
             
             logger.debug(f"Cache MISS (Disk): Artist {artist_id[:8]}...")
             
-            mb_artist, library_mbids, album_mbids = await self._fetch_artist_data(
-                artist_id,
-                library_artist_mbids=library_artist_mbids,
-                library_album_mbids=library_album_mbids
-            )
+            lidarr_artist = await self._lidarr_repo.get_artist_details(artist_id)
+            in_library = lidarr_artist is not None and lidarr_artist.get("monitored", False)
             
-            in_library = artist_id.lower() in library_mbids
-            tags = self._extract_tags(mb_artist)
-            aliases = self._extract_aliases(mb_artist)
-            life_span = self._extract_life_span(mb_artist)
-            external_links = self._build_external_links(mb_artist)
-            
-            albums, singles, eps = await self._get_categorized_releases(mb_artist, album_mbids)
-            
-            description, image = await self._fetch_wikidata_info(mb_artist)
-            
-            artist_info = ArtistInfo(
-                name=mb_artist.get("name", "Unknown Artist"),
-                musicbrainz_id=artist_id,
-                disambiguation=mb_artist.get("disambiguation"),
-                type=mb_artist.get("type"),
-                country=mb_artist.get("country"),
-                life_span=life_span,
-                description=description,
-                image=image,
-                tags=tags,
-                aliases=aliases,
-                external_links=external_links,
-                in_library=in_library,
-                albums=albums,
-                singles=singles,
-                eps=eps,
-            )
+            if in_library and lidarr_artist:
+                logger.info(f"Using Lidarr as primary source for artist {artist_id[:8]}")
+                artist_info = await self._build_artist_from_lidarr(artist_id, lidarr_artist, library_album_mbids)
+            else:
+                logger.info(f"Using MusicBrainz as primary source for artist {artist_id[:8]}")
+                artist_info = await self._build_artist_from_musicbrainz(
+                    artist_id, 
+                    library_artist_mbids, 
+                    library_album_mbids
+                )
             
             advanced_settings = self._preferences_service.get_advanced_settings()
-            ttl = advanced_settings.cache_ttl_artist_library if in_library else advanced_settings.cache_ttl_artist_non_library
+            ttl = advanced_settings.cache_ttl_artist_library if artist_info.in_library else advanced_settings.cache_ttl_artist_non_library
             
             await self._cache.set(cache_key, artist_info, ttl_seconds=ttl)
             
-            await self._disk_cache.set_artist(artist_id, artist_info, is_monitored=in_library, ttl_seconds=ttl if not in_library else None)
+            await self._disk_cache.set_artist(artist_id, artist_info, is_monitored=artist_info.in_library, ttl_seconds=ttl if not artist_info.in_library else None)
             
             return artist_info
         
@@ -140,6 +120,179 @@ class ArtistService:
         except Exception as e:
             logger.error(f"API call failed for artist {artist_id}: {e}")
             raise ResourceNotFoundError(f"Failed to get artist info: {e}")
+    
+    async def _build_artist_from_lidarr(
+        self,
+        artist_id: str,
+        lidarr_artist: dict[str, Any],
+        library_album_mbids: dict[str, Any] = None
+    ) -> ArtistInfo:
+        """Build ArtistInfo primarily from Lidarr data, with MusicBrainz fallback for missing fields."""
+        
+        description = lidarr_artist.get("overview")
+        image = lidarr_artist.get("poster_url")
+        
+        genres = lidarr_artist.get("genres", [])
+        
+        external_links = []
+        for link in lidarr_artist.get("links", []):
+            link_name = link.get("name", "")
+            link_url = link.get("url", "")
+            if link_url:
+                label = self._detect_platform(link_url, link_name.lower())
+                external_links.append(ExternalLink(type=link_name.lower(), url=link_url, label=label))
+        
+        if library_album_mbids is None:
+            library_album_mbids = await self._lidarr_repo.get_library_mbids(include_release_ids=True)
+        
+        lidarr_albums = await self._lidarr_repo.get_artist_albums(artist_id)
+        albums, singles, eps = self._categorize_lidarr_albums(lidarr_albums, library_album_mbids)
+        
+        need_musicbrainz = not description or not genres or not external_links
+        aliases = []
+        life_span = None
+        artist_type = lidarr_artist.get("artist_type")
+        disambiguation = lidarr_artist.get("disambiguation")
+        country = None
+        release_group_count = len(lidarr_albums)
+        
+        if need_musicbrainz:
+            logger.debug(f"Fetching supplementary data from MusicBrainz for artist {artist_id[:8]}")
+            try:
+                mb_artist = await self._mb_repo.get_artist_by_id(artist_id)
+                if mb_artist:
+                    if not description:
+                        mb_description, _ = await self._fetch_wikidata_info(mb_artist)
+                        description = mb_description
+                    
+                    if not genres:
+                        genres = self._extract_tags(mb_artist)
+                    
+                    if not external_links:
+                        external_links = self._build_external_links(mb_artist)
+                    
+                    aliases = self._extract_aliases(mb_artist)
+                    life_span = self._extract_life_span(mb_artist)
+                    country = mb_artist.get("country")
+                    
+                    if not artist_type:
+                        artist_type = mb_artist.get("type")
+                    if not disambiguation:
+                        disambiguation = mb_artist.get("disambiguation")
+                    
+                    release_group_count = mb_artist.get("release-group-count", release_group_count)
+            except Exception as e:
+                logger.warning(f"MusicBrainz fallback failed for artist {artist_id[:8]}: {e}")
+        
+        return ArtistInfo(
+            name=lidarr_artist.get("name", "Unknown Artist"),
+            musicbrainz_id=artist_id,
+            disambiguation=disambiguation,
+            type=artist_type,
+            country=country,
+            life_span=life_span,
+            description=description,
+            image=image,
+            tags=genres,
+            aliases=aliases,
+            external_links=external_links,
+            in_library=True,
+            albums=albums,
+            singles=singles,
+            eps=eps,
+            release_group_count=release_group_count,
+        )
+    
+    def _categorize_lidarr_albums(
+        self,
+        lidarr_albums: list[dict[str, Any]],
+        library_album_mbids: set[str]
+    ) -> tuple[list[dict], list[dict], list[dict]]:
+        """Categorize Lidarr albums into albums, singles, and EPs."""
+        prefs = self._preferences_service.get_preferences()
+        included_primary_types = set(t.lower() for t in prefs.primary_types)
+        included_secondary_types = set(t.lower() for t in prefs.secondary_types)
+        
+        albums = []
+        singles = []
+        eps = []
+        
+        for album in lidarr_albums:
+            album_type = (album.get("album_type") or "").lower()
+            secondary_types = set(map(str.lower, album.get("secondary_types", []) or []))
+            
+            if album_type not in included_primary_types:
+                continue
+            
+            if included_secondary_types:
+                if not secondary_types:
+                    if "studio" not in included_secondary_types:
+                        continue
+                elif not secondary_types.intersection(included_secondary_types):
+                    continue
+            
+            mbid = album.get("mbid", "")
+            album_data = {
+                "id": mbid,
+                "title": album.get("title"),
+                "type": album.get("album_type"),
+                "first_release_date": album.get("release_date"),
+                "year": album.get("year"),
+                "in_library": mbid.lower() in library_album_mbids if mbid else album.get("monitored", False),
+            }
+            
+            if album_type == "album":
+                albums.append(album_data)
+            elif album_type == "single":
+                singles.append(album_data)
+            elif album_type == "ep":
+                eps.append(album_data)
+        
+        for lst in [albums, singles, eps]:
+            lst.sort(key=lambda x: (x.get("year") is None, -(x.get("year") or 0)))
+        
+        return albums, singles, eps
+    
+    async def _build_artist_from_musicbrainz(
+        self,
+        artist_id: str,
+        library_artist_mbids: set[str] = None,
+        library_album_mbids: dict[str, Any] = None
+    ) -> ArtistInfo:
+        """Build ArtistInfo from MusicBrainz data (original flow)."""
+        mb_artist, library_mbids, album_mbids = await self._fetch_artist_data(
+            artist_id,
+            library_artist_mbids=library_artist_mbids,
+            library_album_mbids=library_album_mbids
+        )
+        
+        in_library = artist_id.lower() in library_mbids
+        tags = self._extract_tags(mb_artist)
+        aliases = self._extract_aliases(mb_artist)
+        life_span = self._extract_life_span(mb_artist)
+        external_links = self._build_external_links(mb_artist)
+        
+        albums, singles, eps = await self._get_categorized_releases(mb_artist, album_mbids)
+        
+        description, image = await self._fetch_wikidata_info(mb_artist)
+        
+        return ArtistInfo(
+            name=mb_artist.get("name", "Unknown Artist"),
+            musicbrainz_id=artist_id,
+            disambiguation=mb_artist.get("disambiguation"),
+            type=mb_artist.get("type"),
+            country=mb_artist.get("country"),
+            life_span=life_span,
+            description=description,
+            image=image,
+            tags=tags,
+            aliases=aliases,
+            external_links=external_links,
+            in_library=in_library,
+            albums=albums,
+            singles=singles,
+            eps=eps,
+        )
     
     async def get_artist_info_basic(self, artist_id: str) -> ArtistInfo:
         artist_id = validate_mbid(artist_id, "artist")
@@ -249,17 +402,36 @@ class ArtistService:
         limit: int = 50
     ) -> ArtistReleases:
         try:
-            release_groups, total_count = await self._mb_repo.get_artist_release_groups(
-                artist_id, offset, limit
-            )
+            lidarr_artist = await self._lidarr_repo.get_artist_details(artist_id)
+            in_library = lidarr_artist is not None and lidarr_artist.get("monitored", False)
             
             album_mbids = await self._lidarr_repo.get_library_mbids(include_release_ids=True)
-            
-            temp_artist = {"release-group-list": release_groups}
             
             prefs = self._preferences_service.get_preferences()
             included_primary_types = set(t.lower() for t in prefs.primary_types)
             included_secondary_types = set(t.lower() for t in prefs.secondary_types)
+            
+            if in_library and offset == 0:
+                logger.debug(f"Using Lidarr for artist releases {artist_id[:8]}")
+                lidarr_albums = await self._lidarr_repo.get_artist_albums(artist_id)
+                albums, singles, eps = self._categorize_lidarr_albums(lidarr_albums, album_mbids)
+                
+                total_count = len(albums) + len(singles) + len(eps)
+                
+                return ArtistReleases(
+                    albums=albums,
+                    singles=singles,
+                    eps=eps,
+                    total_count=total_count,
+                    has_more=False
+                )
+            
+            logger.debug(f"Using MusicBrainz for artist releases {artist_id[:8]}")
+            release_groups, total_count = await self._mb_repo.get_artist_release_groups(
+                artist_id, offset, limit
+            )
+            
+            temp_artist = {"release-group-list": release_groups}
             
             albums, singles, eps = self._categorize_release_groups(
                 temp_artist,

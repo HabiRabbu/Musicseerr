@@ -49,7 +49,22 @@ async def cover_from_release_group(
             }
         )
     
-    raise HTTPException(status_code=404, detail="Cover art not found")
+    placeholder_svg = '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+        <rect fill="#374151" width="200" height="200"/>
+        <circle cx="100" cy="100" r="70" fill="#1f2937" stroke="#4B5563" stroke-width="2"/>
+        <circle cx="100" cy="100" r="50" fill="none" stroke="#4B5563" stroke-width="1"/>
+        <circle cx="100" cy="100" r="30" fill="none" stroke="#4B5563" stroke-width="1"/>
+        <circle cx="100" cy="100" r="12" fill="#4B5563"/>
+        <circle cx="100" cy="100" r="4" fill="#374151"/>
+    </svg>'''
+    return Response(
+        content=placeholder_svg.encode(),
+        media_type="image/svg+xml",
+        headers={
+            "Cache-Control": "public, max-age=86400",
+            "X-Cover-Source": "placeholder",
+        }
+    )
 
 
 @router.get("/release/{release_id}")
@@ -75,7 +90,22 @@ async def cover_from_release(
             }
         )
     
-    raise HTTPException(status_code=404, detail="Cover art not found")
+    placeholder_svg = '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+        <rect fill="#374151" width="200" height="200"/>
+        <circle cx="100" cy="100" r="70" fill="#1f2937" stroke="#4B5563" stroke-width="2"/>
+        <circle cx="100" cy="100" r="50" fill="none" stroke="#4B5563" stroke-width="1"/>
+        <circle cx="100" cy="100" r="30" fill="none" stroke="#4B5563" stroke-width="1"/>
+        <circle cx="100" cy="100" r="12" fill="#4B5563"/>
+        <circle cx="100" cy="100" r="4" fill="#374151"/>
+    </svg>'''
+    return Response(
+        content=placeholder_svg.encode(),
+        media_type="image/svg+xml",
+        headers={
+            "Cache-Control": "public, max-age=86400",
+            "X-Cover-Source": "placeholder",
+        }
+    )
 
 
 @router.get("/artist/{artist_id}")
@@ -110,3 +140,63 @@ async def get_artist_cover(
             "X-Cover-Source": "wikidata",
         }
     )
+
+
+@router.get("/debug/artist/{artist_id}")
+async def debug_artist_cover(
+    artist_id: str,
+    coverart_repo: CoverArtRepository = Depends(get_coverart_repository)
+):
+    """
+    Debug endpoint that returns diagnostic info about an artist image fetch.
+    Shows cache state, Lidarr availability, MusicBrainz relations, and Wikidata URL.
+    """
+    from infrastructure.validators import validate_mbid
+    
+    debug_info = {
+        "artist_id": artist_id,
+        "is_valid_mbid": False,
+        "validated_mbid": None,
+        "disk_cache": {
+            "exists_250": False,
+            "exists_500": False,
+            "meta_250": None,
+            "meta_500": None,
+        },
+        "lidarr": {
+            "configured": False,
+            "has_image_url": False,
+            "image_url": None,
+        },
+        "musicbrainz": {
+            "artist_found": False,
+            "has_wikidata_relation": False,
+            "wikidata_url": None,
+        },
+        "memory_cache": {
+            "wikidata_url_cached": False,
+            "cached_value": None,
+        },
+        "recommendation": None,
+    }
+    
+    try:
+        validated_id = validate_mbid(artist_id, "artist")
+        debug_info["is_valid_mbid"] = True
+        debug_info["validated_mbid"] = validated_id
+    except ValueError as e:
+        debug_info["recommendation"] = f"Invalid MBID format: {e}. No image can be fetched."
+        return debug_info
+    
+    debug_info = await coverart_repo.debug_artist_image(validated_id, debug_info)
+    
+    if debug_info["disk_cache"]["exists_250"] or debug_info["disk_cache"]["exists_500"]:
+        debug_info["recommendation"] = "Image is cached on disk - should load successfully."
+    elif debug_info["lidarr"]["has_image_url"]:
+        debug_info["recommendation"] = "Lidarr has an image URL - fetch should succeed from Lidarr."
+    elif debug_info["musicbrainz"]["has_wikidata_relation"]:
+        debug_info["recommendation"] = "Wikidata URL found - fetch should succeed from Wikidata/Wikimedia."
+    else:
+        debug_info["recommendation"] = "No image source found. This artist will show a placeholder."
+    
+    return debug_info

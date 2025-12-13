@@ -119,9 +119,10 @@ def get_coverart_repository() -> CoverArtRepository:
     settings = get_settings()
     cache = get_cache()
     mb_repo = get_musicbrainz_repository()
+    lidarr_repo = get_lidarr_repository()
     http_client = get_http_client(settings)
     cache_dir = settings.cache_dir / "covers"
-    return CoverArtRepository(http_client, cache, mb_repo, cache_dir=cache_dir)
+    return CoverArtRepository(http_client, cache, mb_repo, lidarr_repo, cache_dir=cache_dir)
 
 
 @lru_cache(maxsize=1)
