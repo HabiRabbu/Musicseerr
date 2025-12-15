@@ -189,7 +189,7 @@
 							tabindex="0"
 						>
 							<figure class="flex justify-center pt-4 relative">
-								<ArtistImage mbid={item.mbid ?? ''} alt={item.name} size="md" lazy={false} />
+								<ArtistImage mbid={item.mbid ?? ''} alt={item.name} size="md" lazy={true} />
 								{#if item.in_library}
 									<div class="absolute top-2 right-2 badge badge-success badge-sm">
 										<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3 h-3">

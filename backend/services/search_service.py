@@ -43,17 +43,25 @@ class SearchService:
         if not buckets or "albums" in buckets:
             limits["albums"] = limit_albums
         
-        grouped, library_mbids = await self._safe_gather(
-            self._mb_repo.search_grouped(
+        try:
+            grouped = await self._mb_repo.search_grouped(
                 query,
                 limits=limits,
                 buckets=buckets,
                 included_secondary_types=included_secondary_types
-            ),
-            self._lidarr_repo.get_library_mbids(include_release_ids=True),
-        )
+            )
+        except Exception as e:
+            logger.error(f"MusicBrainz search failed: {e}")
+            grouped = {"artists": [], "albums": []}
         
         grouped = grouped or {"artists": [], "albums": []}
+        
+        try:
+            library_mbids = await self._lidarr_repo.get_library_mbids(include_release_ids=True)
+        except Exception as e:
+            logger.error(f"Lidarr library fetch failed: {e}")
+            library_mbids = set()
+        
         library_mbids = library_mbids or set()
         
         for item in grouped.get("albums", []):

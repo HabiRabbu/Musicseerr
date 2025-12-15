@@ -127,13 +127,6 @@
 	$: validLinks = artist?.external_links.filter(link => link.url && link.url.trim() !== '') || [];
 
 	async function fetchArtist(force = false) {
-		
-		const now = Date.now();
-		if (!force && now - lastFetchTime < 1000) {
-			return;
-		}
-		lastFetchTime = now;
-
 		loadingBasic = true;
 		loadingExtended = true;
 		error = null;
@@ -282,9 +275,31 @@
 		}
 	}
 
-	onMount(() => {
-		fetchArtist();
+	let currentArtistId: string | null = null;
 
+	$: if (browser && data.artistId && data.artistId !== currentArtistId) {
+		currentArtistId = data.artistId;
+		resetState();
+		fetchArtist();
+	}
+
+	function resetState() {
+		artist = null;
+		loadingBasic = true;
+		loadingExtended = true;
+		error = null;
+		heroImageLoaded = false;
+		heroGradient = 'from-base-300 via-base-200 to-base-100';
+		currentOffset = 50;
+		hasMoreReleases = false;
+		loadedReleaseCount = 0;
+		if (abortController) {
+			abortController.abort();
+			abortController = null;
+		}
+	}
+
+	onMount(() => {
 		if (browser) {
 			const handleRefresh = () => fetchArtist(true);
 			window.addEventListener('artist-refresh', handleRefresh);
@@ -430,15 +445,27 @@
 						<div class="flex flex-col sm:flex-row items-center sm:items-end gap-6 sm:gap-8">
 							<div class="flex-shrink-0">
 								<div class="relative">
-									<div class="w-40 h-40 sm:w-52 sm:h-52 lg:w-64 lg:h-64 rounded-full overflow-hidden shadow-2xl ring-4 ring-base-100/20">
+									<div class="w-40 h-40 sm:w-52 sm:h-52 lg:w-64 lg:h-64 rounded-full overflow-hidden shadow-2xl ring-4 ring-base-100/20" style="background-color: #374151;">
+										<!-- Placeholder shown immediately -->
+										{#if !heroImageLoaded}
+											<div class="absolute inset-0 flex items-center justify-center">
+												<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" class="w-full h-full">
+													<rect fill="#374151" width="200" height="200"/>
+													<circle cx="100" cy="80" r="30" fill="#6B7280"/>
+													<path d="M60 120 Q100 140 140 120 L140 160 Q100 180 60 160 Z" fill="#6B7280"/>
+												</svg>
+											</div>
+										{/if}
 										<img
 											src="/api/covers/artist/{artist.musicbrainz_id}?size=500"
 											alt={artist.name}
-											class="w-full h-full object-cover"
+											class="w-full h-full object-cover transition-opacity duration-300 {heroImageLoaded ? 'opacity-100' : 'opacity-0'}"
+											loading="lazy"
+											decoding="async"
 											on:load={onHeroImageLoad}
 											on:error={(e) => {
 												const target = e.currentTarget as HTMLImageElement;
-												target.src = 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 200 200%22%3E%3Crect fill=%22%23374151%22 width=%22200%22 height=%22200%22/%3E%3Ccircle cx=%22100%22 cy=%2280%22 r=%2230%22 fill=%22%236B7280%22/%3E%3Cpath d=%22M60 120 Q100 140 140 120 L140 160 Q100 180 60 160 Z%22 fill=%22%236B7280%22/%3E%3C/svg%3E';
+												target.style.display = 'none';
 											}}
 										/>
 									</div>

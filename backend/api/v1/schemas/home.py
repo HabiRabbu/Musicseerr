@@ -109,6 +109,10 @@ class HomeResponse(BaseModel):
         default_factory=dict,
         description="Status of integrations: listenbrainz, jellyfin, lidarr"
     )
+    genre_artists: dict[str, str | None] = Field(
+        default_factory=dict,
+        description="Map of genre name to representative artist MBID"
+    )
 
 
 class GenreDetailRequest(BaseModel):

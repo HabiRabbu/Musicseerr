@@ -235,6 +235,7 @@ export type HomeResponse = {
 	favorite_artists: HomeSection | null;
 	service_prompts: ServicePrompt[];
 	integration_status: Record<string, boolean>;
+	genre_artists: Record<string, string | null>;
 };
 
 export type QualityProfile = {

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { page } from '$app/stores';
-	import { onMount } from 'svelte';
-	import { goto } from '$app/navigation';
+	import { onMount, onDestroy } from 'svelte';
+	import { goto, beforeNavigate } from '$app/navigation';
 	import ArtistImage from '$lib/components/ArtistImage.svelte';
 	import AlbumImage from '$lib/components/AlbumImage.svelte';
 	import type { HomeArtist, HomeAlbum, GenreDetailResponse } from '$lib/types';
@@ -12,6 +12,8 @@
 	let error = '';
 	let heroArtistMbid: string | null = null;
 	let heroImageLoaded = false;
+	let abortController: AbortController | null = null;
+	let lastLoadedGenre = '';
 
 	let artistOffset = 0;
 	let albumOffset = 0;
@@ -28,12 +30,16 @@
 		heroArtistMbid = null;
 		heroImageLoaded = false;
 		try {
-			const response = await fetch(`/api/home/genre-artist/${encodeURIComponent(genreName)}`);
+			const response = await fetch(`/api/home/genre-artist/${encodeURIComponent(genreName)}`, {
+				signal: abortController?.signal
+			});
 			if (response.ok) {
 				const data = await response.json();
 				heroArtistMbid = data.artist_mbid;
 			}
-		} catch {}
+		} catch (e) {
+			if (e instanceof Error && e.name === 'AbortError') return;
+		}
 	}
 
 	async function loadGenreData() {
@@ -50,7 +56,8 @@
 
 		try {
 			const response = await fetch(
-				`/api/home/genre/${encodeURIComponent(genreName)}?limit=${PAGE_SIZE}`
+				`/api/home/genre/${encodeURIComponent(genreName)}?limit=${PAGE_SIZE}`,
+				{ signal: abortController?.signal }
 			);
 			if (response.ok) {
 				genreData = await response.json();
@@ -58,6 +65,7 @@
 				error = 'Failed to load genre data';
 			}
 		} catch (e) {
+			if (e instanceof Error && e.name === 'AbortError') return;
 			console.error('Failed to load genre data:', e);
 			error = 'Failed to load genre data';
 		} finally {
@@ -113,14 +121,34 @@
 		}
 	}
 
-	onMount(() => {
+	function loadData() {
+		if (abortController) {
+			abortController.abort();
+		}
+		abortController = new AbortController();
+		lastLoadedGenre = genreName;
 		loadGenreData();
 		loadHeroArtist();
+	}
+
+	function cleanup() {
+		if (abortController) {
+			abortController.abort();
+			abortController = null;
+		}
+	}
+
+	onMount(() => {
+		if (genreName) {
+			loadData();
+		}
 	});
 
-	$: if (genreName) {
-		loadGenreData();
-		loadHeroArtist();
+	onDestroy(cleanup);
+	beforeNavigate(cleanup);
+
+	$: if (genreName && genreName !== lastLoadedGenre) {
+		loadData();
 	}
 
 	function handleArtistClick(mbid: string) {

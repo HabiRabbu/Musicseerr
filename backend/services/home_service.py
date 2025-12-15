@@ -188,7 +188,36 @@ class HomeService:
         
         return None
     
+    async def get_genre_artists_batch(self, genres: list[str]) -> dict[str, str | None]:
+        """Fetch artist MBIDs for multiple genres concurrently."""
+        if not genres:
+            return {}
+        
+        tasks = {genre: self.get_genre_artist(genre) for genre in genres[:20]}
+        results = await self._execute_tasks(tasks)
+        return {genre: mbid for genre, mbid in results.items()}
+    
+    def _get_home_cache_key(self) -> str:
+        lb_enabled = self._is_listenbrainz_enabled()
+        jf_enabled = self._is_jellyfin_enabled()
+        username = self._get_listenbrainz_username() or ""
+        return f"home_response:{lb_enabled}:{jf_enabled}:{username}"
+    
+    async def get_cached_home_data(self) -> HomeResponse | None:
+        if not self._memory_cache:
+            return None
+        cache_key = self._get_home_cache_key()
+        return await self._memory_cache.get(cache_key)
+    
     async def get_home_data(self) -> HomeResponse:
+        HOME_CACHE_TTL = 300
+        
+        if self._memory_cache:
+            cache_key = self._get_home_cache_key()
+            cached = await self._memory_cache.get(cache_key)
+            if cached is not None:
+                return cached
+        
         lb_enabled = self._is_listenbrainz_enabled()
         jf_enabled = self._is_jellyfin_enabled()
         username = self._get_listenbrainz_username()
@@ -240,6 +269,13 @@ class HomeService:
             library_albums, results.get("lb_genres")
         )
         
+        if response.genre_list and response.genre_list.items:
+            genre_names = [
+                g.name for g in response.genre_list.items[:20]
+                if isinstance(g, HomeGenre)
+            ]
+            response.genre_artists = await self.get_genre_artists_batch(genre_names)
+        
         if lb_enabled:
             response.fresh_releases = self._build_fresh_releases_section(
                 results, library_mbids
@@ -257,6 +293,9 @@ class HomeService:
             )
         
         response.service_prompts = self._build_service_prompts(lb_enabled, jf_enabled)
+        
+        if self._memory_cache:
+            await self._memory_cache.set(cache_key, response, HOME_CACHE_TTL)
         
         return response
     

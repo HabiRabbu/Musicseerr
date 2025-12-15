@@ -84,23 +84,24 @@
 </script>
 
 <div class="relative overflow-hidden flex-shrink-0 {sizeClass} {roundedClass} {className}" style="background-color: #374151;">
-	{#if imgError || !validMbid}
-		{#if showPlaceholder}
-			<div class="w-full h-full flex items-center justify-center">
-				<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" class="w-full h-full">
-					<rect fill="#374151" width="200" height="200"/>
-					<circle cx="100" cy="80" r="30" fill="#6B7280"/>
-					<path d="M60 120 Q100 140 140 120 L140 160 Q100 180 60 160 Z" fill="#6B7280"/>
-				</svg>
-			</div>
-		{/if}
-	{:else}
+	<!-- Always show placeholder until image loads -->
+	{#if showPlaceholder && (!imgLoaded || imgError || !validMbid)}
+		<div class="absolute inset-0 w-full h-full flex items-center justify-center">
+			<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" class="w-full h-full">
+				<rect fill="#374151" width="200" height="200"/>
+				<circle cx="100" cy="80" r="30" fill="#6B7280"/>
+				<path d="M60 120 Q100 140 140 120 L140 160 Q100 180 60 160 Z" fill="#6B7280"/>
+			</svg>
+		</div>
+	{/if}
+	{#if validMbid && !imgError}
 		{#if lazy}
 			<img
 				src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
 				data-src={coverUrl}
 				{alt}
 				class="w-full h-full object-cover opacity-0 transition-opacity duration-300"
+				loading="lazy"
 				decoding="async"
 				use:lazyImage
 				use:bindImgElement
@@ -113,6 +114,7 @@
 				{alt}
 				class="w-full h-full object-cover transition-opacity duration-300"
 				class:opacity-0={!imgLoaded}
+				loading="lazy"
 				decoding="async"
 				on:error={onImgError}
 				on:load={onImgLoad}

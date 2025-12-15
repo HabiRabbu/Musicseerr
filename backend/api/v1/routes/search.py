@@ -18,8 +18,8 @@ async def search(
         None, ge=1, le=100,
         description="Max items per bucket (deprecated, use limit_artists/limit_albums)"
     ),
-    limit_artists: int = Query(10, ge=1, le=100, description="Max artists to return"),
-    limit_albums: int = Query(10, ge=1, le=100, description="Max albums to return"),
+    limit_artists: int = Query(10, ge=0, le=100, description="Max artists to return"),
+    limit_albums: int = Query(10, ge=0, le=100, description="Max albums to return"),
     buckets: str | None = Query(
         None, description="Comma-separated subset: artists,albums"
     ),

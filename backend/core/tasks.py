@@ -10,6 +10,7 @@ from services.preferences_service import PreferencesService
 
 if TYPE_CHECKING:
     from services.album_service import AlbumService
+    from services.home_service import HomeService
     from infrastructure.cache.persistent_cache import LibraryCache
 
 logger = logging.getLogger(__name__)
@@ -151,4 +152,28 @@ async def warm_library_cache(
     
     except Exception as e:
         logger.error(f"Failed to warm library cache: {e}")
+
+
+async def warm_home_cache_periodically(
+    home_service: 'HomeService',
+    interval: int = 240
+) -> None:
+    await asyncio.sleep(10)
+    
+    while True:
+        try:
+            logger.debug("Warming home page cache...")
+            await home_service.get_home_data()
+            logger.debug("Home cache warming complete")
+        except asyncio.CancelledError:
+            logger.info("Home cache warming task cancelled")
+            break
+        except Exception as e:
+            logger.warning(f"Home cache warming failed: {e}")
+        
+        await asyncio.sleep(interval)
+
+
+def start_home_cache_warming_task(home_service: 'HomeService') -> asyncio.Task:
+    return asyncio.create_task(warm_home_cache_periodically(home_service))
 

@@ -17,12 +17,28 @@
 	let showToast = false;
 	let requesting = false;
 
-	onMount(async () => {
+	let currentAlbumId: string | null = null;
+
+	$: if (browser && data.albumId && data.albumId !== currentAlbumId) {
+		currentAlbumId = data.albumId;
+		resetState();
+		loadAlbum();
+	}
+
+	function resetState() {
+		album = null;
+		tracksInfo = null;
+		error = null;
+		loadingBasic = true;
+		loadingTracks = true;
+	}
+
+	async function loadAlbum() {
 		await fetchBasicInfo();
 		if (album) {
 			fetchTracksInfo();
 		}
-	});
+	}
 
 	async function fetchBasicInfo() {
 		try {

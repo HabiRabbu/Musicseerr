@@ -49,6 +49,8 @@
 
 		abortController = new AbortController();
 		hasSearched = true;
+		artists = [];
+		albums = [];
 		loadingArtists = true;
 		loadingAlbums = true;
 
@@ -63,10 +65,11 @@
 			}
 			loadingArtists = false;
 		}).catch(error => {
-			if (error instanceof Error && error.name !== 'AbortError') {
-				console.error('Artist search failed:', error);
-				artists = [];
+			if (error instanceof Error && error.name === 'AbortError') {
+				return;
 			}
+			console.error('Artist search failed:', error);
+			artists = [];
 			loadingArtists = false;
 		});
 
@@ -81,10 +84,11 @@
 			}
 			loadingAlbums = false;
 		}).catch(error => {
-			if (error instanceof Error && error.name !== 'AbortError') {
-				console.error('Album search failed:', error);
-				albums = [];
+			if (error instanceof Error && error.name === 'AbortError') {
+				return;
 			}
+			console.error('Album search failed:', error);
+			albums = [];
 			loadingAlbums = false;
 		});
 

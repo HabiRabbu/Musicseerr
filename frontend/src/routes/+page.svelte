@@ -1,19 +1,20 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, onDestroy } from 'svelte';
 	import { browser } from '$app/environment';
+	import { beforeNavigate } from '$app/navigation';
 	import HomeSection from '$lib/components/HomeSection.svelte';
 	import type { HomeResponse, HomeSection as HomeSectionType } from '$lib/types';
 
 	const CACHE_KEY = 'musicseerr_home_cache';
-	const CACHE_TTL = 60 * 60 * 1000; // 1 hour in milliseconds
+	const CACHE_TTL = 5 * 60 * 1000; // 5 minutes - when to background refresh
 
 	let homeData: HomeResponse | null = null;
 	let loading = true;
 	let refreshing = false;
+	let isUpdating = false; // Visual indicator for background updates
 	let error = '';
 	let lastUpdated: Date | null = null;
-	
-	let genreArtists: Record<string, string | null> = {};
+	let abortController: AbortController | null = null;
 
 	interface CachedData {
 		data: HomeResponse;
@@ -23,7 +24,7 @@
 	function getCachedData(): CachedData | null {
 		if (!browser) return null;
 		try {
-			const cached = sessionStorage.getItem(CACHE_KEY);
+			const cached = localStorage.getItem(CACHE_KEY);
 			if (cached) {
 				return JSON.parse(cached);
 			}
@@ -40,7 +41,7 @@
 				data,
 				timestamp: Date.now()
 			};
-			sessionStorage.setItem(CACHE_KEY, JSON.stringify(cacheEntry));
+			localStorage.setItem(CACHE_KEY, JSON.stringify(cacheEntry));
 		} catch (e) {
 			console.warn('Failed to write cache:', e);
 		}
@@ -51,19 +52,22 @@
 	}
 
 	async function loadHomeData(forceRefresh = false) {
-		if (!forceRefresh) {
-			const cached = getCachedData();
-			if (cached) {
-				homeData = cached.data;
-				lastUpdated = new Date(cached.timestamp);
-				loading = false;
+		// Always try to show cached data first
+		const cached = getCachedData();
+		if (cached && !forceRefresh) {
+			homeData = cached.data;
+			lastUpdated = new Date(cached.timestamp);
+			loading = false;
 
-				if (isCacheStale(cached.timestamp)) {
-					refreshInBackground();
-				}
-				return;
-			}
+			// Always refresh in background to get fresh data
+			refreshInBackground();
+			return;
 		}
+
+		if (abortController) {
+			abortController.abort();
+		}
+		abortController = new AbortController();
 
 		if (!homeData) {
 			loading = true;
@@ -74,7 +78,7 @@
 		error = '';
 
 		try {
-			const response = await fetch('/api/home');
+			const response = await fetch('/api/home', { signal: abortController.signal });
 			if (response.ok) {
 				const data = await response.json();
 				homeData = data;
@@ -86,6 +90,9 @@
 				}
 			}
 		} catch (e) {
+			if (e instanceof Error && e.name === 'AbortError') {
+				return;
+			}
 			console.error('Failed to load home data:', e);
 			if (!homeData) {
 				error = 'Failed to load home data';
@@ -98,10 +105,16 @@
 
 	async function refreshInBackground() {
 		if (refreshing) return;
+
+		if (abortController) {
+			abortController.abort();
+		}
+		abortController = new AbortController();
 		refreshing = true;
+		isUpdating = true;
 
 		try {
-			const response = await fetch('/api/home');
+			const response = await fetch('/api/home', { signal: abortController.signal });
 			if (response.ok) {
 				const data = await response.json();
 				homeData = data;
@@ -109,9 +122,13 @@
 				setCachedData(data);
 			}
 		} catch (e) {
+			if (e instanceof Error && e.name === 'AbortError') {
+				return;
+			}
 			console.error('Background refresh failed:', e);
 		} finally {
 			refreshing = false;
+			isUpdating = false;
 		}
 	}
 
@@ -119,9 +136,19 @@
 		loadHomeData(true);
 	}
 
+	function cleanup() {
+		if (abortController) {
+			abortController.abort();
+			abortController = null;
+		}
+	}
+
 	onMount(() => {
 		loadHomeData();
 	});
+
+	onDestroy(cleanup);
+	beforeNavigate(cleanup);
 
 	function getGreeting(): string {
 		const hour = new Date().getHours();
@@ -201,26 +228,6 @@
 		}
 	}
 
-	async function loadGenreArtist(genreName: string) {
-		if (genreArtists[genreName] !== undefined) return;
-		genreArtists[genreName] = null;
-		try {
-			const response = await fetch(`/api/home/genre-artist/${encodeURIComponent(genreName)}`);
-			if (response.ok) {
-				const data = await response.json();
-				genreArtists[genreName] = data.artist_mbid;
-				genreArtists = genreArtists;
-			}
-		} catch {}
-	}
-
-	$: if (homeData?.genre_list?.items) {
-		for (const genre of homeData.genre_list.items.slice(0, 20)) {
-			const genreItem = genre as { name: string };
-			loadGenreArtist(genreItem.name);
-		}
-	}
-
 	const genreColors = [
 		'from-rose-500 to-pink-600',
 		'from-violet-500 to-purple-600',
@@ -292,7 +299,12 @@
 				</div>
 				<!-- Refresh Button -->
 				<div class="flex items-center gap-2">
-					{#if lastUpdated && !loading}
+					{#if isUpdating}
+						<span class="badge badge-ghost badge-sm gap-1">
+							<span class="loading loading-spinner loading-xs"></span>
+							Updating...
+						</span>
+					{:else if lastUpdated && !loading}
 						<span class="hidden text-xs text-base-content/50 sm:inline">
 							Updated {formatLastUpdated(lastUpdated)}
 						</span>
@@ -416,7 +428,7 @@
 					<div class="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 md:grid-cols-4 lg:grid-cols-5">
 						{#each homeData.genre_list.items.slice(0, 20) as genre}
 							{@const genreItem = genre as { name: string }}
-							{@const artistMbid = genreArtists[genreItem.name]}
+							{@const artistMbid = homeData.genre_artists?.[genreItem.name]}
 							<a
 								href="/genre?name={encodeURIComponent(genreItem.name)}"
 								class="card text-white shadow-lg transition-all duration-200 hover:scale-105 hover:shadow-xl active:scale-95 overflow-hidden relative"

@@ -86,3 +86,13 @@ async def get_genre_artist(
 ):
     artist_mbid = await home_service.get_genre_artist(genre_name)
     return {"artist_mbid": artist_mbid}
+
+
+@router.post("/genre-artists")
+async def get_genre_artists_batch(
+    genres: list[str],
+    home_service: HomeService = Depends(get_home_service)
+):
+    """Batch fetch artist MBIDs for multiple genres in a single request."""
+    results = await home_service.get_genre_artists_batch(genres)
+    return {"genre_artists": results}

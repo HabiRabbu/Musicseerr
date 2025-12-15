@@ -11,7 +11,7 @@ from core.dependencies import (
     init_app_state, 
     cleanup_app_state
 )
-from core.tasks import start_cache_cleanup_task, start_library_sync_task, start_disk_cache_cleanup_task
+from core.tasks import start_cache_cleanup_task, start_library_sync_task, start_disk_cache_cleanup_task, start_home_cache_warming_task
 from core.exceptions import ResourceNotFoundError, ExternalServiceError
 from core.exception_handlers import (
     resource_not_found_handler,
@@ -75,6 +75,9 @@ async def lifespan(app: FastAPI):
         warm_library_cache(library_service, get_album_service(), get_library_cache())
     )
     cache_task.add_done_callback(handle_cache_warming_error)
+    
+    from core.dependencies import get_home_service
+    start_home_cache_warming_task(get_home_service())
     
     logger.info("Musicseerr started successfully")
     

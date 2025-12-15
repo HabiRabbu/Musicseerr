@@ -29,7 +29,7 @@ _mb_circuit_breaker = CircuitBreaker(
     name="musicbrainz"
 )
 
-_mb_rate_limiter = TokenBucketRateLimiter(rate=1.0, capacity=3)
+_mb_rate_limiter = TokenBucketRateLimiter(rate=1.0, capacity=5)
 
 _mb_deduplicator = RequestDeduplicator()
 
