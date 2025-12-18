@@ -5,6 +5,7 @@
 	import AlbumCard from '$lib/components/AlbumCard.svelte';
 	import type { Album } from '$lib/types';
 	import { colors } from '$lib/colors';
+	import { searchStore } from '$lib/stores/search';
 
 	export let data: { query: string };
 
@@ -17,6 +18,7 @@
 	let showToast = false;
 	let abortController: AbortController | null = null;
 	let observer: IntersectionObserver | null = null;
+	let initializedFromCache = false;
 
 	function navigateBack() {
 		if (data.query) {
@@ -41,7 +43,7 @@
 		if (loading || !hasMore || !data.query) return;
 
 		loading = true;
-		
+
 		if (abortController) {
 			abortController.abort();
 		}
@@ -59,8 +61,20 @@
 				if (newAlbums.length < limit) {
 					hasMore = false;
 				}
-				albums = [...albums, ...newAlbums];
-				offset += newAlbums.length;
+				// If we had cached results displayed, merge new results avoiding duplicates
+				if (offset === 0 && albums.length > 0) {
+					const existingIds = new Set(albums.map((a) => a.musicbrainz_id));
+					const uniqueNewAlbums = newAlbums.filter(
+						(a: Album) => !existingIds.has(a.musicbrainz_id)
+					);
+					albums = [...albums, ...uniqueNewAlbums];
+					offset = albums.length;
+				} else {
+					albums = [...albums, ...newAlbums];
+					offset += newAlbums.length;
+				}
+				// Update cache with full results
+				searchStore.updateAlbums(albums);
 			} else {
 				hasMore = false;
 			}
@@ -80,16 +94,28 @@
 			abortController.abort();
 			abortController = null;
 		}
-		
+
 		if (observer) {
 			observer.disconnect();
 			observer = null;
 		}
-		
-		albums = [];
-		offset = 0;
-		hasMore = true;
-		loadMore();
+
+		// Check cache for initial results
+		const cache = searchStore.getCache(data.query);
+		if (cache && cache.albums.length > 0) {
+			albums = cache.albums;
+			offset = 0; // Will be updated after first loadMore
+			hasMore = true;
+			initializedFromCache = true;
+			// Fetch more in background
+			loadMore();
+		} else {
+			albums = [];
+			offset = 0;
+			hasMore = true;
+			initializedFromCache = false;
+			loadMore();
+		}
 	}
 
 	$: if (browser && data.query) {

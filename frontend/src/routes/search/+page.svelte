@@ -8,9 +8,10 @@
 	import ViewMoreArtistCard from '$lib/components/ViewMoreArtistCard.svelte';
 	import type { Artist, Album } from '$lib/types';
 	import { colors } from '$lib/colors';
+	import { searchStore } from '$lib/stores/search';
 
 	export let data: { query: string };
-	
+
 	let artists: Artist[] = [];
 	let albums: Album[] = [];
 	let loadingArtists = false;
@@ -44,6 +45,7 @@
 			artists = [];
 			albums = [];
 			hasSearched = false;
+			searchStore.clear();
 			return;
 		}
 
@@ -58,8 +60,8 @@
 			signal: abortController.signal
 		}).then(async res => {
 			if (res.ok) {
-				const data = await res.json();
-				artists = data.artists || [];
+				const responseData = await res.json();
+				artists = responseData.artists || [];
 			} else {
 				artists = [];
 			}
@@ -77,8 +79,8 @@
 			signal: abortController.signal
 		}).then(async res => {
 			if (res.ok) {
-				const data = await res.json();
-				albums = data.albums || [];
+				const responseData = await res.json();
+				albums = responseData.albums || [];
 			} else {
 				albums = [];
 			}
@@ -93,10 +95,12 @@
 		});
 
 		await Promise.allSettled([fetchArtists, fetchAlbums]);
+
+		searchStore.setResults(q, artists, albums);
 	}
 
 	let lastQuery = '';
-	
+
 	$: if (browser && data.query && data.query !== lastQuery) {
 		lastQuery = data.query;
 		performSearch(data.query);
@@ -105,6 +109,7 @@
 		albums = [];
 		hasSearched = false;
 		lastQuery = '';
+		searchStore.clear();
 	}
 
 	onMount(() => {
@@ -160,7 +165,7 @@
 		<div>
 			<h2 class="text-xl font-bold mb-4">Artists</h2>
 			<div class="bg-base-200 rounded-box p-4">
-				<div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-3">
+				<div class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-3">
 					<div class="card bg-base-100 w-full shadow-sm">
 						<div class="skeleton aspect-square w-full"></div>
 					</div>
@@ -207,7 +212,7 @@
 			<h2 class="text-xl font-bold mb-4">Artists</h2>
 			{#if loadingArtists}
 				<div class="bg-base-200 rounded-box p-4">
-					<div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-3">
+					<div class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-3">
 						{#each Array(7) as _, i}
 							<div class="card bg-base-100 w-full shadow-sm">
 								<div class="skeleton aspect-square w-full"></div>
@@ -220,7 +225,7 @@
 				</div>
 			{:else if artists.length > 0}
 				<div class="bg-base-200 rounded-box p-4">
-					<div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-3">
+					<div class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-3">
 						<ViewMoreArtistCard />
 						{#each artists as artist}
 							<ArtistCard {artist} />

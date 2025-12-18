@@ -5,6 +5,7 @@
 	import ArtistCard from '$lib/components/ArtistCard.svelte';
 	import type { Artist } from '$lib/types';
 	import { colors } from '$lib/colors';
+	import { searchStore } from '$lib/stores/search';
 
 	export let data: { query: string };
 
@@ -16,6 +17,7 @@
 	let sentinel: HTMLElement;
 	let abortController: AbortController | null = null;
 	let observer: IntersectionObserver | null = null;
+	let initializedFromCache = false;
 
 	function navigateBack() {
 		if (data.query) {
@@ -33,7 +35,7 @@
 		if (loading || !hasMore || !data.query) return;
 
 		loading = true;
-		
+
 		if (abortController) {
 			abortController.abort();
 		}
@@ -51,8 +53,20 @@
 				if (newArtists.length < limit) {
 					hasMore = false;
 				}
-				artists = [...artists, ...newArtists];
-				offset += newArtists.length;
+				// If we had cached results displayed, merge new results avoiding duplicates
+				if (offset === 0 && artists.length > 0) {
+					const existingIds = new Set(artists.map((a) => a.musicbrainz_id));
+					const uniqueNewArtists = newArtists.filter(
+						(a: Artist) => !existingIds.has(a.musicbrainz_id)
+					);
+					artists = [...artists, ...uniqueNewArtists];
+					offset = artists.length;
+				} else {
+					artists = [...artists, ...newArtists];
+					offset += newArtists.length;
+				}
+				// Update cache with full results
+				searchStore.updateArtists(artists);
 			} else {
 				hasMore = false;
 			}
@@ -72,16 +86,26 @@
 			abortController.abort();
 			abortController = null;
 		}
-		
+
 		if (observer) {
 			observer.disconnect();
 			observer = null;
 		}
-		
-		artists = [];
-		offset = 0;
-		hasMore = true;
-		loadMore();
+
+		const cache = searchStore.getCache(data.query);
+		if (cache && cache.artists.length > 0) {
+			artists = cache.artists;
+			offset = 0;
+			hasMore = true;
+			initializedFromCache = true;
+			loadMore();
+		} else {
+			artists = [];
+			offset = 0;
+			hasMore = true;
+			initializedFromCache = false;
+			loadMore();
+		}
 	}
 
 	$: if (browser && data.query) {
@@ -152,7 +176,7 @@
 		<p class="text-center mt-32 text-gray-400">Enter a search query to get started.</p>
 	{:else if loading && artists.length === 0}
 		<div class="bg-base-200 rounded-box p-4">
-			<div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-3">
+			<div class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-3">
 				{#each Array(20) as _, i}
 					<div class="card bg-base-100 w-full shadow-sm">
 						<div class="skeleton aspect-square w-full"></div>
@@ -169,7 +193,7 @@
 		</div>
 	{:else}
 		<div class="bg-base-200 rounded-box p-4">
-			<div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-3">
+			<div class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-3">
 				{#each artists as artist}
 					<ArtistCard {artist} />
 				{/each}

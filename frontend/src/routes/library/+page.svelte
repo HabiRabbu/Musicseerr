@@ -51,10 +51,15 @@
 	let currentAlbumPage = 1;
 	let syncing = false;
 
-	// Recently Added carousel scroll state
 	let recentlyAddedContainer: HTMLDivElement;
 	let showLeftArrow = false;
 	let showRightArrow = true;
+
+	let artistsContainer: HTMLDivElement;
+	let artistsShowLeftArrow = false;
+	let artistsShowRightArrow = true;
+	let artistsVisibleCount = 15;
+	const ARTISTS_LOAD_MORE = 15;
 
 	function updateArrowVisibility() {
 		if (!recentlyAddedContainer) return;
@@ -75,19 +80,54 @@
 		recentlyAddedContainer.scrollBy({ left: scrollAmount, behavior: 'smooth' });
 	}
 
-	// Derive recently added data from store
+	function updateArtistsArrowVisibility() {
+		if (!artistsContainer) return;
+		const { scrollLeft, scrollWidth, clientWidth } = artistsContainer;
+		artistsShowLeftArrow = scrollLeft > 10;
+		artistsShowRightArrow = scrollLeft < scrollWidth - clientWidth - 10;
+
+		const scrollPercentage = (scrollLeft + clientWidth) / scrollWidth;
+		if (scrollPercentage > 0.8 && artistsVisibleCount < allArtists.length) {
+			artistsVisibleCount = Math.min(artistsVisibleCount + ARTISTS_LOAD_MORE, allArtists.length);
+		}
+	}
+
+	function scrollArtistsLeft() {
+		if (!artistsContainer) return;
+		const scrollAmount = artistsContainer.clientWidth * 0.8;
+		artistsContainer.scrollBy({ left: -scrollAmount, behavior: 'smooth' });
+	}
+
+	function scrollArtistsRight() {
+		if (!artistsContainer) return;
+		const scrollAmount = artistsContainer.clientWidth * 0.8;
+		artistsContainer.scrollBy({ left: scrollAmount, behavior: 'smooth' });
+	}
+
+	function loadMoreArtists() {
+		artistsVisibleCount = Math.min(artistsVisibleCount + ARTISTS_LOAD_MORE, allArtists.length);
+	}
+
 	$: recentlyAdded = $recentlyAddedStore.data ?? { artists: [], albums: [] };
 	$: loadingRecentlyAdded = $recentlyAddedStore.loading && !$recentlyAddedStore.data;
 
 	onMount(async () => {
-		// Initialize recently added store (will use cache if available)
 		recentlyAddedStore.initialize();
 
 		// Load other data
 		loadArtists();
 		loadAlbums();
 		loadStats();
+
+		setTimeout(() => {
+			updateArrowVisibility();
+			updateArtistsArrowVisibility();
+		}, 100);
 	});
+
+	$: if (allArtists.length > 0 && artistsContainer) {
+		setTimeout(() => updateArtistsArrowVisibility(), 100);
+	}
 
 	async function loadArtists() {
 		try {
@@ -180,7 +220,7 @@
 		};
 	}
 
-	$: displayedArtists = allArtists.slice(0, 6);
+	$: displayedArtists = allArtists.slice(0, artistsVisibleCount);
 	$: totalAlbumPages = Math.ceil(allAlbums.length / albumsPerPage);
 	$: displayedAlbums = allAlbums.slice(
 		(currentAlbumPage - 1) * albumsPerPage,
@@ -305,16 +345,65 @@
 		</div>
 
 		{#if loadingArtists}
-			<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-				{#each Array(6) as _}
-					<ArtistCardSkeleton />
-				{/each}
+			<div class="relative group">
+				<div class="flex gap-4 overflow-x-auto scrollbar-hide pb-2">
+					{#each Array(8) as _}
+						<div class="w-32 sm:w-36 md:w-44 flex-shrink-0">
+							<ArtistCardSkeleton />
+						</div>
+					{/each}
+				</div>
 			</div>
 		{:else if allArtists.length > 0}
-			<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4" in:fade={{ duration: 300 }}>
-				{#each displayedArtists as artist}
-					<ArtistCard artist={convertToArtist(artist)} />
-				{/each}
+			<div class="relative group" in:fade={{ duration: 300 }}>
+				<!-- Left Arrow -->
+				{#if artistsShowLeftArrow}
+					<button
+						class="absolute left-0 top-1/2 -translate-y-1/2 z-10 btn btn-circle btn-sm bg-base-100/90 shadow-lg opacity-0 group-hover:opacity-100 transition-opacity hidden sm:flex"
+						on:click={scrollArtistsLeft}
+						aria-label="Scroll left"
+					>
+						<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5">
+							<path fill-rule="evenodd" d="M12.79 5.23a.75.75 0 01-.02 1.06L8.832 10l3.938 3.71a.75.75 0 11-1.04 1.08l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 011.06.02z" clip-rule="evenodd" />
+						</svg>
+					</button>
+				{/if}
+
+				<!-- Carousel -->
+				<div
+					bind:this={artistsContainer}
+					on:scroll={updateArtistsArrowVisibility}
+					class="flex gap-3 sm:gap-4 overflow-x-auto scrollbar-hide pb-2"
+				>
+					{#each displayedArtists as artist (artist.mbid)}
+						<div class="w-32 sm:w-36 md:w-44 flex-shrink-0">
+							<ArtistCard artist={convertToArtist(artist)} />
+						</div>
+					{/each}
+					{#if artistsVisibleCount < allArtists.length}
+						<div class="w-32 sm:w-36 md:w-44 flex-shrink-0 flex items-center justify-center">
+							<button
+								class="btn btn-ghost btn-sm"
+								on:click={loadMoreArtists}
+							>
+								Load more...
+							</button>
+						</div>
+					{/if}
+				</div>
+
+				<!-- Right Arrow -->
+				{#if artistsShowRightArrow}
+					<button
+						class="absolute right-0 top-1/2 -translate-y-1/2 z-10 btn btn-circle btn-sm bg-base-100/90 shadow-lg opacity-0 group-hover:opacity-100 transition-opacity hidden sm:flex"
+						on:click={scrollArtistsRight}
+						aria-label="Scroll right"
+					>
+						<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5">
+							<path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" />
+						</svg>
+					</button>
+				{/if}
 			</div>
 		{:else}
 			<div class="p-8 bg-base-200 rounded-box text-center text-base-content/50">
