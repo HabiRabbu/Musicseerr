@@ -5,6 +5,7 @@
 	import type { AlbumBasicInfo, AlbumTracksInfo, Track } from '$lib/types';
 	import { colors } from '$lib/colors';
 	import { errorModal } from '$lib/stores/errorModal';
+	import { libraryStore } from '$lib/stores/library';
 	import AlbumImage from '$lib/components/AlbumImage.svelte';
 
 	export let data: { albumId: string };
@@ -18,6 +19,8 @@
 	let requesting = false;
 
 	let currentAlbumId: string | null = null;
+
+	$: isRequested = album && !album.in_library && (album.requested || libraryStore.isRequested(album.musicbrainz_id));
 
 	$: if (browser && data.albumId && data.albumId !== currentAlbumId) {
 		currentAlbumId = data.albumId;
@@ -102,10 +105,11 @@
 			
 			if (res.ok) {
 				if (album) {
-					album.in_library = true;
+					album.requested = true;
 					album = album;
+					libraryStore.addRequested(album.musicbrainz_id);
 				}
-				
+
 				showToast = true;
 				setTimeout(() => {
 					showToast = false;
@@ -201,8 +205,9 @@
 			<!-- Album Header -->
 			<div class="flex flex-col lg:flex-row gap-6 lg:gap-8">
 				<div class="w-full lg:w-64 xl:w-80 flex-shrink-0">
-					<AlbumImage 
-						mbid={album.musicbrainz_id} 
+					<AlbumImage
+						mbid={album.musicbrainz_id}
+						customUrl={album.cover_url}
 						alt={album.title}
 						size="hero"
 						lazy={false}
@@ -212,7 +217,7 @@
 				</div>
 
 				<!-- Album Info -->
-				<div class="flex-1 flex flex-col justify-end space-y-4">
+				<div class="flex-1 flex flex-col lg:justify-end space-y-4">
 					<div class="text-xs sm:text-sm font-semibold uppercase tracking-wider opacity-70">
 						{album.type || 'Album'}
 					</div>
@@ -281,6 +286,13 @@
 								</svg>
 								In Library
 							</div>
+						{:else if isRequested}
+							<div class="badge badge-lg gap-2" style="background-color: #F59E0B; color: {colors.secondary};">
+								<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+									<path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+								</svg>
+								Requested
+							</div>
 						{:else}
 							<button
 								class="btn btn-lg gap-2"
@@ -343,7 +355,7 @@
 										</div>
 										
 										<!-- Track Duration -->
-										<div class="text-base-content/60 text-sm flex-shrink-0">
+										<div class="text-base-content/60 text-sm flex-shrink-0 ml-auto">
 											{formatDuration(track.length)}
 										</div>
 									</div>

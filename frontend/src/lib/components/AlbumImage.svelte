@@ -79,17 +79,17 @@
 	}
 </script>
 
-<div class="relative overflow-hidden flex-shrink-0 {sizeClass} {roundedClass} {className}" style="background-color: #374151;">
+<div class="relative overflow-hidden flex-shrink-0 {sizeClass} {roundedClass} {className}" style="background-color: #0d120a;">
 	<!-- Always show placeholder until image loads -->
 	{#if showPlaceholder && (!imgLoaded || imgError || (!mbid && !customUrl))}
 		<div class="absolute inset-0 w-full h-full flex items-center justify-center">
 			<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" class="w-full h-full">
-				<rect fill="#374151" width="200" height="200"/>
-				<circle cx="100" cy="100" r="70" fill="#1f2937" stroke="#4B5563" stroke-width="2"/>
-				<circle cx="100" cy="100" r="50" fill="none" stroke="#4B5563" stroke-width="1"/>
-				<circle cx="100" cy="100" r="30" fill="none" stroke="#4B5563" stroke-width="1"/>
-				<circle cx="100" cy="100" r="12" fill="#4B5563"/>
-				<circle cx="100" cy="100" r="4" fill="#374151"/>
+				<rect fill="#0d120a" width="200" height="200"/>
+				<circle cx="100" cy="100" r="70" fill="#161d12" stroke="#1F271B" stroke-width="2"/>
+				<circle cx="100" cy="100" r="50" fill="none" stroke="#1F271B" stroke-width="1"/>
+				<circle cx="100" cy="100" r="30" fill="none" stroke="#1F271B" stroke-width="1"/>
+				<circle cx="100" cy="100" r="12" fill="#1F271B"/>
+				<circle cx="100" cy="100" r="4" fill="#0d120a"/>
 			</svg>
 		</div>
 	{/if}

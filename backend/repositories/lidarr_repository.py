@@ -128,11 +128,9 @@ class LidarrRepository:
                 except ValueError:
                     pass
             
-            cover = None
-            if imgs := item.get("images"):
-                first = imgs[0] if imgs else {}
-                cover = first.get("remoteUrl") or first.get("url")
-            
+            album_id = item.get("id")
+            cover = self._get_album_cover_url(item.get("images", []), album_id)
+
             date_added = None
             if added_str := item.get("added"):
                 try:
@@ -219,10 +217,8 @@ class LidarrRepository:
                 except ValueError:
                     pass
 
-            cover = None
-            if imgs := item.get("images"):
-                first = imgs[0] if imgs else {}
-                cover = first.get("remoteUrl") or first.get("url")
+            album_id = item.get("id")
+            cover = self._get_album_cover_url(item.get("images", []), album_id)
 
             grouped.setdefault(artist, []).append(
                 {
@@ -247,7 +243,13 @@ class LidarrRepository:
         for item in data:
             if not item.get("monitored", False):
                 continue
-                
+
+            # Only include albums that have files downloaded
+            statistics = item.get("statistics", {})
+            track_file_count = statistics.get("trackFileCount", 0)
+            if track_file_count == 0:
+                continue
+
             rg = item.get("foreignAlbumId")
             if isinstance(rg, str):
                 ids.add(rg.lower())
@@ -262,11 +264,11 @@ class LidarrRepository:
     
     async def get_artist_mbids(self) -> set[str]:
         cache_key = lidarr_artist_mbids_key()
-        
+
         cached_result = await self._cache.get(cache_key)
         if cached_result is not None:
             return cached_result
-        
+
         data = await self._get("/api/v1/artist")
         ids: set[str] = set()
         for item in data:
@@ -275,7 +277,34 @@ class LidarrRepository:
             mbid = item.get("foreignArtistId") or item.get("mbId")
             if isinstance(mbid, str):
                 ids.add(mbid.lower())
-        
+
+        await self._cache.set(cache_key, ids, ttl_seconds=300)
+        return ids
+
+    async def get_requested_mbids(self) -> set[str]:
+        """Get album MBIDs that are monitored but not yet downloaded (requested)."""
+        cache_key = "lidarr_requested_mbids"
+
+        cached_result = await self._cache.get(cache_key)
+        if cached_result is not None:
+            return cached_result
+
+        data = await self._get("/api/v1/album")
+        ids: set[str] = set()
+        for item in data:
+            if not item.get("monitored", False):
+                continue
+
+            # Only include albums that are monitored but NOT downloaded
+            statistics = item.get("statistics", {})
+            track_file_count = statistics.get("trackFileCount", 0)
+            if track_file_count > 0:
+                continue  # Skip downloaded albums
+
+            rg = item.get("foreignAlbumId")
+            if isinstance(rg, str):
+                ids.add(rg.lower())
+
         await self._cache.set(cache_key, ids, ttl_seconds=300)
         return ids
     
@@ -749,11 +778,9 @@ class LidarrRepository:
                     except ValueError:
                         pass
                 
-                cover = None
-                if imgs := album_data.get("images"):
-                    first = imgs[0] if imgs else {}
-                    cover = first.get("remoteUrl") or first.get("url")
-                
+                album_id = album_data.get("id")
+                cover_url = self._get_album_cover_url(album_data.get("images", []), album_id)
+
                 out.append(
                     LibraryAlbum(
                         artist=artist,
@@ -761,7 +788,7 @@ class LidarrRepository:
                         year=year,
                         monitored=album_data.get("monitored", False),
                         quality=None,
-                        cover_url=cover,
+                        cover_url=cover_url,
                         musicbrainz_id=album_mbid,
                         artist_mbid=artist_mbid,
                         date_added=date_added,
@@ -824,13 +851,11 @@ class LidarrRepository:
                 except ValueError:
                     pass
             
-            cover = None
-            if imgs := item.get("images"):
-                first = imgs[0] if imgs else {}
-                cover = first.get("remoteUrl") or first.get("url")
-            
+            album_id = item.get("id")
+            cover_url = self._get_album_cover_url(item.get("images", []), album_id)
+
             date_added = int(date_added_dt.timestamp())
-            
+
             out.append(
                 LibraryAlbum(
                     artist=artist,
@@ -838,7 +863,7 @@ class LidarrRepository:
                     year=year,
                     monitored=item.get("monitored", False),
                     quality=None,
-                    cover_url=cover,
+                    cover_url=cover_url,
                     musicbrainz_id=item.get("foreignAlbumId"),
                     artist_mbid=artist_mbid,
                     date_added=date_added,
@@ -941,13 +966,71 @@ class LidarrRepository:
         """Build API-authenticated URL for album MediaCover."""
         path_part = url_path.split("?")[0]
         filename = path_part.rsplit("/", 1)[-1] if "/" in path_part else path_part
-        
+
         if size and "." in filename:
             base, ext = filename.rsplit(".", 1)
             if not base.endswith(f"-{size}"):
                 filename = f"{base}-{size}.{ext}"
-        
+
         return f"{self._base_url}/api/v1/MediaCover/album/{album_id}/{filename}?apikey={self._settings.lidarr_api_key}"
+
+    def _get_album_cover_url(self, images: list[dict], album_id: Optional[int], size: int = 500) -> Optional[str]:
+        """Extract cover URL from album images, preferring remote URLs over local MediaCover URLs."""
+        if not images:
+            return None
+
+        cover_url = None
+        for img in images:
+            cover_type = img.get("coverType", "").lower()
+            # Prefer remoteUrl (external CDN) over url (local path)
+            remote_url = img.get("remoteUrl")
+            local_url = img.get("url", "")
+
+            if remote_url:
+                constructed_url = remote_url
+            elif local_url and local_url.startswith("http"):
+                constructed_url = local_url
+            elif local_url and album_id:
+                # Local path - construct MediaCover URL (internal use only)
+                constructed_url = self._build_api_media_cover_url_album(album_id, local_url, size)
+            else:
+                continue
+
+            if cover_type == "cover":
+                return constructed_url
+            elif not cover_url:
+                cover_url = constructed_url
+
+        return cover_url
+
+    def _get_artist_image_urls(self, images: list[dict], artist_id: Optional[int], size: int = 500) -> dict[str, Optional[str]]:
+        """Extract artist image URLs by type (poster, fanart, banner), preferring remote URLs."""
+        result: dict[str, Optional[str]] = {"poster": None, "fanart": None, "banner": None}
+
+        if not images:
+            return result
+
+        for img in images:
+            cover_type = img.get("coverType", "").lower()
+            if cover_type not in result:
+                continue
+
+            remote_url = img.get("remoteUrl")
+            local_url = img.get("url", "")
+
+            if remote_url:
+                constructed_url = remote_url
+            elif local_url and local_url.startswith("http"):
+                constructed_url = local_url
+            elif local_url and artist_id:
+                constructed_url = self._build_api_media_cover_url(artist_id, local_url, size)
+            else:
+                continue
+
+            if not result[cover_type]:
+                result[cover_type] = constructed_url
+
+        return result
 
     async def get_album_image_url(self, album_mbid: str, size: Optional[int] = 500) -> Optional[str]:
         cache_key = f"lidarr_album_image:{album_mbid}:{size or 'orig'}"
@@ -1019,23 +1102,8 @@ class LidarrRepository:
 
             artist = data[0]
             artist_id = artist.get("id")
-            
-            images = artist.get("images", [])
-            poster_url = None
-            fanart_url = None
-            for img in images:
-                cover_type = img.get("coverType", "").lower()
-                url_path = img.get("url", "")
-                if not url_path:
-                    continue
-                if url_path.startswith("http"):
-                    constructed_url = url_path
-                else:
-                    constructed_url = self._build_api_media_cover_url(artist_id, url_path, 500)
-                if cover_type == "poster" and not poster_url:
-                    poster_url = constructed_url
-                elif cover_type == "fanart" and not fanart_url:
-                    fanart_url = constructed_url
+
+            image_urls = self._get_artist_image_urls(artist.get("images", []), artist_id)
 
             links = []
             for link in artist.get("links", []):
@@ -1054,8 +1122,9 @@ class LidarrRepository:
                 "status": artist.get("status"),
                 "genres": artist.get("genres", []),
                 "links": links,
-                "poster_url": poster_url,
-                "fanart_url": fanart_url,
+                "poster_url": image_urls["poster"],
+                "fanart_url": image_urls["fanart"],
+                "banner_url": image_urls["banner"],
                 "monitored": artist.get("monitored", False),
                 "statistics": artist.get("statistics", {}),
                 "ratings": artist.get("ratings", {}),
@@ -1089,23 +1158,8 @@ class LidarrRepository:
 
             album = data[0]
             album_id = album.get("id")
-            
-            images = album.get("images", [])
-            cover_url = None
-            for img in images:
-                cover_type = img.get("coverType", "").lower()
-                url_path = img.get("url", "")
-                if not url_path:
-                    continue
-                if url_path.startswith("http"):
-                    constructed_url = url_path
-                else:
-                    constructed_url = self._build_api_media_cover_url_album(album_id, url_path, 500)
-                if cover_type == "cover":
-                    cover_url = constructed_url
-                    break
-                elif not cover_url:
-                    cover_url = constructed_url
+
+            cover_url = self._get_album_cover_url(album.get("images", []), album_id)
 
             links = []
             for link in album.get("links", []):
@@ -1253,6 +1307,9 @@ class LidarrRepository:
                     except (ValueError, IndexError):
                         pass
 
+                statistics = album.get("statistics", {})
+                track_file_count = statistics.get("trackFileCount", 0)
+
                 album_info = {
                     "id": album_id,
                     "title": album.get("title", "Unknown"),
@@ -1262,6 +1319,7 @@ class LidarrRepository:
                     "release_date": album.get("releaseDate"),
                     "year": year,
                     "monitored": album.get("monitored", False),
+                    "track_file_count": track_file_count,
                     "cover_url": cover_url,
                     "genres": album.get("genres", []),
                 }

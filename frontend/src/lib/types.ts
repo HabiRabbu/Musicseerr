@@ -11,6 +11,7 @@ export type Album = {
 	year: number | null;
 	musicbrainz_id: string;
 	in_library: boolean;
+	requested?: boolean;
 	cover_url?: string | null;
 };
 
@@ -59,6 +60,8 @@ export type ArtistInfo = {
 	} | null;
 	description?: string | null;
 	image?: string | null;
+	fanart_url?: string | null;
+	banner_url?: string | null;
 	tags: string[];
 	aliases: string[];
 	external_links: ExternalLink[];
@@ -112,6 +115,8 @@ export type AlbumInfo = {
 	total_tracks: number;
 	total_length?: number | null;
 	in_library: boolean;
+	requested?: boolean;
+	cover_url?: string | null;
 };
 
 export type AlbumBasicInfo = {
@@ -124,6 +129,8 @@ export type AlbumBasicInfo = {
 	type?: string | null;
 	disambiguation?: string | null;
 	in_library: boolean;
+	requested?: boolean;
+	cover_url?: string | null;
 };
 
 export type AlbumTracksInfo = {
@@ -184,6 +191,7 @@ export type HomeAlbum = {
 	release_date: string | null;
 	listen_count: number | null;
 	in_library: boolean;
+	requested?: boolean;
 };
 
 export type HomeTrack = {

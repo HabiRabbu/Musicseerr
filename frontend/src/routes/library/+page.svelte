@@ -6,6 +6,7 @@
 	import ArtistCardSkeleton from '$lib/components/ArtistCardSkeleton.svelte';
 	import AlbumCardSkeleton from '$lib/components/AlbumCardSkeleton.svelte';
 	import CacheSyncIndicator from '$lib/components/CacheSyncIndicator.svelte';
+	import { recentlyAddedStore } from '$lib/stores/library';
 	import type { Artist, Album } from '$lib/types';
 
 	type LibraryArtist = {
@@ -33,10 +34,6 @@
 		db_size_mb: number;
 	};
 
-	let recentlyAdded: { artists: LibraryArtist[]; albums: LibraryAlbum[] } = {
-		artists: [],
-		albums: []
-	};
 	let allArtists: LibraryArtist[] = [];
 	let allAlbums: LibraryAlbum[] = [];
 	let stats: LibraryStats = {
@@ -46,42 +43,51 @@
 		db_size_mb: 0
 	};
 
-	let loadingRecentlyAdded = true;
 	let loadingArtists = true;
 	let loadingAlbums = true;
 	let loadingStats = true;
-	
+
 	let albumsPerPage = 50;
 	let currentAlbumPage = 1;
 	let syncing = false;
 
+	// Recently Added carousel scroll state
+	let recentlyAddedContainer: HTMLDivElement;
+	let showLeftArrow = false;
+	let showRightArrow = true;
+
+	function updateArrowVisibility() {
+		if (!recentlyAddedContainer) return;
+		const { scrollLeft, scrollWidth, clientWidth } = recentlyAddedContainer;
+		showLeftArrow = scrollLeft > 10;
+		showRightArrow = scrollLeft < scrollWidth - clientWidth - 10;
+	}
+
+	function scrollCarouselLeft() {
+		if (!recentlyAddedContainer) return;
+		const scrollAmount = recentlyAddedContainer.clientWidth * 0.8;
+		recentlyAddedContainer.scrollBy({ left: -scrollAmount, behavior: 'smooth' });
+	}
+
+	function scrollCarouselRight() {
+		if (!recentlyAddedContainer) return;
+		const scrollAmount = recentlyAddedContainer.clientWidth * 0.8;
+		recentlyAddedContainer.scrollBy({ left: scrollAmount, behavior: 'smooth' });
+	}
+
+	// Derive recently added data from store
+	$: recentlyAdded = $recentlyAddedStore.data ?? { artists: [], albums: [] };
+	$: loadingRecentlyAdded = $recentlyAddedStore.loading && !$recentlyAddedStore.data;
+
 	onMount(async () => {
-		await loadLibraryProgressive();
-	});
+		// Initialize recently added store (will use cache if available)
+		recentlyAddedStore.initialize();
 
-	async function loadLibraryProgressive() {
-
-		loadRecentlyAdded();
-		
+		// Load other data
 		loadArtists();
-		
 		loadAlbums();
-		
 		loadStats();
-	}
-
-	async function loadRecentlyAdded() {
-		try {
-			const res = await fetch('/api/library/recently-added');
-			if (res.ok) {
-				recentlyAdded = await res.json();
-			}
-		} catch (error) {
-			console.error('Failed to load recently added:', error);
-		} finally {
-			loadingRecentlyAdded = false;
-		}
-	}
+	});
 
 	async function loadArtists() {
 		try {
@@ -125,14 +131,13 @@
 	}
 
 	async function loadLibrary() {
-		loadingRecentlyAdded = true;
 		loadingArtists = true;
 		loadingAlbums = true;
 		loadingStats = true;
-		
+
 		try {
 			await Promise.all([
-				loadRecentlyAdded(),
+				recentlyAddedStore.refresh(),
 				loadArtists(),
 				loadAlbums(),
 				loadStats()
@@ -219,25 +224,60 @@
 		<h2 class="text-2xl font-semibold mb-4">Recently Added</h2>
 
 		{#if loadingRecentlyAdded}
-			<div class="carousel carousel-center gap-4 p-4 bg-base-200 rounded-box max-w-full overflow-x-auto">
-				{#each Array(6) as _, i}
-					<div class="carousel-item w-48 flex-shrink-0">
-						<AlbumCardSkeleton />
-					</div>
-				{/each}
+			<div class="relative group">
+				<div class="flex gap-4 p-4 bg-base-200 rounded-box overflow-x-auto scrollbar-hide">
+					{#each Array(6) as _, i}
+						<div class="w-48 flex-shrink-0">
+							<AlbumCardSkeleton />
+						</div>
+					{/each}
+				</div>
 			</div>
 		{:else if recentlyAdded.artists.length > 0 || recentlyAdded.albums.length > 0}
-			<div class="carousel carousel-center gap-4 p-4 bg-base-200 rounded-box max-w-full overflow-x-auto" in:fade={{ duration: 300 }}>
-				{#each recentlyAdded.artists as artist}
-					<div class="carousel-item w-48 flex-shrink-0">
-						<ArtistCard artist={convertToArtist(artist)} />
-					</div>
-				{/each}
-				{#each recentlyAdded.albums as album}
-					<div class="carousel-item w-48 flex-shrink-0">
-						<AlbumCard album={convertToAlbum(album)} />
-					</div>
-				{/each}
+			<div class="relative group" in:fade={{ duration: 300 }}>
+				<!-- Left Arrow -->
+				{#if showLeftArrow}
+					<button
+						class="absolute left-2 top-1/2 -translate-y-1/2 z-10 btn btn-circle btn-sm bg-base-100/90 shadow-lg opacity-0 group-hover:opacity-100 transition-opacity hidden sm:flex"
+						on:click={scrollCarouselLeft}
+						aria-label="Scroll left"
+					>
+						<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5">
+							<path fill-rule="evenodd" d="M12.79 5.23a.75.75 0 01-.02 1.06L8.832 10l3.938 3.71a.75.75 0 11-1.04 1.08l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 011.06.02z" clip-rule="evenodd" />
+						</svg>
+					</button>
+				{/if}
+
+				<!-- Carousel -->
+				<div
+					bind:this={recentlyAddedContainer}
+					on:scroll={updateArrowVisibility}
+					class="flex gap-4 p-4 bg-base-200 rounded-box overflow-x-auto scrollbar-hide"
+				>
+					{#each recentlyAdded.artists as artist}
+						<div class="w-48 flex-shrink-0">
+							<ArtistCard artist={convertToArtist(artist)} />
+						</div>
+					{/each}
+					{#each recentlyAdded.albums as album}
+						<div class="w-48 flex-shrink-0">
+							<AlbumCard album={convertToAlbum(album)} />
+						</div>
+					{/each}
+				</div>
+
+				<!-- Right Arrow -->
+				{#if showRightArrow}
+					<button
+						class="absolute right-2 top-1/2 -translate-y-1/2 z-10 btn btn-circle btn-sm bg-base-100/90 shadow-lg opacity-0 group-hover:opacity-100 transition-opacity hidden sm:flex"
+						on:click={scrollCarouselRight}
+						aria-label="Scroll right"
+					>
+						<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5">
+							<path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" />
+						</svg>
+					</button>
+				{/if}
 			</div>
 		{:else}
 			<div class="p-8 bg-base-200 rounded-box text-center text-base-content/50">
@@ -386,3 +426,13 @@
 		</div>
 	{/if}
 </div>
+
+<style>
+	.scrollbar-hide {
+		-ms-overflow-style: none;
+		scrollbar-width: none;
+	}
+	.scrollbar-hide::-webkit-scrollbar {
+		display: none;
+	}
+</style>

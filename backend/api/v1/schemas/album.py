@@ -25,6 +25,8 @@ class AlbumInfo(BaseModel):
     total_tracks: int = 0
     total_length: Optional[int] = None
     in_library: bool = False
+    requested: bool = False
+    cover_url: Optional[str] = None
 
 
 class AlbumBasicInfo(BaseModel):
@@ -38,6 +40,8 @@ class AlbumBasicInfo(BaseModel):
     type: Optional[str] = None
     disambiguation: Optional[str] = None
     in_library: bool = False
+    requested: bool = False
+    cover_url: Optional[str] = None
 
 
 class AlbumTracksInfo(BaseModel):

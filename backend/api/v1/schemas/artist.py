@@ -17,6 +17,8 @@ class ArtistInfo(BaseModel):
     life_span: Optional[dict[str, Optional[str]]] = None
     description: Optional[str] = None
     image: Optional[str] = None
+    fanart_url: Optional[str] = None
+    banner_url: Optional[str] = None
     tags: list[str] = Field(default_factory=list)
     aliases: list[str] = Field(default_factory=list)
     external_links: list[ExternalLink] = Field(default_factory=list)

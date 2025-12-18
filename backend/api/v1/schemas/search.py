@@ -9,6 +9,7 @@ class SearchResult(BaseModel):
     year: Optional[int] = None
     musicbrainz_id: str
     in_library: bool = False
+    requested: bool = False
     cover_url: Optional[str] = None
 
 

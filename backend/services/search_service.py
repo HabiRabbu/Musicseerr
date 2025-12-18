@@ -61,12 +61,21 @@ class SearchService:
         except Exception as e:
             logger.error(f"Lidarr library fetch failed: {e}")
             library_mbids = set()
-        
+
         library_mbids = library_mbids or set()
-        
+
+        try:
+            queue_items = await self._lidarr_repo.get_queue()
+            queued_mbids = {item.musicbrainz_id.lower() for item in queue_items if item.musicbrainz_id}
+        except Exception as e:
+            logger.warning(f"Failed to fetch queue: {e}")
+            queued_mbids = set()
+
         for item in grouped.get("albums", []):
-            item.in_library = (item.musicbrainz_id or "").lower() in library_mbids
-        
+            mbid_lower = (item.musicbrainz_id or "").lower()
+            item.in_library = mbid_lower in library_mbids
+            item.requested = mbid_lower in queued_mbids and not item.in_library
+
         return SearchResponse(
             artists=grouped.get("artists", []),
             albums=grouped.get("albums", [])
@@ -103,7 +112,16 @@ class SearchService:
         
         if bucket == "albums":
             library_mbids = await self._lidarr_repo.get_library_mbids(include_release_ids=True)
+            try:
+                queue_items = await self._lidarr_repo.get_queue()
+                queued_mbids = {item.musicbrainz_id.lower() for item in queue_items if item.musicbrainz_id}
+            except Exception as e:
+                logger.warning(f"Failed to fetch queue: {e}")
+                queued_mbids = set()
+
             for item in results:
-                item.in_library = (item.musicbrainz_id or "").lower() in library_mbids
-        
+                mbid_lower = (item.musicbrainz_id or "").lower()
+                item.in_library = mbid_lower in library_mbids
+                item.requested = mbid_lower in queued_mbids and not item.in_library
+
         return results

@@ -18,6 +18,7 @@ class HomeAlbum(BaseModel):
     release_date: str | None = Field(default=None, description="Release date")
     listen_count: int | None = Field(default=None, description="Total listen count")
     in_library: bool = Field(default=False, description="Whether album is in library")
+    requested: bool = Field(default=False, description="Whether album is requested/in queue")
 
 
 class HomeTrack(BaseModel):

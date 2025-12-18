@@ -35,6 +35,14 @@ class AlbumService:
             return None
         year = date_str.split("-", 1)[0]
         return int(year) if year.isdigit() else None
+
+    async def _get_queued_mbids(self) -> set[str]:
+        try:
+            queue_items = await self._lidarr_repo.get_queue()
+            return {item.musicbrainz_id.lower() for item in queue_items if item.musicbrainz_id}
+        except Exception as e:
+            logger.warning(f"Failed to fetch queue: {e}")
+            return set()
     
     async def _get_cached_album_info(self, release_group_id: str, cache_key: str) -> Optional[AlbumInfo]:
         cached_info = await self._cache.get(cache_key)
@@ -69,10 +77,16 @@ class AlbumService:
             cached_album_info = await self._get_cached_album_info(release_group_id, cache_key)
             if cached_album_info:
                 return cached_album_info
-            
+
             lidarr_album = await self._lidarr_repo.get_album_details(release_group_id)
-            in_library = lidarr_album is not None and lidarr_album.get("monitored", False)
-            
+            # Album is in library only if monitored AND has files downloaded
+            if lidarr_album and lidarr_album.get("monitored", False):
+                statistics = lidarr_album.get("statistics", {})
+                track_file_count = statistics.get("trackFileCount", 0)
+                in_library = track_file_count > 0
+            else:
+                in_library = False
+
             if in_library and lidarr_album:
                 logger.info(f"Using Lidarr as primary source for album {release_group_id[:8]}")
                 album_info = await self._build_album_from_lidarr(release_group_id, lidarr_album)
@@ -107,9 +121,13 @@ class AlbumService:
         except ValueError as e:
             logger.error(f"Invalid album MBID: {e}")
             raise
-        
+
         try:
             cache_key = f"album_info:{release_group_id}"
+
+            requested_mbids = await self._lidarr_repo.get_requested_mbids()
+            is_requested = release_group_id.lower() in requested_mbids
+
             cached_album_info = await self._get_cached_album_info(release_group_id, cache_key)
             if cached_album_info:
                 return AlbumBasicInfo(
@@ -122,12 +140,21 @@ class AlbumService:
                     type=cached_album_info.type,
                     disambiguation=cached_album_info.disambiguation,
                     in_library=cached_album_info.in_library,
+                    requested=is_requested and not cached_album_info.in_library,
+                    cover_url=getattr(cached_album_info, 'cover_url', None),
                 )
-            
+
             lidarr_album = await self._lidarr_repo.get_album_details(release_group_id)
-            in_library = lidarr_album is not None and lidarr_album.get("monitored", False)
-            
-            if in_library and lidarr_album:
+            # Album is in library only if monitored AND has files downloaded
+            if lidarr_album and lidarr_album.get("monitored", False):
+                statistics = lidarr_album.get("statistics", {})
+                track_file_count = statistics.get("trackFileCount", 0)
+                in_library = track_file_count > 0
+            else:
+                in_library = False
+
+            # Handle albums in Lidarr (either downloaded or monitored)
+            if lidarr_album and lidarr_album.get("monitored", False):
                 logger.info(f"[BASIC] Using Lidarr for album {release_group_id[:8]}")
                 year = None
                 if release_date := lidarr_album.get("release_date"):
@@ -135,7 +162,12 @@ class AlbumService:
                         year = int(release_date.split("-")[0])
                     except (ValueError, IndexError):
                         pass
-                
+
+                cover_url = lidarr_album.get("cover_url")
+
+                # Requested = monitored but not downloaded (we know it's monitored at this point)
+                is_requested_album = not in_library
+
                 return AlbumBasicInfo(
                     title=lidarr_album.get("title", "Unknown Album"),
                     musicbrainz_id=release_group_id,
@@ -145,16 +177,18 @@ class AlbumService:
                     year=year,
                     type=lidarr_album.get("album_type"),
                     disambiguation=lidarr_album.get("disambiguation"),
-                    in_library=True,
+                    in_library=in_library,
+                    requested=is_requested_album,
+                    cover_url=cover_url,
                 )
-            
+
             logger.info(f"[BASIC] Using MusicBrainz for album {release_group_id[:8]}")
             release_group = await self._fetch_release_group(release_group_id)
             artist_name, artist_id = self._extract_artist_info(release_group)
-            
+
             cached_album = await self._library_cache.get_album_by_mbid(release_group_id)
             in_library = cached_album is not None
-            
+
             return AlbumBasicInfo(
                 title=release_group.get("title", "Unknown Album"),
                 musicbrainz_id=release_group_id,
@@ -165,6 +199,8 @@ class AlbumService:
                 type=release_group.get("primary-type"),
                 disambiguation=release_group.get("disambiguation"),
                 in_library=in_library,
+                requested=is_requested and not in_library,
+                cover_url=None,
             )
         
         except ValueError:
@@ -443,7 +479,9 @@ class AlbumService:
                 year = int(release_date.split("-")[0])
             except (ValueError, IndexError):
                 pass
-        
+
+        cover_url = lidarr_album.get("cover_url")
+
         return AlbumInfo(
             title=lidarr_album.get("title", "Unknown Album"),
             musicbrainz_id=release_group_id,
@@ -460,6 +498,7 @@ class AlbumService:
             total_tracks=len(tracks),
             total_length=total_length if total_length > 0 else None,
             in_library=True,
+            cover_url=cover_url,
         )
     
     async def _build_album_from_musicbrainz(

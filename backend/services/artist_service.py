@@ -131,7 +131,9 @@ class ArtistService:
         
         description = lidarr_artist.get("overview")
         image = lidarr_artist.get("poster_url")
-        
+        fanart_url = lidarr_artist.get("fanart_url")
+        banner_url = lidarr_artist.get("banner_url")
+
         genres = lidarr_artist.get("genres", [])
         
         external_links = []
@@ -193,6 +195,8 @@ class ArtistService:
             life_span=life_span,
             description=description,
             image=image,
+            fanart_url=fanart_url,
+            banner_url=banner_url,
             tags=genres,
             aliases=aliases,
             external_links=external_links,
@@ -232,13 +236,22 @@ class ArtistService:
                     continue
             
             mbid = album.get("mbid", "")
+            track_file_count = album.get("track_file_count", 0)
+            monitored = album.get("monitored", False)
+
+            # Album is in library only if it has downloaded files
+            in_library = track_file_count > 0
+            # Album is requested if monitored but not downloaded
+            requested = monitored and track_file_count == 0
+
             album_data = {
                 "id": mbid,
                 "title": album.get("title"),
                 "type": album.get("album_type"),
                 "first_release_date": album.get("release_date"),
                 "year": album.get("year"),
-                "in_library": mbid.lower() in library_album_mbids if mbid else album.get("monitored", False),
+                "in_library": in_library,
+                "requested": requested,
             }
             
             if album_type == "album":
@@ -260,19 +273,19 @@ class ArtistService:
         library_album_mbids: dict[str, Any] = None
     ) -> ArtistInfo:
         """Build ArtistInfo from MusicBrainz data (original flow)."""
-        mb_artist, library_mbids, album_mbids = await self._fetch_artist_data(
+        mb_artist, library_mbids, album_mbids, requested_mbids = await self._fetch_artist_data(
             artist_id,
             library_artist_mbids=library_artist_mbids,
             library_album_mbids=library_album_mbids
         )
-        
+
         in_library = artist_id.lower() in library_mbids
         tags = self._extract_tags(mb_artist)
         aliases = self._extract_aliases(mb_artist)
         life_span = self._extract_life_span(mb_artist)
         external_links = self._build_external_links(mb_artist)
-        
-        albums, singles, eps = await self._get_categorized_releases(mb_artist, album_mbids)
+
+        albums, singles, eps = await self._get_categorized_releases(mb_artist, album_mbids, requested_mbids)
         
         description, image = await self._fetch_wikidata_info(mb_artist)
         
@@ -315,17 +328,17 @@ class ArtistService:
             return artist_info
         
         logger.debug(f"Cache MISS (Disk): Artist {artist_id[:8]}... - fetching from API")
-        
-        mb_artist, library_mbids, album_mbids = await self._fetch_artist_data(artist_id)
-        
+
+        mb_artist, library_mbids, album_mbids, requested_mbids = await self._fetch_artist_data(artist_id)
+
         in_library = artist_id.lower() in library_mbids
 
         tags = self._extract_tags(mb_artist)
         aliases = self._extract_aliases(mb_artist)
         life_span = self._extract_life_span(mb_artist)
         external_links = self._build_external_links(mb_artist)
-        
-        albums, singles, eps = await self._get_categorized_releases(mb_artist, album_mbids)
+
+        albums, singles, eps = await self._get_categorized_releases(mb_artist, album_mbids, requested_mbids)
         
         total_release_count = mb_artist.get("release-group-count", 0)
         
@@ -404,20 +417,23 @@ class ArtistService:
         try:
             lidarr_artist = await self._lidarr_repo.get_artist_details(artist_id)
             in_library = lidarr_artist is not None and lidarr_artist.get("monitored", False)
-            
-            album_mbids = await self._lidarr_repo.get_library_mbids(include_release_ids=True)
-            
+
+            album_mbids, requested_mbids = await asyncio.gather(
+                self._lidarr_repo.get_library_mbids(include_release_ids=True),
+                self._lidarr_repo.get_requested_mbids(),
+            )
+
             prefs = self._preferences_service.get_preferences()
             included_primary_types = set(t.lower() for t in prefs.primary_types)
             included_secondary_types = set(t.lower() for t in prefs.secondary_types)
-            
+
             if in_library and offset == 0:
                 logger.debug(f"Using Lidarr for artist releases {artist_id[:8]}")
                 lidarr_albums = await self._lidarr_repo.get_artist_albums(artist_id)
                 albums, singles, eps = self._categorize_lidarr_albums(lidarr_albums, album_mbids)
-                
+
                 total_count = len(albums) + len(singles) + len(eps)
-                
+
                 return ArtistReleases(
                     albums=albums,
                     singles=singles,
@@ -425,19 +441,20 @@ class ArtistService:
                     total_count=total_count,
                     has_more=False
                 )
-            
+
             logger.debug(f"Using MusicBrainz for artist releases {artist_id[:8]}")
             release_groups, total_count = await self._mb_repo.get_artist_release_groups(
                 artist_id, offset, limit
             )
-            
+
             temp_artist = {"release-group-list": release_groups}
-            
+
             albums, singles, eps = self._categorize_release_groups(
                 temp_artist,
                 album_mbids,
                 included_primary_types,
-                included_secondary_types
+                included_secondary_types,
+                requested_mbids
             )
             
             has_more = (offset + len(release_groups)) < total_count
@@ -454,30 +471,34 @@ class ArtistService:
             return ArtistReleases(albums=[], singles=[], eps=[], total_count=0, has_more=False)
     
     async def _fetch_artist_data(
-        self, 
+        self,
         artist_id: str,
         library_artist_mbids: set[str] = None,
         library_album_mbids: dict[str, Any] = None
-    ) -> tuple[dict, set[str], set[str]]:
+    ) -> tuple[dict, set[str], set[str], set[str]]:
         try:
             if library_artist_mbids is not None and library_album_mbids is not None:
-                mb_artist = await self._mb_repo.get_artist_by_id(artist_id)
+                mb_artist, requested_mbids = await asyncio.gather(
+                    self._mb_repo.get_artist_by_id(artist_id),
+                    self._lidarr_repo.get_requested_mbids(),
+                )
                 library_mbids = library_artist_mbids
                 album_mbids = library_album_mbids
             else:
-                mb_artist, library_mbids, album_mbids = await asyncio.gather(
+                mb_artist, library_mbids, album_mbids, requested_mbids = await asyncio.gather(
                     self._mb_repo.get_artist_by_id(artist_id),
                     self._lidarr_repo.get_artist_mbids(),
                     self._lidarr_repo.get_library_mbids(include_release_ids=True),
+                    self._lidarr_repo.get_requested_mbids(),
                 )
         except Exception as e:
             logger.error(f"Error fetching artist data for {artist_id}: {e}")
             raise ResourceNotFoundError(f"Failed to fetch artist: {e}")
-        
+
         if not mb_artist:
             raise ResourceNotFoundError("Artist not found")
-        
-        return mb_artist, library_mbids, album_mbids
+
+        return mb_artist, library_mbids, album_mbids, requested_mbids
     
     def _build_external_links(self, mb_artist: dict[str, Any]) -> list[ExternalLink]:
         external_links_data = self._extract_external_links(mb_artist)
@@ -489,17 +510,19 @@ class ArtistService:
     async def _get_categorized_releases(
         self,
         mb_artist: dict[str, Any],
-        album_mbids: set[str]
+        album_mbids: set[str],
+        requested_mbids: set[str] = None
     ) -> tuple[list[dict], list[dict], list[dict]]:
         prefs = self._preferences_service.get_preferences()
         included_primary_types = set(t.lower() for t in prefs.primary_types)
         included_secondary_types = set(t.lower() for t in prefs.secondary_types)
-        
+
         return self._categorize_release_groups(
             mb_artist,
             album_mbids,
             included_primary_types,
-            included_secondary_types
+            included_secondary_types,
+            requested_mbids or set()
         )
     
     async def _fetch_wikidata_info(self, mb_artist: dict[str, Any]) -> tuple[Optional[str], Optional[str]]:
@@ -618,53 +641,61 @@ class ArtistService:
         album_mbids: set[str],
         included_primary_types: Optional[set[str]] = None,
         included_secondary_types: Optional[set[str]] = None,
+        requested_mbids: Optional[set[str]] = None,
     ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
         if included_primary_types is None:
             included_primary_types = {"album", "single", "ep", "broadcast", "other"}
-        
+        if requested_mbids is None:
+            requested_mbids = set()
+
         albums = []
         singles = []
         eps = []
-        
+
         if rg_list := mb_artist.get("release-group-list", []):
             for rg in rg_list:
                 rg_id = rg.get("id")
                 primary_type = (rg.get("primary-type") or "").lower()
-                
+
                 if primary_type not in included_primary_types:
                     continue
-                
+
                 if included_secondary_types is not None:
                     secondary_types = set(map(str.lower, rg.get("secondary-type-list", []) or []))
-                    
+
                     if not secondary_types:
                         if "studio" not in included_secondary_types:
                             continue
                     elif not secondary_types.intersection(included_secondary_types):
                         continue
-                
+
+                rg_id_lower = rg_id.lower() if rg_id else ""
+                in_library = rg_id_lower in album_mbids if rg_id else False
+                requested = rg_id_lower in requested_mbids if rg_id and not in_library else False
+
                 rg_data = {
                     "id": rg_id,
                     "title": rg.get("title"),
                     "type": rg.get("primary-type"),
                     "first_release_date": rg.get("first-release-date"),
-                    "in_library": rg_id.lower() in album_mbids if rg_id else False,
+                    "in_library": in_library,
+                    "requested": requested,
                 }
-                
+
                 if date := rg_data.get("first_release_date"):
                     try:
                         rg_data["year"] = int(date.split("-")[0])
                     except (ValueError, AttributeError):
                         pass
-                
+
                 if primary_type == "album":
                     albums.append(rg_data)
                 elif primary_type == "single":
                     singles.append(rg_data)
                 elif primary_type == "ep":
                     eps.append(rg_data)
-            
+
             for lst in [albums, singles, eps]:
                 lst.sort(key=lambda x: (x.get("year") is None, -(x.get("year") or 0)))
-        
+
         return albums, singles, eps
