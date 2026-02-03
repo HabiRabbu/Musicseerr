@@ -53,7 +53,6 @@
 				if (newArtists.length < limit) {
 					hasMore = false;
 				}
-				// If we had cached results displayed, merge new results avoiding duplicates
 				if (offset === 0 && artists.length > 0) {
 					const existingIds = new Set(artists.map((a) => a.musicbrainz_id));
 					const uniqueNewArtists = newArtists.filter(
@@ -65,7 +64,6 @@
 					artists = [...artists, ...newArtists];
 					offset += newArtists.length;
 				}
-				// Update cache with full results
 				searchStore.updateArtists(artists);
 			} else {
 				hasMore = false;
@@ -74,7 +72,6 @@
 			if (error instanceof Error && error.name === 'AbortError') {
 				return;
 			}
-			console.error('Failed to load artists:', error);
 			hasMore = false;
 		} finally {
 			loading = false;

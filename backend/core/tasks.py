@@ -136,14 +136,13 @@ async def warm_library_cache(
             mbid = album_data.get('mbid')
             if mbid and not is_unknown_mbid(mbid):
                 try:
-                    cache_key = f"album_info:{mbid}"
-                    if await album_service._cache.get(cache_key) is None:
+                    if not await album_service.is_album_cached(mbid):
                         await album_service.get_album_info(mbid)
                         warmed += 1
-                    
+
                     if i % 5 == 0:
                         await asyncio.sleep(1)
-                
+
                 except Exception as e:
                     logger.debug(f"Failed to warm cache for album {album_data.get('title')}: {e}")
                     continue

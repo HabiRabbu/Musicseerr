@@ -61,7 +61,6 @@
 				if (newAlbums.length < limit) {
 					hasMore = false;
 				}
-				// If we had cached results displayed, merge new results avoiding duplicates
 				if (offset === 0 && albums.length > 0) {
 					const existingIds = new Set(albums.map((a) => a.musicbrainz_id));
 					const uniqueNewAlbums = newAlbums.filter(
@@ -73,7 +72,6 @@
 					albums = [...albums, ...newAlbums];
 					offset += newAlbums.length;
 				}
-				// Update cache with full results
 				searchStore.updateAlbums(albums);
 			} else {
 				hasMore = false;
@@ -82,7 +80,6 @@
 			if (error instanceof Error && error.name === 'AbortError') {
 				return;
 			}
-			console.error('Failed to load albums:', error);
 			hasMore = false;
 		} finally {
 			loading = false;
@@ -100,14 +97,12 @@
 			observer = null;
 		}
 
-		// Check cache for initial results
 		const cache = searchStore.getCache(data.query);
 		if (cache && cache.albums.length > 0) {
 			albums = cache.albums;
-			offset = 0; // Will be updated after first loadMore
+			offset = 0;
 			hasMore = true;
 			initializedFromCache = true;
-			// Fetch more in background
 			loadMore();
 		} else {
 			albums = [];

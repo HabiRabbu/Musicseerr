@@ -60,21 +60,24 @@ class InMemoryCache(CacheInterface):
         self._lock = asyncio.Lock()
         self._max_entries = max_entries
         self._evictions = 0
+        self._hits = 0
+        self._misses = 0
 
     async def get(self, key: str) -> Optional[Any]:
-        entry = self._cache.get(key)
-        if entry is None:
-            return None
-        
-        if entry.is_expired():
-            asyncio.create_task(self.delete(key))
-            return None
-        
         async with self._lock:
-            if key in self._cache:
-                self._cache.move_to_end(key)
-        
-        return entry.value
+            entry = self._cache.get(key)
+            if entry is None:
+                self._misses += 1
+                return None
+
+            if entry.is_expired():
+                self._cache.pop(key, None)
+                self._misses += 1
+                return None
+
+            self._cache.move_to_end(key)
+            self._hits += 1
+            return entry.value
 
     async def set(self, key: str, value: Any, ttl_seconds: int = 60) -> None:
         async with self._lock:
@@ -130,12 +133,25 @@ class InMemoryCache(CacheInterface):
     
     def estimate_memory_bytes(self) -> int:
         total_size = 0
-        
+
         total_size += sys.getsizeof(self._cache)
-        
+
         for key, entry in self._cache.items():
             total_size += sys.getsizeof(key)
             total_size += sys.getsizeof(entry)
             total_size += sys.getsizeof(entry.value)
-        
+
         return total_size
+
+    def get_stats(self) -> dict[str, Any]:
+        total = self._hits + self._misses
+        hit_rate = (self._hits / total * 100) if total > 0 else 0.0
+        return {
+            "size": len(self._cache),
+            "max_entries": self._max_entries,
+            "hits": self._hits,
+            "misses": self._misses,
+            "hit_rate_percent": round(hit_rate, 2),
+            "evictions": self._evictions,
+            "memory_bytes": self.estimate_memory_bytes()
+        }

@@ -21,8 +21,8 @@ async function loadPreferences(): Promise<void> {
 			const prefs: UserPreferences = await response.json();
 			set(prefs);
 		}
-	} catch (error) {
-		console.error('Failed to load preferences:', error);
+	} catch (e) {
+		console.error('Failed to load preferences:', e);
 	}
 }
 
@@ -43,8 +43,8 @@ async function savePreferences(prefs: UserPreferences): Promise<boolean> {
 			return true;
 		}
 		return false;
-	} catch (error) {
-		console.error('Failed to save preferences:', error);
+	} catch (e) {
+		console.error('Failed to save preferences:', e);
 		return false;
 	}
 }

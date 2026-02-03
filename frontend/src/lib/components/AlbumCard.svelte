@@ -3,6 +3,8 @@
 	import { colors } from '$lib/colors';
 	import { goto } from '$app/navigation';
 	import { libraryStore } from '$lib/stores/library';
+	import { STATUS_COLORS } from '$lib/constants';
+	import { requestAlbum } from '$lib/utils/albumRequest';
 	import AlbumImage from './AlbumImage.svelte';
 
 	export let album: Album;
@@ -17,20 +19,10 @@
 		e.stopPropagation();
 		requesting = true;
 		try {
-			const res = await fetch('/api/request', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ musicbrainz_id: album.musicbrainz_id })
-			});
-
-			if (res.ok) {
-				libraryStore.addRequested(album.musicbrainz_id);
+			const result = await requestAlbum(album.musicbrainz_id);
+			if (result.success) {
 				onadded?.();
-			} else {
-				console.error('Failed to request album: server returned', res.status);
 			}
-		} catch (err) {
-			console.error('Failed to request album:', err);
 		} finally {
 			requesting = false;
 		}
@@ -78,7 +70,7 @@
 	{:else if isRequested}
 		<div
 			class="absolute top-2 right-2 rounded-full p-1.5 shadow-lg"
-			style="background-color: #F59E0B;"
+			style="background-color: {STATUS_COLORS.REQUESTED};"
 		>
 			<svg
 				xmlns="http://www.w3.org/2000/svg"

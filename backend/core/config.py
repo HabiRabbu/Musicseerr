@@ -1,6 +1,7 @@
 from pathlib import Path
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from typing import Self
 import json
 import logging
 from infrastructure.file_utils import atomic_write_json
@@ -55,7 +56,27 @@ class Settings(BaseSettings):
     @classmethod
     def validate_url(cls, v: str) -> str:
         return v.rstrip("/")
-    
+
+    @model_validator(mode='after')
+    def validate_config(self) -> Self:
+        errors = []
+
+        for url_field in ['lidarr_url', 'soularr_url', 'jellyfin_url']:
+            url = getattr(self, url_field, '')
+            if url and not url.startswith(('http://', 'https://')):
+                errors.append(f"{url_field} must start with http:// or https://")
+
+        if self.http_max_connections < self.http_max_keepalive * 2:
+            errors.append(
+                f"http_max_connections ({self.http_max_connections}) should be "
+                f"at least 2x http_max_keepalive ({self.http_max_keepalive})"
+            )
+
+        if errors:
+            logger.warning(f"Configuration validation warnings: {'; '.join(errors)}")
+
+        return self
+
     def load_from_file(self) -> None:
         if not self.config_file_path.exists():
             self._create_default_config()

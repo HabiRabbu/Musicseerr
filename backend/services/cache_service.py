@@ -63,7 +63,8 @@ class CacheService:
                                 timeout=5.0
                             )
                             if result.returncode == 0:
-                                disk_count = len(result.stdout.strip().split('\n'))
+                                lines = result.stdout.strip()
+                                disk_count = len(lines.split('\n')) if lines else 0
                                 logger.debug(f"Disk cache stats calculated via subprocess: {disk_count} files, {disk_bytes} bytes")
                         else:
                             du_available = False

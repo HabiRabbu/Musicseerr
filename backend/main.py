@@ -75,7 +75,35 @@ async def lifespan(app: FastAPI):
         warm_library_cache(library_service, get_album_service(), get_library_cache())
     )
     cache_task.add_done_callback(handle_cache_warming_error)
-    
+
+    from services.cache_status_service import CacheStatusService
+    library_cache = get_library_cache()
+    status_service = CacheStatusService(library_cache)
+
+    interrupted_state = await status_service.restore_from_persistence()
+    if interrupted_state:
+        logger.info("Found interrupted library sync, scheduling resume...")
+
+        async def resume_sync():
+            try:
+                await asyncio.sleep(5)
+                artists = await library_cache.get_artists()
+                albums = await library_cache.get_albums()
+                if artists or albums:
+                    artists_dicts = [{'mbid': a['mbid'], 'name': a['name']} for a in artists]
+                    await library_service._precache_service.precache_library_resources(
+                        artists_dicts, albums, resume=True
+                    )
+                else:
+                    logger.warning("No cached artists/albums to resume sync with, clearing state")
+                    await library_cache.clear_sync_state()
+            except Exception as e:
+                logger.error(f"Failed to resume interrupted sync: {e}")
+                await status_service.complete_sync(str(e))
+
+        resume_task = asyncio.create_task(resume_sync())
+        resume_task.add_done_callback(lambda t: logger.info("Resume sync task completed") if not t.exception() else logger.error(f"Resume sync failed: {t.exception()}"))
+
     from core.dependencies import get_home_service
     start_home_cache_warming_task(get_home_service())
     

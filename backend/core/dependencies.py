@@ -10,7 +10,7 @@ from infrastructure.cache.persistent_cache import LibraryCache
 from infrastructure.cache.disk_cache import DiskMetadataCache
 from infrastructure.http.client import get_http_client, close_http_clients
 from infrastructure.queue.request_queue import RequestQueue
-from repositories.lidarr_repository import LidarrRepository
+from repositories.lidarr import LidarrRepository
 from repositories.musicbrainz_repository import MusicBrainzRepository
 from repositories.wikidata_repository import WikidataRepository
 from repositories.coverart_repository import CoverArtRepository
@@ -25,6 +25,8 @@ from services.library_service import LibraryService
 from services.status_service import StatusService
 from services.cache_service import CacheService
 from services.home_service import HomeService
+from services.home_charts_service import HomeChartsService
+from services.settings_service import SettingsService
 
 logger = logging.getLogger(__name__)
 
@@ -231,7 +233,6 @@ def get_home_service() -> HomeService:
     lidarr_repo = get_lidarr_repository()
     musicbrainz_repo = get_musicbrainz_repository()
     preferences_service = get_preferences_service()
-    library_cache = get_library_cache()
     memory_cache = get_cache()
     return HomeService(
         listenbrainz_repo=listenbrainz_repo,
@@ -239,9 +240,29 @@ def get_home_service() -> HomeService:
         lidarr_repo=lidarr_repo,
         musicbrainz_repo=musicbrainz_repo,
         preferences_service=preferences_service,
-        library_cache=library_cache,
         memory_cache=memory_cache,
     )
+
+
+@lru_cache(maxsize=1)
+def get_home_charts_service() -> HomeChartsService:
+    listenbrainz_repo = get_listenbrainz_repository()
+    lidarr_repo = get_lidarr_repository()
+    musicbrainz_repo = get_musicbrainz_repository()
+    library_cache = get_library_cache()
+    return HomeChartsService(
+        listenbrainz_repo=listenbrainz_repo,
+        lidarr_repo=lidarr_repo,
+        musicbrainz_repo=musicbrainz_repo,
+        library_cache=library_cache,
+    )
+
+
+@lru_cache(maxsize=1)
+def get_settings_service() -> SettingsService:
+    preferences_service = get_preferences_service()
+    cache = get_cache()
+    return SettingsService(preferences_service, cache)
 
 
 CacheDep = Annotated[CacheInterface, Depends(get_cache)]
@@ -263,6 +284,8 @@ LibraryServiceDep = Annotated[LibraryService, Depends(get_library_service)]
 StatusServiceDep = Annotated[StatusService, Depends(get_status_service)]
 CacheServiceDep = Annotated[CacheService, Depends(get_cache_service)]
 HomeServiceDep = Annotated[HomeService, Depends(get_home_service)]
+HomeChartsServiceDep = Annotated[HomeChartsService, Depends(get_home_charts_service)]
+SettingsServiceDep = Annotated[SettingsService, Depends(get_settings_service)]
 
 
 async def init_app_state(app) -> None:
@@ -291,5 +314,7 @@ async def cleanup_app_state() -> None:
     get_status_service.cache_clear()
     get_cache_service.cache_clear()
     get_home_service.cache_clear()
+    get_home_charts_service.cache_clear()
+    get_settings_service.cache_clear()
 
     logger.info("Application state cleaned up")

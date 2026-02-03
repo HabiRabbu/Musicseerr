@@ -11,8 +11,10 @@ from api.v1.schemas.settings import (
     LidarrVerifyResponse
 )
 from api.v1.schemas.advanced_settings import AdvancedSettingsFrontend
-from core.dependencies import get_preferences_service, get_cache, get_lidarr_repository
-from core.exceptions import ConfigurationError, ExternalServiceError
+from core.dependencies import get_preferences_service, get_settings_service
+from core.exceptions import ConfigurationError
+from repositories.jellyfin_repository import JellyfinRepository
+from repositories.listenbrainz_repository import ListenBrainzRepository
 
 logger = logging.getLogger(__name__)
 
@@ -25,8 +27,8 @@ async def get_preferences():
         preferences_service = get_preferences_service()
         return preferences_service.get_preferences()
     except Exception as e:
-        logger.error(f"Failed to get preferences: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to get preferences: {e}")
+        logger.exception(f"Failed to get preferences: {e}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve preferences")
 
 
 @router.put("/preferences", response_model=UserPreferences)
@@ -34,22 +36,18 @@ async def update_preferences(preferences: UserPreferences):
     try:
         preferences_service = get_preferences_service()
         preferences_service.save_preferences(preferences)
-        
-        cache = get_cache()
-        cleared_artist = await cache.clear_prefix("artist:")
-        cleared_mb_artist = await cache.clear_prefix("mb_artist_detail:")
-        cleared_mb_artists = await cache.clear_prefix("mb_artists:")
-        cleared_mb_albums = await cache.clear_prefix("mb_albums:")
-        
-        total_cleared = cleared_artist + cleared_mb_artist + cleared_mb_artists + cleared_mb_albums
+
+        settings_service = get_settings_service()
+        total_cleared = await settings_service.clear_caches_for_preference_change()
         logger.info(f"Updated user preferences. Cleared {total_cleared} cache entries.")
-        
+
         return preferences
     except ConfigurationError as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.warning(f"Configuration error updating preferences: {e}")
+        raise HTTPException(status_code=400, detail="Invalid configuration")
     except Exception as e:
-        logger.error(f"Failed to save preferences: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to save preferences: {e}")
+        logger.exception(f"Failed to save preferences: {e}")
+        raise HTTPException(status_code=500, detail="Failed to save preferences")
 
 
 @router.get("/lidarr", response_model=LidarrSettings)
@@ -58,8 +56,8 @@ async def get_lidarr_settings():
         preferences_service = get_preferences_service()
         return preferences_service.get_lidarr_settings()
     except Exception as e:
-        logger.error(f"Failed to get Lidarr settings: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to get Lidarr settings: {e}")
+        logger.exception(f"Failed to get Lidarr settings: {e}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve Lidarr settings")
 
 
 @router.put("/lidarr", response_model=LidarrSettings)
@@ -71,10 +69,10 @@ async def update_lidarr_settings(lidarr_settings: LidarrSettings):
         return lidarr_settings
     except ConfigurationError as e:
         logger.warning(f"Configuration error updating Lidarr settings: {e}")
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail="Invalid Lidarr configuration")
     except Exception as e:
-        logger.error(f"Failed to save Lidarr settings: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to save Lidarr settings: {e}")
+        logger.exception(f"Failed to save Lidarr settings: {e}")
+        raise HTTPException(status_code=500, detail="Failed to save Lidarr settings")
 
 
 @router.get("/advanced", response_model=AdvancedSettingsFrontend)
@@ -84,8 +82,8 @@ async def get_advanced_settings():
         backend_settings = preferences_service.get_advanced_settings()
         return AdvancedSettingsFrontend.from_backend(backend_settings)
     except Exception as e:
-        logger.error(f"Failed to get advanced settings: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to get advanced settings: {e}")
+        logger.exception(f"Failed to get advanced settings: {e}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve advanced settings")
 
 
 @router.put("/advanced", response_model=AdvancedSettingsFrontend)
@@ -98,13 +96,13 @@ async def update_advanced_settings(settings: AdvancedSettingsFrontend):
         return settings
     except ConfigurationError as e:
         logger.warning(f"Configuration error updating advanced settings: {e}")
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail="Invalid configuration")
     except ValueError as e:
         logger.warning(f"Validation error updating advanced settings: {e}")
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail="Invalid settings value")
     except Exception as e:
-        logger.error(f"Failed to save advanced settings: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to save advanced settings: {e}")
+        logger.exception(f"Failed to save advanced settings: {e}")
+        raise HTTPException(status_code=500, detail="Failed to save advanced settings")
 
 
 @router.get("/lidarr/connection", response_model=LidarrConnectionSettings)
@@ -113,8 +111,8 @@ async def get_lidarr_connection():
         preferences_service = get_preferences_service()
         return preferences_service.get_lidarr_connection()
     except Exception as e:
-        logger.error(f"Failed to get Lidarr connection settings: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to get Lidarr connection settings: {e}")
+        logger.exception(f"Failed to get Lidarr connection settings: {e}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve Lidarr connection settings")
 
 
 @router.put("/lidarr/connection", response_model=LidarrConnectionSettings)
@@ -126,76 +124,16 @@ async def update_lidarr_connection(settings: LidarrConnectionSettings):
         return settings
     except ConfigurationError as e:
         logger.warning(f"Configuration error updating Lidarr connection: {e}")
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail="Invalid Lidarr connection configuration")
     except Exception as e:
-        logger.error(f"Failed to save Lidarr connection settings: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to save Lidarr connection settings: {e}")
+        logger.exception(f"Failed to save Lidarr connection settings: {e}")
+        raise HTTPException(status_code=500, detail="Failed to save Lidarr connection settings")
 
 
 @router.post("/lidarr/verify", response_model=LidarrVerifyResponse)
 async def verify_lidarr_connection(settings: LidarrConnectionSettings):
-    try:
-        lidarr_repo = get_lidarr_repository()
-        
-        from core.config import get_settings
-        app_settings = get_settings()
-        app_settings.lidarr_url = settings.lidarr_url
-        app_settings.lidarr_api_key = settings.lidarr_api_key
-        
-        status = await lidarr_repo.get_status()
-        
-        if status.status != "ok":
-            return LidarrVerifyResponse(
-                success=False,
-                message=status.message or "Connection failed",
-                quality_profiles=[],
-                metadata_profiles=[],
-                root_folders=[]
-            )
-        
-        quality_profiles_raw = await lidarr_repo.get_quality_profiles()
-        quality_profiles = [
-            {"id": int(p.get("id", 0)), "name": str(p.get("name", "Unknown"))}
-            for p in quality_profiles_raw
-        ]
-        
-        metadata_profiles_raw = await lidarr_repo.get_metadata_profiles()
-        metadata_profiles = [
-            {"id": int(p.get("id", 0)), "name": str(p.get("name", "Unknown"))}
-            for p in metadata_profiles_raw
-        ]
-        
-        root_folders_raw = await lidarr_repo.get_root_folders()
-        root_folders = [
-            {"id": str(r.get("id", "")), "path": str(r.get("path", ""))}
-            for r in root_folders_raw
-        ]
-        
-        return LidarrVerifyResponse(
-            success=True,
-            message="Successfully connected to Lidarr",
-            quality_profiles=quality_profiles,
-            metadata_profiles=metadata_profiles,
-            root_folders=root_folders
-        )
-    except ExternalServiceError as e:
-        logger.warning(f"Lidarr connection test failed: {e}")
-        return LidarrVerifyResponse(
-            success=False,
-            message=f"Connection failed: {str(e)}",
-            quality_profiles=[],
-            metadata_profiles=[],
-            root_folders=[]
-        )
-    except Exception as e:
-        logger.error(f"Failed to verify Lidarr connection: {e}")
-        return LidarrVerifyResponse(
-            success=False,
-            message=f"Verification error: {str(e)}",
-            quality_profiles=[],
-            metadata_profiles=[],
-            root_folders=[]
-        )
+    settings_service = get_settings_service()
+    return await settings_service.verify_lidarr(settings)
 
 
 @router.get("/soularr", response_model=SoularrConnectionSettings)
@@ -204,8 +142,8 @@ async def get_soularr_settings():
         preferences_service = get_preferences_service()
         return preferences_service.get_soularr_connection()
     except Exception as e:
-        logger.error(f"Failed to get Soularr settings: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to get Soularr settings: {e}")
+        logger.exception(f"Failed to get Soularr settings: {e}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve Soularr settings")
 
 
 @router.put("/soularr", response_model=SoularrConnectionSettings)
@@ -217,10 +155,10 @@ async def update_soularr_settings(settings: SoularrConnectionSettings):
         return settings
     except ConfigurationError as e:
         logger.warning(f"Configuration error updating Soularr settings: {e}")
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail="Invalid Soularr configuration")
     except Exception as e:
-        logger.error(f"Failed to save Soularr settings: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to save Soularr settings: {e}")
+        logger.exception(f"Failed to save Soularr settings: {e}")
+        raise HTTPException(status_code=500, detail="Failed to save Soularr settings")
 
 
 @router.get("/jellyfin", response_model=JellyfinConnectionSettings)
@@ -229,8 +167,8 @@ async def get_jellyfin_settings():
         preferences_service = get_preferences_service()
         return preferences_service.get_jellyfin_connection()
     except Exception as e:
-        logger.error(f"Failed to get Jellyfin settings: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to get Jellyfin settings: {e}")
+        logger.exception(f"Failed to get Jellyfin settings: {e}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve Jellyfin settings")
 
 
 @router.put("/jellyfin", response_model=JellyfinConnectionSettings)
@@ -238,33 +176,28 @@ async def update_jellyfin_settings(settings: JellyfinConnectionSettings):
     try:
         preferences_service = get_preferences_service()
         preferences_service.save_jellyfin_connection(settings)
+        JellyfinRepository.reset_circuit_breaker()
+        settings_service = get_settings_service()
+        await settings_service.clear_home_cache()
         logger.info("Updated Jellyfin connection settings")
         return settings
     except ConfigurationError as e:
         logger.warning(f"Configuration error updating Jellyfin settings: {e}")
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail="Invalid Jellyfin configuration")
     except Exception as e:
-        logger.error(f"Failed to save Jellyfin settings: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to save Jellyfin settings: {e}")
+        logger.exception(f"Failed to save Jellyfin settings: {e}")
+        raise HTTPException(status_code=500, detail="Failed to save Jellyfin settings")
 
 
 @router.post("/jellyfin/verify")
 async def verify_jellyfin_connection(settings: JellyfinConnectionSettings):
-    try:
-        from core.dependencies import get_jellyfin_repository
-        jellyfin_repo = get_jellyfin_repository()
-        
-        jellyfin_repo.configure(
-            base_url=settings.jellyfin_url,
-            api_key=settings.api_key,
-            user_id=settings.user_id
-        )
-        
-        success, message = await jellyfin_repo.validate_connection()
-        return {"success": success, "message": message}
-    except Exception as e:
-        logger.error(f"Failed to verify Jellyfin connection: {e}")
-        return {"success": False, "message": f"Verification error: {str(e)}"}
+    settings_service = get_settings_service()
+    result = await settings_service.verify_jellyfin(settings)
+    return {
+        "success": result.success,
+        "message": result.message,
+        "users": result.users if result.success else []
+    }
 
 
 @router.get("/listenbrainz", response_model=ListenBrainzConnectionSettings)
@@ -273,8 +206,8 @@ async def get_listenbrainz_settings():
         preferences_service = get_preferences_service()
         return preferences_service.get_listenbrainz_connection()
     except Exception as e:
-        logger.error(f"Failed to get ListenBrainz settings: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to get ListenBrainz settings: {e}")
+        logger.exception(f"Failed to get ListenBrainz settings: {e}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve ListenBrainz settings")
 
 
 @router.put("/listenbrainz", response_model=ListenBrainzConnectionSettings)
@@ -282,36 +215,24 @@ async def update_listenbrainz_settings(settings: ListenBrainzConnectionSettings)
     try:
         preferences_service = get_preferences_service()
         preferences_service.save_listenbrainz_connection(settings)
+        ListenBrainzRepository.reset_circuit_breaker()
+        settings_service = get_settings_service()
+        await settings_service.clear_home_cache()
         logger.info("Updated ListenBrainz connection settings")
         return settings
     except ConfigurationError as e:
         logger.warning(f"Configuration error updating ListenBrainz settings: {e}")
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail="Invalid ListenBrainz configuration")
     except Exception as e:
-        logger.error(f"Failed to save ListenBrainz settings: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to save ListenBrainz settings: {e}")
+        logger.exception(f"Failed to save ListenBrainz settings: {e}")
+        raise HTTPException(status_code=500, detail="Failed to save ListenBrainz settings")
 
 
 @router.post("/listenbrainz/verify")
 async def verify_listenbrainz_connection(settings: ListenBrainzConnectionSettings):
-    try:
-        from core.dependencies import get_listenbrainz_repository
-        lb_repo = get_listenbrainz_repository()
-        
-        lb_repo.configure(
-            username=settings.username,
-            user_token=settings.user_token
-        )
-        
-        if settings.user_token:
-            valid, message = await lb_repo.validate_token()
-        else:
-            valid, message = await lb_repo.validate_username(settings.username)
-        
-        return {"valid": valid, "message": message}
-    except Exception as e:
-        logger.error(f"Failed to verify ListenBrainz connection: {e}")
-        return {"valid": False, "message": f"Verification error: {str(e)}"}
+    settings_service = get_settings_service()
+    result = await settings_service.verify_listenbrainz(settings)
+    return {"valid": result.valid, "message": result.message}
 
 
 @router.get("/home", response_model=HomeSettings)
@@ -320,8 +241,8 @@ async def get_home_settings():
         preferences_service = get_preferences_service()
         return preferences_service.get_home_settings()
     except Exception as e:
-        logger.error(f"Failed to get home settings: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to get home settings: {e}")
+        logger.exception(f"Failed to get home settings: {e}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve home settings")
 
 
 @router.put("/home", response_model=HomeSettings)
@@ -333,7 +254,7 @@ async def update_home_settings(settings: HomeSettings):
         return settings
     except ConfigurationError as e:
         logger.warning(f"Configuration error updating home settings: {e}")
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail="Invalid home configuration")
     except Exception as e:
-        logger.error(f"Failed to save home settings: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to save home settings: {e}")
+        logger.exception(f"Failed to save home settings: {e}")
+        raise HTTPException(status_code=500, detail="Failed to save home settings")

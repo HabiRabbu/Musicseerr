@@ -1,6 +1,3 @@
-# ============================================
-# Stage 1 – Frontend build (SvelteKit + Tailwind)
-# ============================================
 FROM node:20-bookworm-slim AS frontend-build
 WORKDIR /app/frontend
 
@@ -10,26 +7,26 @@ RUN npm install
 COPY frontend .
 RUN npm run build
 
-
-# ============================================
-# Stage 2 – Backend runtime (FastAPI)
-# ============================================
 FROM python:3.11-slim AS backend
 
 WORKDIR /app
 
-# Install backend deps
+RUN apt-get update && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy backend source
 COPY backend .
 
-# Copy compiled frontend into backend's static dir
 COPY --from=frontend-build /app/frontend/build ./static
 
-# Set default port
+RUN mkdir -p /app/cache /app/config
+
 ENV PORT=8688
 EXPOSE ${PORT}
 
-CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT} --loop uvloop --http httptools"]
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:${PORT}/health || exit 1
+
+CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT} --loop uvloop --http httptools --workers 1"]

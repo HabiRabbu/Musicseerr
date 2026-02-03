@@ -1,10 +1,10 @@
 import httpx
 import logging
 from typing import Any
-from dataclasses import dataclass
 from core.exceptions import ExternalServiceError
 from infrastructure.cache.memory_cache import CacheInterface
 from infrastructure.resilience.retry import with_retry, CircuitBreaker
+from repositories.jellyfin_models import JellyfinItem, JellyfinUser, parse_item, parse_user
 
 logger = logging.getLogger(__name__)
 
@@ -14,29 +14,6 @@ _jellyfin_circuit_breaker = CircuitBreaker(
     timeout=60.0,
     name="jellyfin"
 )
-
-
-@dataclass
-class JellyfinItem:
-    id: str
-    name: str
-    type: str
-    artist_name: str | None = None
-    album_name: str | None = None
-    play_count: int = 0
-    is_favorite: bool = False
-    last_played: str | None = None
-    image_tag: str | None = None
-    parent_id: str | None = None
-    album_id: str | None = None
-    artist_id: str | None = None
-    provider_ids: dict[str, str] | None = None
-
-
-@dataclass
-class JellyfinUser:
-    id: str
-    name: str
 
 
 class JellyfinRepository:
@@ -58,6 +35,10 @@ class JellyfinRepository:
         self._base_url = base_url.rstrip("/") if base_url else ""
         self._api_key = api_key
         self._user_id = user_id
+    
+    @staticmethod
+    def reset_circuit_breaker() -> None:
+        _jellyfin_circuit_breaker.reset()
     
     def is_configured(self) -> bool:
         return bool(self._base_url and self._api_key)
@@ -133,352 +114,178 @@ class JellyfinRepository:
             return False, "Jellyfin URL or API key not configured"
         
         try:
-            result = await self._get("/System/Info")
-            if result:
-                server_name = result.get("ServerName", "Unknown")
-                version = result.get("Version", "Unknown")
-                return True, f"Connected to {server_name} (v{version})"
-            return False, "Failed to get server info"
+            url = f"{self._base_url}/System/Info"
+            response = await self._client.request(
+                "GET",
+                url,
+                headers=self._get_headers(),
+                timeout=10.0,
+            )
+            
+            if response.status_code == 401:
+                return False, "Authentication failed - check API key"
+            
+            if response.status_code != 200:
+                return False, f"Connection failed (HTTP {response.status_code})"
+            
+            result = response.json()
+            server_name = result.get("ServerName", "Unknown")
+            version = result.get("Version", "Unknown")
+            return True, f"Connected to {server_name} (v{version})"
+        except httpx.TimeoutException:
+            return False, "Connection timed out - check URL"
+        except httpx.ConnectError:
+            return False, "Could not connect - check URL and ensure server is running"
         except Exception as e:
-            return False, str(e)
+            return False, f"Connection failed: {str(e)}"
     
     async def get_users(self) -> list[JellyfinUser]:
         try:
             result = await self._get("/Users")
             if not result:
                 return []
-            
-            return [
-                JellyfinUser(
-                    id=user.get("Id", ""),
-                    name=user.get("Name", "Unknown")
-                )
-                for user in result
-                if user.get("Id")
-            ]
+            return [parse_user(user) for user in result if user.get("Id")]
         except Exception as e:
             logger.error(f"Failed to get Jellyfin users: {e}")
             return []
-    
+
+    async def fetch_users_direct(self) -> list[JellyfinUser]:
+        if not self._base_url or not self._api_key:
+            return []
+        
+        try:
+            url = f"{self._base_url}/Users"
+            response = await self._client.request(
+                "GET",
+                url,
+                headers=self._get_headers(),
+                timeout=10.0,
+            )
+            
+            if response.status_code != 200:
+                return []
+            
+            result = response.json()
+            if not result:
+                return []
+            return [parse_user(user) for user in result if user.get("Id")]
+        except Exception as e:
+            logger.error(f"Failed to fetch Jellyfin users: {e}")
+            return []
+
     async def get_current_user(self) -> JellyfinUser | None:
         try:
             result = await self._get("/Users/Me")
-            if not result:
-                return None
-            
-            return JellyfinUser(
-                id=result.get("Id", ""),
-                name=result.get("Name", "Unknown")
-            )
+            return parse_user(result) if result else None
         except Exception:
             return None
-    
-    def _parse_item(self, item: dict[str, Any]) -> JellyfinItem:
-        user_data = item.get("UserData", {})
-        provider_ids = item.get("ProviderIds", {})
-        
-        artist_name = None
-        if artists := item.get("ArtistItems"):
-            artist_name = artists[0].get("Name") if artists else None
-        elif album_artist := item.get("AlbumArtist"):
-            artist_name = album_artist
-        
-        return JellyfinItem(
-            id=item.get("Id", ""),
-            name=item.get("Name", "Unknown"),
-            type=item.get("Type", "Unknown"),
-            artist_name=artist_name,
-            album_name=item.get("Album"),
-            play_count=user_data.get("PlayCount", 0),
-            is_favorite=user_data.get("IsFavorite", False),
-            last_played=user_data.get("LastPlayedDate"),
-            image_tag=item.get("ImageTags", {}).get("Primary"),
-            parent_id=item.get("ParentId"),
-            album_id=item.get("AlbumId"),
-            artist_id=item.get("ArtistItems", [{}])[0].get("Id") if item.get("ArtistItems") else None,
-            provider_ids=provider_ids if provider_ids else None,
-        )
-    
-    async def get_recently_played(
+
+    async def _fetch_items(
         self,
-        user_id: str | None = None,
-        limit: int = 20
+        endpoint: str,
+        cache_key: str,
+        params: dict[str, Any],
+        error_msg: str,
+        ttl: int = 300,
+        filter_fn=None
     ) -> list[JellyfinItem]:
-        uid = user_id or self._user_id
-        if not uid:
-            return []
-        
-        cache_key = f"jellyfin_recent:{uid}:{limit}"
         cached = await self._cache.get(cache_key)
         if cached:
             return cached
-        
-        params = {
-            "userId": uid,
-            "includeItemTypes": "Audio",
-            "sortBy": "DatePlayed",
-            "sortOrder": "Descending",
-            "isPlayed": "true",
-            "enableUserData": "true",
-            "limit": limit,
-            "recursive": "true",
-        }
-        
         try:
-            result = await self._get("/Items", params=params)
+            result = await self._get(endpoint, params=params)
             if not result:
+                logger.warning(f"{error_msg}: _get returned None/empty")
                 return []
-            
-            items = [
-                self._parse_item(item)
-                for item in result.get("Items", [])
-            ]
-            
-            await self._cache.set(cache_key, items, ttl=300)
+            raw_items = result.get("Items", []) if isinstance(result, dict) else result
+            items = [parse_item(i) for i in raw_items if not filter_fn or filter_fn(i)]
+            if items:
+                await self._cache.set(cache_key, items, ttl_seconds=ttl)
             return items
         except Exception as e:
-            logger.error(f"Failed to get recently played: {e}")
+            logger.error(f"{error_msg}: {e}")
             return []
-    
-    async def get_favorite_artists(
-        self,
-        user_id: str | None = None,
-        limit: int = 20
-    ) -> list[JellyfinItem]:
+
+    async def get_recently_played(self, user_id: str | None = None, limit: int = 20) -> list[JellyfinItem]:
         uid = user_id or self._user_id
         if not uid:
             return []
-        
-        cache_key = f"jellyfin_fav_artists:{uid}:{limit}"
-        cached = await self._cache.get(cache_key)
-        if cached:
-            return cached
-        
-        params = {
-            "userId": uid,
-            "isFavorite": "true",
-            "enableUserData": "true",
-            "limit": limit,
-        }
-        
-        try:
-            result = await self._get("/Artists", params=params)
-            if not result:
-                return []
-            
-            items = [
-                self._parse_item(item)
-                for item in result.get("Items", [])
-            ]
-            
-            await self._cache.set(cache_key, items, ttl=300)
-            return items
-        except Exception as e:
-            logger.error(f"Failed to get favorite artists: {e}")
-            return []
-    
-    async def get_favorite_albums(
-        self,
-        user_id: str | None = None,
-        limit: int = 20
-    ) -> list[JellyfinItem]:
+        params = {"userId": uid, "includeItemTypes": "Audio", "sortBy": "DatePlayed",
+                  "sortOrder": "Descending", "isPlayed": "true", "enableUserData": "true",
+                  "limit": limit, "recursive": "true", "Fields": "ProviderIds"}
+        return await self._fetch_items("/Items", f"jellyfin_recent:{uid}:{limit}", params, "Failed to get recently played")
+
+    async def get_favorite_artists(self, user_id: str | None = None, limit: int = 20) -> list[JellyfinItem]:
         uid = user_id or self._user_id
         if not uid:
             return []
-        
-        cache_key = f"jellyfin_fav_albums:{uid}:{limit}"
-        cached = await self._cache.get(cache_key)
-        if cached:
-            return cached
-        
-        params = {
-            "userId": uid,
-            "includeItemTypes": "MusicAlbum",
-            "isFavorite": "true",
-            "enableUserData": "true",
-            "limit": limit,
-            "recursive": "true",
-        }
-        
-        try:
-            result = await self._get("/Items", params=params)
-            if not result:
-                return []
-            
-            items = [
-                self._parse_item(item)
-                for item in result.get("Items", [])
-            ]
-            
-            await self._cache.set(cache_key, items, ttl=300)
-            return items
-        except Exception as e:
-            logger.error(f"Failed to get favorite albums: {e}")
-            return []
-    
-    async def get_most_played_artists(
-        self,
-        user_id: str | None = None,
-        limit: int = 20
-    ) -> list[JellyfinItem]:
+        params = {"userId": uid, "isFavorite": "true", "enableUserData": "true", "limit": limit, "Fields": "ProviderIds"}
+        return await self._fetch_items("/Artists", f"jellyfin_fav_artists:{uid}:{limit}", params, "Failed to get favorite artists")
+
+    async def get_favorite_albums(self, user_id: str | None = None, limit: int = 20) -> list[JellyfinItem]:
         uid = user_id or self._user_id
         if not uid:
             return []
-        
-        cache_key = f"jellyfin_top_artists:{uid}:{limit}"
-        cached = await self._cache.get(cache_key)
-        if cached:
-            return cached
-        
-        params = {
-            "userId": uid,
-            "sortBy": "PlayCount",
-            "sortOrder": "Descending",
-            "enableUserData": "true",
-            "limit": limit,
-        }
-        
-        try:
-            result = await self._get("/Artists", params=params)
-            if not result:
-                return []
-            
-            items = [
-                self._parse_item(item)
-                for item in result.get("Items", [])
-                if item.get("UserData", {}).get("PlayCount", 0) > 0
-            ]
-            
-            await self._cache.set(cache_key, items, ttl=300)
-            return items
-        except Exception as e:
-            logger.error(f"Failed to get most played artists: {e}")
-            return []
-    
-    async def get_most_played_albums(
-        self,
-        user_id: str | None = None,
-        limit: int = 20
-    ) -> list[JellyfinItem]:
+        params = {"userId": uid, "includeItemTypes": "MusicAlbum", "isFavorite": "true",
+                  "enableUserData": "true", "limit": limit, "recursive": "true"}
+        return await self._fetch_items("/Items", f"jellyfin_fav_albums:{uid}:{limit}", params, "Failed to get favorite albums")
+
+    async def get_most_played_artists(self, user_id: str | None = None, limit: int = 20) -> list[JellyfinItem]:
         uid = user_id or self._user_id
         if not uid:
             return []
-        
-        cache_key = f"jellyfin_top_albums:{uid}:{limit}"
-        cached = await self._cache.get(cache_key)
-        if cached:
-            return cached
-        
-        params = {
-            "userId": uid,
-            "includeItemTypes": "MusicAlbum",
-            "sortBy": "PlayCount",
-            "sortOrder": "Descending",
-            "enableUserData": "true",
-            "limit": limit,
-            "recursive": "true",
-        }
-        
-        try:
-            result = await self._get("/Items", params=params)
-            if not result:
-                return []
-            
-            items = [
-                self._parse_item(item)
-                for item in result.get("Items", [])
-                if item.get("UserData", {}).get("PlayCount", 0) > 0
-            ]
-            
-            await self._cache.set(cache_key, items, ttl=300)
-            return items
-        except Exception as e:
-            logger.error(f"Failed to get most played albums: {e}")
-            return []
-    
-    async def get_recently_added(
-        self,
-        user_id: str | None = None,
-        limit: int = 20
-    ) -> list[JellyfinItem]:
+        params = {"userId": uid, "sortBy": "PlayCount", "sortOrder": "Descending",
+                  "enableUserData": "true", "limit": limit}
+        filter_fn = lambda i: i.get("UserData", {}).get("PlayCount", 0) > 0
+        return await self._fetch_items("/Artists", f"jellyfin_top_artists:{uid}:{limit}", params, "Failed to get most played artists", filter_fn=filter_fn)
+
+    async def get_most_played_albums(self, user_id: str | None = None, limit: int = 20) -> list[JellyfinItem]:
         uid = user_id or self._user_id
         if not uid:
             return []
-        
-        params = {
-            "userId": uid,
-            "includeItemTypes": "MusicAlbum",
-            "limit": limit,
-            "enableUserData": "true",
-        }
-        
+        params = {"userId": uid, "includeItemTypes": "MusicAlbum", "sortBy": "PlayCount",
+                  "sortOrder": "Descending", "enableUserData": "true", "limit": limit, "recursive": "true"}
+        filter_fn = lambda i: i.get("UserData", {}).get("PlayCount", 0) > 0
+        return await self._fetch_items("/Items", f"jellyfin_top_albums:{uid}:{limit}", params, "Failed to get most played albums", filter_fn=filter_fn)
+
+    async def get_recently_added(self, user_id: str | None = None, limit: int = 20) -> list[JellyfinItem]:
+        uid = user_id or self._user_id
+        if not uid:
+            return []
+        params = {"userId": uid, "includeItemTypes": "MusicAlbum", "limit": limit, "enableUserData": "true"}
         try:
             result = await self._get("/Items/Latest", params=params)
-            if not result:
-                return []
-            
-            return [self._parse_item(item) for item in result]
+            return [parse_item(item) for item in result] if result else []
         except Exception as e:
             logger.error(f"Failed to get recently added: {e}")
             return []
-    
-    async def get_genres(
-        self,
-        user_id: str | None = None
-    ) -> list[str]:
+
+    async def get_genres(self, user_id: str | None = None) -> list[str]:
         uid = user_id or self._user_id
-        
         cache_key = f"jellyfin_genres:{uid}"
         cached = await self._cache.get(cache_key)
         if cached:
             return cached
-        
-        params: dict[str, Any] = {}
-        if uid:
-            params["userId"] = uid
-        
+        params: dict[str, Any] = {"userId": uid} if uid else {}
         try:
             result = await self._get("/MusicGenres", params=params)
             if not result:
                 return []
-            
-            genres = [
-                item.get("Name", "")
-                for item in result.get("Items", [])
-                if item.get("Name")
-            ]
-            
-            await self._cache.set(cache_key, genres, ttl=3600)
+            genres = [item.get("Name", "") for item in result.get("Items", []) if item.get("Name")]
+            await self._cache.set(cache_key, genres, ttl_seconds=3600)
             return genres
         except Exception as e:
             logger.error(f"Failed to get genres: {e}")
             return []
-    
-    async def get_artists_by_genre(
-        self,
-        genre: str,
-        user_id: str | None = None,
-        limit: int = 50
-    ) -> list[JellyfinItem]:
+
+    async def get_artists_by_genre(self, genre: str, user_id: str | None = None, limit: int = 50) -> list[JellyfinItem]:
         uid = user_id or self._user_id
-        
-        params: dict[str, Any] = {
-            "genres": genre,
-            "limit": limit,
-            "enableUserData": "true",
-        }
+        params: dict[str, Any] = {"genres": genre, "limit": limit, "enableUserData": "true"}
         if uid:
             params["userId"] = uid
-        
         try:
             result = await self._get("/Artists", params=params)
-            if not result:
-                return []
-            
-            return [
-                self._parse_item(item)
-                for item in result.get("Items", [])
-            ]
+            return [parse_item(item) for item in result.get("Items", [])] if result else []
         except Exception as e:
             logger.error(f"Failed to get artists by genre: {e}")
             return []

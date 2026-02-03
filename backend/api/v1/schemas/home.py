@@ -2,7 +2,7 @@ from pydantic import BaseModel, Field
 
 
 class HomeArtist(BaseModel):
-    mbid: str = Field(..., description="MusicBrainz artist ID (required)")
+    mbid: str | None = Field(default=None, description="MusicBrainz artist ID")
     name: str = Field(description="Artist name")
     image_url: str | None = Field(default=None, description="Artist image URL")
     listen_count: int | None = Field(default=None, description="Total listen count")

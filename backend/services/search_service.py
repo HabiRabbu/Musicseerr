@@ -4,6 +4,7 @@ from typing import Optional
 from api.v1.schemas.search import SearchResult, SearchResponse
 from repositories.protocols import MusicBrainzRepositoryProtocol, LidarrRepositoryProtocol, CoverArtRepositoryProtocol
 from services.preferences_service import PreferencesService
+from infrastructure.http.deduplication import deduplicate
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +27,8 @@ class SearchService:
     async def _safe_gather(self, *tasks):
         results = await asyncio.gather(*tasks, return_exceptions=True)
         return [r if not isinstance(r, Exception) else None for r in results]
-    
+
+    @deduplicate(lambda self, query, limit_artists=10, limit_albums=10, buckets=None: f"search:{query}:{limit_artists}:{limit_albums}:{buckets}")
     async def search(
         self,
         query: str,
@@ -87,7 +89,8 @@ class SearchService:
             for item in albums[:COVER_PREFETCH_LIMIT]
             if item.musicbrainz_id
         ]
-    
+
+    @deduplicate(lambda self, bucket, query, limit=50, offset=0: f"search_bucket:{bucket}:{query}:{limit}:{offset}")
     async def search_bucket(
         self,
         bucket: str,

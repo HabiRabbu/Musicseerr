@@ -82,6 +82,13 @@ class CircuitBreaker:
             "success_count": self.success_count,
             "last_failure_time": self.last_failure_time
         }
+    
+    def reset(self):
+        logger.info(f"Circuit breaker '{self.name}' manually reset")
+        self.state = CircuitState.CLOSED
+        self.failure_count = 0
+        self.success_count = 0
+        self.last_failure_time = 0
 
 
 class CircuitOpenError(Exception):

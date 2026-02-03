@@ -1,5 +1,4 @@
 import logging
-from time import time
 from fastapi import APIRouter, Depends, HTTPException
 from api.v1.schemas.library import (
     LibraryResponse,
@@ -8,10 +7,9 @@ from api.v1.schemas.library import (
     RecentlyAddedResponse,
     LibraryStatsResponse
 )
-from core.dependencies import get_library_service, get_preferences_service
+from core.dependencies import get_library_service
 from core.exceptions import ExternalServiceError
 from services.library_service import LibraryService
-from services.preferences_service import PreferencesService
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +34,7 @@ async def get_library_artists(
         return LibraryArtistsResponse(artists=artists, total=len(artists))
     except Exception as e:
         logger.error(f"Failed to get library artists: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Failed to load artists")
 
 
 @router.get("/albums", response_model=LibraryAlbumsResponse)
@@ -48,7 +46,7 @@ async def get_library_albums(
         return LibraryAlbumsResponse(albums=albums, total=len(albums))
     except Exception as e:
         logger.error(f"Failed to get library albums: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Failed to load albums")
 
 
 @router.get("/recently-added", response_model=RecentlyAddedResponse)
@@ -61,29 +59,23 @@ async def get_recently_added(
         return RecentlyAddedResponse(albums=albums, artists=[])
     except Exception as e:
         logger.error(f"Failed to get recently added: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Failed to load recently added")
 
 
 @router.post("/sync")
 async def sync_library(
-    library_service: LibraryService = Depends(get_library_service),
-    preferences_service: PreferencesService = Depends(get_preferences_service)
+    library_service: LibraryService = Depends(get_library_service)
 ):
     try:
-        result = await library_service.sync_library(is_manual=True)
-        
-        lidarr_settings = preferences_service.get_lidarr_settings()
-        updated_settings = lidarr_settings.model_copy(update={'last_sync': int(time())})
-        preferences_service.save_lidarr_settings(updated_settings)
-        
-        return result
+        return await library_service.sync_library(is_manual=True)
     except ExternalServiceError as e:
+        logger.error(f"Failed to sync library: {e}")
         if "cooldown" in str(e).lower():
-            raise HTTPException(status_code=429, detail=str(e))
-        raise HTTPException(status_code=503, detail=str(e))
+            raise HTTPException(status_code=429, detail="Sync is on cooldown, please wait")
+        raise HTTPException(status_code=503, detail="External service unavailable")
     except Exception as e:
         logger.error(f"Failed to sync library: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Failed to sync library")
 
 
 @router.get("/stats", response_model=LibraryStatsResponse)
@@ -94,7 +86,7 @@ async def get_library_stats(
         return await library_service.get_stats()
     except Exception as e:
         logger.error(f"Failed to get library stats: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Failed to load stats")
 
 
 @router.get("/mbids")
@@ -106,7 +98,7 @@ async def get_library_mbids(
         return {"mbids": mbids}
     except Exception as e:
         logger.error(f"Failed to get library mbids: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Failed to load library")
 
 
 @router.get("/grouped")

@@ -2,6 +2,7 @@
 	import type { HomeSection, HomeArtist, HomeAlbum, HomeTrack, HomeGenre } from '$lib/types';
 	import { goto } from '$app/navigation';
 	import { browser } from '$app/environment';
+	import { formatListenCount, formatListenedAt } from '$lib/utils/formatting';
 	import ArtistImage from './ArtistImage.svelte';
 	import AlbumImage from './AlbumImage.svelte';
 
@@ -56,35 +57,6 @@
 
 	function handleGenreClick(genre: HomeGenre) {
 		goto(`/genre?name=${encodeURIComponent(genre.name)}`);
-	}
-
-	function getArtistCoverUrl(artist: HomeArtist): string {
-		if (artist.image_url) return artist.image_url;
-		if (artist.mbid) return `/api/covers/artist/${artist.mbid}?size=250`;
-		return '';
-	}
-
-	function formatListenCount(count: number | null): string {
-		if (!count) return '';
-		if (count >= 1000000) return `${(count / 1000000).toFixed(1)}M plays`;
-		if (count >= 1000) return `${(count / 1000).toFixed(1)}K plays`;
-		return `${count} plays`;
-	}
-
-	function formatListenedAt(timestamp: string | null): string {
-		if (!timestamp) return '';
-		const date = new Date(timestamp);
-		const now = new Date();
-		const diffMs = now.getTime() - date.getTime();
-		const diffMins = Math.floor(diffMs / 60000);
-		const diffHours = Math.floor(diffMins / 60);
-		const diffDays = Math.floor(diffHours / 24);
-
-		if (diffMins < 1) return 'Just now';
-		if (diffMins < 60) return `${diffMins}m ago`;
-		if (diffHours < 24) return `${diffHours}h ago`;
-		if (diffDays < 7) return `${diffDays}d ago`;
-		return date.toLocaleDateString();
 	}
 
 	function isArtist(item: HomeArtist | HomeAlbum | HomeTrack | HomeGenre): item is HomeArtist {
@@ -159,7 +131,6 @@
 		</div>
 	{:else}
 		<div class="relative group">
-			<!-- Left Arrow -->
 			{#if showLeftArrow}
 				<button
 					class="absolute left-0 top-1/2 -translate-y-1/2 z-10 btn btn-circle btn-sm bg-base-100/90 shadow-lg opacity-0 group-hover:opacity-100 transition-opacity hidden sm:flex"
@@ -171,8 +142,7 @@
 					</svg>
 				</button>
 			{/if}
-			
-			<!-- Carousel -->
+
 			<div 
 				bind:this={scrollContainer}
 				on:scroll={updateArrowVisibility}
@@ -182,14 +152,21 @@
 				{#if isArtist(item)}
 					<div class="w-32 sm:w-36 md:w-44 flex-shrink-0">
 						<div 
-							class="card bg-base-100 w-full shadow-sm cursor-pointer transition-transform hover:scale-105 active:scale-95 hover:shadow-lg"
+							class="card bg-base-100 w-full shadow-sm transition-transform {item.mbid ? 'cursor-pointer hover:scale-105 active:scale-95 hover:shadow-lg' : 'cursor-default opacity-80'}"
 							on:click={() => handleArtistClick(item)}
 							on:keydown={(e) => e.key === 'Enter' && handleArtistClick(item)}
-							role="button"
-							tabindex="0"
+							role={item.mbid ? "button" : "presentation"}
+							tabindex={item.mbid ? 0 : -1}
 						>
 							<figure class="flex justify-center pt-4 relative">
 								<ArtistImage mbid={item.mbid ?? ''} alt={item.name} size="md" lazy={true} />
+								{#if !item.mbid}
+									<div class="absolute top-2 left-2 badge badge-ghost badge-sm" title="Not linked to MusicBrainz">
+										<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3 h-3">
+											<path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
+										</svg>
+									</div>
+								{/if}
 								{#if item.in_library}
 									<div class="absolute top-2 right-2 badge badge-success badge-sm">
 										<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3 h-3">
@@ -261,8 +238,7 @@
 				{/if}
 			{/each}
 			</div>
-			
-			<!-- Right Arrow -->
+
 			{#if showRightArrow}
 				<button
 					class="absolute right-0 top-1/2 -translate-y-1/2 z-10 btn btn-circle btn-sm bg-base-100/90 shadow-lg opacity-0 group-hover:opacity-100 transition-opacity hidden sm:flex"

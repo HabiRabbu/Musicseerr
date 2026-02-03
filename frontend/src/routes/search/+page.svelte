@@ -70,7 +70,6 @@
 			if (error instanceof Error && error.name === 'AbortError') {
 				return;
 			}
-			console.error('Artist search failed:', error);
 			artists = [];
 			loadingArtists = false;
 		});
@@ -89,7 +88,6 @@
 			if (error instanceof Error && error.name === 'AbortError') {
 				return;
 			}
-			console.error('Album search failed:', error);
 			albums = [];
 			loadingAlbums = false;
 		});

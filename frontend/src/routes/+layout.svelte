@@ -51,7 +51,7 @@
 		
 		<div class="drawer-content flex flex-col">
 			
-			<div class="navbar bg-base-100 shadow-sm sticky top-0 z-10">
+			<div class="navbar bg-base-100 shadow-sm sticky top-0 z-50">
 				<div class="navbar-start">
 					<a href="/" class="btn btn-ghost" aria-label="Home">
 						<img src="/logo_wide.png" alt="Musicseerr" class="h-8" />
@@ -82,7 +82,7 @@
 						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
 					</svg>
 					</summary>
-						<ul class="dropdown-content menu bg-base-200 rounded-box z-[1] w-52 p-2 shadow">
+						<ul class="dropdown-content menu bg-base-200 rounded-box z-50 w-52 p-2 shadow">
 							<li>
 								<a href="/settings" on:click={handleSettingsClick}>
 								<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5">

@@ -1,12 +1,14 @@
 <script lang="ts">
-	import { onMount, onDestroy } from 'svelte';
+	import { onDestroy } from 'svelte';
 	import { browser } from '$app/environment';
 	import { goto } from '$app/navigation';
-	import type { AlbumBasicInfo, AlbumTracksInfo, Track } from '$lib/types';
+	import type { AlbumBasicInfo, AlbumTracksInfo } from '$lib/types';
 	import { colors } from '$lib/colors';
-	import { errorModal } from '$lib/stores/errorModal';
 	import { libraryStore } from '$lib/stores/library';
 	import AlbumImage from '$lib/components/AlbumImage.svelte';
+	import Toast from '$lib/components/Toast.svelte';
+	import { requestAlbum } from '$lib/utils/albumRequest';
+	import { formatDuration, formatTotalDuration } from '$lib/utils/formatting';
 
 	export let data: { albumId: string };
 
@@ -65,74 +67,23 @@
 				tracksInfo = await res.json();
 			}
 		} catch (e) {
-			console.error('Failed to load tracks:', e);
-		} finally {
-			loadingTracks = false;
 		}
-	}
-
-	function formatDuration(ms?: number | null): string {
-		if (!ms) return '--:--';
-		const totalSeconds = Math.floor(ms / 1000);
-		const minutes = Math.floor(totalSeconds / 60);
-		const seconds = totalSeconds % 60;
-		return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-	}
-
-	function formatTotalDuration(ms?: number | null): string {
-		if (!ms) return '';
-		const totalSeconds = Math.floor(ms / 1000);
-		const hours = Math.floor(totalSeconds / 3600);
-		const minutes = Math.floor((totalSeconds % 3600) / 60);
-		
-		if (hours > 0) {
-			return `${hours} hr ${minutes} min`;
-		}
-		return `${minutes} min`;
+		loadingTracks = false;
 	}
 
 	async function handleRequest() {
 		if (!album || requesting) return;
-		
-		requesting = true;
-		
-		try {
-			const res = await fetch('/api/request', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ musicbrainz_id: album.musicbrainz_id })
-			});
-			
-			if (res.ok) {
-				if (album) {
-					album.requested = true;
-					album = album;
-					libraryStore.addRequested(album.musicbrainz_id);
-				}
 
+		requesting = true;
+
+		try {
+			const result = await requestAlbum(album.musicbrainz_id);
+
+			if (result.success && album) {
+				album.requested = true;
+				album = album;
 				showToast = true;
-				setTimeout(() => {
-					showToast = false;
-				}, 2000);
-			} else {
-				const errorData = await res.json();
-				const errorDetail = errorData.detail || 'Unknown error';
-				
-				if (errorDetail.includes('Metadata Profile') || errorDetail.includes('Cannot add this')) {
-					const albumTypeMatch = errorDetail.match(/Cannot add this (\w+)/);
-					const albumType = albumTypeMatch ? albumTypeMatch[1] : 'release';
-					
-					errorModal.show(
-						`Cannot Add ${albumType}`,
-						errorDetail,
-						'Go to Lidarr -> Settings -> Profiles -> Metadata Profiles, and enable the appropriate release types in your active profile. After enabling, refresh the artist in Lidarr.'
-					);
-				} else {
-					errorModal.show('Request Failed', errorDetail, '');
-				}
 			}
-		} catch (e) {
-			errorModal.show('Request Failed', 'Network error occurred', '');
 		} finally {
 			requesting = false;
 		}
@@ -156,7 +107,6 @@
 </script>
 
 <div class="w-full px-2 sm:px-4 lg:px-8 py-4 sm:py-8 max-w-7xl mx-auto">
-	<!-- Back Button -->
 	<button 
 		on:click={goBack}
 		class="btn btn-ghost btn-circle mb-4"
@@ -174,13 +124,9 @@
 			</div>
 		</div>
 	{:else if loadingBasic || !album}
-		<!-- Skeleton Loading State -->
 		<div class="space-y-6 sm:space-y-8">
 			<div class="flex flex-col lg:flex-row gap-6 lg:gap-8">
-				<!-- Skeleton Cover -->
 				<div class="skeleton w-full lg:w-64 xl:w-80 aspect-square rounded-box flex-shrink-0"></div>
-				
-				<!-- Skeleton Info -->
 				<div class="flex-1 flex flex-col justify-end space-y-4">
 					<div class="skeleton h-4 w-20"></div>
 					<div class="skeleton h-12 w-3/4"></div>
@@ -191,8 +137,7 @@
 					</div>
 				</div>
 			</div>
-			
-			<!-- Skeleton Tracklist -->
+
 			<div class="space-y-2">
 				<div class="skeleton h-8 w-32 mb-4"></div>
 				{#each Array(8) as _, i}
@@ -202,7 +147,6 @@
 		</div>
 	{:else if album}
 		<div class="space-y-6 sm:space-y-8">
-			<!-- Album Header -->
 			<div class="flex flex-col lg:flex-row gap-6 lg:gap-8">
 				<div class="w-full lg:w-64 xl:w-80 flex-shrink-0">
 					<AlbumImage
@@ -216,7 +160,6 @@
 					/>
 				</div>
 
-				<!-- Album Info -->
 				<div class="flex-1 flex flex-col lg:justify-end space-y-4">
 					<div class="text-xs sm:text-sm font-semibold uppercase tracking-wider opacity-70">
 						{album.type || 'Album'}
@@ -231,7 +174,6 @@
 					{/if}
 					
 					<div class="flex flex-wrap items-center gap-2 text-sm">
-						<!-- Artist Link -->
 						<button 
 							on:click={goToArtist}
 							class="font-semibold hover:underline cursor-pointer"
@@ -258,7 +200,6 @@
 						{/if}
 					</div>
 
-					<!-- Additional Info -->
 					<div class="flex flex-wrap gap-x-4 gap-y-2 text-xs sm:text-sm opacity-70">
 						{#if tracksInfo?.label}
 							<div>
@@ -276,8 +217,7 @@
 							</div>
 						{/if}
 					</div>
-					
-					<!-- Action Button -->
+
 					<div class="pt-4">
 						{#if album.in_library}
 							<div class="badge badge-lg gap-2" style="background-color: {colors.accent}; color: {colors.secondary};">
@@ -315,7 +255,6 @@
 				</div>
 			</div>
 
-			<!-- Tracks List -->
 			{#if loadingTracks}
 				<div class="space-y-3">
 					<h2 class="text-xl sm:text-2xl font-bold">Tracks</h2>
@@ -342,19 +281,16 @@
 							{#each tracksInfo.tracks as track, index}
 								<li class="list-row hover:bg-base-300/50 transition-colors p-3 sm:p-4">
 									<div class="flex items-center gap-4 w-full">
-										<!-- Track Number -->
 										<div class="text-base-content/60 font-medium w-8 text-center flex-shrink-0">
 											{track.position}
 										</div>
-										
-										<!-- Track Title -->
+
 										<div class="flex-1 min-w-0">
 											<div class="font-medium truncate">
 												{track.title}
 											</div>
 										</div>
-										
-										<!-- Track Duration -->
+
 										<div class="text-base-content/60 text-sm flex-shrink-0 ml-auto">
 											{formatDuration(track.length)}
 										</div>
@@ -366,7 +302,6 @@
 				</div>
 			{/if}
 
-			<!-- Release Date -->
 			{#if album.release_date}
 				<div class="text-xs opacity-60">
 					<span class="font-semibold">Release Date:</span> {album.release_date}
@@ -380,14 +315,4 @@
 	{/if}
 </div>
 
-<!-- Toast Notification -->
-{#if showToast}
-	<div class="toast toast-end toast-bottom">
-		<div class="alert alert-success">
-			<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-				<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
-			</svg>
-			<span>Added to Library</span>
-		</div>
-	</div>
-{/if}
+<Toast bind:show={showToast} message="Added to Library" />

@@ -17,6 +17,7 @@
 
 	let allAlbums: LibraryAlbum[] = [];
 	let loading = true;
+	let error: string | null = null;
 
 	onMount(async () => {
 		await loadAlbums();
@@ -24,14 +25,19 @@
 
 	async function loadAlbums() {
 		loading = true;
+		error = null;
 		try {
 			const res = await fetch('/api/library/albums');
 			if (res.ok) {
 				const data = await res.json();
 				allAlbums = data.albums;
+			} else {
+				console.error('Failed to load albums:', res.status);
+				error = 'Failed to load albums';
 			}
-		} catch (error) {
-			console.error('Failed to load albums:', error);
+		} catch (e) {
+			console.error('Failed to load albums:', e);
+			error = 'Failed to load albums';
 		} finally {
 			loading = false;
 		}
@@ -59,11 +65,10 @@
 </script>
 
 <div class="container mx-auto p-4 md:p-6 lg:p-8">
-	<!-- Header with back button -->
 	<div class="flex items-center gap-4 mb-6">
 		<button
 			class="btn btn-ghost btn-circle"
-			on:click={() => goto('/library')}
+			onclick={() => goto('/library')}
 			aria-label="Back to library"
 		>
 			<svg
@@ -85,7 +90,12 @@
 		</div>
 	</div>
 
-	{#if loading}
+	{#if error}
+		<div class="alert alert-error mb-6">
+			<span>{error}</span>
+			<button class="btn btn-sm btn-ghost" onclick={loadAlbums}>Retry</button>
+		</div>
+	{:else if loading}
 		<div class="flex justify-center items-center min-h-[400px]">
 			<span class="loading loading-spinner loading-lg"></span>
 		</div>
@@ -98,7 +108,6 @@
 			</p>
 		</div>
 	{:else}
-		<!-- Albums Grouped by Artist -->
 		<div class="space-y-8">
 			{#each sortedArtistNames as artistName}
 				<div>

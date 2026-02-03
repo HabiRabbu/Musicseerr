@@ -1,65 +1,31 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
-	import { browser } from '$app/environment';
 	import { beforeNavigate } from '$app/navigation';
 	import HomeSection from '$lib/components/HomeSection.svelte';
+	import ServicePromptCard from '$lib/components/ServicePromptCard.svelte';
+	import GenreGrid from '$lib/components/GenreGrid.svelte';
 	import type { HomeResponse, HomeSection as HomeSectionType } from '$lib/types';
-
-	const CACHE_KEY = 'musicseerr_home_cache';
-	const CACHE_TTL = 5 * 60 * 1000; // 5 minutes - when to background refresh
+	import {
+		getHomeCachedData,
+		setHomeCachedData,
+		formatLastUpdated,
+		getGreeting
+	} from '$lib/utils/homeCache';
 
 	let homeData: HomeResponse | null = null;
 	let loading = true;
 	let refreshing = false;
-	let isUpdating = false; // Visual indicator for background updates
+	let isUpdating = false;
 	let error = '';
 	let lastUpdated: Date | null = null;
 	let abortController: AbortController | null = null;
 
-	interface CachedData {
-		data: HomeResponse;
-		timestamp: number;
-	}
-
-	function getCachedData(): CachedData | null {
-		if (!browser) return null;
-		try {
-			const cached = localStorage.getItem(CACHE_KEY);
-			if (cached) {
-				return JSON.parse(cached);
-			}
-		} catch (e) {
-			console.warn('Failed to read cache:', e);
-		}
-		return null;
-	}
-
-	function setCachedData(data: HomeResponse): void {
-		if (!browser) return;
-		try {
-			const cacheEntry: CachedData = {
-				data,
-				timestamp: Date.now()
-			};
-			localStorage.setItem(CACHE_KEY, JSON.stringify(cacheEntry));
-		} catch (e) {
-			console.warn('Failed to write cache:', e);
-		}
-	}
-
-	function isCacheStale(timestamp: number): boolean {
-		return Date.now() - timestamp > CACHE_TTL;
-	}
-
 	async function loadHomeData(forceRefresh = false) {
-		// Always try to show cached data first
-		const cached = getCachedData();
+		const cached = getHomeCachedData();
 		if (cached && !forceRefresh) {
 			homeData = cached.data;
 			lastUpdated = new Date(cached.timestamp);
 			loading = false;
-
-			// Always refresh in background to get fresh data
 			refreshInBackground();
 			return;
 		}
@@ -83,7 +49,7 @@
 				const data = await response.json();
 				homeData = data;
 				lastUpdated = new Date();
-				setCachedData(data);
+				setHomeCachedData(data);
 			} else {
 				if (!homeData) {
 					error = 'Failed to load home data';
@@ -93,7 +59,6 @@
 			if (e instanceof Error && e.name === 'AbortError') {
 				return;
 			}
-			console.error('Failed to load home data:', e);
 			if (!homeData) {
 				error = 'Failed to load home data';
 			}
@@ -119,13 +84,12 @@
 				const data = await response.json();
 				homeData = data;
 				lastUpdated = new Date();
-				setCachedData(data);
+				setHomeCachedData(data);
 			}
 		} catch (e) {
 			if (e instanceof Error && e.name === 'AbortError') {
 				return;
 			}
-			console.error('Background refresh failed:', e);
 		} finally {
 			refreshing = false;
 			isUpdating = false;
@@ -150,13 +114,6 @@
 	onDestroy(cleanup);
 	beforeNavigate(cleanup);
 
-	function getGreeting(): string {
-		const hour = new Date().getHours();
-		if (hour < 12) return 'Good morning';
-		if (hour < 18) return 'Good afternoon';
-		return 'Good evening';
-	}
-
 	function getSections(): { key: string; section: HomeSectionType; link?: string }[] {
 		if (!homeData) return [];
 
@@ -175,94 +132,51 @@
 		return sections;
 	}
 
-	function getPostGenreSections(): { key: string; section: HomeSectionType; link?: string }[] {
+	function getLibrarySections(): { key: string; section: HomeSectionType; link?: string }[] {
 		if (!homeData) return [];
-
 		const sections: { key: string; section: HomeSectionType; link?: string }[] = [];
-
 		if (homeData.library_artists && homeData.library_artists.items.length > 0) {
 			sections.push({ key: 'library_artists', section: homeData.library_artists, link: '/library/artists' });
 		}
 		if (homeData.library_albums && homeData.library_albums.items.length > 0) {
 			sections.push({ key: 'library_albums', section: homeData.library_albums, link: '/library/albums' });
 		}
+		return sections;
+	}
+
+	function getListenBrainzSections(): { key: string; section: HomeSectionType; link?: string }[] {
+		if (!homeData) return [];
+		const sections: { key: string; section: HomeSectionType; link?: string }[] = [];
 		if (homeData.recommended_artists && homeData.recommended_artists.items.length > 0) {
 			sections.push({ key: 'recommended_artists', section: homeData.recommended_artists });
 		}
 		if (homeData.fresh_releases && homeData.fresh_releases.items.length > 0) {
 			sections.push({ key: 'fresh_releases', section: homeData.fresh_releases });
 		}
+		return sections;
+	}
+
+	function getJellyfinSections(): { key: string; section: HomeSectionType; link?: string }[] {
+		if (!homeData) return [];
+		const sections: { key: string; section: HomeSectionType; link?: string }[] = [];
 		if (homeData.recently_played && homeData.recently_played.items.length > 0) {
 			sections.push({ key: 'recently_played', section: homeData.recently_played });
 		}
 		if (homeData.favorite_artists && homeData.favorite_artists.items.length > 0) {
 			sections.push({ key: 'favorite_artists', section: homeData.favorite_artists });
 		}
-
 		return sections;
 	}
 
-	function getPromptGradient(color: string): string {
-		switch (color) {
-			case 'primary':
-				return 'from-primary/20 to-primary/5 border-primary/30';
-			case 'secondary':
-				return 'from-secondary/20 to-secondary/5 border-secondary/30';
-			case 'accent':
-				return 'from-accent/20 to-accent/5 border-accent/30';
-			default:
-				return 'from-base-200 to-base-100 border-base-300';
-		}
-	}
-
-	function getPromptButtonClass(color: string): string {
-		switch (color) {
-			case 'primary':
-				return 'btn-primary';
-			case 'secondary':
-				return 'btn-secondary';
-			case 'accent':
-				return 'btn-accent';
-			default:
-				return 'btn-neutral';
-		}
-	}
-
-	const genreColors = [
-		'from-rose-500 to-pink-600',
-		'from-violet-500 to-purple-600',
-		'from-blue-500 to-cyan-600',
-		'from-emerald-500 to-teal-600',
-		'from-amber-500 to-orange-600',
-		'from-red-500 to-rose-600',
-		'from-indigo-500 to-violet-600',
-		'from-cyan-500 to-blue-600',
-		'from-green-500 to-emerald-600',
-		'from-orange-500 to-amber-600'
-	];
-
-	function getGenreColor(name: string): string {
-		return genreColors[name.length % genreColors.length];
-	}
-
-	function formatLastUpdated(date: Date | null): string {
-		if (!date) return '';
-		const now = new Date();
-		const diffMs = now.getTime() - date.getTime();
-		const diffMins = Math.floor(diffMs / 60000);
-
-		if (diffMins < 1) return 'Just now';
-		if (diffMins < 60) return `${diffMins}m ago`;
-		const diffHours = Math.floor(diffMins / 60);
-		if (diffHours < 24) return `${diffHours}h ago`;
-		return date.toLocaleDateString();
-	}
-
 	$: sections = homeData ? getSections() : [];
-	$: postGenreSections = homeData ? getPostGenreSections() : [];
+	$: librarySections = homeData ? getLibrarySections() : [];
+	$: listenbrainzSections = homeData ? getListenBrainzSections() : [];
+	$: jellyfinSections = homeData ? getJellyfinSections() : [];
 	$: hasContent =
 		sections.length > 0 ||
-		postGenreSections.length > 0 ||
+		librarySections.length > 0 ||
+		listenbrainzSections.length > 0 ||
+		jellyfinSections.length > 0 ||
 		(homeData?.genre_list?.items?.length ?? 0) > 0;
 	$: servicePrompts = homeData?.service_prompts || [];
 </script>
@@ -279,10 +193,31 @@
 	.scrollbar-hide::-webkit-scrollbar {
 		display: none;
 	}
+
+	.section-group {
+		border-radius: 1rem;
+		display: flex;
+		flex-direction: column;
+		gap: 1.5rem;
+	}
+
+	.section-group-library {
+		background: linear-gradient(135deg, rgba(34, 197, 94, 0.06) 0%, rgba(34, 197, 94, 0.02) 100%);
+		border: 1px solid rgba(34, 197, 94, 0.12);
+	}
+
+	.section-group-listenbrainz {
+		background: linear-gradient(135deg, rgba(251, 146, 60, 0.06) 0%, rgba(251, 146, 60, 0.02) 100%);
+		border: 1px solid rgba(251, 146, 60, 0.12);
+	}
+
+	.section-group-jellyfin {
+		background: linear-gradient(135deg, rgba(168, 85, 247, 0.06) 0%, rgba(168, 85, 247, 0.02) 100%);
+		border: 1px solid rgba(168, 85, 247, 0.12);
+	}
 </style>
 
 <div class="min-h-[calc(100vh-200px)]">
-	<!-- Hero Banner - Always visible -->
 	<div
 		class="relative mb-6 overflow-hidden bg-gradient-to-br from-primary/30 via-secondary/20 to-accent/10"
 	>
@@ -297,7 +232,6 @@
 						Discover music, explore your library, and find new favorites.
 					</p>
 				</div>
-				<!-- Refresh Button -->
 				<div class="flex items-center gap-2">
 					{#if isUpdating}
 						<span class="badge badge-ghost badge-sm gap-1">
@@ -310,7 +244,7 @@
 						</span>
 					{/if}
 					<button
-						class="btn btn-circle btn-ghost btn-sm"
+						class="btn btn-sm btn-primary gap-1"
 						on:click={handleRefresh}
 						disabled={refreshing || loading}
 						title="Refresh"
@@ -319,7 +253,7 @@
 							xmlns="http://www.w3.org/2000/svg"
 							viewBox="0 0 20 20"
 							fill="currentColor"
-							class="h-5 w-5 {refreshing ? 'animate-spin' : ''}"
+							class="h-4 w-4 {refreshing ? 'animate-spin' : ''}"
 						>
 							<path
 								fill-rule="evenodd"
@@ -327,6 +261,7 @@
 								clip-rule="evenodd"
 							/>
 						</svg>
+						<span class="hidden sm:inline">Refresh</span>
 					</button>
 				</div>
 			</div>
@@ -341,57 +276,15 @@
 		</div>
 	{:else}
 		<div class="space-y-6 px-4 sm:space-y-8 sm:px-6 lg:px-8">
-			<!-- Service Connection Prompts -->
 			{#if servicePrompts.length > 0}
 				<div class="space-y-3">
 					{#each servicePrompts as prompt}
-						<div
-							class="card overflow-hidden border bg-gradient-to-r shadow-lg {getPromptGradient(
-								prompt.color
-							)}"
-						>
-							<div class="card-body flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:p-6">
-								<div class="flex-shrink-0 text-4xl sm:text-5xl">{prompt.icon}</div>
-								<div class="min-w-0 flex-1">
-									<h3 class="card-title mb-1 text-base sm:text-lg">{prompt.title}</h3>
-									<p class="mb-2 text-xs text-base-content/70 sm:mb-3 sm:text-sm">
-										{prompt.description}
-									</p>
-									<div class="flex flex-wrap gap-1 sm:gap-2">
-										{#each prompt.features as feature}
-											<span class="badge badge-ghost badge-xs sm:badge-sm">{feature}</span>
-										{/each}
-									</div>
-								</div>
-								<div class="flex-shrink-0">
-									<a
-										href="/settings"
-										class="btn btn-sm sm:btn-md {getPromptButtonClass(prompt.color)}"
-									>
-										Connect
-										<svg
-											xmlns="http://www.w3.org/2000/svg"
-											viewBox="0 0 20 20"
-											fill="currentColor"
-											class="h-4 w-4"
-										>
-											<path
-												fill-rule="evenodd"
-												d="M3 10a.75.75 0 01.75-.75h10.638L10.23 5.29a.75.75 0 111.04-1.08l5.5 5.25a.75.75 0 010 1.08l-5.5 5.25a.75.75 0 11-1.04-1.08l4.158-3.96H3.75A.75.75 0 013 10z"
-												clip-rule="evenodd"
-											/>
-										</svg>
-									</a>
-								</div>
-							</div>
-						</div>
+						<ServicePromptCard {prompt} />
 					{/each}
 				</div>
 			{/if}
 
-			<!-- Main Sections (Popular, Trending, Recently Added) -->
 			{#if loading && !homeData}
-				<!-- Only show full skeleton when we have no data at all -->
 				<section>
 					<div class="skeleton mb-4 h-6 w-40"></div>
 					<div class="scrollbar-hide flex gap-3 overflow-x-auto pb-2 sm:gap-4">
@@ -410,7 +303,6 @@
 				{/each}
 			{/if}
 
-			<!-- Genre Grid -->
 			{#if loading && !homeData}
 				<section>
 					<div class="skeleton mb-4 h-6 w-36"></div>
@@ -421,43 +313,13 @@
 					</div>
 				</section>
 			{:else if homeData?.genre_list && homeData.genre_list.items.length > 0}
-				<section>
-					<div class="mb-4 flex items-center justify-between">
-						<h2 class="text-lg font-bold sm:text-xl">{homeData.genre_list.title}</h2>
-					</div>
-					<div class="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 md:grid-cols-4 lg:grid-cols-5">
-						{#each homeData.genre_list.items.slice(0, 20) as genre}
-							{@const genreItem = genre as { name: string }}
-							{@const artistMbid = homeData.genre_artists?.[genreItem.name]}
-							<a
-								href="/genre?name={encodeURIComponent(genreItem.name)}"
-								class="card text-white shadow-lg transition-all duration-200 hover:scale-105 hover:shadow-xl active:scale-95 overflow-hidden relative"
-							>
-								<!-- Base gradient background -->
-								<div class="absolute inset-0 bg-gradient-to-br {getGenreColor(genreItem.name)}"></div>
-								<!-- Artist image overlay -->
-								{#if artistMbid}
-									<img
-										src="/api/covers/artist/{artistMbid}?size=250"
-										alt=""
-										class="absolute inset-0 w-full h-full object-cover opacity-25 pointer-events-none"
-										style="z-index: 5;"
-										loading="lazy"
-									/>
-								{/if}
-								<!-- Dark gradient for text readability -->
-								<div class="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" style="z-index: 6;"></div>
-								<!-- Content -->
-								<div class="card-body min-h-24 justify-end p-3 sm:min-h-28 sm:p-4 relative" style="z-index: 10;">
-									<h3 class="text-xs font-bold sm:text-sm drop-shadow-lg">{genreItem.name}</h3>
-								</div>
-							</a>
-						{/each}
-					</div>
-				</section>
+				<GenreGrid
+					title={homeData.genre_list.title}
+					genres={homeData.genre_list.items}
+					genreArtists={homeData.genre_artists}
+				/>
 			{/if}
 
-			<!-- Post-Genre Sections (Library Artists/Albums, Recommendations, etc.) -->
 			{#if loading && !homeData}
 				{#each Array(3) as _}
 					<section>
@@ -473,12 +335,31 @@
 					</section>
 				{/each}
 			{:else}
-				{#each postGenreSections as { key, section, link } (key)}
-					<HomeSection {section} headerLink={link} />
-				{/each}
+				{#if librarySections.length > 0}
+					<div class="section-group section-group-library -mx-4 px-4 py-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+						{#each librarySections as { key, section, link } (key)}
+							<HomeSection {section} headerLink={link} />
+						{/each}
+					</div>
+				{/if}
+
+				{#if listenbrainzSections.length > 0}
+					<div class="section-group section-group-listenbrainz -mx-4 px-4 py-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+						{#each listenbrainzSections as { key, section, link } (key)}
+							<HomeSection {section} headerLink={link} />
+						{/each}
+					</div>
+				{/if}
+
+				{#if jellyfinSections.length > 0}
+					<div class="section-group section-group-jellyfin -mx-4 px-4 py-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+						{#each jellyfinSections as { key, section, link } (key)}
+							<HomeSection {section} headerLink={link} />
+						{/each}
+					</div>
+				{/if}
 			{/if}
 
-			<!-- Empty state -->
 			{#if !loading && !hasContent && servicePrompts.length === 0}
 				<div class="flex flex-col items-center justify-center py-12 sm:py-16">
 					<div class="mb-4 text-5xl sm:mb-6 sm:text-6xl">🎵</div>

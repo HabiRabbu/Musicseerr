@@ -6,7 +6,6 @@
   let imgError = false;
   
   function handleError() {
-    console.error('Failed to load album_bg.png');
     imgError = true;
   }
 
