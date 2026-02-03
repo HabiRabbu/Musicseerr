@@ -18,6 +18,10 @@ _lidarr_circuit_breaker = CircuitBreaker(
 )
 
 
+def reset_lidarr_circuit_breaker():
+    _lidarr_circuit_breaker.reset()
+
+
 class LidarrBase:
     def __init__(
         self,

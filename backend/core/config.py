@@ -26,6 +26,11 @@ class Settings(BaseSettings):
     
     jellyfin_url: str = Field(default="http://jellyfin:8096")
     
+    contact_email: str = Field(
+        default="contact@musicseerr.com",
+        description="Contact email for MusicBrainz API User-Agent. Override with your own if desired."
+    )
+    
     quality_profile_id: int = Field(default=1)
     metadata_profile_id: int = Field(default=1)
     root_folder_path: str = Field(default="/music")
@@ -60,6 +65,7 @@ class Settings(BaseSettings):
     @model_validator(mode='after')
     def validate_config(self) -> Self:
         errors = []
+        warnings = []
 
         for url_field in ['lidarr_url', 'soularr_url', 'jellyfin_url']:
             url = getattr(self, url_field, '')
@@ -72,10 +78,19 @@ class Settings(BaseSettings):
                 f"at least 2x http_max_keepalive ({self.http_max_keepalive})"
             )
 
+        if not self.lidarr_api_key:
+            warnings.append("LIDARR_API_KEY is not set - Lidarr features will not work")
+
         if errors:
             logger.warning(f"Configuration validation warnings: {'; '.join(errors)}")
+        
+        for warning in warnings:
+            logger.warning(warning)
 
         return self
+    
+    def get_user_agent(self) -> str:
+        return f"Musicseerr/1.0 ({self.contact_email}; https://www.musicseerr.com)"
 
     def load_from_file(self) -> None:
         if not self.config_file_path.exists():
@@ -107,6 +122,7 @@ class Settings(BaseSettings):
             "soularr_api_key": self.soularr_api_key,
             "jellyfin_url": self.jellyfin_url,
             "trigger_soularr": self.trigger_soularr,
+            "contact_email": self.contact_email,
             "quality_profile_id": self.quality_profile_id,
             "metadata_profile_id": self.metadata_profile_id,
             "root_folder_path": self.root_folder_path,
@@ -136,6 +152,7 @@ class Settings(BaseSettings):
                 "soularr_api_key": self.soularr_api_key,
                 "jellyfin_url": self.jellyfin_url,
                 "trigger_soularr": self.trigger_soularr,
+                "contact_email": self.contact_email,
                 "quality_profile_id": self.quality_profile_id,
                 "metadata_profile_id": self.metadata_profile_id,
                 "root_folder_path": self.root_folder_path,

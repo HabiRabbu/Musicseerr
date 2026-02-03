@@ -1,9 +1,1 @@
-{
-  "lidarr_url": "http://lidarr:8686",
-  "lidarr_api_key": "",
-  "soularr_url": "http://soularr:8181",
-  "soularr_api_key": "",
-  "jellyfin_url": "http://jellyfin:8096",
-  "trigger_soularr": true,
-  "port": 8688
-}
+{}

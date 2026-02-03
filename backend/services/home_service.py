@@ -48,6 +48,10 @@ class HomeService:
         jf_settings = self._preferences.get_jellyfin_connection()
         return jf_settings.enabled and bool(jf_settings.jellyfin_url) and bool(jf_settings.api_key)
     
+    def _is_lidarr_configured(self) -> bool:
+        lidarr_connection = self._preferences.get_lidarr_connection()
+        return bool(lidarr_connection.lidarr_url) and bool(lidarr_connection.lidarr_api_key)
+    
     def _get_listenbrainz_username(self) -> str | None:
         lb_settings = self._preferences.get_listenbrainz_connection()
         return lb_settings.username if lb_settings.enabled else None
@@ -110,15 +114,18 @@ class HomeService:
         
         lb_enabled = self._is_listenbrainz_enabled()
         jf_enabled = self._is_jellyfin_enabled()
+        lidarr_configured = self._is_lidarr_configured()
         username = self._get_listenbrainz_username()
         
         tasks: dict[str, Any] = {
-            "library_albums": self._lidarr_repo.get_library(),
-            "library_artists": self._lidarr_repo.get_artists_from_library(),
-            "recently_imported": self._lidarr_repo.get_recently_imported(limit=15),
             "lb_trending_artists": self._lb_repo.get_sitewide_top_artists(count=20),
             "lb_trending_albums": self._lb_repo.get_sitewide_top_release_groups(count=20),
         }
+        
+        if lidarr_configured:
+            tasks["library_albums"] = self._lidarr_repo.get_library()
+            tasks["library_artists"] = self._lidarr_repo.get_artists_from_library()
+            tasks["recently_imported"] = self._lidarr_repo.get_recently_imported(limit=15)
         
         if lb_enabled and username:
             lb_settings = self._preferences.get_listenbrainz_connection()
@@ -149,7 +156,7 @@ class HomeService:
             integration_status={
                 "listenbrainz": lb_enabled,
                 "jellyfin": jf_enabled,
-                "lidarr": len(library_albums) > 0,
+                "lidarr": lidarr_configured,
             }
         )
         
@@ -189,7 +196,7 @@ class HomeService:
                 results, library_mbids
             )
         
-        response.service_prompts = self._build_service_prompts(lb_enabled, jf_enabled)
+        response.service_prompts = self._build_service_prompts(lb_enabled, jf_enabled, lidarr_configured)
         
         if self._memory_cache:
             await self._memory_cache.set(cache_key, response, HOME_CACHE_TTL)
@@ -343,9 +350,20 @@ class HomeService:
     def _build_service_prompts(
         self,
         lb_enabled: bool,
-        jf_enabled: bool
+        jf_enabled: bool,
+        lidarr_configured: bool = True
     ) -> list[ServicePrompt]:
         prompts = []
+        
+        if not lidarr_configured:
+            prompts.append(ServicePrompt(
+                service="lidarr-connection",
+                title="Connect Lidarr",
+                description="Lidarr is required to manage your music library, request albums, and track your collection. Set up the connection to get started.",
+                icon="🎶",
+                color="accent",
+                features=["Music library management", "Album requests", "Collection tracking", "Automatic imports"],
+            ))
         
         if not lb_enabled:
             prompts.append(ServicePrompt(

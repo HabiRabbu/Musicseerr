@@ -42,6 +42,9 @@ class SettingsService:
     async def verify_lidarr(self, settings: LidarrConnectionSettings) -> LidarrVerifyResponse:
         try:
             from repositories.lidarr import LidarrRepository
+            from repositories.lidarr.base import reset_lidarr_circuit_breaker
+            
+            reset_lidarr_circuit_breaker()
 
             app_settings = get_settings()
             http_client = get_http_client(app_settings)
@@ -118,6 +121,8 @@ class SettingsService:
     async def verify_jellyfin(self, settings: JellyfinConnectionSettings) -> JellyfinVerifyResult:
         try:
             from repositories.jellyfin_repository import JellyfinRepository
+            
+            JellyfinRepository.reset_circuit_breaker()
 
             app_settings = get_settings()
             http_client = get_http_client(app_settings)
@@ -148,6 +153,8 @@ class SettingsService:
     async def verify_listenbrainz(self, settings: ListenBrainzConnectionSettings) -> ListenBrainzVerifyResult:
         try:
             from repositories.listenbrainz_repository import ListenBrainzRepository
+            
+            ListenBrainzRepository.reset_circuit_breaker()
 
             app_settings = get_settings()
             http_client = get_http_client(app_settings)

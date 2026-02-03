@@ -118,8 +118,13 @@ async def get_lidarr_connection():
 @router.put("/lidarr/connection", response_model=LidarrConnectionSettings)
 async def update_lidarr_connection(settings: LidarrConnectionSettings):
     try:
+        from repositories.lidarr.base import reset_lidarr_circuit_breaker
+        
         preferences_service = get_preferences_service()
         preferences_service.save_lidarr_connection(settings)
+        reset_lidarr_circuit_breaker()
+        settings_service = get_settings_service()
+        await settings_service.clear_home_cache()
         logger.info("Updated Lidarr connection settings")
         return settings
     except ConfigurationError as e:

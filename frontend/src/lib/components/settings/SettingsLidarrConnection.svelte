@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { LidarrConnectionSettings, LidarrVerifyResponse } from '$lib/types';
+	import { integrationStore } from '$lib/stores/integration';
 
 	let connection: LidarrConnectionSettings | null = $state(null);
 	let loading = $state(false);
@@ -40,6 +41,9 @@
 			if (response.ok) {
 				message = 'Lidarr connection settings saved successfully!';
 				connection = await response.json();
+				if (connection?.lidarr_url && connection?.lidarr_api_key) {
+					integrationStore.setLidarrConfigured(true);
+				}
 				setTimeout(() => { message = ''; }, 5000);
 			} else {
 				const error = await response.json();
@@ -91,8 +95,8 @@
 
 <div class="card bg-base-200">
 	<div class="card-body">
-		<h2 class="card-title text-2xl mb-4">Lidarr Connection</h2>
-		<p class="text-base-content/70 mb-6">
+		<h2 class="card-title text-2xl">Lidarr Connection</h2>
+		<p class="text-base-content/70 mb-4">
 			Configure your Lidarr server connection for music library management.
 		</p>
 
@@ -102,48 +106,85 @@
 			</div>
 		{:else if connection}
 			<div class="space-y-4">
-				<label class="form-control">
-					<div class="label"><span class="label-text">Lidarr URL</span></div>
-					<input type="url" bind:value={connection.lidarr_url} class="input input-bordered" placeholder="http://localhost:8686" />
-				</label>
+				<div class="form-control w-full">
+					<label class="label" for="lidarr-url">
+						<span class="label-text">Lidarr URL</span>
+					</label>
+					<input
+						id="lidarr-url"
+						type="url"
+						bind:value={connection.lidarr_url}
+						class="input input-bordered w-full"
+						placeholder="http://localhost:8686"
+					/>
+				</div>
 
-				<label class="form-control">
-					<div class="label"><span class="label-text">API Key</span></div>
+				<div class="form-control w-full">
+					<label class="label" for="lidarr-api-key">
+						<span class="label-text">API Key</span>
+					</label>
 					<div class="join w-full">
-						<input type={showApiKey ? 'text' : 'password'} bind:value={connection.lidarr_api_key} class="input input-bordered join-item flex-1" placeholder="Your Lidarr API key" />
-						<button class="btn join-item" onclick={() => showApiKey = !showApiKey}>
+						<input
+							id="lidarr-api-key"
+							type={showApiKey ? 'text' : 'password'}
+							bind:value={connection.lidarr_api_key}
+							class="input input-bordered join-item flex-1"
+							placeholder="Your Lidarr API key"
+						/>
+						<button type="button" class="btn join-item" onclick={() => showApiKey = !showApiKey}>
 							{showApiKey ? 'Hide' : 'Show'}
 						</button>
 					</div>
-				</label>
+					<label class="label">
+						<span class="label-text-alt text-base-content/50">Settings → General → API Key</span>
+					</label>
+				</div>
 
 				{#if verifyResult?.success && verifyResult.quality_profiles}
-					<label class="form-control">
-						<div class="label"><span class="label-text">Quality Profile</span></div>
-						<select bind:value={connection.quality_profile_id} class="select select-bordered">
+					<div class="form-control w-full">
+						<label class="label" for="quality-profile">
+							<span class="label-text">Quality Profile</span>
+						</label>
+						<select
+							id="quality-profile"
+							bind:value={connection.quality_profile_id}
+							class="select select-bordered w-full"
+						>
 							{#each verifyResult.quality_profiles as profile}
 								<option value={profile.id}>{profile.name}</option>
 							{/each}
 						</select>
-					</label>
+					</div>
 
-					<label class="form-control">
-						<div class="label"><span class="label-text">Metadata Profile</span></div>
-						<select bind:value={connection.metadata_profile_id} class="select select-bordered">
+					<div class="form-control w-full">
+						<label class="label" for="metadata-profile">
+							<span class="label-text">Metadata Profile</span>
+						</label>
+						<select
+							id="metadata-profile"
+							bind:value={connection.metadata_profile_id}
+							class="select select-bordered w-full"
+						>
 							{#each verifyResult.metadata_profiles as profile}
 								<option value={profile.id}>{profile.name}</option>
 							{/each}
 						</select>
-					</label>
+					</div>
 
-					<label class="form-control">
-						<div class="label"><span class="label-text">Root Folder</span></div>
-						<select bind:value={connection.root_folder_path} class="select select-bordered">
+					<div class="form-control w-full">
+						<label class="label" for="root-folder">
+							<span class="label-text">Root Folder</span>
+						</label>
+						<select
+							id="root-folder"
+							bind:value={connection.root_folder_path}
+							class="select select-bordered w-full"
+						>
 							{#each verifyResult.root_folders as folder}
 								<option value={folder.path}>{folder.path}</option>
 							{/each}
 						</select>
-					</label>
+					</div>
 				{/if}
 
 				{#if message}
@@ -152,20 +193,18 @@
 					</div>
 				{/if}
 
-				<div class="card-actions justify-end gap-2">
-					<button class="btn btn-ghost" onclick={verify} disabled={verifying}>
+				<div class="flex justify-end gap-2 pt-2">
+					<button type="button" class="btn btn-ghost" onclick={verify} disabled={verifying || !connection.lidarr_url || !connection.lidarr_api_key}>
 						{#if verifying}
 							<span class="loading loading-spinner loading-sm"></span>
 						{/if}
 						Test Connection
 					</button>
-					<button class="btn btn-primary" onclick={save} disabled={saving}>
+					<button type="button" class="btn btn-primary" onclick={save} disabled={saving}>
 						{#if saving}
 							<span class="loading loading-spinner loading-sm"></span>
-							Saving...
-						{:else}
-							Save Settings
 						{/if}
+						Save Settings
 					</button>
 				</div>
 			</div>

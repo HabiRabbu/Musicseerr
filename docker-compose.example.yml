@@ -1,0 +1,16 @@
+services:
+  musicseerr:
+    image: ghcr.io/habirabbu/musicseerr:latest
+    container_name: musicseerr
+    ports:
+      - "8688:8688"
+    volumes:
+      - ./config:/app/config
+      - ./cache:/app/cache
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8688/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s

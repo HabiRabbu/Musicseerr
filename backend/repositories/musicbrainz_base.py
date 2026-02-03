@@ -6,11 +6,24 @@ from infrastructure.resilience.retry import with_retry, CircuitBreaker
 from infrastructure.resilience.rate_limiter import TokenBucketRateLimiter
 from infrastructure.queue.priority_queue import RequestPriority, get_priority_queue
 from infrastructure.http.deduplication import RequestDeduplicator
+from core.config import get_settings
 
 logger = logging.getLogger(__name__)
 
-musicbrainzngs.set_useragent("Musicseerr", "1.0", "https://github.com/HabiRabbu/musicseerr")
-musicbrainzngs.set_rate_limit(limit_or_interval=False)
+_mb_initialized = False
+
+
+def _init_musicbrainz():
+    global _mb_initialized
+    if not _mb_initialized:
+        settings = get_settings()
+        musicbrainzngs.set_useragent(
+            "Musicseerr",
+            "1.0",
+            f"{settings.contact_email}; https://www.musicseerr.com"
+        )
+        musicbrainzngs.set_rate_limit(limit_or_interval=False)
+        _mb_initialized = True
 
 mb_circuit_breaker = CircuitBreaker(
     failure_threshold=5,
@@ -26,6 +39,7 @@ mb_deduplicator = RequestDeduplicator()
 
 @with_retry(max_attempts=3, circuit_breaker=mb_circuit_breaker)
 async def mb_call(func, *args, priority: RequestPriority = RequestPriority.USER_INITIATED, **kwargs):
+    _init_musicbrainz()
     priority_mgr = get_priority_queue()
     semaphore = await priority_mgr.acquire_slot(priority)
     async with semaphore:
