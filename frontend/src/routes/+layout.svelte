@@ -4,18 +4,30 @@
 	import { errorModal } from '$lib/stores/errorModal';
 	import { libraryStore } from '$lib/stores/library';
 	import { integrationStore } from '$lib/stores/integration';
-	import { onMount } from 'svelte';
+	import { onMount, onDestroy } from 'svelte';
 	import { cancelPendingImages } from '$lib/utils/lazyImage';
 	
 	let query = '';
 	let modalQuery = '';
+	let userDropdown: HTMLDetailsElement;
 
 	beforeNavigate(() => {
 		cancelPendingImages();
 	});
 
+	function handleClickOutside(event: MouseEvent) {
+		if (userDropdown && userDropdown.open && !userDropdown.contains(event.target as Node)) {
+			userDropdown.open = false;
+		}
+	}
+
 	onMount(() => {
 		libraryStore.initialize();
+		document.addEventListener('click', handleClickOutside);
+	});
+
+	onDestroy(() => {
+		document.removeEventListener('click', handleClickOutside);
 	});
 
 	function handleSearch(e: Event) {
@@ -37,10 +49,7 @@
 
 	function handleSettingsClick(e: Event) {
 		e.preventDefault();
-		const dropdown = document.querySelector('.dropdown') as HTMLDetailsElement;
-		if (dropdown) {
-			dropdown.open = false;
-		}
+		userDropdown.open = false;
 		goto('/settings');
 	}
 
@@ -81,13 +90,13 @@
 					{/if}
 				</div>
 			<div class="navbar-end">
-				<details class="dropdown dropdown-end">
+				<details class="dropdown dropdown-end" bind:this={userDropdown}>
 					<summary class="btn btn-ghost btn-circle btn-lg" aria-label="User Profile">
 					<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-6 w-6">
 						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
 					</svg>
 					</summary>
-						<ul class="dropdown-content menu bg-base-200 rounded-box z-50 w-52 p-2 shadow">
+						<ul class="dropdown-content menu bg-base-200 rounded-box z-[100] w-52 p-2 shadow">
 							<li>
 								<a href="/settings" on:click={handleSettingsClick}>
 								<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5">
