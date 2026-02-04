@@ -34,7 +34,7 @@
 </script>
 
 <div
-	class="card bg-base-100 w-full shadow-sm flex-shrink-0 group relative cursor-pointer hover:shadow-lg transition-shadow"
+	class="card bg-base-100 w-full shadow-sm flex-shrink-0 group relative cursor-pointer transition-transform hover:scale-105 hover:shadow-lg active:scale-95"
 	on:click={handleClick}
 	on:keydown={(e) => e.key === 'Enter' && handleClick()}
 	role="button"

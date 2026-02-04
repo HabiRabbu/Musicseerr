@@ -32,26 +32,37 @@ interface RecentlyAddedState {
 	initialized: boolean;
 }
 
-function createRecentlyAddedStore() {
-	const { subscribe, set, update } = writable<RecentlyAddedState>({
+function loadCachedData(): { data: RecentlyAddedData; timestamp: number } | null {
+	if (!browser) return null;
+	try {
+		const cached = localStorage.getItem(CACHE_KEYS.RECENTLY_ADDED);
+		if (cached) return JSON.parse(cached);
+	} catch {
+		// Ignore parse errors
+	}
+	return null;
+}
+
+function getInitialState(): RecentlyAddedState {
+	const cached = loadCachedData();
+	if (cached?.data) {
+		return {
+			data: cached.data,
+			loading: false,
+			lastUpdated: cached.timestamp,
+			initialized: true
+		};
+	}
+	return {
 		data: null,
 		loading: false,
 		lastUpdated: null,
 		initialized: false
-	});
+	};
+}
 
-	function loadFromStorage(): { data: RecentlyAddedData; timestamp: number } | null {
-		if (!browser) return null;
-
-		try {
-			const cached = localStorage.getItem(CACHE_KEYS.RECENTLY_ADDED);
-			if (cached) {
-				return JSON.parse(cached);
-			}
-		} catch (e) {
-		}
-		return null;
-	}
+function createRecentlyAddedStore() {
+	const { subscribe, set, update } = writable<RecentlyAddedState>(getInitialState());
 
 	function saveToStorage(data: RecentlyAddedData) {
 		if (!browser) return;
@@ -70,23 +81,16 @@ function createRecentlyAddedStore() {
 
 	async function initialize() {
 		const state = get({ subscribe });
-		if (state.initialized || state.loading) return;
+		if (state.loading) return;
 
-		const cached = loadFromStorage();
-		if (cached && cached.data) {
-			update((s) => ({
-				...s,
-				data: cached.data,
-				lastUpdated: cached.timestamp,
-				initialized: true
-			}));
-
-			if (Date.now() - cached.timestamp > CACHE_TTL.RECENTLY_ADDED) {
+		if (state.initialized && state.data) {
+			if (state.lastUpdated && Date.now() - state.lastUpdated > CACHE_TTL.RECENTLY_ADDED) {
 				fetchRecentlyAdded(true);
 			}
-		} else {
-			await fetchRecentlyAdded(false);
+			return;
 		}
+
+		await fetchRecentlyAdded(false);
 	}
 
 	async function fetchRecentlyAdded(background = false) {
