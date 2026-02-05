@@ -38,10 +38,10 @@
 	});
 </script>
 
-<div class="relative group">
+<div class="relative group/carousel">
 	{#if showLeftArrow}
 		<button
-			class="absolute left-0 top-1/2 -translate-y-1/2 z-10 btn btn-circle btn-sm bg-base-100/90 shadow-lg opacity-0 group-hover:opacity-100 transition-opacity hidden sm:flex"
+			class="absolute left-0 top-1/2 -translate-y-1/2 z-10 btn btn-circle btn-sm bg-base-100/90 shadow-lg opacity-0 group-hover/carousel:opacity-100 transition-opacity hidden sm:flex"
 			onclick={scrollLeft}
 			aria-label="Scroll left"
 		>
@@ -57,7 +57,7 @@
 
 	{#if showRightArrow}
 		<button
-			class="absolute right-0 top-1/2 -translate-y-1/2 z-10 btn btn-circle btn-sm bg-base-100/90 shadow-lg opacity-0 group-hover:opacity-100 transition-opacity hidden sm:flex"
+			class="absolute right-0 top-1/2 -translate-y-1/2 z-10 btn btn-circle btn-sm bg-base-100/90 shadow-lg opacity-0 group-hover/carousel:opacity-100 transition-opacity hidden sm:flex"
 			onclick={scrollRight}
 			aria-label="Scroll right"
 		>

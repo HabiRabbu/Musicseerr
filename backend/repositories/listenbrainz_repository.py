@@ -6,9 +6,10 @@ from infrastructure.cache.memory_cache import CacheInterface
 from infrastructure.resilience.retry import with_retry, CircuitBreaker
 from repositories.listenbrainz_models import (
     ListenBrainzArtist, ListenBrainzReleaseGroup, ListenBrainzRecording,
-    ListenBrainzListen, ListenBrainzGenreActivity, ALLOWED_STATS_RANGE,
+    ListenBrainzListen, ListenBrainzGenreActivity, ListenBrainzSimilarArtist,
+    ALLOWED_STATS_RANGE,
     parse_artist, parse_release_group, parse_recording, parse_listen,
-    parse_artist_recording,
+    parse_artist_recording, parse_similar_artist,
 )
 
 logger = logging.getLogger(__name__)
@@ -439,3 +440,71 @@ class ListenBrainzRepository:
         if releases:
             await self._cache.set(cache_key, releases, ttl_seconds=3600)
         return releases
+
+    async def get_similar_artists(
+        self,
+        artist_mbid: str,
+        max_similar: int = 15,
+        mode: str = "easy"
+    ) -> list[ListenBrainzSimilarArtist]:
+        cache_key = f"lb_similar_artists:{artist_mbid}:{max_similar}:{mode}"
+        cached = await self._cache.get(cache_key)
+        if cached:
+            return cached
+
+        params = {
+            "mode": mode,
+            "max_similar_artists": max_similar,
+            "max_recordings_per_artist": 5,
+            "pop_begin": 0,
+            "pop_end": 100,
+        }
+        result = await self._get(f"/1/lb-radio/artist/{artist_mbid}", params=params)
+        if not result or "error" in result:
+            return []
+
+        similar_artists: list[ListenBrainzSimilarArtist] = []
+        for mbid, recordings in result.items():
+            if mbid == artist_mbid:
+                continue
+            if not isinstance(recordings, list):
+                continue
+            similar_artists.append(parse_similar_artist(mbid, recordings))
+
+        similar_artists.sort(key=lambda a: a.listen_count, reverse=True)
+        if similar_artists:
+            await self._cache.set(cache_key, similar_artists, ttl_seconds=3600)
+        return similar_artists
+
+    async def get_artist_top_release_groups(
+        self,
+        artist_mbid: str,
+        count: int = 10
+    ) -> list[ListenBrainzReleaseGroup]:
+        cache_key = f"lb_artist_release_groups:{artist_mbid}:{count}"
+        cached = await self._cache.get(cache_key)
+        if cached:
+            return cached
+
+        result = await self._get(f"/1/popularity/top-release-groups-for-artist/{artist_mbid}")
+        if not result or not isinstance(result, list):
+            return []
+
+        release_groups = []
+        for item in result[:count]:
+            rg = item.get("release_group", {})
+            release_groups.append(ListenBrainzReleaseGroup(
+                release_group_name=rg.get("name", "Unknown"),
+                artist_name=item.get("artist", {}).get("name", "Unknown"),
+                listen_count=item.get("total_listen_count", 0),
+                release_group_mbid=item.get("release_group_mbid"),
+                caa_release_mbid=rg.get("caa_release_mbid"),
+                caa_id=rg.get("caa_id"),
+            ))
+
+        if release_groups:
+            await self._cache.set(cache_key, release_groups, ttl_seconds=3600)
+        return release_groups
+
+    def is_configured(self) -> bool:
+        return bool(self._username)

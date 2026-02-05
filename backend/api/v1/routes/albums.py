@@ -1,8 +1,10 @@
 import logging
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from api.v1.schemas.album import AlbumInfo, AlbumBasicInfo, AlbumTracksInfo
-from core.dependencies import get_album_service
+from api.v1.schemas.discovery import SimilarAlbumsResponse, MoreByArtistResponse
+from core.dependencies import get_album_service, get_album_discovery_service
 from services.album_service import AlbumService
+from services.album_discovery_service import AlbumDiscoveryService
 from infrastructure.validators import is_unknown_mbid
 
 logger = logging.getLogger(__name__)
@@ -70,3 +72,35 @@ async def get_album_tracks(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e)
         )
+
+
+@router.get("/{album_id}/similar", response_model=SimilarAlbumsResponse)
+async def get_similar_albums(
+    album_id: str,
+    artist_id: str = Query(..., description="Artist MBID for similarity lookup"),
+    count: int = Query(default=10, ge=1, le=30),
+    discovery_service: AlbumDiscoveryService = Depends(get_album_discovery_service)
+):
+    """Get albums from similar artists."""
+    if is_unknown_mbid(album_id) or is_unknown_mbid(artist_id):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or unknown album/artist ID"
+        )
+    return await discovery_service.get_similar_albums(album_id, artist_id, count)
+
+
+@router.get("/{album_id}/more-by-artist", response_model=MoreByArtistResponse)
+async def get_more_by_artist(
+    album_id: str,
+    artist_id: str = Query(..., description="Artist MBID"),
+    count: int = Query(default=10, ge=1, le=30),
+    discovery_service: AlbumDiscoveryService = Depends(get_album_discovery_service)
+):
+    """Get other albums by the same artist."""
+    if is_unknown_mbid(artist_id):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or unknown artist ID"
+        )
+    return await discovery_service.get_more_by_artist(artist_id, album_id, count)

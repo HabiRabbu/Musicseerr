@@ -196,3 +196,32 @@ class MusicBrainzAlbumMixin:
         except Exception as e:
             logger.error(f"Failed to fetch release {release_id}: {e}")
             return None
+
+    async def get_release_group_id_from_release(
+        self,
+        release_id: str
+    ) -> Optional[str]:
+        cache_key = f"mb:release_to_rg:{release_id}"
+        cached = await self._cache.get(cache_key)
+        if cached is not None:
+            logger.info(f"[MB] Cache hit for release {release_id[:8]}: '{cached[:8] if cached else 'empty'}'")
+            return cached if cached != "" else None
+
+        try:
+            logger.info(f"[MB] Fetching release group for release {release_id[:8]}")
+            result = await mb_call(
+                musicbrainzngs.get_release_by_id,
+                release_id,
+                includes=["release-groups"],
+                priority=RequestPriority.BACKGROUND_SYNC
+            )
+            release = result.get("release", {})
+            rg = release.get("release-group", {})
+            rg_id = rg.get("id")
+            logger.info(f"[MB] Resolved release {release_id[:8]} -> release_group {rg_id}")
+            await self._cache.set(cache_key, rg_id or "", ttl_seconds=86400)
+            return rg_id
+        except Exception as e:
+            logger.warning(f"[MB] Failed to get release group for release {release_id[:8]}: {e}")
+            await self._cache.set(cache_key, "", ttl_seconds=3600)
+            return None

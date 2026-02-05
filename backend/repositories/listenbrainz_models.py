@@ -47,6 +47,14 @@ class ListenBrainzGenreActivity:
     hour: int | None = None
 
 
+@dataclass
+class ListenBrainzSimilarArtist:
+    artist_mbid: str
+    artist_name: str
+    listen_count: int
+    score: float | None = None
+
+
 ALLOWED_STATS_RANGE = [
     "this_week", "this_month", "this_year",
     "week", "month", "quarter", "year", "half_yearly", "all_time"
@@ -110,4 +118,20 @@ def parse_artist_recording(item: dict) -> ListenBrainzRecording:
         release_name=item.get("release_name"),
         release_mbid=item.get("release_mbid"),
         artist_mbids=item.get("artist_mbids"),
+    )
+
+
+def parse_similar_artist(artist_mbid: str, recordings: list[dict]) -> ListenBrainzSimilarArtist:
+    if not recordings:
+        return ListenBrainzSimilarArtist(
+            artist_mbid=artist_mbid,
+            artist_name="Unknown",
+            listen_count=0,
+        )
+    first = recordings[0]
+    total_count = sum(r.get("total_listen_count", 0) for r in recordings)
+    return ListenBrainzSimilarArtist(
+        artist_mbid=artist_mbid,
+        artist_name=first.get("similar_artist_name", "Unknown"),
+        listen_count=total_count,
     )

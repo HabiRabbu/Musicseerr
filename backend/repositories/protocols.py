@@ -83,6 +83,19 @@ class MusicBrainzRepositoryProtocol(Protocol):
         release_mbid: str
     ) -> Optional[Any]:
         ...
+    
+    async def get_release_group_id_from_release(
+        self,
+        release_mbid: str
+    ) -> Optional[str]:
+        ...
+
+    async def get_release_groups_by_artist(
+        self,
+        artist_mbid: str,
+        limit: int = 10
+    ) -> list[dict[str, Any]]:
+        ...
 
 
 class LidarrRepositoryProtocol(Protocol):

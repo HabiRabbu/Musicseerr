@@ -2,7 +2,7 @@
 	import { onMount, onDestroy } from 'svelte';
 	import { browser } from '$app/environment';
 	import { goto } from '$app/navigation';
-	import type { ArtistInfo, ArtistReleases } from '$lib/types';
+	import type { ArtistInfo, ArtistReleases, SimilarArtistsResponse, TopSongsResponse, TopAlbumsResponse } from '$lib/types';
 	import { colors } from '$lib/colors';
 	import ArtistHeaderSkeleton from '$lib/components/ArtistHeaderSkeleton.svelte';
 	import AlbumGridSkeleton from '$lib/components/AlbumGridSkeleton.svelte';
@@ -11,7 +11,11 @@
 	import Toast from '$lib/components/Toast.svelte';
 	import ArtistHero from '$lib/components/ArtistHero.svelte';
 	import ArtistDescription from '$lib/components/ArtistDescription.svelte';
+	import SimilarArtistsCarousel from '$lib/components/SimilarArtistsCarousel.svelte';
+	import TopSongsList from '$lib/components/TopSongsList.svelte';
+	import TopAlbumsList from '$lib/components/TopAlbumsList.svelte';
 	import { requestAlbum } from '$lib/utils/albumRequest';
+	import { getArtistDiscoveryCache, setArtistDiscoveryCache } from '$lib/stores/discoveryCache';
 
 	export let data: { artistId: string };
 
@@ -34,6 +38,11 @@
 	const BATCH_SIZE = 50;
 	let fetchMoreTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
+	let similarArtists: SimilarArtistsResponse | null = null;
+	let topSongs: TopSongsResponse | null = null;
+	let topAlbums: TopAlbumsResponse | null = null;
+	let loadingDiscovery = true;
+
 	function sortReleasesByYear(releases: any[]) {
 		return releases.sort((a, b) => {
 			const yearA = a.year;
@@ -47,8 +56,9 @@
 	$: validLinks = artist?.external_links.filter((link) => link.url && link.url.trim() !== '') || [];
 
 	async function fetchArtist(force = false) {
-		loadingBasic = true;
-		loadingExtended = true;
+		if (!artist) loadingBasic = true;
+		if (!artist) loadingExtended = true;
+		if (!similarArtists && !topSongs && !topAlbums) loadingDiscovery = true;
 		error = null;
 		
 		if (abortController) {
@@ -60,6 +70,7 @@
 
 		if (artist) {
 			fetchExtendedInfo(force, artist);
+			fetchDiscoveryData();
 		}
 	}
 	
@@ -132,6 +143,36 @@
 			loadingExtended = false;
 		}
 	}
+
+	async function fetchDiscoveryData() {
+		const cached = getArtistDiscoveryCache(data.artistId);
+		if (cached) {
+			similarArtists = cached.similarArtists;
+			topSongs = cached.topSongs;
+			topAlbums = cached.topAlbums;
+			loadingDiscovery = false;
+		} else if (!similarArtists && !topSongs && !topAlbums) {
+			loadingDiscovery = true;
+		}
+
+		try {
+			const [similarRes, songsRes, albumsRes] = await Promise.all([
+				fetch(`/api/artist/${data.artistId}/similar`, { signal: abortController?.signal }),
+				fetch(`/api/artist/${data.artistId}/top-songs`, { signal: abortController?.signal }),
+				fetch(`/api/artist/${data.artistId}/top-albums`, { signal: abortController?.signal })
+			]);
+
+			if (similarRes.ok) similarArtists = await similarRes.json();
+			if (songsRes.ok) topSongs = await songsRes.json();
+			if (albumsRes.ok) topAlbums = await albumsRes.json();
+
+			setArtistDiscoveryCache(data.artistId, { similarArtists, topSongs, topAlbums });
+		} catch (e) {
+			if (e instanceof Error && e.name === 'AbortError') return;
+		} finally {
+			loadingDiscovery = false;
+		}
+	}
 	
 	async function fetchMoreReleases() {
 		if (!artist || loadingMoreReleases || !hasMoreReleases) {
@@ -195,6 +236,10 @@
 		artist = null;
 		loadingBasic = true;
 		loadingExtended = true;
+		loadingDiscovery = true;
+		similarArtists = null;
+		topSongs = null;
+		topAlbums = null;
 		error = null;
 		currentOffset = 50;
 		hasMoreReleases = false;
@@ -309,6 +354,35 @@
 			{#if validLinks.length > 0}
 				<ExternalLinksCarousel links={validLinks} />
 			{/if}
+
+			<!-- Discovery Section: Top Albums & Top Songs side by side -->
+			<div class="flex flex-col md:flex-row gap-6 mt-8">
+				<div class="flex-1">
+					<TopAlbumsList 
+						albums={topAlbums?.albums || []} 
+						loading={loadingDiscovery} 
+						configured={topAlbums?.configured ?? true} 
+					/>
+				</div>
+				<div class="hidden md:block w-px bg-base-content/15 self-stretch"></div>
+				<div class="block md:hidden h-px bg-base-content/15 w-full"></div>
+				<div class="flex-1">
+					<TopSongsList 
+						songs={topSongs?.songs || []} 
+						loading={loadingDiscovery} 
+						configured={topSongs?.configured ?? true} 
+					/>
+				</div>
+			</div>
+
+			<!-- Similar Artists Carousel -->
+			<div class="mt-8">
+				<SimilarArtistsCarousel 
+					artists={similarArtists?.similar_artists || []} 
+					loading={loadingDiscovery} 
+					configured={similarArtists?.configured ?? true} 
+				/>
+			</div>
 
 			{#if hasMoreReleases || loadingMoreReleases}
 				<div class="flex items-center justify-center gap-3 p-4 bg-base-300 rounded-box mb-6" style="border: 2px solid {colors.accent};">

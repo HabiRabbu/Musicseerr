@@ -2,11 +2,12 @@
 	import { onDestroy } from 'svelte';
 	import { browser } from '$app/environment';
 	import { goto } from '$app/navigation';
-	import type { AlbumBasicInfo, AlbumTracksInfo } from '$lib/types';
+	import type { AlbumBasicInfo, AlbumTracksInfo, SimilarAlbumsResponse, MoreByArtistResponse } from '$lib/types';
 	import { colors } from '$lib/colors';
 	import { libraryStore } from '$lib/stores/library';
 	import AlbumImage from '$lib/components/AlbumImage.svelte';
 	import Toast from '$lib/components/Toast.svelte';
+	import DiscoveryAlbumCarousel from '$lib/components/DiscoveryAlbumCarousel.svelte';
 	import { requestAlbum } from '$lib/utils/albumRequest';
 	import { formatDuration, formatTotalDuration } from '$lib/utils/formatting';
 
@@ -19,6 +20,10 @@
 	let loadingTracks: boolean = true;
 	let showToast = false;
 	let requesting = false;
+
+	let moreByArtist: MoreByArtistResponse | null = null;
+	let similarAlbums: SimilarAlbumsResponse | null = null;
+	let loadingDiscovery = true;
 
 	let currentAlbumId: string | null = null;
 
@@ -36,12 +41,16 @@
 		error = null;
 		loadingBasic = true;
 		loadingTracks = true;
+		loadingDiscovery = true;
+		moreByArtist = null;
+		similarAlbums = null;
 	}
 
 	async function loadAlbum() {
 		await fetchBasicInfo();
 		if (album) {
 			fetchTracksInfo();
+			fetchDiscoveryData();
 		}
 	}
 
@@ -69,6 +78,26 @@
 		} catch (e) {
 		}
 		loadingTracks = false;
+	}
+
+	async function fetchDiscoveryData() {
+		if (!album?.artist_id) {
+			loadingDiscovery = false;
+			return;
+		}
+		loadingDiscovery = true;
+		try {
+			const [moreRes, similarRes] = await Promise.all([
+				fetch(`/api/album/${data.albumId}/more-by-artist?artist_id=${album.artist_id}`),
+				fetch(`/api/album/${data.albumId}/similar?artist_id=${album.artist_id}`)
+			]);
+
+			if (moreRes.ok) moreByArtist = await moreRes.json();
+			if (similarRes.ok) similarAlbums = await similarRes.json();
+		} catch (e) {
+		} finally {
+			loadingDiscovery = false;
+		}
 	}
 
 	async function handleRequest() {
@@ -307,6 +336,26 @@
 					<span class="font-semibold">Release Date:</span> {album.release_date}
 				</div>
 			{/if}
+
+			<!-- More by Artist Section -->
+			<div class="mt-8">
+				<DiscoveryAlbumCarousel 
+					albums={moreByArtist?.albums || []}
+					loading={loadingDiscovery}
+					configured={true}
+					title="More by {moreByArtist?.artist_name || album.artist_name}"
+					emptyMessage="No other albums found"
+				/>
+			</div>
+
+			<!-- Similar Albums Section -->
+			<DiscoveryAlbumCarousel 
+				albums={similarAlbums?.albums || []}
+				loading={loadingDiscovery}
+				configured={similarAlbums?.configured ?? true}
+				title="You Might Also Like"
+				emptyMessage="No similar albums found"
+			/>
 		</div>
 	{:else}
 		<div class="flex items-center justify-center min-h-[50vh]">

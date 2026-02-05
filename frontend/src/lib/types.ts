@@ -338,3 +338,71 @@ export type GenreDetailResponse = {
 	artists: HomeArtist[];
 	total_count: number | null;
 };
+
+export type SimilarArtist = {
+	musicbrainz_id: string;
+	name: string;
+	listen_count: number;
+	in_library: boolean;
+	image_url?: string | null;
+};
+
+export type SimilarArtistsResponse = {
+	similar_artists: SimilarArtist[];
+	source: string;
+	configured: boolean;
+};
+
+export type TopSong = {
+	recording_mbid?: string | null;
+	title: string;
+	artist_name: string;
+	release_mbid?: string | null;
+	release_name?: string | null;
+	listen_count: number;
+};
+
+export type TopSongsResponse = {
+	songs: TopSong[];
+	source: string;
+	configured: boolean;
+};
+
+export type TopAlbum = {
+	release_group_mbid?: string | null;
+	title: string;
+	artist_name: string;
+	year?: number | null;
+	listen_count: number;
+	in_library: boolean;
+	requested?: boolean;
+	cover_url?: string | null;
+};
+
+export type TopAlbumsResponse = {
+	albums: TopAlbum[];
+	source: string;
+	configured: boolean;
+};
+
+export type DiscoveryAlbum = {
+	musicbrainz_id: string;
+	title: string;
+	artist_name: string;
+	artist_id?: string | null;
+	year?: number | null;
+	in_library: boolean;
+	requested?: boolean;
+	cover_url?: string | null;
+};
+
+export type SimilarAlbumsResponse = {
+	albums: DiscoveryAlbum[];
+	source: string;
+	configured: boolean;
+};
+
+export type MoreByArtistResponse = {
+	albums: DiscoveryAlbum[];
+	artist_name: string;
+};

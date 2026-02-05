@@ -170,3 +170,11 @@ class MusicBrainzArtistMixin:
         except Exception as e:
             logger.error(f"Failed to fetch release groups for artist {artist_mbid} at offset {offset}: {e}")
             return [], 0
+
+    async def get_release_groups_by_artist(
+        self,
+        artist_mbid: str,
+        limit: int = 10
+    ) -> list[dict[str, Any]]:
+        release_groups, _ = await self.get_artist_release_groups(artist_mbid, offset=0, limit=limit)
+        return release_groups

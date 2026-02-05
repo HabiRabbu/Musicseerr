@@ -1,0 +1,72 @@
+<script lang="ts">
+	import type { SimilarArtist } from '$lib/types';
+	import HorizontalCarousel from './HorizontalCarousel.svelte';
+	import ArtistImage from './ArtistImage.svelte';
+	import { colors } from '$lib/colors';
+	import { goto } from '$app/navigation';
+
+	interface Props {
+		artists: SimilarArtist[];
+		loading?: boolean;
+		configured?: boolean;
+	}
+
+	let { artists, loading = false, configured = true }: Props = $props();
+
+	function handleClick(mbid: string) {
+		goto(`/artist/${mbid}`);
+	}
+</script>
+
+<div>
+	<h3 class="text-lg font-semibold mb-3">Similar Artists</h3>
+
+	{#if loading}
+		<div class="flex gap-4 overflow-hidden">
+			{#each Array(8) as _}
+				<div class="w-32 flex-shrink-0">
+					<div class="skeleton aspect-square rounded-full"></div>
+					<div class="skeleton h-4 w-3/4 mx-auto mt-2"></div>
+				</div>
+			{/each}
+		</div>
+	{:else if !configured}
+		<div class="bg-base-200 rounded-lg p-6 text-center">
+			<p class="text-base-content/70">Connect ListenBrainz in Settings to see similar artists</p>
+			<a href="/settings" class="btn btn-primary btn-sm mt-3">Configure</a>
+		</div>
+	{:else if artists.length === 0}
+		<div class="bg-base-200 rounded-lg p-6 text-center">
+			<p class="text-base-content/70">No similar artists found</p>
+		</div>
+	{:else}
+		<HorizontalCarousel>
+			{#each artists as artist}
+				<div
+					class="w-32 flex-shrink-0 cursor-pointer"
+					role="button"
+					tabindex="0"
+					onclick={() => handleClick(artist.musicbrainz_id)}
+					onkeydown={(e) => e.key === 'Enter' && handleClick(artist.musicbrainz_id)}
+				>
+					<div class="relative group">
+						<div class="aspect-square rounded-full overflow-hidden transition-transform group-hover:scale-105">
+							<ArtistImage mbid={artist.musicbrainz_id} alt={artist.name} size="full" className="w-full h-full object-cover" />
+						</div>
+						{#if artist.in_library}
+							<div 
+								class="absolute bottom-1 right-1 rounded-full p-1"
+								style="background-color: {colors.accent};"
+							>
+								<svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke={colors.secondary} stroke-width="3">
+									<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+								</svg>
+							</div>
+						{/if}
+					</div>
+					<p class="text-center text-sm mt-2 truncate font-medium">{artist.name}</p>
+				</div>
+			{/each}
+		</HorizontalCarousel>
+	{/if}
+</div>

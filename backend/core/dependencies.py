@@ -27,6 +27,8 @@ from services.cache_service import CacheService
 from services.home_service import HomeService
 from services.home_charts_service import HomeChartsService
 from services.settings_service import SettingsService
+from services.artist_discovery_service import ArtistDiscoveryService
+from services.album_discovery_service import AlbumDiscoveryService
 
 logger = logging.getLogger(__name__)
 
@@ -265,6 +267,34 @@ def get_settings_service() -> SettingsService:
     return SettingsService(preferences_service, cache)
 
 
+@lru_cache(maxsize=1)
+def get_artist_discovery_service() -> ArtistDiscoveryService:
+    listenbrainz_repo = get_listenbrainz_repository()
+    musicbrainz_repo = get_musicbrainz_repository()
+    library_cache = get_library_cache()
+    lidarr_repo = get_lidarr_repository()
+    return ArtistDiscoveryService(
+        listenbrainz_repo=listenbrainz_repo,
+        musicbrainz_repo=musicbrainz_repo,
+        library_cache=library_cache,
+        lidarr_repo=lidarr_repo,
+    )
+
+
+@lru_cache(maxsize=1)
+def get_album_discovery_service() -> AlbumDiscoveryService:
+    listenbrainz_repo = get_listenbrainz_repository()
+    musicbrainz_repo = get_musicbrainz_repository()
+    library_cache = get_library_cache()
+    lidarr_repo = get_lidarr_repository()
+    return AlbumDiscoveryService(
+        listenbrainz_repo=listenbrainz_repo,
+        musicbrainz_repo=musicbrainz_repo,
+        library_cache=library_cache,
+        lidarr_repo=lidarr_repo,
+    )
+
+
 CacheDep = Annotated[CacheInterface, Depends(get_cache)]
 DiskCacheDep = Annotated[DiskMetadataCache, Depends(get_disk_cache)]
 LibraryCacheDep = Annotated[LibraryCache, Depends(get_library_cache)]
@@ -286,6 +316,8 @@ CacheServiceDep = Annotated[CacheService, Depends(get_cache_service)]
 HomeServiceDep = Annotated[HomeService, Depends(get_home_service)]
 HomeChartsServiceDep = Annotated[HomeChartsService, Depends(get_home_charts_service)]
 SettingsServiceDep = Annotated[SettingsService, Depends(get_settings_service)]
+ArtistDiscoveryServiceDep = Annotated[ArtistDiscoveryService, Depends(get_artist_discovery_service)]
+AlbumDiscoveryServiceDep = Annotated[AlbumDiscoveryService, Depends(get_album_discovery_service)]
 
 
 async def init_app_state(app) -> None:
@@ -316,5 +348,7 @@ async def cleanup_app_state() -> None:
     get_home_service.cache_clear()
     get_home_charts_service.cache_clear()
     get_settings_service.cache_clear()
+    get_artist_discovery_service.cache_clear()
+    get_album_discovery_service.cache_clear()
 
     logger.info("Application state cleaned up")

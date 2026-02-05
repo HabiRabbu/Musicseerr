@@ -1,8 +1,10 @@
 import logging
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from api.v1.schemas.artist import ArtistInfo, ArtistExtendedInfo, ArtistReleases
-from core.dependencies import get_artist_service
+from api.v1.schemas.discovery import SimilarArtistsResponse, TopSongsResponse, TopAlbumsResponse
+from core.dependencies import get_artist_service, get_artist_discovery_service
 from services.artist_service import ArtistService
+from services.artist_discovery_service import ArtistDiscoveryService
 from infrastructure.validators import is_unknown_mbid
 
 logger = logging.getLogger(__name__)
@@ -70,3 +72,45 @@ async def get_artist_releases(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e)
         )
+
+
+@router.get("/{artist_id}/similar", response_model=SimilarArtistsResponse)
+async def get_similar_artists(
+    artist_id: str,
+    count: int = Query(default=15, ge=1, le=50),
+    discovery_service: ArtistDiscoveryService = Depends(get_artist_discovery_service)
+):
+    if is_unknown_mbid(artist_id):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid or unknown artist ID: {artist_id}"
+        )
+    return await discovery_service.get_similar_artists(artist_id, count)
+
+
+@router.get("/{artist_id}/top-songs", response_model=TopSongsResponse)
+async def get_top_songs(
+    artist_id: str,
+    count: int = Query(default=10, ge=1, le=50),
+    discovery_service: ArtistDiscoveryService = Depends(get_artist_discovery_service)
+):
+    if is_unknown_mbid(artist_id):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid or unknown artist ID: {artist_id}"
+        )
+    return await discovery_service.get_top_songs(artist_id, count)
+
+
+@router.get("/{artist_id}/top-albums", response_model=TopAlbumsResponse)
+async def get_top_albums(
+    artist_id: str,
+    count: int = Query(default=10, ge=1, le=50),
+    discovery_service: ArtistDiscoveryService = Depends(get_artist_discovery_service)
+):
+    if is_unknown_mbid(artist_id):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid or unknown artist ID: {artist_id}"
+        )
+    return await discovery_service.get_top_albums(artist_id, count)
