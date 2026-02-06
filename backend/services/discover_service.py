@@ -91,10 +91,12 @@ class DiscoverService:
             if cached is not None:
                 if isinstance(cached, DiscoverResponse):
                     return cached.model_copy(update={"refreshing": self._building})
+        if not self._building:
+            asyncio.create_task(self.warm_cache())
         return DiscoverResponse(
             integration_status=self._get_integration_status(),
             service_prompts=self._build_service_prompts(),
-            refreshing=self._building,
+            refreshing=True,
         )
 
     def _get_integration_status(self) -> dict[str, bool]:

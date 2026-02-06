@@ -268,6 +268,14 @@
 		return text.slice(0, maxLen).trimEnd() + '…';
 	}
 
+	const PLACEHOLDER = '/placeholder-album.png';
+
+	function handleCoverError() {
+		if (currentItem && currentItem.cover_url !== PLACEHOLDER) {
+			queue[currentIndex] = { ...queue[currentIndex], cover_url: PLACEHOLDER };
+		}
+	}
+
 	function resetYtSearch() {
 		ytSearching = false;
 		ytSearchResult = null;
@@ -369,13 +377,10 @@
 								<div class="dq-cover-skeleton skeleton"></div>
 							{:else}
 								<img
-									src={currentItem.cover_url || '/placeholder-album.png'}
+									src={currentItem.cover_url || PLACEHOLDER}
 									alt={currentItem.album_name}
 									class="dq-cover"
-									onerror={(e) => {
-										const img = e.currentTarget as HTMLImageElement;
-										img.src = '/placeholder-album.png';
-									}}
+									onerror={handleCoverError}
 								/>
 							{/if}
 						</button>
@@ -573,13 +578,10 @@
 					onclick={() => navigateTo(`/album/${currentItem.release_group_mbid}`)}
 				>
 					<img
-						src={currentItem.cover_url || '/placeholder-album.png'}
+						src={currentItem.cover_url || PLACEHOLDER}
 						alt={currentItem.album_name}
 						class="dq-cover-mobile"
-						onerror={(e) => {
-							const img = e.currentTarget as HTMLImageElement;
-							img.src = '/placeholder-album.png';
-						}}
+						onerror={handleCoverError}
 					/>
 				</button>
 
