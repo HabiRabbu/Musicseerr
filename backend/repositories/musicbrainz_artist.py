@@ -113,7 +113,7 @@ class MusicBrainzArtistMixin:
             artists = result.get("artist-list", [])
             artists = dedupe_by_id(artists)
 
-            results = [self._map_artist_to_result(a) for a in artists[:limit]]
+            results = [r for a in artists[:limit] if (r := self._map_artist_to_result(a)) is not None]
 
             advanced_settings = self._preferences_service.get_advanced_settings()
             await self._cache.set(cache_key, results, ttl_seconds=advanced_settings.cache_ttl_search * 2)
