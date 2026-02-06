@@ -270,6 +270,34 @@ export type HomeResponse = {
 	service_prompts: ServicePrompt[];
 	integration_status: Record<string, boolean>;
 	genre_artists: Record<string, string | null>;
+	discover_preview: DiscoverPreview | null;
+};
+
+export type DiscoverPreview = {
+	seed_artist: string;
+	seed_artist_mbid: string;
+	items: HomeArtist[];
+};
+
+export type BecauseYouListenTo = {
+	seed_artist: string;
+	seed_artist_mbid: string;
+	listen_count: number;
+	section: HomeSection;
+};
+
+export type DiscoverResponse = {
+	because_you_listen_to: BecauseYouListenTo[];
+	discover_queue_enabled: boolean;
+	fresh_releases: HomeSection | null;
+	missing_essentials: HomeSection | null;
+	rediscover: HomeSection | null;
+	artists_you_might_like: HomeSection | null;
+	popular_in_your_genres: HomeSection | null;
+	genre_list: HomeSection | null;
+	globally_trending: HomeSection | null;
+	integration_status: Record<string, boolean>;
+	service_prompts: ServicePrompt[];
 };
 
 export type QualityProfile = {
@@ -426,6 +454,43 @@ export type SimilarAlbumsResponse = {
 	albums: DiscoveryAlbum[];
 	source: string;
 	configured: boolean;
+};
+
+export type DiscoverQueueItemLight = {
+	release_group_mbid: string;
+	album_name: string;
+	artist_name: string;
+	artist_mbid: string;
+	cover_url: string | null;
+	recommendation_reason: string;
+	is_wildcard: boolean;
+	in_library: boolean;
+};
+
+export type DiscoverQueueEnrichment = {
+	release_date: string | null;
+	country: string | null;
+	tags: string[];
+	youtube_url: string | null;
+	youtube_search_url: string;
+	youtube_search_available: boolean;
+	artist_description: string | null;
+	listen_count: number | null;
+};
+
+export type YouTubeSearchResponse = {
+	video_id: string | null;
+	embed_url: string | null;
+	error: string | null;
+};
+
+export type DiscoverQueueResponse = {
+	items: DiscoverQueueItemLight[];
+	queue_id: string;
+};
+
+export type DiscoverQueueItemFull = DiscoverQueueItemLight & {
+	enrichment?: DiscoverQueueEnrichment;
 };
 
 export type MoreByArtistResponse = {

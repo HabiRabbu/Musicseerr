@@ -10,6 +10,7 @@ from api.v1.schemas.settings import (
     SoularrConnectionSettings,
     JellyfinConnectionSettings,
     ListenBrainzConnectionSettings,
+    YouTubeConnectionSettings,
     HomeSettings
 )
 from api.v1.schemas.advanced_settings import AdvancedSettings
@@ -212,6 +213,27 @@ class PreferencesService:
         except Exception as e:
             logger.error(f"Failed to save ListenBrainz connection settings: {e}")
             raise ConfigurationError(f"Failed to save ListenBrainz connection settings: {e}")
+
+    def get_youtube_connection(self) -> YouTubeConnectionSettings:
+        config = self._load_config()
+        yt_data = config.get("youtube_settings", {})
+        return YouTubeConnectionSettings(
+            api_key=yt_data.get("api_key", ""),
+            enabled=yt_data.get("enabled", False),
+        )
+
+    def save_youtube_connection(self, settings: YouTubeConnectionSettings) -> None:
+        try:
+            config = self._load_config().copy()
+            config["youtube_settings"] = {
+                "api_key": settings.api_key,
+                "enabled": settings.enabled,
+            }
+            self._save_config(config)
+            logger.info(f"Saved YouTube connection settings to {self._config_path}")
+        except Exception as e:
+            logger.error(f"Failed to save YouTube connection settings: {e}")
+            raise ConfigurationError(f"Failed to save YouTube connection settings: {e}")
 
     def get_home_settings(self) -> HomeSettings:
         return self._get_section("home_settings", HomeSettings)

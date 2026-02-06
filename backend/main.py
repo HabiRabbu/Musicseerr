@@ -11,7 +11,7 @@ from core.dependencies import (
     init_app_state, 
     cleanup_app_state
 )
-from core.tasks import start_cache_cleanup_task, start_library_sync_task, start_disk_cache_cleanup_task, start_home_cache_warming_task
+from core.tasks import start_cache_cleanup_task, start_library_sync_task, start_disk_cache_cleanup_task, start_home_cache_warming_task, start_discover_cache_warming_task
 from core.exceptions import ResourceNotFoundError, ExternalServiceError
 from core.exception_handlers import (
     resource_not_found_handler,
@@ -23,7 +23,7 @@ from infrastructure.resilience.retry import CircuitOpenError
 from middleware import PerformanceMiddleware
 from static_server import mount_frontend
 from api.v1.routes import (
-    search, requests, library, status, queue, covers, artists, albums, settings, home
+    search, requests, library, status, queue, covers, artists, albums, settings, home, discover
 )
 from api.v1.routes import cache as cache_routes
 from api.v1.routes import cache_status as cache_status_routes
@@ -106,6 +106,9 @@ async def lifespan(app: FastAPI):
 
     from core.dependencies import get_home_service
     start_home_cache_warming_task(get_home_service())
+
+    from core.dependencies import get_discover_service
+    start_discover_cache_warming_task(get_discover_service())
     
     logger.info("Musicseerr started successfully")
     
@@ -160,6 +163,7 @@ app.include_router(artists.router)
 app.include_router(albums.router)
 app.include_router(settings.router)
 app.include_router(home.router)
+app.include_router(discover.router)
 app.include_router(cache_routes.router)
 app.include_router(cache_status_routes.router)
 

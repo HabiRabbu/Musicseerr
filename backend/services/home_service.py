@@ -6,6 +6,8 @@ from api.v1.schemas.home import (
     HomeSection,
     HomeGenre,
     ServicePrompt,
+    HomeArtist,
+    DiscoverPreview,
 )
 from repositories.protocols import (
     ListenBrainzRepositoryProtocol,
@@ -197,6 +199,8 @@ class HomeService:
             )
         
         response.service_prompts = self._build_service_prompts(lb_enabled, jf_enabled, lidarr_configured)
+
+        response.discover_preview = await self._build_discover_preview()
         
         if self._memory_cache:
             await self._memory_cache.set(cache_key, response, HOME_CACHE_TTL)
@@ -347,6 +351,30 @@ class HomeService:
             return None
         return HomeSection(title="Your Favorites", type="artists", items=items, source="jellyfin")
     
+    async def _build_discover_preview(self) -> DiscoverPreview | None:
+        if not self._memory_cache:
+            return None
+        try:
+            from api.v1.schemas.discover import DiscoverResponse as DR
+            cached = await self._memory_cache.get("discover_response")
+            if not cached or not isinstance(cached, DR):
+                return None
+            if not cached.because_you_listen_to:
+                return None
+            first = cached.because_you_listen_to[0]
+            preview_items = [
+                item for item in first.section.items[:15]
+                if isinstance(item, HomeArtist)
+            ]
+            return DiscoverPreview(
+                seed_artist=first.seed_artist,
+                seed_artist_mbid=first.seed_artist_mbid,
+                items=preview_items,
+            )
+        except Exception as e:
+            logger.debug(f"Could not build discover preview: {e}")
+            return None
+
     def _build_service_prompts(
         self,
         lb_enabled: bool,

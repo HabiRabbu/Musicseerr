@@ -2,6 +2,7 @@
 	import type { HomeSection, HomeArtist, HomeAlbum, HomeTrack, HomeGenre } from '$lib/types';
 	import { goto } from '$app/navigation';
 	import { browser } from '$app/environment';
+	import { onMount, onDestroy, tick } from 'svelte';
 	import { formatListenCount, formatListenedAt } from '$lib/utils/formatting';
 	import ArtistImage from './ArtistImage.svelte';
 	import AlbumImage from './AlbumImage.svelte';
@@ -13,6 +14,7 @@
 	let scrollContainer: HTMLDivElement;
 	let showLeftArrow = false;
 	let showRightArrow = true;
+	let resizeObserver: ResizeObserver | null = null;
 
 	function updateArrowVisibility() {
 		if (!scrollContainer) return;
@@ -36,6 +38,21 @@
 	$: if (browser && scrollContainer) {
 		updateArrowVisibility();
 	}
+
+	$: if (section.items) {
+		tick().then(updateArrowVisibility);
+	}
+
+	onMount(() => {
+		if (browser && scrollContainer) {
+			resizeObserver = new ResizeObserver(() => updateArrowVisibility());
+			resizeObserver.observe(scrollContainer);
+		}
+	});
+
+	onDestroy(() => {
+		resizeObserver?.disconnect();
+	});
 
 	function handleArtistClick(artist: HomeArtist) {
 		if (artist.mbid) {
@@ -133,7 +150,7 @@
 		<div class="relative group">
 			{#if showLeftArrow}
 				<button
-					class="absolute left-0 top-1/2 -translate-y-1/2 z-10 btn btn-circle btn-sm bg-base-100/90 shadow-lg opacity-0 group-hover:opacity-100 transition-opacity hidden sm:flex"
+					class="scroll-arrow absolute left-0 top-1/2 -translate-y-1/2 z-10 btn btn-circle btn-sm bg-base-100/90 shadow-lg transition-opacity hidden sm:flex"
 					on:click={scrollLeft}
 					aria-label="Scroll left"
 				>
@@ -241,7 +258,7 @@
 
 			{#if showRightArrow}
 				<button
-					class="absolute right-0 top-1/2 -translate-y-1/2 z-10 btn btn-circle btn-sm bg-base-100/90 shadow-lg opacity-0 group-hover:opacity-100 transition-opacity hidden sm:flex"
+					class="scroll-arrow absolute right-0 top-1/2 -translate-y-1/2 z-10 btn btn-circle btn-sm bg-base-100/90 shadow-lg transition-opacity hidden sm:flex"
 					on:click={scrollRight}
 					aria-label="Scroll right"
 				>
@@ -261,5 +278,14 @@
 	}
 	.scrollbar-hide::-webkit-scrollbar {
 		display: none;
+	}
+
+	@media (hover: hover) and (pointer: fine) {
+		.scroll-arrow {
+			opacity: 0;
+		}
+		.group:hover .scroll-arrow {
+			opacity: 1;
+		}
 	}
 </style>

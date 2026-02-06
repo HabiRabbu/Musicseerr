@@ -114,6 +114,16 @@ class HomeResponse(BaseModel):
         default_factory=dict,
         description="Map of genre name to representative artist MBID"
     )
+    discover_preview: "DiscoverPreview | None" = Field(
+        default=None,
+        description="Preview teaser from discover cache for home page"
+    )
+
+
+class DiscoverPreview(BaseModel):
+    seed_artist: str = Field(description="Name of the seed artist")
+    seed_artist_mbid: str = Field(description="MusicBrainz ID of the seed artist")
+    items: list[HomeArtist] = Field(default_factory=list, description="Preview artist items")
 
 
 class GenreDetailRequest(BaseModel):

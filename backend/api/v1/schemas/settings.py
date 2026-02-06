@@ -106,6 +106,17 @@ class ListenBrainzConnectionSettings(BaseModel):
     )
 
 
+class YouTubeConnectionSettings(BaseModel):
+    api_key: str = Field(
+        default="",
+        description="YouTube Data API v3 key"
+    )
+    enabled: bool = Field(
+        default=False,
+        description="Whether YouTube integration is enabled"
+    )
+
+
 class HomeSettings(BaseModel):
     cache_ttl_trending: int = Field(
         default=3600,

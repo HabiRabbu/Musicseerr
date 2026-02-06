@@ -130,10 +130,18 @@
 			sections.push({ key: 'popular_albums', section: homeData.popular_albums, link: '/popular' });
 		}
 		if (homeData.trending_artists && homeData.trending_artists.items.length > 0) {
-			sections.push({ key: 'trending_artists', section: homeData.trending_artists, link: '/trending' });
+			sections.push({
+				key: 'trending_artists',
+				section: homeData.trending_artists,
+				link: '/trending'
+			});
 		}
 		if (homeData.recently_added && homeData.recently_added.items.length > 0) {
-			sections.push({ key: 'recently_added', section: homeData.recently_added, link: '/library/albums' });
+			sections.push({
+				key: 'recently_added',
+				section: homeData.recently_added,
+				link: '/library/albums'
+			});
 		}
 
 		return sections;
@@ -143,10 +151,18 @@
 		if (!homeData) return [];
 		const sections: { key: string; section: HomeSectionType; link?: string }[] = [];
 		if (homeData.library_artists && homeData.library_artists.items.length > 0) {
-			sections.push({ key: 'library_artists', section: homeData.library_artists, link: '/library/artists' });
+			sections.push({
+				key: 'library_artists',
+				section: homeData.library_artists,
+				link: '/library/artists'
+			});
 		}
 		if (homeData.library_albums && homeData.library_albums.items.length > 0) {
-			sections.push({ key: 'library_albums', section: homeData.library_albums, link: '/library/albums' });
+			sections.push({
+				key: 'library_albums',
+				section: homeData.library_albums,
+				link: '/library/albums'
+			});
 		}
 		return sections;
 	}
@@ -154,9 +170,6 @@
 	function getListenBrainzSections(): { key: string; section: HomeSectionType; link?: string }[] {
 		if (!homeData) return [];
 		const sections: { key: string; section: HomeSectionType; link?: string }[] = [];
-		if (homeData.recommended_artists && homeData.recommended_artists.items.length > 0) {
-			sections.push({ key: 'recommended_artists', section: homeData.recommended_artists });
-		}
 		if (homeData.fresh_releases && homeData.fresh_releases.items.length > 0) {
 			sections.push({ key: 'fresh_releases', section: homeData.fresh_releases });
 		}
@@ -187,45 +200,14 @@
 		(homeData?.genre_list?.items?.length ?? 0) > 0;
 	$: servicePrompts = homeData?.service_prompts || [];
 	$: lidarrConfigured = homeData?.integration_status?.lidarr ?? true;
-	$: lidarrPrompt = servicePrompts.find(p => p.service === 'lidarr-connection');
-	$: otherPrompts = servicePrompts.filter(p => p.service !== 'lidarr-connection');
+	$: lidarrPrompt = servicePrompts.find((p) => p.service === 'lidarr-connection');
+	$: otherPrompts = servicePrompts.filter((p) => p.service !== 'lidarr-connection');
+	$: discoverPreview = homeData?.discover_preview ?? null;
 </script>
 
 <svelte:head>
 	<title>Home - Musicseerr</title>
 </svelte:head>
-
-<style>
-	.scrollbar-hide {
-		-ms-overflow-style: none;
-		scrollbar-width: none;
-	}
-	.scrollbar-hide::-webkit-scrollbar {
-		display: none;
-	}
-
-	.section-group {
-		border-radius: 1rem;
-		display: flex;
-		flex-direction: column;
-		gap: 1.5rem;
-	}
-
-	.section-group-library {
-		background: linear-gradient(135deg, rgba(34, 197, 94, 0.06) 0%, rgba(34, 197, 94, 0.02) 100%);
-		border: 1px solid rgba(34, 197, 94, 0.12);
-	}
-
-	.section-group-listenbrainz {
-		background: linear-gradient(135deg, rgba(251, 146, 60, 0.06) 0%, rgba(251, 146, 60, 0.02) 100%);
-		border: 1px solid rgba(251, 146, 60, 0.12);
-	}
-
-	.section-group-jellyfin {
-		background: linear-gradient(135deg, rgba(168, 85, 247, 0.06) 0%, rgba(168, 85, 247, 0.02) 100%);
-		border: 1px solid rgba(168, 85, 247, 0.12);
-	}
-</style>
 
 <div class="min-h-[calc(100vh-200px)]">
 	<div
@@ -287,12 +269,15 @@
 	{:else}
 		<div class="space-y-6 px-4 sm:space-y-8 sm:px-6 lg:px-8">
 			{#if !lidarrConfigured && lidarrPrompt}
-				<div class="card bg-gradient-to-br from-accent/20 via-accent/10 to-base-200 border-2 border-accent/40 shadow-xl">
+				<div
+					class="card bg-gradient-to-br from-accent/20 via-accent/10 to-base-200 border-2 border-accent/40 shadow-xl"
+				>
 					<div class="card-body items-center text-center py-12">
 						<div class="text-6xl mb-4">🎶</div>
 						<h2 class="card-title text-2xl sm:text-3xl mb-2">Welcome to Musicseerr!</h2>
 						<p class="text-base-content/70 max-w-lg mb-6">
-							To get started, connect your Lidarr server. This is required to manage your music library, request albums, and track your collection.
+							To get started, connect your Lidarr server. This is required to manage your music
+							library, request albums, and track your collection.
 						</p>
 						<div class="flex flex-wrap justify-center gap-2 mb-6">
 							{#each lidarrPrompt.features as feature}
@@ -300,12 +285,28 @@
 							{/each}
 						</div>
 						<a href="/settings?tab=lidarr-connection" class="btn btn-accent btn-lg gap-2">
-							<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-5 w-5">
+							<svg
+								xmlns="http://www.w3.org/2000/svg"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="2"
+								class="h-5 w-5"
+							>
 								<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
 							</svg>
 							Connect Lidarr
-							<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-5 w-5">
-								<path fill-rule="evenodd" d="M3 10a.75.75 0 01.75-.75h10.638L10.23 5.29a.75.75 0 111.04-1.08l5.5 5.25a.75.75 0 010 1.08l-5.5 5.25a.75.75 0 11-1.04-1.08l4.158-3.96H3.75A.75.75 0 013 10z" clip-rule="evenodd" />
+							<svg
+								xmlns="http://www.w3.org/2000/svg"
+								viewBox="0 0 20 20"
+								fill="currentColor"
+								class="h-5 w-5"
+							>
+								<path
+									fill-rule="evenodd"
+									d="M3 10a.75.75 0 01.75-.75h10.638L10.23 5.29a.75.75 0 111.04-1.08l5.5 5.25a.75.75 0 010 1.08l-5.5 5.25a.75.75 0 11-1.04-1.08l4.158-3.96H3.75A.75.75 0 013 10z"
+									clip-rule="evenodd"
+								/>
 							</svg>
 						</a>
 					</div>
@@ -372,7 +373,9 @@
 				{/each}
 			{:else}
 				{#if librarySections.length > 0}
-					<div class="section-group section-group-library -mx-4 px-4 py-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+					<div
+						class="section-group section-group-library -mx-4 px-4 py-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8"
+					>
 						{#each librarySections as { key, section, link } (key)}
 							<HomeSection {section} headerLink={link} />
 						{/each}
@@ -380,15 +383,67 @@
 				{/if}
 
 				{#if listenbrainzSections.length > 0}
-					<div class="section-group section-group-listenbrainz -mx-4 px-4 py-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+					<div
+						class="section-group section-group-listenbrainz -mx-4 px-4 py-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8"
+					>
 						{#each listenbrainzSections as { key, section, link } (key)}
 							<HomeSection {section} headerLink={link} />
 						{/each}
 					</div>
 				{/if}
 
+				{#if discoverPreview && discoverPreview.items.length > 0}
+					<div
+						class="section-group section-group-discover -mx-4 px-4 py-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8"
+					>
+						<HomeSection
+							section={{
+								title: `Because You Listen to ${discoverPreview.seed_artist}`,
+								type: 'artists',
+								items: discoverPreview.items,
+								source: null,
+								fallback_message: null,
+								connect_service: null
+							}}
+						/>
+						<div class="flex items-center justify-center pt-2 pb-2">
+							<a href="/discover" class="btn btn-primary gap-2">
+								<svg
+									xmlns="http://www.w3.org/2000/svg"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="2"
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									class="h-5 w-5"
+								>
+									<circle cx="12" cy="12" r="10"></circle>
+									<polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"
+									></polygon>
+								</svg>
+								Explore More on Discover
+								<svg
+									xmlns="http://www.w3.org/2000/svg"
+									viewBox="0 0 20 20"
+									fill="currentColor"
+									class="h-5 w-5"
+								>
+									<path
+										fill-rule="evenodd"
+										d="M3 10a.75.75 0 01.75-.75h10.638L10.23 5.29a.75.75 0 111.04-1.08l5.5 5.25a.75.75 0 010 1.08l-5.5 5.25a.75.75 0 11-1.04-1.08l4.158-3.96H3.75A.75.75 0 013 10z"
+										clip-rule="evenodd"
+									/>
+								</svg>
+							</a>
+						</div>
+					</div>
+				{/if}
+
 				{#if jellyfinSections.length > 0}
-					<div class="section-group section-group-jellyfin -mx-4 px-4 py-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+					<div
+						class="section-group section-group-jellyfin -mx-4 px-4 py-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8"
+					>
 						{#each jellyfinSections as { key, section, link } (key)}
 							<HomeSection {section} headerLink={link} />
 						{/each}
@@ -410,3 +465,40 @@
 		</div>
 	{/if}
 </div>
+
+<style>
+	.scrollbar-hide {
+		-ms-overflow-style: none;
+		scrollbar-width: none;
+	}
+	.scrollbar-hide::-webkit-scrollbar {
+		display: none;
+	}
+
+	.section-group {
+		border-radius: 1rem;
+		display: flex;
+		flex-direction: column;
+		gap: 1.5rem;
+	}
+
+	.section-group-library {
+		background: linear-gradient(135deg, rgba(34, 197, 94, 0.06) 0%, rgba(34, 197, 94, 0.02) 100%);
+		border: 1px solid rgba(34, 197, 94, 0.12);
+	}
+
+	.section-group-listenbrainz {
+		background: linear-gradient(135deg, rgba(251, 146, 60, 0.06) 0%, rgba(251, 146, 60, 0.02) 100%);
+		border: 1px solid rgba(251, 146, 60, 0.12);
+	}
+
+	.section-group-jellyfin {
+		background: linear-gradient(135deg, rgba(168, 85, 247, 0.06) 0%, rgba(168, 85, 247, 0.02) 100%);
+		border: 1px solid rgba(168, 85, 247, 0.12);
+	}
+
+	.section-group-discover {
+		background: linear-gradient(135deg, rgba(56, 189, 248, 0.06) 0%, rgba(59, 130, 246, 0.02) 100%);
+		border: 1px solid rgba(56, 189, 248, 0.12);
+	}
+</style>

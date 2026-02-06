@@ -8,6 +8,7 @@
 	import SettingsSoularr from '$lib/components/settings/SettingsSoularr.svelte';
 	import SettingsJellyfin from '$lib/components/settings/SettingsJellyfin.svelte';
 	import SettingsListenBrainz from '$lib/components/settings/SettingsListenBrainz.svelte';
+	import SettingsYouTube from '$lib/components/settings/SettingsYouTube.svelte';
 	import SettingsAdvanced from '$lib/components/settings/SettingsAdvanced.svelte';
 
 	let activeTab = $state('settings');
@@ -19,6 +20,7 @@
 		{ id: 'soularr', label: 'Soularr', group: 'External Services', icon: 'M12 2a10 10 0 100 20 10 10 0 000-20zM10 8l6 4-6 4V8z' },
 		{ id: 'jellyfin', label: 'Jellyfin', group: 'External Services', icon: 'M2 7h20v15a2 2 0 01-2 2H4a2 2 0 01-2-2V7zM17 2l-5 5-5-5' },
 		{ id: 'listenbrainz', label: 'ListenBrainz', group: 'External Services', icon: 'M9 18V5l12-2v13M6 18a3 3 0 100-6 3 3 0 000 6zM18 16a3 3 0 100-6 3 3 0 000 6z' },
+		{ id: 'youtube', label: 'YouTube', group: 'External Services', icon: 'M22.54 6.42a2.78 2.78 0 00-1.94-2C18.88 4 12 4 12 4s-6.88 0-8.6.46a2.78 2.78 0 00-1.94 2A29 29 0 001 12a29 29 0 00.46 5.58 2.78 2.78 0 001.94 2C5.12 20 12 20 12 20s6.88 0 8.6-.46a2.78 2.78 0 001.94-2A29 29 0 0023 12a29 29 0 00-.46-5.58zM9.75 15.02V8.98L15.5 12l-5.75 3.02z' },
 		{ id: 'cache', label: 'Cache', group: 'System', icon: 'M3 7v10a2 2 0 002 2h14a2 2 0 002-2V7M21 3H3v4h18V3zM10 12h4' },
 		{ id: 'advanced', label: 'Advanced', group: 'System', icon: 'M12 12a3 3 0 100-6 3 3 0 000 6zM12 1v6m0 6v6M1 12h6m6 0h6M4.2 4.2l4.3 4.3m7 7l4.3 4.3M19.8 4.2l-4.3 4.3m-7 7l-4.3 4.3' }
 	];
@@ -86,6 +88,8 @@
 					<SettingsJellyfin />
 				{:else if activeTab === 'listenbrainz'}
 					<SettingsListenBrainz />
+				{:else if activeTab === 'youtube'}
+					<SettingsYouTube />
 				{:else if activeTab === 'advanced'}
 					<SettingsAdvanced />
 				{/if}

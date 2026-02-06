@@ -154,6 +154,20 @@
 					</a>
 				</li>
 
+				<li>
+					<a 
+						href="/discover" 
+						class="is-drawer-close:tooltip is-drawer-close:tooltip-right" 
+						data-tip="Discover"
+					>
+					<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-6 w-6">
+						<circle cx="12" cy="12" r="10"></circle>
+						<polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"></polygon>
+					</svg>
+						<span class="is-drawer-close:hidden">Discover</span>
+					</a>
+				</li>
+
 				{#if lidarrConfigured}
 					<li>
 						<a 

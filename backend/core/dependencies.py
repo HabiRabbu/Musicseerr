@@ -16,6 +16,7 @@ from repositories.wikidata_repository import WikidataRepository
 from repositories.coverart_repository import CoverArtRepository
 from repositories.listenbrainz_repository import ListenBrainzRepository
 from repositories.jellyfin_repository import JellyfinRepository
+from repositories.youtube import YouTubeRepository
 from services.preferences_service import PreferencesService
 from services.search_service import SearchService
 from services.search_enrichment_service import SearchEnrichmentService
@@ -30,6 +31,7 @@ from services.home_charts_service import HomeChartsService
 from services.settings_service import SettingsService
 from services.artist_discovery_service import ArtistDiscoveryService
 from services.album_discovery_service import AlbumDiscoveryService
+from services.discover_service import DiscoverService
 
 logger = logging.getLogger(__name__)
 
@@ -304,6 +306,38 @@ def get_search_enrichment_service() -> SearchEnrichmentService:
     return SearchEnrichmentService(mb_repo, lb_repo, preferences_service)
 
 
+@lru_cache(maxsize=1)
+def get_youtube_repo() -> YouTubeRepository:
+    settings = get_settings()
+    http_client = get_http_client(settings)
+    preferences_service = get_preferences_service()
+    yt_settings = preferences_service.get_youtube_connection()
+    api_key = yt_settings.api_key if yt_settings.enabled else ""
+    return YouTubeRepository(http_client=http_client, api_key=api_key)
+
+
+@lru_cache(maxsize=1)
+def get_discover_service() -> DiscoverService:
+    listenbrainz_repo = get_listenbrainz_repository()
+    jellyfin_repo = get_jellyfin_repository()
+    lidarr_repo = get_lidarr_repository()
+    musicbrainz_repo = get_musicbrainz_repository()
+    preferences_service = get_preferences_service()
+    memory_cache = get_cache()
+    library_cache = get_library_cache()
+    wikidata_repo = get_wikidata_repository()
+    return DiscoverService(
+        listenbrainz_repo=listenbrainz_repo,
+        jellyfin_repo=jellyfin_repo,
+        lidarr_repo=lidarr_repo,
+        musicbrainz_repo=musicbrainz_repo,
+        preferences_service=preferences_service,
+        memory_cache=memory_cache,
+        library_cache=library_cache,
+        wikidata_repo=wikidata_repo,
+    )
+
+
 CacheDep = Annotated[CacheInterface, Depends(get_cache)]
 DiskCacheDep = Annotated[DiskMetadataCache, Depends(get_disk_cache)]
 LibraryCacheDep = Annotated[LibraryCache, Depends(get_library_cache)]
@@ -328,6 +362,8 @@ HomeChartsServiceDep = Annotated[HomeChartsService, Depends(get_home_charts_serv
 SettingsServiceDep = Annotated[SettingsService, Depends(get_settings_service)]
 ArtistDiscoveryServiceDep = Annotated[ArtistDiscoveryService, Depends(get_artist_discovery_service)]
 AlbumDiscoveryServiceDep = Annotated[AlbumDiscoveryService, Depends(get_album_discovery_service)]
+DiscoverServiceDep = Annotated[DiscoverService, Depends(get_discover_service)]
+YouTubeRepositoryDep = Annotated[YouTubeRepository, Depends(get_youtube_repo)]
 
 
 async def init_app_state(app) -> None:
@@ -361,5 +397,7 @@ async def cleanup_app_state() -> None:
     get_settings_service.cache_clear()
     get_artist_discovery_service.cache_clear()
     get_album_discovery_service.cache_clear()
+    get_youtube_repo.cache_clear()
+    get_discover_service.cache_clear()
 
     logger.info("Application state cleaned up")

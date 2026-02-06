@@ -7,11 +7,12 @@ from api.v1.schemas.settings import (
     SoularrConnectionSettings,
     JellyfinConnectionSettings,
     ListenBrainzConnectionSettings,
+    YouTubeConnectionSettings,
     HomeSettings,
     LidarrVerifyResponse
 )
 from api.v1.schemas.advanced_settings import AdvancedSettingsFrontend
-from core.dependencies import get_preferences_service, get_settings_service
+from core.dependencies import get_preferences_service, get_settings_service, get_youtube_repo
 from core.exceptions import ConfigurationError
 from repositories.jellyfin_repository import JellyfinRepository
 from repositories.listenbrainz_repository import ListenBrainzRepository
@@ -238,6 +239,45 @@ async def verify_listenbrainz_connection(settings: ListenBrainzConnectionSetting
     settings_service = get_settings_service()
     result = await settings_service.verify_listenbrainz(settings)
     return {"valid": result.valid, "message": result.message}
+
+
+@router.get("/youtube", response_model=YouTubeConnectionSettings)
+async def get_youtube_settings():
+    try:
+        preferences_service = get_preferences_service()
+        return preferences_service.get_youtube_connection()
+    except Exception as e:
+        logger.exception(f"Failed to get YouTube settings: {e}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve YouTube settings")
+
+
+@router.put("/youtube", response_model=YouTubeConnectionSettings)
+async def update_youtube_settings(settings: YouTubeConnectionSettings):
+    try:
+        preferences_service = get_preferences_service()
+        preferences_service.save_youtube_connection(settings)
+        get_youtube_repo.cache_clear()
+        logger.info("Updated YouTube connection settings")
+        return settings
+    except ConfigurationError as e:
+        logger.warning(f"Configuration error updating YouTube settings: {e}")
+        raise HTTPException(status_code=400, detail="Invalid YouTube configuration")
+    except Exception as e:
+        logger.exception(f"Failed to save YouTube settings: {e}")
+        raise HTTPException(status_code=500, detail="Failed to save YouTube settings")
+
+
+@router.post("/youtube/verify")
+async def verify_youtube_connection(settings: YouTubeConnectionSettings):
+    from repositories.youtube import YouTubeRepository
+    from infrastructure.http.client import get_http_client
+    from core.config import get_settings as get_app_settings
+
+    app_settings = get_app_settings()
+    http_client = get_http_client(app_settings)
+    temp_repo = YouTubeRepository(http_client=http_client, api_key=settings.api_key)
+    valid, message = await temp_repo.verify_api_key(settings.api_key)
+    return {"valid": valid, "message": message}
 
 
 @router.get("/home", response_model=HomeSettings)

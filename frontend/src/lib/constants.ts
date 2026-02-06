@@ -1,14 +1,18 @@
 export const CACHE_KEYS = {
 	LIBRARY_MBIDS: 'musicseerr_library_mbids',
 	RECENTLY_ADDED: 'musicseerr_recently_added',
-	HOME_CACHE: 'musicseerr_home_cache'
+	HOME_CACHE: 'musicseerr_home_cache',
+	DISCOVER_CACHE: 'musicseerr_discover_cache',
+	DISCOVER_QUEUE: 'musicseerr_discover_queue'
 } as const;
 
 export const CACHE_TTL = {
 	DEFAULT: 5 * 60 * 1000,
 	LIBRARY: 5 * 60 * 1000,
 	RECENTLY_ADDED: 5 * 60 * 1000,
-	HOME: 5 * 60 * 1000
+	HOME: 5 * 60 * 1000,
+	DISCOVER: 30 * 60 * 1000,
+	DISCOVER_QUEUE: 24 * 60 * 60 * 1000
 } as const;
 
 export const API_SIZES = {
@@ -70,6 +74,15 @@ export const API = {
 		albums: (query: string) => `/api/search/albums?query=${encodeURIComponent(query)}`
 	},
 	home: () => '/api/home',
+	discover: () => '/api/discover',
+	discoverRefresh: () => '/api/discover/refresh',
+	discoverQueue: () => '/api/discover/queue',
+	discoverQueueEnrich: (mbid: string) => `/api/discover/queue/enrich/${mbid}`,
+	discoverQueueIgnore: () => '/api/discover/queue/ignore',
+	discoverQueueIgnored: () => '/api/discover/queue/ignored',
+	discoverQueueValidate: () => '/api/discover/queue/validate',
+	discoverQueueYoutubeSearch: (artist: string, album: string) =>
+		`/api/discover/queue/youtube-search?artist=${encodeURIComponent(artist)}&album=${encodeURIComponent(album)}`,
 	queue: () => '/api/queue',
 	settings: () => '/api/settings'
 } as const;

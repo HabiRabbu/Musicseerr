@@ -234,3 +234,50 @@ class MusicBrainzAlbumMixin:
             logger.warning(f"[MB] Failed to get release group for release {release_id[:8]}: {e}")
             await self._cache.set(cache_key, "", ttl_seconds=3600)
             return None
+
+    @staticmethod
+    def extract_youtube_url_from_relations(entity_data: dict) -> str | None:
+        for rel in entity_data.get("url-relation-list", []):
+            url = rel.get("target", "")
+            if "youtube.com" in url or "youtu.be" in url:
+                return url
+        return None
+
+    @staticmethod
+    def youtube_url_to_embed(url: str) -> str | None:
+        import re
+        patterns = [
+            r"youtube\.com/watch\?v=([a-zA-Z0-9_-]{11})",
+            r"youtu\.be/([a-zA-Z0-9_-]{11})",
+            r"youtube\.com/embed/([a-zA-Z0-9_-]{11})",
+        ]
+        for pattern in patterns:
+            match = re.search(pattern, url)
+            if match:
+                return f"https://www.youtube.com/embed/{match.group(1)}"
+        return None
+
+    async def get_recording_by_id(
+        self,
+        recording_id: str,
+        includes: list[str] | None = None,
+    ) -> dict | None:
+        if includes is None:
+            includes = ["url-rels"]
+        cache_key = f"mb:recording:{recording_id}:{','.join(sorted(includes))}"
+        cached = await self._cache.get(cache_key)
+        if cached is not None:
+            return cached
+        try:
+            result = await mb_call(
+                musicbrainzngs.get_recording_by_id,
+                recording_id,
+                includes=includes,
+                priority=RequestPriority.BACKGROUND_SYNC,
+            )
+            recording = result.get("recording")
+            await self._cache.set(cache_key, recording, ttl_seconds=3600)
+            return recording
+        except Exception as e:
+            logger.error(f"Failed to fetch recording {recording_id}: {e}")
+            return None
