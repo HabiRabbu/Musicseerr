@@ -16,7 +16,6 @@
 	let queue: DiscoverQueueItemFull[] = $state([]);
 	let currentIndex: number = $state(0);
 	let loading: boolean = $state(false);
-	let enriching: boolean = $derived(currentItem != null && !currentItem.enrichment);
 	let queueId: string = $state('');
 	let mobileTab: 'video' | 'info' | 'bio' = $state('video');
 	let bioExpanded: boolean = $state(false);
@@ -29,6 +28,7 @@
 
 	let currentItem: DiscoverQueueItemFull | undefined = $derived(queue[currentIndex]);
 	let enrichment: DiscoverQueueEnrichment | undefined = $derived(currentItem?.enrichment);
+	let enriching: boolean = $derived(currentItem != null && !currentItem.enrichment);
 	let isLastItem: boolean = $derived(currentIndex >= queue.length - 1);
 	let progressText: string = $derived(
 		queue.length > 0 ? `${currentIndex + 1} of ${queue.length}` : ''
@@ -129,8 +129,10 @@
 	async function enrichCurrentAndNext() {
 		if (queue.length === 0) return;
 		await enrichItem(currentIndex);
-		if (currentIndex + 1 < queue.length) {
-			enrichItem(currentIndex + 1);
+		for (let i = 1; i <= 2; i++) {
+			if (currentIndex + i < queue.length) {
+				enrichItem(currentIndex + i);
+			}
 		}
 	}
 

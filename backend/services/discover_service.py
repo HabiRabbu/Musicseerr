@@ -831,10 +831,12 @@ class DiscoverService:
 
         await asyncio.gather(*[_process_seed(i, seed) for i, seed in enumerate(seeds)])
 
-        personalized = self._round_robin_select(candidate_pools, count)
+        wildcard_slots = 2
+        personalized_target = max(count - wildcard_slots, 0)
+        personalized = self._round_robin_select(candidate_pools, personalized_target)
         seen_mbids = {item.release_group_mbid.lower() for item in personalized}
 
-        wildcard_count = count - len(personalized)
+        wildcard_count = max(wildcard_slots, count - len(personalized))
         wildcards = await self._get_wildcard_albums(wildcard_count, ignored_mbids, library_album_mbids, seen_mbids)
 
         return self._interleave_wildcards(personalized, wildcards)
@@ -886,65 +888,77 @@ class DiscoverService:
             return []
         exclude = ignored_mbids | library_album_mbids | (seen_mbids or set())
         wildcards: list[DiscoverQueueItemLight] = []
-        trending_target = min(count, 2)
 
-        try:
-            trending = await self._lb_repo.get_sitewide_top_release_groups(count=25)
-            random.shuffle(trending)
-            for rg in trending:
-                if len(wildcards) >= trending_target:
+        decades = ["1970s", "1980s", "1990s", "2000s", "2010s"]
+        sampled_decades = random.sample(decades, min(3, len(decades)))
+        decade_offsets = [(d, random.randint(0, 200)) for d in sampled_decades]
+
+        async def _fetch_trending():
+            try:
+                return await self._lb_repo.get_sitewide_top_release_groups(count=25)
+            except Exception as e:
+                logger.debug(f"Failed to get trending wildcards: {e}")
+                return []
+
+        async def _fetch_decade(decade: str, offset: int):
+            try:
+                return (decade, await self._mb_repo.search_release_groups_by_tag(
+                    decade, limit=25, offset=offset
+                ))
+            except Exception as e:
+                logger.debug(f"Failed to get decade wildcards for {decade}: {e}")
+                return (decade, [])
+
+        results = await asyncio.gather(
+            _fetch_trending(),
+            *[_fetch_decade(d, o) for d, o in decade_offsets],
+        )
+
+        trending = results[0]
+        random.shuffle(trending)
+        trending_target = min(count, 2)
+        for rg in trending:
+            if len(wildcards) >= trending_target:
+                break
+            rg_mbid = rg.release_group_mbid
+            if not rg_mbid or rg_mbid.lower() in exclude:
+                continue
+            artist_mbid = rg.artist_mbids[0] if rg.artist_mbids else ""
+            if artist_mbid.lower() == VARIOUS_ARTISTS_MBID:
+                continue
+            wildcards.append(DiscoverQueueItemLight(
+                release_group_mbid=rg_mbid,
+                album_name=rg.release_group_name,
+                artist_name=rg.artist_name,
+                artist_mbid=artist_mbid,
+                cover_url=f"https://coverartarchive.org/release-group/{rg_mbid}/front",
+                recommendation_reason="Trending This Week",
+                is_wildcard=True,
+                in_library=False,
+            ))
+            exclude.add(rg_mbid.lower())
+
+        for decade, decade_results in results[1:]:
+            if len(wildcards) >= count:
+                break
+            random.shuffle(decade_results)
+            for rg in decade_results:
+                if len(wildcards) >= count:
                     break
-                rg_mbid = rg.release_group_mbid
+                rg_mbid = rg.musicbrainz_id
                 if not rg_mbid or rg_mbid.lower() in exclude:
-                    continue
-                artist_mbid = rg.artist_mbids[0] if rg.artist_mbids else ""
-                if artist_mbid.lower() == VARIOUS_ARTISTS_MBID:
                     continue
                 wildcards.append(DiscoverQueueItemLight(
                     release_group_mbid=rg_mbid,
-                    album_name=rg.release_group_name,
-                    artist_name=rg.artist_name,
-                    artist_mbid=artist_mbid,
+                    album_name=rg.title,
+                    artist_name=rg.artist or "Unknown",
+                    artist_mbid="",
                     cover_url=f"https://coverartarchive.org/release-group/{rg_mbid}/front",
-                    recommendation_reason="Trending This Week",
+                    recommendation_reason=f"Classic from the {decade}",
                     is_wildcard=True,
                     in_library=False,
                 ))
                 exclude.add(rg_mbid.lower())
-        except Exception as e:
-            logger.debug(f"Failed to get trending wildcards: {e}")
-
-        decades = ["1970s", "1980s", "1990s", "2000s", "2010s"]
-        if len(wildcards) < count:
-            sampled_decades = random.sample(decades, min(3, len(decades)))
-            for decade in sampled_decades:
-                if len(wildcards) >= count:
-                    break
-                offset = random.randint(0, 200)
-                try:
-                    decade_results = await self._mb_repo.search_release_groups_by_tag(
-                        decade, limit=25, offset=offset
-                    )
-                    random.shuffle(decade_results)
-                    for rg in decade_results:
-                        if len(wildcards) >= count:
-                            break
-                        rg_mbid = rg.musicbrainz_id
-                        if not rg_mbid or rg_mbid.lower() in exclude:
-                            continue
-                        wildcards.append(DiscoverQueueItemLight(
-                            release_group_mbid=rg_mbid,
-                            album_name=rg.title,
-                            artist_name=rg.artist or "Unknown",
-                            artist_mbid="",
-                            cover_url=f"https://coverartarchive.org/release-group/{rg_mbid}/front",
-                            recommendation_reason=f"Classic from the {decade}",
-                            is_wildcard=True,
-                            in_library=False,
-                        ))
-                        exclude.add(rg_mbid.lower())
-                except Exception as e:
-                    logger.debug(f"Failed to get decade wildcards for {decade}: {e}")
 
         if len(wildcards) == 0:
             logger.warning("Failed to populate any wildcard albums for discover queue")
@@ -1116,7 +1130,9 @@ class DiscoverService:
 
         parallel_tasks: dict[str, Any] = {}
 
-        if artist_mbid:
+        async def _get_artist_and_bio():
+            if not artist_mbid:
+                return
             try:
                 mb_artist = await self._mb_repo.get_artist_by_id(artist_mbid)
                 if mb_artist:
@@ -1129,20 +1145,23 @@ class DiscoverService:
                                 wiki_url = rel.get("target")
                                 break
                         if wiki_url:
-                            parallel_tasks["bio"] = self._wikidata_repo.get_wikipedia_extract(wiki_url)
+                            bio = await self._wikidata_repo.get_wikipedia_extract(wiki_url)
+                            if bio:
+                                enrichment.artist_description = bio
             except Exception as e:
                 logger.debug(f"Failed to get artist MB data: {e}")
 
-        parallel_tasks["listen_count"] = self._lb_repo.get_release_group_popularity_batch(
-            [release_group_mbid]
-        )
+        async def _get_listen_count():
+            try:
+                counts = await self._lb_repo.get_release_group_popularity_batch(
+                    [release_group_mbid]
+                )
+                if counts:
+                    enrichment.listen_count = counts.get(release_group_mbid)
+            except Exception as e:
+                logger.debug(f"Failed to get listen count: {e}")
 
-        if parallel_tasks:
-            results = await self._execute_tasks(parallel_tasks)
-            if results.get("bio"):
-                enrichment.artist_description = results["bio"]
-            listen_counts = results.get("listen_count") or {}
-            enrichment.listen_count = listen_counts.get(release_group_mbid)
+        await asyncio.gather(_get_artist_and_bio(), _get_listen_count())
 
         if self._memory_cache:
             await self._memory_cache.set(cache_key, enrichment, DISCOVER_QUEUE_ENRICH_TTL)

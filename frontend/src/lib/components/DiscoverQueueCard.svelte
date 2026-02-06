@@ -1,5 +1,21 @@
 <script lang="ts">
+	import { CACHE_KEYS, CACHE_TTL } from '$lib/constants';
+
 	let { onLaunch }: { onLaunch: () => void } = $props();
+
+	let hasCachedQueue = $state(false);
+
+	$effect(() => {
+		try {
+			const raw = localStorage.getItem(CACHE_KEYS.DISCOVER_QUEUE);
+			if (!raw) return;
+			const data = JSON.parse(raw);
+			hasCachedQueue =
+				data?.items?.length > 0 && Date.now() - data.timestamp < CACHE_TTL.DISCOVER_QUEUE;
+		} catch {
+			hasCachedQueue = false;
+		}
+	});
 </script>
 
 <div class="discover-queue-card">
@@ -35,9 +51,13 @@
 				stroke-linejoin="round"
 				class="h-5 w-5"
 			>
-				<polygon points="5 3 19 12 5 21 5 3" />
+				{#if hasCachedQueue}
+					<polygon points="5 3 19 12 5 21 5 3" />
+				{:else}
+					<polygon points="5 3 19 12 5 21 5 3" />
+				{/if}
 			</svg>
-			Launch Discover Queue
+			{hasCachedQueue ? 'Resume Discover Queue' : 'Launch Discover Queue'}
 		</button>
 	</div>
 </div>
