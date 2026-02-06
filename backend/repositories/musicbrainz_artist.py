@@ -15,16 +15,39 @@ from repositories.musicbrainz_base import (
 logger = logging.getLogger(__name__)
 
 
+FILTERED_ARTIST_MBIDS = {
+    "89ad4ac3-39f7-470e-963a-56509c546377",  # Various Artists
+    "41ece0f7-91f6-4c87-982c-3a39c5a02586",  # /v/
+    "125ec42a-7229-4250-afc5-e057484327fe",  # [Unknown]
+}
+
+FILTERED_ARTIST_NAMES = {
+    "various artists",
+    "[unknown]",
+    "/v/",
+}
+
+
 class MusicBrainzArtistMixin:
     _cache: CacheInterface
     _preferences_service: PreferencesService
 
-    def _map_artist_to_result(self, artist: dict[str, Any]) -> SearchResult:
+    def _map_artist_to_result(self, artist: dict[str, Any]) -> Optional[SearchResult]:
+        artist_id = artist.get("id", "")
+        if artist_id in FILTERED_ARTIST_MBIDS:
+            return None
+        
+        name = artist.get("name", "Unknown Artist")
+        if name.lower() in FILTERED_ARTIST_NAMES:
+            return None
+        
         return SearchResult(
             type="artist",
-            title=artist.get("name", "Unknown Artist"),
-            musicbrainz_id=artist.get("id", ""),
+            title=name,
+            musicbrainz_id=artist_id,
             in_library=False,
+            disambiguation=artist.get("disambiguation") or None,
+            type_info=artist.get("type") or None,
         )
 
     async def search_artists(
@@ -51,9 +74,14 @@ class MusicBrainzArtistMixin:
             )
             artists = result.get("artist-list", [])
             artists = dedupe_by_id(artists)
-            artists = artists[:limit]
 
-            results = [self._map_artist_to_result(a) for a in artists]
+            results = []
+            for a in artists:
+                mapped = self._map_artist_to_result(a)
+                if mapped:
+                    results.append(mapped)
+                if len(results) >= limit:
+                    break
 
             advanced_settings = self._preferences_service.get_advanced_settings()
             await self._cache.set(cache_key, results, ttl_seconds=advanced_settings.cache_ttl_search)

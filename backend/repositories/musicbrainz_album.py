@@ -30,6 +30,13 @@ class MusicBrainzAlbumMixin:
         if not should_include_release(rg, included_secondary_types):
             return None
 
+        primary_type = rg.get("primary-type", "")
+        secondary_types = rg.get("secondary-type-list", [])
+        if secondary_types:
+            type_info = f"{primary_type} + {', '.join(secondary_types)}"
+        else:
+            type_info = primary_type or None
+
         return SearchResult(
             type="album",
             title=rg.get("title", "Unknown Album"),
@@ -37,6 +44,8 @@ class MusicBrainzAlbumMixin:
             year=parse_year(rg.get("first-release-date")),
             musicbrainz_id=rg.get("id", ""),
             in_library=False,
+            type_info=type_info,
+            disambiguation=rg.get("disambiguation") or None,
         )
 
     async def search_albums(

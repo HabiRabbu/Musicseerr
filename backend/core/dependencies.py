@@ -18,6 +18,7 @@ from repositories.listenbrainz_repository import ListenBrainzRepository
 from repositories.jellyfin_repository import JellyfinRepository
 from services.preferences_service import PreferencesService
 from services.search_service import SearchService
+from services.search_enrichment_service import SearchEnrichmentService
 from services.artist_service import ArtistService
 from services.album_service import AlbumService
 from services.request_service import RequestService
@@ -295,6 +296,14 @@ def get_album_discovery_service() -> AlbumDiscoveryService:
     )
 
 
+@lru_cache(maxsize=1)
+def get_search_enrichment_service() -> SearchEnrichmentService:
+    mb_repo = get_musicbrainz_repository()
+    lb_repo = get_listenbrainz_repository()
+    preferences_service = get_preferences_service()
+    return SearchEnrichmentService(mb_repo, lb_repo, preferences_service)
+
+
 CacheDep = Annotated[CacheInterface, Depends(get_cache)]
 DiskCacheDep = Annotated[DiskMetadataCache, Depends(get_disk_cache)]
 LibraryCacheDep = Annotated[LibraryCache, Depends(get_library_cache)]
@@ -306,6 +315,7 @@ ListenBrainzRepositoryDep = Annotated[ListenBrainzRepository, Depends(get_listen
 JellyfinRepositoryDep = Annotated[JellyfinRepository, Depends(get_jellyfin_repository)]
 CoverArtRepositoryDep = Annotated[CoverArtRepository, Depends(get_coverart_repository)]
 SearchServiceDep = Annotated[SearchService, Depends(get_search_service)]
+SearchEnrichmentServiceDep = Annotated[SearchEnrichmentService, Depends(get_search_enrichment_service)]
 ArtistServiceDep = Annotated[ArtistService, Depends(get_artist_service)]
 AlbumServiceDep = Annotated[AlbumService, Depends(get_album_service)]
 RequestQueueDep = Annotated[RequestQueue, Depends(get_request_queue)]
@@ -338,6 +348,7 @@ async def cleanup_app_state() -> None:
     get_jellyfin_repository.cache_clear()
     get_coverart_repository.cache_clear()
     get_search_service.cache_clear()
+    get_search_enrichment_service.cache_clear()
     get_artist_service.cache_clear()
     get_album_service.cache_clear()
     get_request_queue.cache_clear()

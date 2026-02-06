@@ -197,6 +197,19 @@ class ListenBrainzRepositoryProtocol(Protocol):
     async def check_connection(self) -> ServiceStatus:
         ...
 
+    async def get_artist_top_release_groups(
+        self,
+        artist_mbid: str,
+        count: int = 10
+    ) -> list[ListenBrainzReleaseGroup]:
+        ...
+
+    async def get_release_group_popularity_batch(
+        self,
+        release_group_mbids: list[str]
+    ) -> dict[str, int]:
+        ...
+
 
 class JellyfinRepositoryProtocol(Protocol):
     

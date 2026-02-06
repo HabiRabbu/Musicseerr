@@ -506,5 +506,31 @@ class ListenBrainzRepository:
             await self._cache.set(cache_key, release_groups, ttl_seconds=3600)
         return release_groups
 
+    async def get_release_group_popularity_batch(
+        self,
+        release_group_mbids: list[str]
+    ) -> dict[str, int]:
+        """Get listen counts for multiple release groups in a single call.
+        
+        Returns a dict mapping mbid -> total_listen_count.
+        """
+        if not release_group_mbids:
+            return {}
+
+        result = await self._post(
+            "/1/popularity/release-group",
+            {"release_group_mbids": release_group_mbids}
+        )
+        if not result or not isinstance(result, list):
+            return {}
+
+        counts: dict[str, int] = {}
+        for item in result:
+            mbid = item.get("release_group_mbid")
+            count = item.get("total_listen_count")
+            if mbid and count is not None:
+                counts[mbid] = count
+        return counts
+
     def is_configured(self) -> bool:
         return bool(self._username)

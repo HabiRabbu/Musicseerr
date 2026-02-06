@@ -3,6 +3,10 @@ export type Artist = {
 	musicbrainz_id: string;
 	in_library: boolean;
 	cover_url?: string | null;
+	disambiguation?: string | null;
+	type_info?: string | null;
+	release_group_count?: number | null;
+	listen_count?: number | null;
 };
 
 export type Album = {
@@ -13,6 +17,10 @@ export type Album = {
 	in_library: boolean;
 	requested?: boolean;
 	cover_url?: string | null;
+	type_info?: string | null;
+	disambiguation?: string | null;
+	track_count?: number | null;
+	listen_count?: number | null;
 };
 
 export type LibraryAlbum = {
@@ -30,6 +38,24 @@ export type LibraryAlbum = {
 export type SearchResults = {
 	artists: Artist[];
 	albums: Album[];
+};
+
+export type ArtistEnrichment = {
+	musicbrainz_id: string;
+	release_group_count?: number | null;
+	listen_count?: number | null;
+};
+
+export type AlbumEnrichment = {
+	musicbrainz_id: string;
+	track_count?: number | null;
+	listen_count?: number | null;
+};
+
+export type EnrichmentResponse = {
+	artists: ArtistEnrichment[];
+	albums: AlbumEnrichment[];
+	listenbrainz_enabled: boolean;
 };
 
 export type ReleaseGroup = {

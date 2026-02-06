@@ -1,8 +1,9 @@
 import logging
 from fastapi import APIRouter, Query, Path, BackgroundTasks, Depends
-from api.v1.schemas.search import SearchResponse
-from core.dependencies import get_search_service, get_coverart_repository
+from api.v1.schemas.search import SearchResponse, EnrichmentResponse
+from core.dependencies import get_search_service, get_coverart_repository, get_search_enrichment_service
 from services.search_service import SearchService
+from services.search_enrichment_service import SearchEnrichmentService
 from repositories.coverart_repository import CoverArtRepository
 
 logger = logging.getLogger(__name__)
@@ -64,4 +65,19 @@ async def search_bucket(
         offset=offset
     )
     return {"bucket": bucket, "limit": limit, "offset": offset, "results": results}
+
+
+@router.get("/enrich/batch", response_model=EnrichmentResponse)
+async def enrich_search_results(
+    artist_mbids: str = Query("", description="Comma-separated artist MBIDs"),
+    album_mbids: str = Query("", description="Comma-separated album MBIDs"),
+    enrichment_service: SearchEnrichmentService = Depends(get_search_enrichment_service)
+):
+    artist_list = [m.strip() for m in artist_mbids.split(",") if m.strip()]
+    album_list = [m.strip() for m in album_mbids.split(",") if m.strip()]
+
+    return await enrichment_service.enrich(
+        artist_mbids=artist_list,
+        album_mbids=album_list,
+    )
 

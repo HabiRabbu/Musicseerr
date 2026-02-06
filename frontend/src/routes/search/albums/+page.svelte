@@ -2,10 +2,11 @@
 	import { onDestroy, onMount } from 'svelte';
 	import { browser } from '$app/environment';
 	import { goto } from '$app/navigation';
-	import AlbumCard from '$lib/components/AlbumCard.svelte';
+	import SearchAlbumCard from '$lib/components/SearchAlbumCard.svelte';
 	import type { Album } from '$lib/types';
 	import { colors } from '$lib/colors';
 	import { searchStore } from '$lib/stores/search';
+	import { fetchEnrichmentBatch, applyAlbumEnrichment } from '$lib/utils/enrichment';
 
 	export let data: { query: string };
 
@@ -17,6 +18,7 @@
 	let sentinel: HTMLElement;
 	let showToast = false;
 	let abortController: AbortController | null = null;
+	let enrichmentController: AbortController | null = null;
 	let observer: IntersectionObserver | null = null;
 	let initializedFromCache = false;
 
@@ -39,6 +41,26 @@
 		}, 3000);
 	}
 
+	async function fetchEnrichment(albumMbids: string[]) {
+		if (albumMbids.length === 0) return;
+
+		if (enrichmentController) {
+			enrichmentController.abort();
+		}
+		enrichmentController = new AbortController();
+
+		try {
+			const enrichment = await fetchEnrichmentBatch([], albumMbids, enrichmentController.signal);
+			if (!enrichment) return;
+
+			albums = applyAlbumEnrichment(albums, enrichment);
+		} catch (error) {
+			if (error instanceof Error && error.name === 'AbortError') {
+				return;
+			}
+		}
+	}
+
 	async function loadMore() {
 		if (loading || !hasMore || !data.query) return;
 
@@ -57,10 +79,12 @@
 
 			if (res.ok) {
 				const responseData = await res.json();
-				const newAlbums = responseData.results || [];
+				const newAlbums: Album[] = responseData.results || [];
 				if (newAlbums.length < limit) {
 					hasMore = false;
 				}
+
+				const newMbids: string[] = [];
 				if (offset === 0 && albums.length > 0) {
 					const existingIds = new Set(albums.map((a) => a.musicbrainz_id));
 					const uniqueNewAlbums = newAlbums.filter(
@@ -68,11 +92,17 @@
 					);
 					albums = [...albums, ...uniqueNewAlbums];
 					offset = albums.length;
+					uniqueNewAlbums.forEach(a => newMbids.push(a.musicbrainz_id));
 				} else {
 					albums = [...albums, ...newAlbums];
 					offset += newAlbums.length;
+					newAlbums.forEach(a => newMbids.push(a.musicbrainz_id));
 				}
 				searchStore.updateAlbums(albums);
+
+				if (newMbids.length > 0) {
+					fetchEnrichment(newMbids);
+				}
 			} else {
 				hasMore = false;
 			}
@@ -90,6 +120,10 @@
 		if (abortController) {
 			abortController.abort();
 			abortController = null;
+		}
+		if (enrichmentController) {
+			enrichmentController.abort();
+			enrichmentController = null;
 		}
 
 		if (observer) {
@@ -150,6 +184,10 @@
 			abortController.abort();
 			abortController = null;
 		}
+		if (enrichmentController) {
+			enrichmentController.abort();
+			enrichmentController = null;
+		}
 	});
 </script>
 
@@ -181,8 +219,8 @@
 		<p class="text-center mt-32 text-gray-400">Enter a search query to get started.</p>
 	{:else if loading && albums.length === 0}
 		<div class="bg-base-200 rounded-box p-4">
-			<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4">
-				{#each Array(16) as _, i}
+			<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+				{#each Array(12) as _, i}
 					<div class="card bg-base-100 w-full shadow-sm">
 						<div class="skeleton aspect-square w-full"></div>
 						<div class="card-body p-3">
@@ -199,9 +237,9 @@
 		</div>
 	{:else}
 		<div class="bg-base-200 rounded-box p-4">
-			<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4">
-				{#each albums as album}
-					<AlbumCard {album} onadded={handleAlbumAdded} />
+			<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+				{#each albums as album (album.musicbrainz_id)}
+					<SearchAlbumCard {album} onadded={handleAlbumAdded} />
 				{/each}
 			</div>
 		</div>

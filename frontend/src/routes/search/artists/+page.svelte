@@ -2,10 +2,11 @@
 	import { onDestroy, onMount } from 'svelte';
 	import { browser } from '$app/environment';
 	import { goto } from '$app/navigation';
-	import ArtistCard from '$lib/components/ArtistCard.svelte';
+	import SearchArtistCard from '$lib/components/SearchArtistCard.svelte';
 	import type { Artist } from '$lib/types';
 	import { colors } from '$lib/colors';
 	import { searchStore } from '$lib/stores/search';
+	import { fetchEnrichmentBatch, applyArtistEnrichment } from '$lib/utils/enrichment';
 
 	export let data: { query: string };
 
@@ -16,6 +17,7 @@
 	const limit = 24;
 	let sentinel: HTMLElement;
 	let abortController: AbortController | null = null;
+	let enrichmentController: AbortController | null = null;
 	let observer: IntersectionObserver | null = null;
 	let initializedFromCache = false;
 
@@ -28,6 +30,26 @@
 	function navigateToBucket(bucket: 'albums') {
 		if (data.query) {
 			goto(`/search/${bucket}?q=${encodeURIComponent(data.query)}`);
+		}
+	}
+
+	async function fetchEnrichment(artistMbids: string[]) {
+		if (artistMbids.length === 0) return;
+
+		if (enrichmentController) {
+			enrichmentController.abort();
+		}
+		enrichmentController = new AbortController();
+
+		try {
+			const enrichment = await fetchEnrichmentBatch(artistMbids, [], enrichmentController.signal);
+			if (!enrichment) return;
+
+			artists = applyArtistEnrichment(artists, enrichment);
+		} catch (error) {
+			if (error instanceof Error && error.name === 'AbortError') {
+				return;
+			}
 		}
 	}
 
@@ -49,10 +71,11 @@
 
 			if (res.ok) {
 				const responseData = await res.json();
-				const newArtists = responseData.results || [];
+				const newArtists: Artist[] = responseData.results || [];
 				if (newArtists.length < limit) {
 					hasMore = false;
 				}
+
 				if (offset === 0 && artists.length > 0) {
 					const existingIds = new Set(artists.map((a) => a.musicbrainz_id));
 					const uniqueNewArtists = newArtists.filter(
@@ -65,6 +88,13 @@
 					offset += newArtists.length;
 				}
 				searchStore.updateArtists(artists);
+
+				const needsEnrichment = artists
+					.filter(a => a.release_group_count == null)
+					.map(a => a.musicbrainz_id);
+				if (needsEnrichment.length > 0) {
+					fetchEnrichment(needsEnrichment);
+				}
 			} else {
 				hasMore = false;
 			}
@@ -82,6 +112,10 @@
 		if (abortController) {
 			abortController.abort();
 			abortController = null;
+		}
+		if (enrichmentController) {
+			enrichmentController.abort();
+			enrichmentController = null;
 		}
 
 		if (observer) {
@@ -142,6 +176,10 @@
 			abortController.abort();
 			abortController = null;
 		}
+		if (enrichmentController) {
+			enrichmentController.abort();
+			enrichmentController = null;
+		}
 	});
 </script>
 
@@ -173,12 +211,16 @@
 		<p class="text-center mt-32 text-gray-400">Enter a search query to get started.</p>
 	{:else if loading && artists.length === 0}
 		<div class="bg-base-200 rounded-box p-4">
-			<div class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-3">
-				{#each Array(20) as _, i}
+			<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+				{#each Array(12) as _, i}
 					<div class="card bg-base-100 w-full shadow-sm">
-						<div class="skeleton aspect-square w-full"></div>
-						<div class="card-body p-2">
-							<div class="skeleton h-4 w-full"></div>
+						<figure class="flex justify-center pt-4">
+							<div class="skeleton w-28 h-28 sm:w-32 sm:h-32 md:w-36 md:h-36 rounded-full"></div>
+						</figure>
+						<div class="card-body items-center text-center p-3 gap-1">
+							<div class="skeleton h-4 w-3/4"></div>
+							<div class="skeleton h-3 w-1/2"></div>
+							<div class="skeleton h-5 w-2/3 mt-1"></div>
 						</div>
 					</div>
 				{/each}
@@ -190,9 +232,9 @@
 		</div>
 	{:else}
 		<div class="bg-base-200 rounded-box p-4">
-			<div class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-3">
-				{#each artists as artist}
-					<ArtistCard {artist} />
+			<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+				{#each artists as artist (artist.musicbrainz_id)}
+					<SearchArtistCard {artist} />
 				{/each}
 			</div>
 		</div>
