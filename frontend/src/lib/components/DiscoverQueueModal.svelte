@@ -2,6 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { fly } from 'svelte/transition';
 	import { API, CACHE_KEYS, CACHE_TTL } from '$lib/constants';
+	import AlbumImage from './AlbumImage.svelte';
 	import type {
 		DiscoverQueueItemLight,
 		DiscoverQueueEnrichment,
@@ -268,13 +269,8 @@
 		return text.slice(0, maxLen).trimEnd() + '…';
 	}
 
-	const PLACEHOLDER = '/placeholder-album.png';
 
-	function handleCoverError() {
-		if (currentItem && currentItem.cover_url !== PLACEHOLDER) {
-			queue[currentIndex] = { ...queue[currentIndex], cover_url: PLACEHOLDER };
-		}
-	}
+
 
 	function resetYtSearch() {
 		ytSearching = false;
@@ -373,16 +369,14 @@
 							class="dq-cover-wrap"
 							onclick={() => navigateTo(`/album/${currentItem.release_group_mbid}`)}
 						>
-							{#if enriching}
-								<div class="dq-cover-skeleton skeleton"></div>
-							{:else}
-								<img
-									src={currentItem.cover_url || PLACEHOLDER}
-									alt={currentItem.album_name}
-									class="dq-cover"
-									onerror={handleCoverError}
-								/>
-							{/if}
+							<AlbumImage
+								mbid={currentItem.release_group_mbid}
+								alt={currentItem.album_name}
+								size="full"
+								lazy={false}
+								rounded="none"
+								className="dq-cover"
+							/>
 						</button>
 
 						<!-- Info card below cover -->
@@ -577,11 +571,13 @@
 					class="dq-cover-wrap-mobile"
 					onclick={() => navigateTo(`/album/${currentItem.release_group_mbid}`)}
 				>
-					<img
-						src={currentItem.cover_url || PLACEHOLDER}
+					<AlbumImage
+						mbid={currentItem.release_group_mbid}
 						alt={currentItem.album_name}
-						class="dq-cover-mobile"
-						onerror={handleCoverError}
+						size="full"
+						lazy={false}
+						rounded="none"
+						className="dq-cover-mobile"
 					/>
 				</button>
 

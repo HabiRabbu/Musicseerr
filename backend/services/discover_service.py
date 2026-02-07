@@ -815,7 +815,7 @@ class DiscoverService:
                                 continue
                             if rg_mbid.lower() in ignored_mbids or rg_mbid.lower() in library_album_mbids:
                                 continue
-                            cover_url = f"https://coverartarchive.org/release-group/{rg_mbid}/front"
+                            cover_url = f"/api/covers/release-group/{rg_mbid}?size=500"
                             candidate_pools[i].append(DiscoverQueueItemLight(
                                 release_group_mbid=rg_mbid,
                                 album_name=rg.release_group_name,
@@ -933,7 +933,7 @@ class DiscoverService:
                 album_name=rg.release_group_name,
                 artist_name=rg.artist_name,
                 artist_mbid=artist_mbid,
-                cover_url=f"https://coverartarchive.org/release-group/{rg_mbid}/front",
+                cover_url=f"/api/covers/release-group/{rg_mbid}?size=500",
                 recommendation_reason="Trending This Week",
                 is_wildcard=True,
                 in_library=False,
@@ -955,7 +955,7 @@ class DiscoverService:
                     album_name=rg.title,
                     artist_name=rg.artist or "Unknown",
                     artist_mbid="",
-                    cover_url=f"https://coverartarchive.org/release-group/{rg_mbid}/front",
+                    cover_url=f"/api/covers/release-group/{rg_mbid}?size=500",
                     recommendation_reason=f"Classic from the {decade}",
                     is_wildcard=True,
                     in_library=False,
@@ -1003,7 +1003,7 @@ class DiscoverService:
                     album_name=rg.release_group_name,
                     artist_name=rg.artist_name,
                     artist_mbid=artist_mbid,
-                    cover_url=f"https://coverartarchive.org/release-group/{rg_mbid}/front",
+                    cover_url=f"/api/covers/release-group/{rg_mbid}?size=500",
                     recommendation_reason="Trending This Week",
                     is_wildcard=True,
                     in_library=False,
@@ -1032,7 +1032,7 @@ class DiscoverService:
                         album_name=rg.title,
                         artist_name=rg.artist or "Unknown",
                         artist_mbid="",
-                        cover_url=f"https://coverartarchive.org/release-group/{rg_mbid}/front",
+                        cover_url=f"/api/covers/release-group/{rg_mbid}?size=500",
                         recommendation_reason=f"Classic from the {decade}",
                         is_wildcard=True,
                         in_library=False,

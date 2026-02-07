@@ -214,7 +214,7 @@
 		<h2 class="text-2xl font-semibold mb-4">Recently Added</h2>
 		{#if loadingRecentlyAdded}
 			<div class="flex gap-4 p-4 bg-base-200 rounded-box overflow-x-auto scrollbar-hide">
-				{#each Array(6) as _}<div class="w-32 sm:w-36 md:w-44 flex-shrink-0"><AlbumCardSkeleton /></div>{/each}
+				{#each Array(6) as _}<div class="w-48 flex-shrink-0"><AlbumCardSkeleton /></div>{/each}
 			</div>
 		{:else if recentlyAdded.artists.length > 0 || recentlyAdded.albums.length > 0}
 			<div in:fade={{ duration: 300 }}>
