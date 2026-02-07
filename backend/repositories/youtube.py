@@ -1,5 +1,7 @@
+import json
 import logging
 from datetime import datetime, timezone
+from pathlib import Path
 from urllib.parse import quote_plus
 
 import httpx
@@ -7,17 +9,50 @@ import httpx
 logger = logging.getLogger(__name__)
 
 YOUTUBE_SEARCH_URL = "https://www.googleapis.com/youtube/v3/search"
-DAILY_QUOTA_LIMIT = 80
+DEFAULT_DAILY_QUOTA_LIMIT = 80
 SEARCH_COST = 100
+QUOTA_FILE = Path("/app/cache/youtube_quota.json")
 
 
 class YouTubeRepository:
-    def __init__(self, http_client: httpx.AsyncClient, api_key: str = ""):
+    def __init__(
+        self,
+        http_client: httpx.AsyncClient,
+        api_key: str = "",
+        daily_quota_limit: int = DEFAULT_DAILY_QUOTA_LIMIT,
+    ):
         self._http_client = http_client
         self._api_key = api_key
+        self._daily_quota_limit = daily_quota_limit
+        self._cache: dict[str, str | None] = {}
         self._daily_count = 0
         self._quota_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-        self._cache: dict[str, str | None] = {}
+        self._load_quota()
+
+    def _load_quota(self) -> None:
+        try:
+            if QUOTA_FILE.exists():
+                data = json.loads(QUOTA_FILE.read_text())
+                saved_date = data.get("date", "")
+                today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+                if saved_date == today:
+                    self._daily_count = data.get("count", 0)
+                    self._quota_date = saved_date
+                else:
+                    self._daily_count = 0
+                    self._quota_date = today
+                    self._save_quota()
+        except Exception as e:
+            logger.warning(f"Failed to load YouTube quota state: {e}")
+
+    def _save_quota(self) -> None:
+        try:
+            QUOTA_FILE.parent.mkdir(parents=True, exist_ok=True)
+            QUOTA_FILE.write_text(
+                json.dumps({"date": self._quota_date, "count": self._daily_count})
+            )
+        except Exception as e:
+            logger.warning(f"Failed to save YouTube quota state: {e}")
 
     def configure(self, api_key: str) -> None:
         self._api_key = api_key
@@ -31,18 +66,28 @@ class YouTubeRepository:
         if today != self._quota_date:
             self._daily_count = 0
             self._quota_date = today
+            self._save_quota()
 
     @property
     def quota_remaining(self) -> int:
         self._check_and_reset_quota()
-        return max(0, DAILY_QUOTA_LIMIT - self._daily_count)
+        return max(0, self._daily_quota_limit - self._daily_count)
+
+    def get_quota_status(self) -> dict:
+        self._check_and_reset_quota()
+        return {
+            "used": self._daily_count,
+            "limit": self._daily_quota_limit,
+            "remaining": max(0, self._daily_quota_limit - self._daily_count),
+            "date": self._quota_date,
+        }
 
     async def search_video(self, artist: str, album: str) -> str | None:
         if not self._api_key:
             return None
 
         self._check_and_reset_quota()
-        if self._daily_count >= DAILY_QUOTA_LIMIT:
+        if self._daily_count >= self._daily_quota_limit:
             logger.warning("YouTube API daily quota exceeded")
             return None
 
@@ -65,6 +110,7 @@ class YouTubeRepository:
                 timeout=10.0,
             )
             self._daily_count += 1
+            self._save_quota()
 
             if response.status_code == 403:
                 logger.error("YouTube API key invalid or quota exceeded upstream")

@@ -12,7 +12,8 @@ export const CACHE_TTL = {
 	RECENTLY_ADDED: 5 * 60 * 1000,
 	HOME: 5 * 60 * 1000,
 	DISCOVER: 30 * 60 * 1000,
-	DISCOVER_QUEUE: 24 * 60 * 60 * 1000
+	DISCOVER_QUEUE: 24 * 60 * 60 * 1000,
+	SEARCH: 5 * 60 * 1000
 } as const;
 
 export const API_SIZES = {
@@ -83,6 +84,7 @@ export const API = {
 	discoverQueueValidate: () => '/api/discover/queue/validate',
 	discoverQueueYoutubeSearch: (artist: string, album: string) =>
 		`/api/discover/queue/youtube-search?artist=${encodeURIComponent(artist)}&album=${encodeURIComponent(album)}`,
+	discoverQueueYoutubeQuota: () => '/api/discover/queue/youtube-quota',
 	queue: () => '/api/queue',
 	settings: () => '/api/settings'
 } as const;

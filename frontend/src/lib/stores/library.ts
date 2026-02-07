@@ -1,6 +1,6 @@
 import { writable, get } from 'svelte/store';
-import { browser } from '$app/environment';
 import { CACHE_KEYS, CACHE_TTL } from '$lib/constants';
+import { createLocalStorageCache } from '$lib/utils/localStorageCache';
 
 export interface LibraryState {
 	mbidSet: Set<string>;
@@ -20,51 +20,22 @@ const initialState: LibraryState = {
 
 function createLibraryStore() {
 	const { subscribe, set, update } = writable<LibraryState>(initialState);
-
-	function loadFromStorage(): { mbids: string[]; timestamp: number } | null {
-		if (!browser) return null;
-
-		try {
-			const cached = localStorage.getItem(CACHE_KEYS.LIBRARY_MBIDS);
-			if (cached) {
-				return JSON.parse(cached);
-			}
-		} catch (e) {
-			console.error('Failed to load library from storage:', e);
-		}
-		return null;
-	}
-
-	function saveToStorage(mbids: string[]) {
-		if (!browser) return;
-
-		try {
-			localStorage.setItem(
-				CACHE_KEYS.LIBRARY_MBIDS,
-				JSON.stringify({
-					mbids,
-					timestamp: Date.now()
-				})
-			);
-		} catch (e) {
-			console.error('Failed to save library to storage:', e);
-		}
-	}
+	const cache = createLocalStorageCache<string[]>(CACHE_KEYS.LIBRARY_MBIDS, CACHE_TTL.LIBRARY);
 
 	async function initialize() {
 		const state = get({ subscribe });
 		if (state.initialized || state.loading) return;
 
-		const cached = loadFromStorage();
-		if (cached && cached.mbids.length > 0) {
+		const cached = cache.get();
+		if (cached && cached.data.length > 0) {
 			update((s) => ({
 				...s,
-				mbidSet: new Set(cached.mbids),
+				mbidSet: new Set(cached.data),
 				lastUpdated: cached.timestamp,
 				initialized: true
 			}));
 
-			if (Date.now() - cached.timestamp > CACHE_TTL.LIBRARY) {
+			if (cache.isStale(cached.timestamp)) {
 				fetchLibraryMbids(true);
 			}
 		} else {
@@ -92,7 +63,7 @@ function createLibraryStore() {
 				initialized: true
 			}));
 
-			saveToStorage(mbids);
+			cache.set(mbids);
 		} catch (e) {
 			console.error('Failed to fetch library MBIDs:', e);
 			if (!background) {
@@ -145,7 +116,8 @@ function createLibraryStore() {
 		isInLibrary,
 		addMbid,
 		isRequested,
-		addRequested
+		addRequested,
+		updateCacheTTL: cache.updateTTL
 	};
 }
 

@@ -49,17 +49,22 @@ class HttpClientFactory:
         cls._clients.clear()
 
 
-def get_http_client(settings: Optional[Settings] = None) -> httpx.AsyncClient:
-    if settings:
-        return HttpClientFactory.get_client(
-            name="default",
-            timeout=settings.http_timeout,
-            connect_timeout=settings.http_connect_timeout,
-            max_connections=settings.http_max_connections,
-            max_keepalive=settings.http_max_keepalive,
-            settings=settings,
-        )
-    return HttpClientFactory.get_client()
+def get_http_client(
+    settings: Optional[Settings] = None,
+    timeout: Optional[float] = None,
+    connect_timeout: Optional[float] = None,
+    max_connections: Optional[int] = None,
+) -> httpx.AsyncClient:
+    if settings is None:
+        settings = get_settings()
+    return HttpClientFactory.get_client(
+        name="default",
+        timeout=timeout or settings.http_timeout,
+        connect_timeout=connect_timeout or settings.http_connect_timeout,
+        max_connections=max_connections or settings.http_max_connections,
+        max_keepalive=settings.http_max_keepalive,
+        settings=settings,
+    )
 
 
 async def close_http_clients() -> None:

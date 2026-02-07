@@ -40,15 +40,17 @@ async def lifespan(app: FastAPI):
     
     await init_app_state(app)
     
+    preferences_service = get_preferences_service()
+    advanced_settings = preferences_service.get_advanced_settings()
+
     cache = get_cache()
-    start_cache_cleanup_task(cache)
+    start_cache_cleanup_task(cache, interval=advanced_settings.memory_cache_cleanup_interval)
     
     from core.dependencies import get_disk_cache
     disk_cache = get_disk_cache()
-    start_disk_cache_cleanup_task(disk_cache)
+    start_disk_cache_cleanup_task(disk_cache, interval=advanced_settings.disk_cache_cleanup_interval)
     
     library_service = get_library_service()
-    preferences_service = get_preferences_service()
     start_library_sync_task(library_service, preferences_service)
 
     request_queue = get_request_queue()

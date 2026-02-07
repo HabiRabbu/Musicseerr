@@ -484,6 +484,13 @@ export type YouTubeSearchResponse = {
 	error: string | null;
 };
 
+export type YouTubeQuotaStatus = {
+	used: number;
+	limit: number;
+	remaining: number;
+	date: string;
+};
+
 export type DiscoverQueueResponse = {
 	items: DiscoverQueueItemLight[];
 	queue_id: string;

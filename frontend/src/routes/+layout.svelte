@@ -4,6 +4,7 @@
 	import { errorModal } from '$lib/stores/errorModal';
 	import { libraryStore } from '$lib/stores/library';
 	import { integrationStore } from '$lib/stores/integration';
+	import { initCacheTTLs } from '$lib/stores/cacheTtl';
 	import { onMount, onDestroy } from 'svelte';
 	import { cancelPendingImages } from '$lib/utils/lazyImage';
 	
@@ -22,6 +23,7 @@
 	}
 
 	onMount(() => {
+		initCacheTTLs();
 		libraryStore.initialize();
 		document.addEventListener('click', handleClickOutside);
 	});

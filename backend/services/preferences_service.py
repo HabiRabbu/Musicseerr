@@ -220,6 +220,7 @@ class PreferencesService:
         return YouTubeConnectionSettings(
             api_key=yt_data.get("api_key", ""),
             enabled=yt_data.get("enabled", False),
+            daily_quota_limit=yt_data.get("daily_quota_limit", 80),
         )
 
     def save_youtube_connection(self, settings: YouTubeConnectionSettings) -> None:
@@ -228,6 +229,7 @@ class PreferencesService:
             config["youtube_settings"] = {
                 "api_key": settings.api_key,
                 "enabled": settings.enabled,
+                "daily_quota_limit": settings.daily_quota_limit,
             }
             self._save_config(config)
             logger.info(f"Saved YouTube connection settings to {self._config_path}")

@@ -119,19 +119,58 @@ class AdvancedSettings(BaseModel):
         description="TTL for persistent metadata cache in hours (primarily for covers)"
     )
     
-    recent_metadata_ttl_hours: int = Field(
-        default=6,
-        ge=1,
-        le=48,
-        description="TTL for recent metadata cache in hours"
-    )
-    
     musicbrainz_concurrent_searches: int = Field(
         default=3,
         ge=2,
         le=5,
         description="Max concurrent MusicBrainz API requests for parallel search"
     )
+
+    frontend_ttl_home: int = Field(
+        default=300000,
+        ge=60000,
+        le=3600000,
+        description="Frontend Home page cache TTL in milliseconds"
+    )
+    frontend_ttl_discover: int = Field(
+        default=1800000,
+        ge=60000,
+        le=86400000,
+        description="Frontend Discover page cache TTL in milliseconds"
+    )
+    frontend_ttl_library: int = Field(
+        default=300000,
+        ge=60000,
+        le=3600000,
+        description="Frontend Library cache TTL in milliseconds"
+    )
+    frontend_ttl_recently_added: int = Field(
+        default=300000,
+        ge=60000,
+        le=3600000,
+        description="Frontend Recently Added cache TTL in milliseconds"
+    )
+    frontend_ttl_discover_queue: int = Field(
+        default=86400000,
+        ge=3600000,
+        le=604800000,
+        description="Frontend Discover Queue cache TTL in milliseconds"
+    )
+    frontend_ttl_search: int = Field(
+        default=300000,
+        ge=60000,
+        le=3600000,
+        description="Frontend Search/Discovery cache TTL in milliseconds"
+    )
+
+
+class FrontendCacheTTLs(BaseModel):
+    home: int = Field(default=300000, description="Home page cache TTL in ms")
+    discover: int = Field(default=1800000, description="Discover page cache TTL in ms")
+    library: int = Field(default=300000, description="Library cache TTL in ms")
+    recently_added: int = Field(default=300000, description="Recently Added cache TTL in ms")
+    discover_queue: int = Field(default=86400000, description="Discover Queue cache TTL in ms")
+    search: int = Field(default=300000, description="Search/Discovery cache TTL in ms")
 
 
 class AdvancedSettingsFrontend(BaseModel):
@@ -252,20 +291,50 @@ class AdvancedSettingsFrontend(BaseModel):
         description="TTL for persistent metadata cache in hours (primarily for covers)"
     )
     
-    recent_metadata_ttl_hours: int = Field(
-        default=6,
-        ge=1,
-        le=48,
-        description="TTL for recent metadata cache in hours"
-    )
-    
     musicbrainz_concurrent_searches: int = Field(
         default=3,
         ge=2,
         le=5,
         description="Max concurrent MusicBrainz API requests for parallel search"
     )
-    
+
+    frontend_ttl_home: int = Field(
+        default=5,
+        ge=1,
+        le=60,
+        description="Home page cache freshness in minutes"
+    )
+    frontend_ttl_discover: int = Field(
+        default=30,
+        ge=1,
+        le=1440,
+        description="Discover page cache freshness in minutes"
+    )
+    frontend_ttl_library: int = Field(
+        default=5,
+        ge=1,
+        le=60,
+        description="Library cache freshness in minutes"
+    )
+    frontend_ttl_recently_added: int = Field(
+        default=5,
+        ge=1,
+        le=60,
+        description="Recently Added cache freshness in minutes"
+    )
+    frontend_ttl_discover_queue: int = Field(
+        default=1440,
+        ge=60,
+        le=10080,
+        description="Discover Queue cache freshness in minutes"
+    )
+    frontend_ttl_search: int = Field(
+        default=5,
+        ge=1,
+        le=60,
+        description="Search/Discovery cache freshness in minutes"
+    )
+
     @field_validator(
         'cache_ttl_album_library', 
         'cache_ttl_album_non_library', 
@@ -307,8 +376,13 @@ class AdvancedSettingsFrontend(BaseModel):
             recent_metadata_max_size_mb=settings.recent_metadata_max_size_mb,
             recent_covers_max_size_mb=settings.recent_covers_max_size_mb,
             persistent_metadata_ttl_hours=settings.persistent_metadata_ttl_hours,
-            recent_metadata_ttl_hours=settings.recent_metadata_ttl_hours,
             musicbrainz_concurrent_searches=settings.musicbrainz_concurrent_searches,
+            frontend_ttl_home=settings.frontend_ttl_home // 60000,
+            frontend_ttl_discover=settings.frontend_ttl_discover // 60000,
+            frontend_ttl_library=settings.frontend_ttl_library // 60000,
+            frontend_ttl_recently_added=settings.frontend_ttl_recently_added // 60000,
+            frontend_ttl_discover_queue=settings.frontend_ttl_discover_queue // 60000,
+            frontend_ttl_search=settings.frontend_ttl_search // 60000,
         )
     
     def to_backend(self) -> AdvancedSettings:
@@ -331,6 +405,11 @@ class AdvancedSettingsFrontend(BaseModel):
             recent_metadata_max_size_mb=self.recent_metadata_max_size_mb,
             recent_covers_max_size_mb=self.recent_covers_max_size_mb,
             persistent_metadata_ttl_hours=self.persistent_metadata_ttl_hours,
-            recent_metadata_ttl_hours=self.recent_metadata_ttl_hours,
             musicbrainz_concurrent_searches=self.musicbrainz_concurrent_searches,
+            frontend_ttl_home=self.frontend_ttl_home * 60000,
+            frontend_ttl_discover=self.frontend_ttl_discover * 60000,
+            frontend_ttl_library=self.frontend_ttl_library * 60000,
+            frontend_ttl_recently_added=self.frontend_ttl_recently_added * 60000,
+            frontend_ttl_discover_queue=self.frontend_ttl_discover_queue * 60000,
+            frontend_ttl_search=self.frontend_ttl_search * 60000,
         )

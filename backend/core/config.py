@@ -48,7 +48,6 @@ class Settings(BaseSettings):
     cache_dir: Path = Field(default=Path("/app/cache"), description="Root directory for all cache files")
     library_db_path: Path = Field(default=Path("/app/cache/library.db"), description="SQLite library database path")
     cover_cache_max_size_mb: int = Field(default=500, description="Maximum cover cache size in MB")
-    metadata_cache_max_entries: int = Field(default=100, description="Maximum entries in RAM metadata cache")
     
     http_timeout: float = Field(default=10.0)
     http_connect_timeout: float = Field(default=5.0)

@@ -6,12 +6,15 @@
 	import GenreGrid from '$lib/components/GenreGrid.svelte';
 	import type { HomeResponse, HomeSection as HomeSectionType } from '$lib/types';
 	import { integrationStore } from '$lib/stores/integration';
+	import CarouselSkeleton from '$lib/components/CarouselSkeleton.svelte';
+	import PageHeader from '$lib/components/PageHeader.svelte';
 	import {
 		getHomeCachedData,
 		setHomeCachedData,
-		formatLastUpdated,
+		isHomeCacheStale,
 		getGreeting
 	} from '$lib/utils/homeCache';
+	import { formatLastUpdated } from '$lib/utils/formatting';
 
 	let homeData: HomeResponse | null = null;
 	let loading = true;
@@ -27,7 +30,9 @@
 			homeData = cached.data;
 			lastUpdated = new Date(cached.timestamp);
 			loading = false;
-			refreshInBackground();
+			if (isHomeCacheStale(cached.timestamp)) {
+				refreshInBackground();
+			}
 			return;
 		}
 
@@ -210,55 +215,18 @@
 </svelte:head>
 
 <div class="min-h-[calc(100vh-200px)]">
-	<div
-		class="relative mb-6 overflow-hidden bg-gradient-to-br from-primary/30 via-secondary/20 to-accent/10"
+	<PageHeader
+		subtitle="Discover music, explore your library, and find new favorites."
+		{loading}
+		{refreshing}
+		{isUpdating}
+		{lastUpdated}
+		onRefresh={handleRefresh}
 	>
-		<div class="absolute inset-0 bg-gradient-to-t from-base-100 to-transparent"></div>
-		<div class="relative px-4 py-8 sm:px-6 sm:py-12 lg:px-8">
-			<div class="flex items-start justify-between">
-				<div>
-					<h1 class="mb-2 text-3xl font-bold sm:text-4xl lg:text-5xl">
-						{getGreeting()} 👋
-					</h1>
-					<p class="max-w-xl text-sm text-base-content/70 sm:text-base">
-						Discover music, explore your library, and find new favorites.
-					</p>
-				</div>
-				<div class="flex items-center gap-2">
-					{#if isUpdating}
-						<span class="badge badge-ghost badge-sm gap-1">
-							<span class="loading loading-spinner loading-xs"></span>
-							Updating...
-						</span>
-					{:else if lastUpdated && !loading}
-						<span class="hidden text-xs text-base-content/50 sm:inline">
-							Updated {formatLastUpdated(lastUpdated)}
-						</span>
-					{/if}
-					<button
-						class="btn btn-sm btn-primary gap-1"
-						on:click={handleRefresh}
-						disabled={refreshing || loading}
-						title="Refresh"
-					>
-						<svg
-							xmlns="http://www.w3.org/2000/svg"
-							viewBox="0 0 20 20"
-							fill="currentColor"
-							class="h-4 w-4 {refreshing ? 'animate-spin' : ''}"
-						>
-							<path
-								fill-rule="evenodd"
-								d="M15.312 11.424a5.5 5.5 0 01-9.201 2.466l-.312-.311h2.433a.75.75 0 000-1.5H3.989a.75.75 0 00-.75.75v4.242a.75.75 0 001.5 0v-2.43l.31.31a7 7 0 0011.712-3.138.75.75 0 00-1.449-.39zm1.23-3.723a.75.75 0 00.219-.53V2.929a.75.75 0 00-1.5 0v2.43l-.31-.31A7 7 0 003.239 8.188a.75.75 0 101.448.389A5.5 5.5 0 0113.89 6.11l.311.31h-2.432a.75.75 0 000 1.5h4.243a.75.75 0 00.53-.219z"
-								clip-rule="evenodd"
-							/>
-						</svg>
-						<span class="hidden sm:inline">Refresh</span>
-					</button>
-				</div>
-			</div>
-		</div>
-	</div>
+		{#snippet title()}
+			{getGreeting()} 👋
+		{/snippet}
+	</PageHeader>
 
 	{#if error && !homeData}
 		<div class="mt-16 flex flex-col items-center justify-center px-4">
@@ -324,15 +292,7 @@
 			{#if loading && !homeData}
 				<section>
 					<div class="skeleton mb-4 h-6 w-40"></div>
-					<div class="scrollbar-hide flex gap-3 overflow-x-auto pb-2 sm:gap-4">
-						{#each Array(6) as _}
-							<div class="w-32 flex-shrink-0 sm:w-36 md:w-44">
-								<div class="skeleton aspect-square w-full rounded-lg"></div>
-								<div class="skeleton mt-2 h-4 w-3/4"></div>
-								<div class="skeleton mt-1 h-3 w-1/2"></div>
-							</div>
-						{/each}
-					</div>
+					<CarouselSkeleton />
 				</section>
 			{:else}
 				{#each sections as { key, section, link } (key)}
@@ -361,14 +321,7 @@
 				{#each Array(3) as _}
 					<section>
 						<div class="skeleton mb-4 h-6 w-32"></div>
-						<div class="scrollbar-hide flex gap-3 overflow-x-auto pb-2 sm:gap-4">
-							{#each Array(6) as _}
-								<div class="w-32 flex-shrink-0 sm:w-36 md:w-44">
-									<div class="skeleton aspect-square w-full rounded-lg"></div>
-									<div class="skeleton mt-2 h-4 w-3/4"></div>
-								</div>
-							{/each}
-						</div>
+						<CarouselSkeleton showSubtitle={false} />
 					</section>
 				{/each}
 			{:else}
@@ -467,14 +420,6 @@
 </div>
 
 <style>
-	.scrollbar-hide {
-		-ms-overflow-style: none;
-		scrollbar-width: none;
-	}
-	.scrollbar-hide::-webkit-scrollbar {
-		display: none;
-	}
-
 	.section-group {
 		border-radius: 1rem;
 		display: flex;
@@ -483,22 +428,38 @@
 	}
 
 	.section-group-library {
-		background: linear-gradient(135deg, rgba(34, 197, 94, 0.06) 0%, rgba(34, 197, 94, 0.02) 100%);
-		border: 1px solid rgba(34, 197, 94, 0.12);
+		background: linear-gradient(
+			135deg,
+			rgb(var(--brand-library) / 0.06) 0%,
+			rgb(var(--brand-library) / 0.02) 100%
+		);
+		border: 1px solid rgb(var(--brand-library) / 0.12);
 	}
 
 	.section-group-listenbrainz {
-		background: linear-gradient(135deg, rgba(251, 146, 60, 0.06) 0%, rgba(251, 146, 60, 0.02) 100%);
-		border: 1px solid rgba(251, 146, 60, 0.12);
+		background: linear-gradient(
+			135deg,
+			rgb(var(--brand-listenbrainz) / 0.06) 0%,
+			rgb(var(--brand-listenbrainz) / 0.02) 100%
+		);
+		border: 1px solid rgb(var(--brand-listenbrainz) / 0.12);
 	}
 
 	.section-group-jellyfin {
-		background: linear-gradient(135deg, rgba(168, 85, 247, 0.06) 0%, rgba(168, 85, 247, 0.02) 100%);
-		border: 1px solid rgba(168, 85, 247, 0.12);
+		background: linear-gradient(
+			135deg,
+			rgb(var(--brand-jellyfin) / 0.06) 0%,
+			rgb(var(--brand-jellyfin) / 0.02) 100%
+		);
+		border: 1px solid rgb(var(--brand-jellyfin) / 0.12);
 	}
 
 	.section-group-discover {
-		background: linear-gradient(135deg, rgba(56, 189, 248, 0.06) 0%, rgba(59, 130, 246, 0.02) 100%);
-		border: 1px solid rgba(56, 189, 248, 0.12);
+		background: linear-gradient(
+			135deg,
+			rgb(var(--brand-discover) / 0.06) 0%,
+			rgb(var(--brand-discover) / 0.02) 100%
+		);
+		border: 1px solid rgb(var(--brand-discover) / 0.12);
 	}
 </style>

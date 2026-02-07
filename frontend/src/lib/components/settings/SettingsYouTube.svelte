@@ -2,6 +2,7 @@
 	type YouTubeConnectionSettings = {
 		api_key: string;
 		enabled: boolean;
+		daily_quota_limit: number;
 	};
 
 	let connection: YouTubeConnectionSettings | null = $state(null);
@@ -165,6 +166,25 @@
 								{/if}
 							</p>
 						</div>
+					</label>
+				</div>
+
+				<div class="form-control w-full">
+					<label class="label" for="yt-quota-limit">
+						<span class="label-text">Daily Quota Limit</span>
+					</label>
+					<input
+						id="yt-quota-limit"
+						type="number"
+						min="1"
+						max="10000"
+						bind:value={connection.daily_quota_limit}
+						class="input input-bordered w-32"
+					/>
+					<label class="label" for="yt-quota-limit">
+						<span class="label-text-alt text-base-content/50">
+							Maximum video lookups per day (default: 80)
+						</span>
 					</label>
 				</div>
 

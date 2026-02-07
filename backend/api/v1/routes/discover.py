@@ -8,8 +8,10 @@ from api.v1.schemas.discover import (
     DiscoverQueueValidateRequest,
     DiscoverQueueValidateResponse,
     YouTubeSearchResponse,
+    YouTubeQuotaResponse,
 )
-from core.dependencies import get_discover_service
+from core.dependencies import get_discover_service, get_youtube_repo
+from repositories.youtube import YouTubeRepository
 from services.discover_service import DiscoverService
 
 logger = logging.getLogger(__name__)
@@ -106,10 +108,8 @@ async def validate_queue(
 async def youtube_search(
     artist: str = Query(..., description="Artist name"),
     album: str = Query(..., description="Album name"),
+    yt_repo: YouTubeRepository = Depends(get_youtube_repo),
 ):
-    from core.dependencies import get_youtube_repo
-
-    yt_repo = get_youtube_repo()
     if not yt_repo or not yt_repo.is_configured:
         return YouTubeSearchResponse(error="not_configured")
 
@@ -123,3 +123,12 @@ async def youtube_search(
             embed_url=f"https://www.youtube.com/embed/{video_id}",
         )
     return YouTubeSearchResponse(error="not_found")
+
+
+@router.get("/queue/youtube-quota", response_model=YouTubeQuotaResponse)
+async def youtube_quota(
+    yt_repo: YouTubeRepository = Depends(get_youtube_repo),
+):
+    if not yt_repo or not yt_repo.is_configured:
+        raise HTTPException(status_code=404, detail="YouTube not configured")
+    return YouTubeQuotaResponse(**yt_repo.get_quota_status())

@@ -37,6 +37,13 @@ class YouTubeSearchResponse(BaseModel):
     error: str | None = None
 
 
+class YouTubeQuotaResponse(BaseModel):
+    used: int
+    limit: int
+    remaining: int
+    date: str
+
+
 class DiscoverQueueResponse(BaseModel):
     items: list[DiscoverQueueItemLight] = Field(default_factory=list)
     queue_id: str = ""

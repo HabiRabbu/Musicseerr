@@ -7,12 +7,10 @@
 	import DiscoverQueueModal from '$lib/components/DiscoverQueueModal.svelte';
 	import ServicePromptCard from '$lib/components/ServicePromptCard.svelte';
 	import type { DiscoverResponse } from '$lib/types';
-	import {
-		getDiscoverCachedData,
-		setDiscoverCachedData,
-		isDiscoverCacheStale
-	} from '$lib/utils/discoverCache';
-	import { formatLastUpdated } from '$lib/utils/homeCache';
+	import CarouselSkeleton from '$lib/components/CarouselSkeleton.svelte';
+	import PageHeader from '$lib/components/PageHeader.svelte';
+	import { getDiscoverCachedData, setDiscoverCachedData, isDiscoverCacheStale } from '$lib/utils/discoverCache';
+	import { formatLastUpdated } from '$lib/utils/formatting';
 
 	let discoverData: DiscoverResponse | null = null;
 	let loading = true;
@@ -26,6 +24,9 @@
 	async function loadDiscoverData(forceRefresh = false) {
 		const cached = getDiscoverCachedData();
 		if (cached && !forceRefresh) {
+			// Guard: when the backend is still computing async recommendations,
+			// all personalized sections are null/empty. Don't use a cached response
+			// that has no content — it represents a transient "still computing" state.
 			const cachedHasContent =
 				(cached.data.because_you_listen_to?.length ?? 0) > 0 ||
 				cached.data.fresh_releases != null ||
@@ -35,7 +36,9 @@
 				discoverData = cached.data;
 				lastUpdated = new Date(cached.timestamp);
 				loading = false;
-				refreshInBackground();
+				if (isDiscoverCacheStale(cached.timestamp)) {
+					refreshInBackground();
+				}
 				return;
 			}
 		}
@@ -56,6 +59,8 @@
 				const data: DiscoverResponse = await response.json();
 				discoverData = data;
 				lastUpdated = new Date();
+				// Only cache responses that have actual content — empty responses
+				// indicate the backend hasn't finished async computation yet
 				const dataHasContent =
 					(data.because_you_listen_to?.length ?? 0) > 0 ||
 					data.fresh_releases != null ||
@@ -90,9 +95,18 @@
 			const response = await fetch('/api/discover', { signal: abortController.signal });
 			if (response.ok) {
 				const data: DiscoverResponse = await response.json();
-				discoverData = data;
-				lastUpdated = new Date();
-				setDiscoverCachedData(data);
+				// Only update cached data if the response has content — empty means
+				// the backend is still computing and we should keep showing stale data
+				const hasContent =
+					(data.because_you_listen_to?.length ?? 0) > 0 ||
+					data.fresh_releases != null ||
+					data.missing_essentials != null ||
+					data.globally_trending != null;
+				if (hasContent) {
+					discoverData = data;
+					lastUpdated = new Date();
+					setDiscoverCachedData(data);
+				}
 			}
 		} catch (e) {
 			if (e instanceof Error && e.name === 'AbortError') return;
@@ -185,68 +199,33 @@
 </svelte:head>
 
 <div class="min-h-[calc(100vh-200px)]">
-	<div
-		class="relative mb-6 overflow-hidden bg-gradient-to-br from-info/30 via-primary/20 to-secondary/10"
+	<PageHeader
+		subtitle="Personalized music recommendations based on your listening habits."
+		gradientClass="bg-gradient-to-br from-info/30 via-primary/20 to-secondary/10"
+		{loading}
+		{refreshing}
+		{isUpdating}
+		{lastUpdated}
+		refreshLabel="Refresh"
+		onRefresh={handleRefresh}
 	>
-		<div class="absolute inset-0 bg-gradient-to-t from-base-100 to-transparent"></div>
-		<div class="relative px-4 py-8 sm:px-6 sm:py-12 lg:px-8">
-			<div class="flex items-start justify-between">
-				<div>
-					<h1 class="mb-2 text-3xl font-bold sm:text-4xl lg:text-5xl">
-						<svg
-							xmlns="http://www.w3.org/2000/svg"
-							viewBox="0 0 24 24"
-							fill="none"
-							stroke="currentColor"
-							stroke-width="2"
-							stroke-linecap="round"
-							stroke-linejoin="round"
-							class="inline h-8 w-8 sm:h-10 sm:w-10 lg:h-12 lg:w-12 mr-2 align-text-bottom"
-						>
-							<circle cx="12" cy="12" r="10"></circle>
-							<polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"></polygon>
-						</svg>
-						Discover
-					</h1>
-					<p class="max-w-xl text-sm text-base-content/70 sm:text-base">
-						Personalized music recommendations based on your listening habits.
-					</p>
-				</div>
-				<div class="flex items-center gap-2">
-					{#if isUpdating}
-						<span class="badge badge-ghost badge-sm gap-1">
-							<span class="loading loading-spinner loading-xs"></span>
-							Updating...
-						</span>
-					{:else if lastUpdated && !loading}
-						<span class="hidden text-xs text-base-content/50 sm:inline">
-							Updated {formatLastUpdated(lastUpdated)}
-						</span>
-					{/if}
-					<button
-						class="btn btn-sm btn-primary gap-1"
-						on:click={handleRefresh}
-						disabled={refreshing || loading}
-						title="Refresh Recommendations"
-					>
-						<svg
-							xmlns="http://www.w3.org/2000/svg"
-							viewBox="0 0 20 20"
-							fill="currentColor"
-							class="h-4 w-4 {refreshing ? 'animate-spin' : ''}"
-						>
-							<path
-								fill-rule="evenodd"
-								d="M15.312 11.424a5.5 5.5 0 01-9.201 2.466l-.312-.311h2.433a.75.75 0 000-1.5H3.989a.75.75 0 00-.75.75v4.242a.75.75 0 001.5 0v-2.43l.31.31a7 7 0 0011.712-3.138.75.75 0 00-1.449-.39zm1.23-3.723a.75.75 0 00.219-.53V2.929a.75.75 0 00-1.5 0v2.43l-.31-.31A7 7 0 003.239 8.188a.75.75 0 101.448.389A5.5 5.5 0 0113.89 6.11l.311.31h-2.432a.75.75 0 000 1.5h4.243a.75.75 0 00.53-.219z"
-								clip-rule="evenodd"
-							/>
-						</svg>
-						<span class="hidden sm:inline">Refresh</span>
-					</button>
-				</div>
-			</div>
-		</div>
-	</div>
+		{#snippet title()}
+			<svg
+				xmlns="http://www.w3.org/2000/svg"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="2"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				class="inline h-8 w-8 sm:h-10 sm:w-10 lg:h-12 lg:w-12 mr-2 align-text-bottom"
+			>
+				<circle cx="12" cy="12" r="10"></circle>
+				<polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"></polygon>
+			</svg>
+			Discover
+		{/snippet}
+	</PageHeader>
 
 	{#if error && !discoverData}
 		<div class="mt-16 flex flex-col items-center justify-center px-4">
@@ -269,15 +248,7 @@
 				{#each Array(3) as _}
 					<section>
 						<div class="skeleton mb-4 h-6 w-48"></div>
-						<div class="scrollbar-hide flex gap-3 overflow-x-auto pb-2 sm:gap-4">
-							{#each Array(6) as _}
-								<div class="w-32 flex-shrink-0 sm:w-36 md:w-44">
-									<div class="skeleton aspect-square w-full rounded-lg"></div>
-									<div class="skeleton mt-2 h-4 w-3/4"></div>
-									<div class="skeleton mt-1 h-3 w-1/2"></div>
-								</div>
-							{/each}
-						</div>
+						<CarouselSkeleton />
 					</section>
 				{/each}
 			{:else if discoverData}
@@ -384,13 +355,17 @@
 		display: flex;
 		flex-direction: column;
 		gap: 1.5rem;
-		background: linear-gradient(135deg, rgba(56, 189, 248, 0.06) 0%, rgba(59, 130, 246, 0.02) 100%);
-		border: 1px solid rgba(56, 189, 248, 0.12);
+		background: linear-gradient(
+			135deg,
+			rgb(var(--brand-discover) / 0.06) 0%,
+			rgb(var(--brand-discover) / 0.02) 100%
+		);
+		border: 1px solid rgb(var(--brand-discover) / 0.12);
 	}
 
 	.listen-count-tooltip {
 		font-size: 0.75rem;
-		color: oklch(var(--bc) / 0.5);
+		color: color-mix(in srgb, var(--color-base-content) 50%, transparent);
 		margin-left: 0.5rem;
 	}
 </style>

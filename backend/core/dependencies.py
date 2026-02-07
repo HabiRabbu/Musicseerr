@@ -2,6 +2,7 @@ from functools import lru_cache
 import logging
 from typing import Annotated
 
+import httpx
 from fastapi import Depends
 
 from core.config import Settings, get_settings
@@ -40,8 +41,9 @@ SettingsDep = Annotated[Settings, Depends(get_settings)]
 
 @lru_cache(maxsize=1)
 def get_cache() -> CacheInterface:
-    settings = get_settings()
-    max_entries = settings.metadata_cache_max_entries
+    preferences_service = get_preferences_service()
+    advanced = preferences_service.get_advanced_settings()
+    max_entries = advanced.memory_cache_max_entries
     logger.info(f"Initialized RAM cache with max {max_entries} entries")
     return InMemoryCache(max_entries=max_entries)
 
@@ -49,9 +51,16 @@ def get_cache() -> CacheInterface:
 @lru_cache(maxsize=1)
 def get_disk_cache() -> DiskMetadataCache:
     settings = get_settings()
+    preferences_service = get_preferences_service()
+    advanced = preferences_service.get_advanced_settings()
     cache_dir = settings.cache_dir / "metadata"
     logger.info(f"Initialized disk metadata cache at {cache_dir}")
-    return DiskMetadataCache(base_path=cache_dir)
+    return DiskMetadataCache(
+        base_path=cache_dir,
+        recent_metadata_max_size_mb=advanced.recent_metadata_max_size_mb,
+        recent_covers_max_size_mb=advanced.recent_covers_max_size_mb,
+        persistent_metadata_ttl_hours=advanced.persistent_metadata_ttl_hours,
+    )
 
 
 @lru_cache(maxsize=1)
@@ -67,11 +76,22 @@ def get_preferences_service() -> PreferencesService:
     return PreferencesService(settings)
 
 
+def _get_configured_http_client() -> httpx.AsyncClient:
+    settings = get_settings()
+    advanced = get_preferences_service().get_advanced_settings()
+    return get_http_client(
+        settings,
+        timeout=float(advanced.http_timeout),
+        connect_timeout=float(advanced.http_connect_timeout),
+        max_connections=advanced.http_max_connections,
+    )
+
+
 @lru_cache(maxsize=1)
 def get_lidarr_repository() -> LidarrRepository:
     settings = get_settings()
     cache = get_cache()
-    http_client = get_http_client(settings)
+    http_client = _get_configured_http_client()
     return LidarrRepository(settings, http_client, cache)
 
 
@@ -84,17 +104,15 @@ def get_musicbrainz_repository() -> MusicBrainzRepository:
 
 @lru_cache(maxsize=1)
 def get_wikidata_repository() -> WikidataRepository:
-    settings = get_settings()
     cache = get_cache()
-    http_client = get_http_client(settings)
+    http_client = _get_configured_http_client()
     return WikidataRepository(http_client, cache)
 
 
 @lru_cache(maxsize=1)
 def get_listenbrainz_repository() -> ListenBrainzRepository:
-    settings = get_settings()
     cache = get_cache()
-    http_client = get_http_client(settings)
+    http_client = _get_configured_http_client()
     preferences = get_preferences_service()
     lb_settings = preferences.get_listenbrainz_connection()
     return ListenBrainzRepository(
@@ -107,9 +125,8 @@ def get_listenbrainz_repository() -> ListenBrainzRepository:
 
 @lru_cache(maxsize=1)
 def get_jellyfin_repository() -> JellyfinRepository:
-    settings = get_settings()
     cache = get_cache()
-    http_client = get_http_client(settings)
+    http_client = _get_configured_http_client()
     preferences = get_preferences_service()
     jf_settings = preferences.get_jellyfin_connection()
     return JellyfinRepository(
@@ -127,7 +144,7 @@ def get_coverart_repository() -> CoverArtRepository:
     cache = get_cache()
     mb_repo = get_musicbrainz_repository()
     lidarr_repo = get_lidarr_repository()
-    http_client = get_http_client(settings)
+    http_client = _get_configured_http_client()
     cache_dir = settings.cache_dir / "covers"
     return CoverArtRepository(http_client, cache, mb_repo, lidarr_repo, cache_dir=cache_dir)
 
@@ -308,12 +325,15 @@ def get_search_enrichment_service() -> SearchEnrichmentService:
 
 @lru_cache(maxsize=1)
 def get_youtube_repo() -> YouTubeRepository:
-    settings = get_settings()
-    http_client = get_http_client(settings)
+    http_client = _get_configured_http_client()
     preferences_service = get_preferences_service()
     yt_settings = preferences_service.get_youtube_connection()
     api_key = yt_settings.api_key if yt_settings.enabled else ""
-    return YouTubeRepository(http_client=http_client, api_key=api_key)
+    return YouTubeRepository(
+        http_client=http_client,
+        api_key=api_key,
+        daily_quota_limit=yt_settings.daily_quota_limit,
+    )
 
 
 @lru_cache(maxsize=1)

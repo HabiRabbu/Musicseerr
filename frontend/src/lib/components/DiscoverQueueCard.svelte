@@ -1,20 +1,13 @@
 <script lang="ts">
-	import { CACHE_KEYS, CACHE_TTL } from '$lib/constants';
+	import { getQueueCachedData } from '$lib/utils/discoverQueueCache';
 
 	let { onLaunch }: { onLaunch: () => void } = $props();
 
 	let hasCachedQueue = $state(false);
 
 	$effect(() => {
-		try {
-			const raw = localStorage.getItem(CACHE_KEYS.DISCOVER_QUEUE);
-			if (!raw) return;
-			const data = JSON.parse(raw);
-			hasCachedQueue =
-				data?.items?.length > 0 && Date.now() - data.timestamp < CACHE_TTL.DISCOVER_QUEUE;
-		} catch {
-			hasCachedQueue = false;
-		}
+		const cached = getQueueCachedData();
+		hasCachedQueue = (cached?.data?.items?.length ?? 0) > 0;
 	});
 </script>
 
@@ -51,11 +44,7 @@
 				stroke-linejoin="round"
 				class="h-5 w-5"
 			>
-				{#if hasCachedQueue}
-					<polygon points="5 3 19 12 5 21 5 3" />
-				{:else}
-					<polygon points="5 3 19 12 5 21 5 3" />
-				{/if}
+				<polygon points="5 3 19 12 5 21 5 3" />
 			</svg>
 			{hasCachedQueue ? 'Resume Discover Queue' : 'Launch Discover Queue'}
 		</button>

@@ -3,6 +3,7 @@
 	import { browser } from '$app/environment';
 	import { goto } from '$app/navigation';
 	import SearchArtistCard from '$lib/components/SearchArtistCard.svelte';
+	import ArtistCardSkeleton from '$lib/components/ArtistCardSkeleton.svelte';
 	import type { Artist } from '$lib/types';
 	import { colors } from '$lib/colors';
 	import { searchStore } from '$lib/stores/search';
@@ -90,8 +91,8 @@
 				searchStore.updateArtists(artists);
 
 				const needsEnrichment = artists
-					.filter(a => a.release_group_count == null)
-					.map(a => a.musicbrainz_id);
+					.filter((a) => a.release_group_count == null)
+					.map((a) => a.musicbrainz_id);
 				if (needsEnrichment.length > 0) {
 					fetchEnrichment(needsEnrichment);
 				}
@@ -160,7 +161,7 @@
 		if (browser) {
 			const handleRefresh = () => resetAndLoad();
 			window.addEventListener('search-refresh', handleRefresh);
-			
+
 			return () => {
 				window.removeEventListener('search-refresh', handleRefresh);
 			};
@@ -183,20 +184,22 @@
 	});
 </script>
 
-
 <div class="px-8 pt-4 pb-2">
 	<div class="flex gap-2">
-		<button 
+		<button
 			class="badge badge-lg cursor-pointer transition-colors"
 			style="background-color: {colors.secondary}; color: {colors.primary};"
 			on:click={navigateBack}
 		>
 			All
 		</button>
-		<button class="badge badge-lg cursor-pointer" style="background-color: {colors.primary}; color: {colors.secondary};">
+		<button
+			class="badge badge-lg cursor-pointer"
+			style="background-color: {colors.primary}; color: {colors.secondary};"
+		>
 			Artists
 		</button>
-		<button 
+		<button
 			class="badge badge-lg cursor-pointer transition-colors"
 			style="background-color: {colors.secondary}; color: {colors.primary};"
 			on:click={() => navigateToBucket('albums')}
@@ -211,28 +214,21 @@
 		<p class="text-center mt-32 text-gray-400">Enter a search query to get started.</p>
 	{:else if loading && artists.length === 0}
 		<div class="bg-base-200 rounded-box p-4">
-			<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+			<div
+				class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4"
+			>
 				{#each Array(12) as _, i}
-					<div class="card bg-base-100 w-full shadow-sm">
-						<figure class="flex justify-center pt-4">
-							<div class="skeleton w-28 h-28 sm:w-32 sm:h-32 md:w-36 md:h-36 rounded-full"></div>
-						</figure>
-						<div class="card-body items-center text-center p-3 gap-1">
-							<div class="skeleton h-4 w-3/4"></div>
-							<div class="skeleton h-3 w-1/2"></div>
-							<div class="skeleton h-5 w-2/3 mt-1"></div>
-						</div>
-					</div>
+					<ArtistCardSkeleton variant="detailed" />
 				{/each}
 			</div>
 		</div>
 	{:else if artists.length === 0 && !loading}
-		<div class="p-8 bg-base-200 rounded-box text-center text-gray-500">
-			No artists found
-		</div>
+		<div class="p-8 bg-base-200 rounded-box text-center text-gray-500">No artists found</div>
 	{:else}
 		<div class="bg-base-200 rounded-box p-4">
-			<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+			<div
+				class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4"
+			>
 				{#each artists as artist (artist.musicbrainz_id)}
 					<SearchArtistCard {artist} />
 				{/each}

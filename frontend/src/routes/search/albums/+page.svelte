@@ -2,7 +2,8 @@
 	import { onDestroy, onMount } from 'svelte';
 	import { browser } from '$app/environment';
 	import { goto } from '$app/navigation';
-	import SearchAlbumCard from '$lib/components/SearchAlbumCard.svelte';
+	import AlbumCard from '$lib/components/AlbumCard.svelte';
+	import AlbumCardSkeleton from '$lib/components/AlbumCardSkeleton.svelte';
 	import type { Album } from '$lib/types';
 	import { colors } from '$lib/colors';
 	import { searchStore } from '$lib/stores/search';
@@ -92,11 +93,11 @@
 					);
 					albums = [...albums, ...uniqueNewAlbums];
 					offset = albums.length;
-					uniqueNewAlbums.forEach(a => newMbids.push(a.musicbrainz_id));
+					uniqueNewAlbums.forEach((a) => newMbids.push(a.musicbrainz_id));
 				} else {
 					albums = [...albums, ...newAlbums];
 					offset += newAlbums.length;
-					newAlbums.forEach(a => newMbids.push(a.musicbrainz_id));
+					newAlbums.forEach((a) => newMbids.push(a.musicbrainz_id));
 				}
 				searchStore.updateAlbums(albums);
 
@@ -168,7 +169,7 @@
 		if (browser) {
 			const handleRefresh = () => resetAndLoad();
 			window.addEventListener('search-refresh', handleRefresh);
-			
+
 			return () => {
 				window.removeEventListener('search-refresh', handleRefresh);
 			};
@@ -191,24 +192,26 @@
 	});
 </script>
 
-
 <div class="px-8 pt-4 pb-2">
 	<div class="flex gap-2">
-		<button 
+		<button
 			class="badge badge-lg cursor-pointer transition-colors"
 			style="background-color: {colors.secondary}; color: {colors.primary};"
 			on:click={navigateBack}
 		>
 			All
 		</button>
-		<button 
+		<button
 			class="badge badge-lg cursor-pointer transition-colors"
 			style="background-color: {colors.secondary}; color: {colors.primary};"
 			on:click={() => navigateToBucket('artists')}
 		>
 			Artists
 		</button>
-		<button class="badge badge-lg cursor-pointer" style="background-color: {colors.primary}; color: {colors.secondary};">
+		<button
+			class="badge badge-lg cursor-pointer"
+			style="background-color: {colors.primary}; color: {colors.secondary};"
+		>
 			Albums
 		</button>
 	</div>
@@ -219,27 +222,23 @@
 		<p class="text-center mt-32 text-gray-400">Enter a search query to get started.</p>
 	{:else if loading && albums.length === 0}
 		<div class="bg-base-200 rounded-box p-4">
-			<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+			<div
+				class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4"
+			>
 				{#each Array(12) as _, i}
-					<div class="card bg-base-100 w-full shadow-sm">
-						<div class="skeleton aspect-square w-full"></div>
-						<div class="card-body p-3">
-							<div class="skeleton h-4 w-full mb-2"></div>
-							<div class="skeleton h-3 w-3/4"></div>
-						</div>
-					</div>
+					<AlbumCardSkeleton />
 				{/each}
 			</div>
 		</div>
 	{:else if albums.length === 0 && !loading}
-		<div class="p-8 bg-base-200 rounded-box text-center text-gray-500">
-			No albums found
-		</div>
+		<div class="p-8 bg-base-200 rounded-box text-center text-gray-500">No albums found</div>
 	{:else}
 		<div class="bg-base-200 rounded-box p-4">
-			<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+			<div
+				class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4"
+			>
 				{#each albums as album (album.musicbrainz_id)}
-					<SearchAlbumCard {album} onadded={handleAlbumAdded} />
+					<AlbumCard {album} onadded={handleAlbumAdded} />
 				{/each}
 			</div>
 		</div>
@@ -254,11 +253,17 @@
 	{/if}
 </section>
 
-
 {#if showToast}
 	<div class="toast toast-end toast-bottom">
 		<div class="alert alert-success">
-			<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+			<svg
+				xmlns="http://www.w3.org/2000/svg"
+				class="h-6 w-6"
+				fill="none"
+				viewBox="0 0 24 24"
+				stroke="currentColor"
+				stroke-width="2"
+			>
 				<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
 			</svg>
 			<span>Added to Library</span>

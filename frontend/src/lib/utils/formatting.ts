@@ -61,3 +61,26 @@ export function isValidMbid(id: string | null | undefined): boolean {
 	const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 	return UUID_PATTERN.test(id);
 }
+
+export function formatLastUpdated(date: Date | null): string {
+	if (!date) return '';
+	const now = new Date();
+	const diffMs = now.getTime() - date.getTime();
+	const diffMins = Math.floor(diffMs / 60000);
+
+	if (diffMins < 1) return 'Just now';
+	if (diffMins < 60) return `${diffMins}m ago`;
+	const diffHours = Math.floor(diffMins / 60);
+	if (diffHours < 24) return `${diffHours}h ago`;
+	return date.toLocaleDateString();
+}
+
+export function countryToFlag(code: string | null): string {
+	if (!code || code.length !== 2) return '';
+	return String.fromCodePoint(
+		...code
+			.toUpperCase()
+			.split('')
+			.map((c) => 0x1f1e6 + c.charCodeAt(0) - 65)
+	);
+}

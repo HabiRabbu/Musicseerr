@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { DiscoveryAlbum, Album } from '$lib/types';
 	import HorizontalCarousel from './HorizontalCarousel.svelte';
+	import CarouselSkeleton from './CarouselSkeleton.svelte';
 	import AlbumCard from './AlbumCard.svelte';
 
 	interface Props {
@@ -11,10 +12,10 @@
 		emptyMessage?: string;
 	}
 
-	let { 
-		albums, 
-		loading = false, 
-		configured = true, 
+	let {
+		albums,
+		loading = false,
+		configured = true,
 		title,
 		emptyMessage = 'No albums found'
 	}: Props = $props();
@@ -36,15 +37,7 @@
 	<h3 class="text-lg font-semibold mb-3">{title}</h3>
 
 	{#if loading}
-		<div class="flex gap-4 overflow-hidden">
-			{#each Array(6) as _}
-				<div class="w-36 flex-shrink-0">
-					<div class="skeleton aspect-square rounded-lg"></div>
-					<div class="skeleton h-4 w-3/4 mt-2"></div>
-					<div class="skeleton h-3 w-1/2 mt-1"></div>
-				</div>
-			{/each}
-		</div>
+		<CarouselSkeleton count={6} cardWidth="w-36" />
 	{:else if !configured}
 		<div class="bg-base-200 rounded-lg p-6 text-center">
 			<p class="text-base-content/70">Connect ListenBrainz in Settings to see recommendations</p>

@@ -34,7 +34,18 @@
 	}
 
 	$effect(() => {
-		if (container) setTimeout(updateArrows, 100);
+		if (!container) return;
+
+		const observer = new ResizeObserver(() => {
+			updateArrows();
+		});
+		observer.observe(container);
+
+		updateArrows();
+
+		return () => {
+			observer.disconnect();
+		};
 	});
 </script>
 
@@ -68,12 +79,3 @@
 	{/if}
 </div>
 
-<style>
-	.scrollbar-hide {
-		-ms-overflow-style: none;
-		scrollbar-width: none;
-	}
-	.scrollbar-hide::-webkit-scrollbar {
-		display: none;
-	}
-</style>

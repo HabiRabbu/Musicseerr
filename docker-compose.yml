@@ -1,19 +1,20 @@
 services:
   musicseerr:
-    build: .
+    build:
+      context: .
+      args:
+        - COMMIT_TAG=${COMMIT_TAG:-dev}
+        - BUILD_DATE=${BUILD_DATE:-}
     container_name: musicseerr
+    environment:
+      - PORT=${PORT:-8688}
+      - TZ=${TZ:-Etc/UTC}
     ports:
-      - "8688:8688"
+      - "${PORT:-8688}:${PORT:-8688}"
     volumes:
       - ./config:/app/config
       - ./cache:/app/cache
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8688/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 10s
     deploy:
       resources:
         limits:

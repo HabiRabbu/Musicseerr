@@ -8,7 +8,11 @@ interface SearchCache {
 	timestamp: number;
 }
 
-const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+let CACHE_TTL = 5 * 60 * 1000;
+
+export function updateSearchCacheTTL(ttlMs: number): void {
+	CACHE_TTL = ttlMs;
+}
 
 function createSearchStore() {
 	const { subscribe, set, update } = writable<SearchCache | null>(null);

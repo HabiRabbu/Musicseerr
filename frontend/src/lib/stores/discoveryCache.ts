@@ -13,10 +13,14 @@ interface AlbumDiscoveryCache {
 	timestamp: number;
 }
 
-const CACHE_TTL_MS = 5 * 60 * 1000;
+let CACHE_TTL_MS = 5 * 60 * 1000;
 
 const artistCache = new Map<string, ArtistDiscoveryCache>();
 const albumCache = new Map<string, AlbumDiscoveryCache>();
+
+export function updateDiscoveryCacheTTL(ttlMs: number): void {
+	CACHE_TTL_MS = ttlMs;
+}
 
 export function getArtistDiscoveryCache(artistId: string): ArtistDiscoveryCache | null {
 	const cached = artistCache.get(artistId);

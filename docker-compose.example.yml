@@ -2,15 +2,18 @@ services:
   musicseerr:
     image: ghcr.io/habirabbu/musicseerr:latest
     container_name: musicseerr
+    environment:
+      - PORT=8688           # Internal port (must match the right side of "ports" below)
+      - TZ=Etc/UTC          # Timezone — e.g. America/New_York, Europe/London
     ports:
-      - "8688:8688"
+      - "8688:8688"         # <host-port>:<container-port> — change the left side to remap
     volumes:
-      - ./config:/app/config
-      - ./cache:/app/cache
+      - ./config:/app/config  # Persistent app configuration
+      - ./cache:/app/cache    # Cover art & metadata cache
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8688/health"]
       interval: 30s
       timeout: 10s
+      start_period: 15s
       retries: 3
-      start_period: 10s

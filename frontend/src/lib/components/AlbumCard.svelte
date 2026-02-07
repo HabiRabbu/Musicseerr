@@ -5,6 +5,7 @@
 	import { libraryStore } from '$lib/stores/library';
 	import { STATUS_COLORS } from '$lib/constants';
 	import { requestAlbum } from '$lib/utils/albumRequest';
+	import { formatListenCount } from '$lib/utils/formatting';
 	import AlbumImage from './AlbumImage.svelte';
 
 	export let album: Album;
@@ -13,7 +14,8 @@
 	let requesting = false;
 
 	$: inLibrary = album.in_library || libraryStore.isInLibrary(album.musicbrainz_id);
-	$: isRequested = !inLibrary && (album.requested || libraryStore.isRequested(album.musicbrainz_id));
+	$: isRequested =
+		!inLibrary && (album.requested || libraryStore.isRequested(album.musicbrainz_id));
 
 	async function handleRequest(e: Event) {
 		e.stopPropagation();
@@ -31,12 +33,21 @@
 	function handleClick() {
 		goto(`/album/${album.musicbrainz_id}`);
 	}
+
+	function getTypeBadgeClass(type: string): string {
+		const lower = type.toLowerCase();
+		if (lower.includes('ep')) return 'badge-warning';
+		if (lower.includes('single')) return 'badge-info';
+		if (lower.includes('compilation')) return 'badge-secondary';
+		if (lower.includes('live')) return 'badge-error';
+		return 'badge-ghost';
+	}
 </script>
 
 <div
 	class="card bg-base-100 w-full shadow-sm flex-shrink-0 group relative cursor-pointer transition-transform hover:scale-105 hover:shadow-lg active:scale-95"
-	on:click={handleClick}
-	on:keydown={(e) => e.key === 'Enter' && handleClick()}
+	onclick={handleClick}
+	onkeydown={(e) => e.key === 'Enter' && handleClick()}
 	role="button"
 	tabindex="0"
 >
@@ -49,6 +60,12 @@
 			rounded="none"
 			className="w-full h-full"
 		/>
+
+		{#if album.type_info && album.type_info !== 'Album'}
+			<div class="absolute top-2 left-2">
+				<span class="badge badge-sm {getTypeBadgeClass(album.type_info)}">{album.type_info}</span>
+			</div>
+		{/if}
 	</figure>
 
 	{#if inLibrary}
@@ -80,7 +97,11 @@
 				stroke={colors.secondary}
 				stroke-width="2"
 			>
-				<path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+				<path
+					stroke-linecap="round"
+					stroke-linejoin="round"
+					d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+				/>
 			</svg>
 		</div>
 	{/if}
@@ -94,13 +115,21 @@
 				{album.artist}
 			{/if}
 		</p>
+
+		{#if album.listen_count != null}
+			<div class="flex items-center gap-1 mt-1">
+				<span class="badge badge-sm badge-primary badge-outline" title="ListenBrainz plays">
+					♪ {formatListenCount(album.listen_count, true)}
+				</span>
+			</div>
+		{/if}
 	</div>
 
 	{#if !inLibrary && !isRequested}
 		<button
 			class="absolute bottom-2 right-2 btn btn-square btn-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 border-none shadow-lg"
 			style="background-color: {colors.accent};"
-			on:click={handleRequest}
+			onclick={handleRequest}
 			disabled={requesting}
 			aria-label="Request album"
 		>

@@ -1,6 +1,6 @@
 [tool.black]
 line-length = 100
-target-version = ["py311"]
+target-version = ["py313"]
 skip-string-normalization = false
 color = true
 

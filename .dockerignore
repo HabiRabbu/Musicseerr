@@ -1,0 +1,42 @@
+# Source control & CI
+.git
+.github
+.gitignore
+.dockerignore
+
+# Documentation & metadata
+*.md
+LICENSE
+pyproject.toml
+todos.md
+Docs/
+
+# Caches & runtime data
+cache/
+config/
+__pycache__/
+*.pyc
+*.pyo
+.mypy_cache/
+.ruff_cache/
+
+# Dev-only files
+backend/requirements-dev.txt
+
+# Frontend build artifacts & dev files
+frontend/node_modules/
+frontend/build/
+frontend/.svelte-kit/
+frontend/.vite/
+
+# Docker (prevent recursive context)
+docker-compose*.yml
+Dockerfile
+manage.sh
+
+# IDE & OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db

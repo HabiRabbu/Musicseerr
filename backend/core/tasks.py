@@ -28,8 +28,8 @@ async def cleanup_cache_periodically(cache: CacheInterface, interval: int = 300)
             logger.error(f"Error in cache cleanup task: {e}")
 
 
-def start_cache_cleanup_task(cache: CacheInterface) -> asyncio.Task:
-    return asyncio.create_task(cleanup_cache_periodically(cache))
+def start_cache_cleanup_task(cache: CacheInterface, interval: int = 300) -> asyncio.Task:
+    return asyncio.create_task(cleanup_cache_periodically(cache, interval=interval))
 
 
 async def cleanup_disk_cache_periodically(disk_cache: DiskMetadataCache, interval: int = 600) -> None:
@@ -48,8 +48,8 @@ async def cleanup_disk_cache_periodically(disk_cache: DiskMetadataCache, interva
             logger.error(f"Error in disk cache cleanup task: {e}")
 
 
-def start_disk_cache_cleanup_task(disk_cache: DiskMetadataCache) -> asyncio.Task:
-    return asyncio.create_task(cleanup_disk_cache_periodically(disk_cache))
+def start_disk_cache_cleanup_task(disk_cache: DiskMetadataCache, interval: int = 600) -> asyncio.Task:
+    return asyncio.create_task(cleanup_disk_cache_periodically(disk_cache, interval=interval))
 
 
 async def sync_library_periodically(

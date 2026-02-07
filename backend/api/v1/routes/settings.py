@@ -1,5 +1,5 @@
 import logging
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from api.v1.schemas.settings import (
     UserPreferences, 
     LidarrSettings, 
@@ -11,11 +11,18 @@ from api.v1.schemas.settings import (
     HomeSettings,
     LidarrVerifyResponse
 )
-from api.v1.schemas.advanced_settings import AdvancedSettingsFrontend
-from core.dependencies import get_preferences_service, get_settings_service, get_youtube_repo
+from api.v1.schemas.advanced_settings import AdvancedSettingsFrontend, FrontendCacheTTLs
+from core.dependencies import (
+    get_preferences_service,
+    get_settings_service,
+    get_youtube_repo,
+)
 from core.exceptions import ConfigurationError
 from repositories.jellyfin_repository import JellyfinRepository
 from repositories.listenbrainz_repository import ListenBrainzRepository
+from repositories.youtube import YouTubeRepository
+from services.preferences_service import PreferencesService
+from services.settings_service import SettingsService
 
 logger = logging.getLogger(__name__)
 
@@ -74,6 +81,24 @@ async def update_lidarr_settings(lidarr_settings: LidarrSettings):
     except Exception as e:
         logger.exception(f"Failed to save Lidarr settings: {e}")
         raise HTTPException(status_code=500, detail="Failed to save Lidarr settings")
+
+
+@router.get("/cache-ttls", response_model=FrontendCacheTTLs)
+async def get_frontend_cache_ttls():
+    try:
+        preferences_service = get_preferences_service()
+        backend_settings = preferences_service.get_advanced_settings()
+        return FrontendCacheTTLs(
+            home=backend_settings.frontend_ttl_home,
+            discover=backend_settings.frontend_ttl_discover,
+            library=backend_settings.frontend_ttl_library,
+            recently_added=backend_settings.frontend_ttl_recently_added,
+            discover_queue=backend_settings.frontend_ttl_discover_queue,
+            search=backend_settings.frontend_ttl_search,
+        )
+    except Exception as e:
+        logger.exception(f"Failed to get frontend cache TTLs: {e}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve cache TTLs")
 
 
 @router.get("/advanced", response_model=AdvancedSettingsFrontend)
@@ -242,9 +267,10 @@ async def verify_listenbrainz_connection(settings: ListenBrainzConnectionSetting
 
 
 @router.get("/youtube", response_model=YouTubeConnectionSettings)
-async def get_youtube_settings():
+async def get_youtube_settings(
+    preferences_service: PreferencesService = Depends(get_preferences_service),
+):
     try:
-        preferences_service = get_preferences_service()
         return preferences_service.get_youtube_connection()
     except Exception as e:
         logger.exception(f"Failed to get YouTube settings: {e}")
@@ -252,9 +278,11 @@ async def get_youtube_settings():
 
 
 @router.put("/youtube", response_model=YouTubeConnectionSettings)
-async def update_youtube_settings(settings: YouTubeConnectionSettings):
+async def update_youtube_settings(
+    settings: YouTubeConnectionSettings,
+    preferences_service: PreferencesService = Depends(get_preferences_service),
+):
     try:
-        preferences_service = get_preferences_service()
         preferences_service.save_youtube_connection(settings)
         get_youtube_repo.cache_clear()
         logger.info("Updated YouTube connection settings")
@@ -269,13 +297,16 @@ async def update_youtube_settings(settings: YouTubeConnectionSettings):
 
 @router.post("/youtube/verify")
 async def verify_youtube_connection(settings: YouTubeConnectionSettings):
-    from repositories.youtube import YouTubeRepository
     from infrastructure.http.client import get_http_client
     from core.config import get_settings as get_app_settings
 
     app_settings = get_app_settings()
     http_client = get_http_client(app_settings)
-    temp_repo = YouTubeRepository(http_client=http_client, api_key=settings.api_key)
+    temp_repo = YouTubeRepository(
+        http_client=http_client,
+        api_key=settings.api_key,
+        daily_quota_limit=settings.daily_quota_limit,
+    )
     valid, message = await temp_repo.verify_api_key(settings.api_key)
     return {"valid": valid, "message": message}
 

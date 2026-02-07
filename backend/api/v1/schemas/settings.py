@@ -115,6 +115,12 @@ class YouTubeConnectionSettings(BaseModel):
         default=False,
         description="Whether YouTube integration is enabled"
     )
+    daily_quota_limit: int = Field(
+        default=80,
+        description="Maximum YouTube API searches per day",
+        ge=1,
+        le=10000,
+    )
 
 
 class HomeSettings(BaseModel):
