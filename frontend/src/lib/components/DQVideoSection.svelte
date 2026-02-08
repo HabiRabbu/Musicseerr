@@ -110,6 +110,16 @@
 		{:else if !compact}
 			<p class="mt-2 text-xs text-base-content/30">Uses YouTube Data API</p>
 		{/if}
+		{#if enrichment?.youtube_search_url}
+			<a
+				href={enrichment.youtube_search_url}
+				target="_blank"
+				rel="noopener noreferrer"
+				class="link link-hover text-xs text-base-content/40 mt-4"
+			>
+				or search YouTube manually ↗
+			</a>
+		{/if}
 	</div>
 {:else if enrichment}
 	<div class="dq-no-video text-base-content/40">
