@@ -27,6 +27,7 @@ from api.v1.routes import (
 )
 from api.v1.routes import cache as cache_routes
 from api.v1.routes import cache_status as cache_status_routes
+from api.v1.routes import youtube as youtube_routes
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -166,6 +167,7 @@ app.include_router(albums.router)
 app.include_router(settings.router)
 app.include_router(home.router)
 app.include_router(discover.router)
+app.include_router(youtube_routes.router)
 app.include_router(cache_routes.router)
 app.include_router(cache_status_routes.router)
 

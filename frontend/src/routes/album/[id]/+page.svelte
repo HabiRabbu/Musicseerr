@@ -10,6 +10,8 @@
 	import DiscoveryAlbumCarousel from '$lib/components/DiscoveryAlbumCarousel.svelte';
 	import { requestAlbum } from '$lib/utils/albumRequest';
 	import { formatDuration, formatTotalDuration } from '$lib/utils/formatting';
+	import { integrationStore } from '$lib/stores/integration';
+	import AlbumPlayButton from '$lib/components/AlbumPlayButton.svelte';
 
 	export let data: { albumId: string };
 
@@ -247,7 +249,7 @@
 						{/if}
 					</div>
 
-					<div class="pt-4">
+					<div class="pt-4 flex flex-wrap items-start gap-3">
 						{#if album.in_library}
 							<div class="badge badge-lg gap-2" style="background-color: {colors.accent}; color: {colors.secondary};">
 								<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -279,6 +281,15 @@
 									Add to Library
 								{/if}
 							</button>
+						{/if}
+
+						{#if $integrationStore.youtube}
+							<AlbumPlayButton
+								artistName={album.artist_name}
+								albumName={album.title}
+								albumId={album.musicbrainz_id}
+								coverUrl={album.cover_url}
+							/>
 						{/if}
 					</div>
 				</div>

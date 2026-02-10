@@ -53,10 +53,22 @@ class HomeService:
     def _is_lidarr_configured(self) -> bool:
         lidarr_connection = self._preferences.get_lidarr_connection()
         return bool(lidarr_connection.lidarr_url) and bool(lidarr_connection.lidarr_api_key)
+
+    def _is_youtube_enabled(self) -> bool:
+        yt_settings = self._preferences.get_youtube_connection()
+        return yt_settings.enabled and bool(yt_settings.api_key)
     
     def _get_listenbrainz_username(self) -> str | None:
         lb_settings = self._preferences.get_listenbrainz_connection()
         return lb_settings.username if lb_settings.enabled else None
+
+    def get_integration_status(self) -> dict[str, bool]:
+        return {
+            "listenbrainz": self._is_listenbrainz_enabled(),
+            "jellyfin": self._is_jellyfin_enabled(),
+            "lidarr": self._is_lidarr_configured(),
+            "youtube": self._is_youtube_enabled(),
+        }
 
     async def get_genre_artist(self, genre_name: str) -> str | None:
         VARIOUS_ARTISTS_MBID = "89ad4ac3-39f7-470e-963a-56509c546377"
@@ -114,9 +126,10 @@ class HomeService:
             if cached is not None:
                 return cached
         
-        lb_enabled = self._is_listenbrainz_enabled()
-        jf_enabled = self._is_jellyfin_enabled()
-        lidarr_configured = self._is_lidarr_configured()
+        integration_status = self.get_integration_status()
+        lb_enabled = integration_status["listenbrainz"]
+        jf_enabled = integration_status["jellyfin"]
+        lidarr_configured = integration_status["lidarr"]
         username = self._get_listenbrainz_username()
         
         tasks: dict[str, Any] = {
@@ -154,13 +167,7 @@ class HomeService:
         recently_imported: list[LibraryAlbum] = results.get("recently_imported") or []
         library_mbids = {a.get("mbid", "").lower() for a in library_artists if a.get("mbid")}
         
-        response = HomeResponse(
-            integration_status={
-                "listenbrainz": lb_enabled,
-                "jellyfin": jf_enabled,
-                "lidarr": lidarr_configured,
-            }
-        )
+        response = HomeResponse(integration_status=integration_status)
         
         response.recently_added = self._build_recently_added_section(recently_imported)
         response.library_artists = self._build_library_artists_section(library_artists)

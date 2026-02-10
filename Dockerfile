@@ -43,26 +43,26 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends curl tini \
+    && apt-get install -y --no-install-recommends curl tini gosu \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=python-deps /install /usr/local
 
-RUN groupadd -r musicseerr \
-    && useradd -r -g musicseerr -d /app -s /sbin/nologin musicseerr
+RUN groupadd -r -g 911 musicseerr \
+    && useradd -r -u 911 -g musicseerr -d /app -s /sbin/nologin musicseerr
 
 COPY backend/ .
 COPY --from=frontend-build /app/frontend/build ./static
+COPY entrypoint.sh /entrypoint.sh
 
 RUN mkdir -p /app/cache /app/config \
-    && chown -R musicseerr:musicseerr /app
-
-USER musicseerr
+    && chown -R musicseerr:musicseerr /app \
+    && chmod +x /entrypoint.sh
 
 EXPOSE ${PORT}
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
     CMD curl -f http://localhost:${PORT}/health || exit 1
 
-ENTRYPOINT ["tini", "--"]
+ENTRYPOINT ["tini", "--", "/entrypoint.sh"]
 CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT} --loop uvloop --http httptools --workers 1"]

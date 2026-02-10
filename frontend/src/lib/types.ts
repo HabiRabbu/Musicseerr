@@ -504,3 +504,25 @@ export type MoreByArtistResponse = {
 	albums: DiscoveryAlbum[];
 	artist_name: string;
 };
+
+export type YouTubeLink = {
+	album_id: string;
+	video_id: string;
+	album_name: string;
+	artist_name: string;
+	embed_url: string;
+	cover_url: string | null;
+	created_at: string;
+};
+
+export type YouTubeLinkResponse = {
+	link: YouTubeLink;
+	quota: YouTubeQuotaStatus;
+};
+
+export type YouTubeLinkGenerateRequest = {
+	artist_name: string;
+	album_name: string;
+	album_id: string;
+	cover_url?: string | null;
+};

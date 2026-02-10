@@ -28,6 +28,17 @@ async def get_home_data(
         raise HTTPException(status_code=500, detail="Failed to load home page")
 
 
+@router.get("/integration-status", response_model=dict[str, bool])
+async def get_integration_status(
+    home_service: HomeService = Depends(get_home_service)
+):
+    try:
+        return home_service.get_integration_status()
+    except Exception as e:
+        logger.error(f"Failed to get integration status: {e}")
+        raise HTTPException(status_code=500, detail="Failed to load integration status")
+
+
 @router.get("/genre/{genre_name}", response_model=GenreDetailResponse)
 async def get_genre_detail(
     genre_name: str,

@@ -5,6 +5,10 @@
 	import { libraryStore } from '$lib/stores/library';
 	import { integrationStore } from '$lib/stores/integration';
 	import { initCacheTTLs } from '$lib/stores/cacheTtl';
+	import { playerStore } from '$lib/stores/player.svelte';
+	import { launchYouTubePlayback } from '$lib/player/launchYouTubePlayback';
+	import Player from '$lib/components/Player.svelte';
+	import YouTubeIcon from '$lib/components/YouTubeIcon.svelte';
 	import { onMount, onDestroy } from 'svelte';
 	import { cancelPendingImages } from '$lib/utils/lazyImage';
 	
@@ -25,12 +29,61 @@
 	onMount(() => {
 		initCacheTTLs();
 		libraryStore.initialize();
+		void integrationStore.ensureLoaded();
 		document.addEventListener('click', handleClickOutside);
+		document.addEventListener('keydown', handleGlobalKeydown);
+		void restorePlayerSession();
 	});
 
 	onDestroy(() => {
 		document.removeEventListener('click', handleClickOutside);
+		document.removeEventListener('keydown', handleGlobalKeydown);
 	});
+
+	function handleGlobalKeydown(e: KeyboardEvent): void {
+		const tag = (e.target as HTMLElement)?.tagName;
+		if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+		if (!playerStore.isPlayerVisible) return;
+
+		switch (e.key) {
+			case ' ':
+				e.preventDefault();
+				playerStore.togglePlay();
+				break;
+			case 'ArrowRight':
+				e.preventDefault();
+				playerStore.seekTo(Math.min(playerStore.progress + 10, playerStore.duration));
+				break;
+			case 'ArrowLeft':
+				e.preventDefault();
+				playerStore.seekTo(Math.max(playerStore.progress - 10, 0));
+				break;
+			case 'ArrowUp':
+				e.preventDefault();
+				playerStore.setVolume(playerStore.volume + 5);
+				break;
+			case 'ArrowDown':
+				e.preventDefault();
+				playerStore.setVolume(playerStore.volume - 5);
+				break;
+		}
+	}
+
+	async function restorePlayerSession(): Promise<void> {
+		const session = playerStore.restoreSession();
+		if (session?.sourceType === 'youtube' && session.videoId) {
+			try {
+				await launchYouTubePlayback({
+					albumId: session.albumId,
+					albumName: session.albumName,
+					artistName: session.artistName,
+					coverUrl: session.coverUrl,
+					videoId: session.videoId,
+					embedUrl: session.embedUrl
+				});
+			} catch {}
+		}
+	}
 
 	function handleSearch(e: Event) {
 		e.preventDefault();
@@ -114,7 +167,9 @@
 			</div>
 			
 			
-			<slot />
+			<div class="flex-1" class:pb-24={playerStore.isPlayerVisible}>
+				<slot />
+			</div>
 		</div>
 
 		
@@ -187,6 +242,19 @@
 						</a>
 					</li>
 				{/if}
+
+				{#if $integrationStore.youtube}
+					<li>
+						<a
+							href="/library/youtube"
+							class="is-drawer-close:tooltip is-drawer-close:tooltip-right"
+							data-tip="YouTube"
+						>
+							<YouTubeIcon class="h-6 w-6" />
+							<span class="is-drawer-close:hidden">YouTube</span>
+						</a>
+					</li>
+				{/if}
 			</ul>				
 				<div class="m-2 is-drawer-close:tooltip is-drawer-close:tooltip-right" data-tip="Open">
 					<label for="main-drawer" class="btn btn-ghost btn-circle drawer-button is-drawer-open:rotate-y-180">
@@ -254,4 +322,6 @@
 			</form>
 		</dialog>
 	{/if}
+
+	<Player />
 </div>

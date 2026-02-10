@@ -231,3 +231,16 @@ class JellyfinRepositoryProtocol(Protocol):
     
     async def check_connection(self) -> ServiceStatus:
         ...
+
+
+class YouTubeRepositoryProtocol(Protocol):
+
+    @property
+    def is_configured(self) -> bool:
+        ...
+
+    async def search_video(self, artist: str, album: str) -> str | None:
+        ...
+
+    def get_quota_status(self) -> dict:
+        ...

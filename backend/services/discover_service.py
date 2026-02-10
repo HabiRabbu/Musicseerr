@@ -81,6 +81,10 @@ class DiscoverService:
         lidarr_connection = self._preferences.get_lidarr_connection()
         return bool(lidarr_connection.lidarr_url) and bool(lidarr_connection.lidarr_api_key)
 
+    def _is_youtube_enabled(self) -> bool:
+        yt_settings = self._preferences.get_youtube_connection()
+        return yt_settings.enabled and bool(yt_settings.api_key)
+
     def _get_listenbrainz_username(self) -> str | None:
         lb_settings = self._preferences.get_listenbrainz_connection()
         return lb_settings.username if lb_settings.enabled else None
@@ -104,6 +108,7 @@ class DiscoverService:
             "listenbrainz": self._is_listenbrainz_enabled(),
             "jellyfin": self._is_jellyfin_enabled(),
             "lidarr": self._is_lidarr_configured(),
+            "youtube": self._is_youtube_enabled(),
         }
 
     async def get_discover_preview(self) -> DiscoverPreview | None:

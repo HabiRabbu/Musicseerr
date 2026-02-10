@@ -33,6 +33,7 @@ from services.settings_service import SettingsService
 from services.artist_discovery_service import ArtistDiscoveryService
 from services.album_discovery_service import AlbumDiscoveryService
 from services.discover_service import DiscoverService
+from services.youtube_service import YouTubeService
 
 logger = logging.getLogger(__name__)
 
@@ -337,6 +338,13 @@ def get_youtube_repo() -> YouTubeRepository:
 
 
 @lru_cache(maxsize=1)
+def get_youtube_service() -> YouTubeService:
+    youtube_repo = get_youtube_repo()
+    library_cache = get_library_cache()
+    return YouTubeService(youtube_repo=youtube_repo, library_cache=library_cache)
+
+
+@lru_cache(maxsize=1)
 def get_discover_service() -> DiscoverService:
     listenbrainz_repo = get_listenbrainz_repository()
     jellyfin_repo = get_jellyfin_repository()
@@ -384,6 +392,7 @@ ArtistDiscoveryServiceDep = Annotated[ArtistDiscoveryService, Depends(get_artist
 AlbumDiscoveryServiceDep = Annotated[AlbumDiscoveryService, Depends(get_album_discovery_service)]
 DiscoverServiceDep = Annotated[DiscoverService, Depends(get_discover_service)]
 YouTubeRepositoryDep = Annotated[YouTubeRepository, Depends(get_youtube_repo)]
+YouTubeServiceDep = Annotated[YouTubeService, Depends(get_youtube_service)]
 
 
 async def init_app_state(app) -> None:
@@ -418,6 +427,7 @@ async def cleanup_app_state() -> None:
     get_artist_discovery_service.cache_clear()
     get_album_discovery_service.cache_clear()
     get_youtube_repo.cache_clear()
+    get_youtube_service.cache_clear()
     get_discover_service.cache_clear()
 
     logger.info("Application state cleaned up")

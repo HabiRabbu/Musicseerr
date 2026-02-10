@@ -75,6 +75,7 @@ export const API = {
 		albums: (query: string) => `/api/search/albums?query=${encodeURIComponent(query)}`
 	},
 	home: () => '/api/home',
+	homeIntegrationStatus: () => '/api/home/integration-status',
 	discover: () => '/api/discover',
 	discoverRefresh: () => '/api/discover/refresh',
 	discoverQueue: () => '/api/discover/queue',
@@ -85,6 +86,13 @@ export const API = {
 	discoverQueueYoutubeSearch: (artist: string, album: string) =>
 		`/api/discover/queue/youtube-search?artist=${encodeURIComponent(artist)}&album=${encodeURIComponent(album)}`,
 	discoverQueueYoutubeQuota: () => '/api/discover/queue/youtube-quota',
+	youtube: {
+		generate: () => '/api/youtube/generate',
+		link: (albumId: string) => `/api/youtube/link/${albumId}`,
+		links: () => '/api/youtube/links',
+		deleteLink: (albumId: string) => `/api/youtube/link/${albumId}`,
+		quota: () => '/api/youtube/quota'
+	},
 	queue: () => '/api/queue',
 	settings: () => '/api/settings'
 } as const;
