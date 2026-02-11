@@ -100,7 +100,8 @@ def get_lidarr_repository() -> LidarrRepository:
 def get_musicbrainz_repository() -> MusicBrainzRepository:
     cache = get_cache()
     preferences_service = get_preferences_service()
-    return MusicBrainzRepository(cache, preferences_service)
+    http_client = _get_configured_http_client()
+    return MusicBrainzRepository(http_client, cache, preferences_service)
 
 
 @lru_cache(maxsize=1)

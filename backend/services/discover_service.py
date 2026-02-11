@@ -1065,7 +1065,7 @@ class DiscoverService:
         youtube_url = None
 
         if rg_data:
-            tags_raw = rg_data.get("tag-list", [])
+            tags_raw = rg_data.get("tags", [])
             enrichment.tags = [t.get("name", "") for t in tags_raw if t.get("name")][:10]
 
             youtube_raw = self._mb_repo.extract_youtube_url_from_relations(rg_data)
@@ -1145,11 +1145,12 @@ class DiscoverService:
                 if mb_artist:
                     enrichment.country = mb_artist.get("country") or mb_artist.get("area", {}).get("name", "")
                     if self._wikidata_repo:
-                        url_rels = mb_artist.get("url-relation-list", [])
+                        url_rels = mb_artist.get("relations", [])
                         wiki_url = None
                         for rel in url_rels:
                             if rel.get("type") in ("wikipedia", "wikidata"):
-                                wiki_url = rel.get("target")
+                                url_obj = rel.get("url", {})
+                                wiki_url = url_obj.get("resource", "") if isinstance(url_obj, dict) else ""
                                 break
                         if wiki_url:
                             bio = await self._wikidata_repo.get_wikipedia_extract(wiki_url)

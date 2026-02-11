@@ -4,6 +4,7 @@ from typing import Any
 from core.exceptions import ExternalServiceError
 from infrastructure.cache.memory_cache import CacheInterface
 from infrastructure.resilience.retry import with_retry, CircuitBreaker
+from infrastructure.resilience.rate_limiter import TokenBucketRateLimiter
 from repositories.listenbrainz_models import (
     ListenBrainzArtist, ListenBrainzReleaseGroup, ListenBrainzRecording,
     ListenBrainzListen, ListenBrainzGenreActivity, ListenBrainzSimilarArtist,
@@ -20,6 +21,8 @@ _listenbrainz_circuit_breaker = CircuitBreaker(
     timeout=60.0,
     name="listenbrainz"
 )
+
+_listenbrainz_rate_limiter = TokenBucketRateLimiter(rate=5.0, capacity=10)
 
 LISTENBRAINZ_API_URL = "https://api.listenbrainz.org"
 
@@ -58,7 +61,7 @@ class ListenBrainzRepository:
     @with_retry(
         max_attempts=3,
         base_delay=1.0,
-        max_delay=5.0,
+        max_delay=3.0,
         circuit_breaker=_listenbrainz_circuit_breaker,
         retriable_exceptions=(httpx.HTTPError, ExternalServiceError)
     )
@@ -74,6 +77,8 @@ class ListenBrainzRepository:
         
         if require_auth and not self._user_token:
             raise ExternalServiceError("ListenBrainz user token required for this request")
+        
+        await _listenbrainz_rate_limiter.acquire()
         
         try:
             response = await self._client.request(

@@ -1,29 +1,17 @@
-import asyncio
 import logging
 from typing import Any, Optional
-import musicbrainzngs
+
+import httpx
+
+from core.exceptions import ExternalServiceError
 from infrastructure.resilience.retry import with_retry, CircuitBreaker
 from infrastructure.resilience.rate_limiter import TokenBucketRateLimiter
 from infrastructure.queue.priority_queue import RequestPriority, get_priority_queue
 from infrastructure.http.deduplication import RequestDeduplicator
-from core.config import get_settings
 
 logger = logging.getLogger(__name__)
 
-_mb_initialized = False
-
-
-def _init_musicbrainz():
-    global _mb_initialized
-    if not _mb_initialized:
-        settings = get_settings()
-        musicbrainzngs.set_useragent(
-            "Musicseerr",
-            "1.0",
-            f"{settings.contact_email}; https://www.musicseerr.com"
-        )
-        musicbrainzngs.set_rate_limit(limit_or_interval=False)
-        _mb_initialized = True
+MB_API_BASE = "https://musicbrainz.org/ws/2"
 
 mb_circuit_breaker = CircuitBreaker(
     failure_threshold=5,
@@ -36,22 +24,55 @@ mb_rate_limiter = TokenBucketRateLimiter(rate=1.0, capacity=5)
 
 mb_deduplicator = RequestDeduplicator()
 
+_http_client: Optional[httpx.AsyncClient] = None
 
-@with_retry(max_attempts=3, circuit_breaker=mb_circuit_breaker)
-async def mb_call(func, *args, priority: RequestPriority = RequestPriority.USER_INITIATED, **kwargs):
-    _init_musicbrainz()
+
+def set_mb_http_client(client: httpx.AsyncClient) -> None:
+    global _http_client
+    _http_client = client
+
+
+def get_mb_http_client() -> httpx.AsyncClient:
+    if _http_client is None:
+        raise RuntimeError("MusicBrainz HTTP client not initialized")
+    return _http_client
+
+
+@with_retry(
+    max_attempts=3,
+    circuit_breaker=mb_circuit_breaker,
+    retriable_exceptions=(httpx.HTTPError, ExternalServiceError),
+)
+async def mb_api_get(
+    path: str,
+    params: Optional[dict[str, Any]] = None,
+    priority: RequestPriority = RequestPriority.USER_INITIATED,
+) -> dict[str, Any]:
     priority_mgr = get_priority_queue()
     semaphore = await priority_mgr.acquire_slot(priority)
     async with semaphore:
         await mb_rate_limiter.acquire()
-        return await asyncio.to_thread(func, *args, **kwargs)
+        client = get_mb_http_client()
+        url = f"{MB_API_BASE}{path}"
+        request_params = dict(params) if params else {}
+        request_params["fmt"] = "json"
+        response = await client.get(url, params=request_params)
+        if response.status_code == 404:
+            return {}
+        if response.status_code == 503:
+            raise ExternalServiceError(f"MusicBrainz rate limited (503): {path}")
+        if response.status_code != 200:
+            raise ExternalServiceError(
+                f"MusicBrainz API error ({response.status_code}): {path}"
+            )
+        return response.json()
 
 
 def should_include_release(
     release_group: dict[str, Any],
     included_secondary_types: Optional[set[str]] = None
 ) -> bool:
-    secondary_types = set(map(str.lower, release_group.get("secondary-type-list", []) or []))
+    secondary_types = set(map(str.lower, release_group.get("secondary-types", []) or []))
 
     if included_secondary_types is None:
         exclude_types = {"compilation", "live", "remix", "soundtrack", "dj-mix", "mixtape/street", "demo"}

@@ -1,13 +1,14 @@
+import asyncio
 import logging
 from typing import Any, Optional
-import musicbrainzngs
+
 from api.v1.schemas.search import SearchResult
 from services.preferences_service import PreferencesService
 from infrastructure.cache.memory_cache import CacheInterface
 from infrastructure.cache.cache_keys import mb_artist_search_key, mb_artist_detail_key
 from infrastructure.queue.priority_queue import RequestPriority
 from repositories.musicbrainz_base import (
-    mb_call,
+    mb_api_get,
     mb_deduplicator,
     dedupe_by_id,
 )
@@ -65,14 +66,16 @@ class MusicBrainzArtistMixin:
         try:
             search_query = f'artist:"{query}"^3 OR artistaccent:"{query}"^3 OR alias:"{query}"^2 OR {query}'
 
-            result = await mb_call(
-                musicbrainzngs.search_artists,
-                query=search_query,
-                limit=min(100, max(limit * 2, 25)),
-                offset=offset,
-                priority=RequestPriority.USER_INITIATED
+            result = await mb_api_get(
+                "/artist",
+                params={
+                    "query": search_query,
+                    "limit": min(100, max(limit * 2, 25)),
+                    "offset": offset,
+                },
+                priority=RequestPriority.USER_INITIATED,
             )
-            artists = result.get("artist-list", [])
+            artists = result.get("artists", [])
             artists = dedupe_by_id(artists)
 
             results = []
@@ -103,14 +106,16 @@ class MusicBrainzArtistMixin:
             return cached
 
         try:
-            result = await mb_call(
-                musicbrainzngs.search_artists,
-                tag=tag.lower(),
-                limit=min(100, limit),
-                offset=offset,
-                priority=RequestPriority.BACKGROUND_SYNC
+            result = await mb_api_get(
+                "/artist",
+                params={
+                    "query": f"tag:{tag.lower()}",
+                    "limit": min(100, limit),
+                    "offset": offset,
+                },
+                priority=RequestPriority.BACKGROUND_SYNC,
             )
-            artists = result.get("artist-list", [])
+            artists = result.get("artists", [])
             artists = dedupe_by_id(artists)
 
             results = [r for a in artists[:limit] if (r := self._map_artist_to_result(a)) is not None]
@@ -132,45 +137,81 @@ class MusicBrainzArtistMixin:
         dedupe_key = f"mb:artist:{mbid}"
         return await mb_deduplicator.dedupe(dedupe_key, lambda: self._fetch_artist_by_id(mbid, cache_key))
 
+    async def get_artist_relations(self, mbid: str) -> Optional[dict]:
+        detail_key = mb_artist_detail_key(mbid)
+        cached = await self._cache.get(detail_key)
+        if cached is not None:
+            return cached
+
+        rels_key = f"mb:artist_rels:{mbid}"
+        cached_rels = await self._cache.get(rels_key)
+        if cached_rels is not None:
+            return cached_rels
+
+        dedupe_key = f"mb:artist_rels:{mbid}"
+        return await mb_deduplicator.dedupe(dedupe_key, lambda: self._fetch_artist_relations(mbid, rels_key))
+
+    async def _fetch_artist_relations(self, mbid: str, cache_key: str) -> Optional[dict]:
+        try:
+            result = await mb_api_get(
+                f"/artist/{mbid}",
+                params={"inc": "url-rels"},
+                priority=RequestPriority.IMAGE_FETCH,
+            )
+            if not result:
+                return None
+            await self._cache.set(cache_key, result, ttl_seconds=86400)
+            return result
+        except Exception as e:
+            logger.error(f"Failed to fetch artist relations {mbid}: {e}")
+            return None
+
     async def _fetch_artist_by_id(self, mbid: str, cache_key: str) -> Optional[dict]:
         try:
-            result = await mb_call(
-                musicbrainzngs.get_artist_by_id,
-                mbid,
-                includes=["tags", "aliases", "url-rels"],
-                priority=RequestPriority.USER_INITIATED
-            )
-            artist = result.get("artist")
-
-            if not artist:
-                return None
-
             limit = 50
 
-            first_batch = await mb_call(
-                musicbrainzngs.browse_release_groups,
-                artist=mbid,
-                limit=limit,
-                offset=0,
-                priority=RequestPriority.USER_INITIATED
+            artist_result, browse_result = await asyncio.gather(
+                mb_api_get(
+                    f"/artist/{mbid}",
+                    params={"inc": "tags+aliases+url-rels"},
+                    priority=RequestPriority.USER_INITIATED,
+                ),
+                mb_api_get(
+                    "/release-group",
+                    params={"artist": mbid, "limit": limit, "offset": 0},
+                    priority=RequestPriority.USER_INITIATED,
+                ),
             )
 
-            all_release_groups = []
-            total_count = 0
-            if first_batch and "release-group-list" in first_batch:
-                all_release_groups.extend(first_batch["release-group-list"])
-                total_count = int(first_batch.get("release-group-count", 0))
+            if not artist_result:
+                return None
+
+            all_release_groups = browse_result.get("release-groups", [])
+            total_count = int(browse_result.get("release-group-count", 0))
 
             if all_release_groups:
-                artist["release-group-list"] = all_release_groups
+                artist_result["release-group-list"] = all_release_groups
 
-            artist["release-group-count"] = total_count
+            artist_result["release-group-count"] = total_count
 
-            await self._cache.set(cache_key, artist, ttl_seconds=21600)
-            return artist
+            await self._cache.set(cache_key, artist_result, ttl_seconds=21600)
+
+            asyncio.create_task(self._warm_release_group_cache(all_release_groups[:6]))
+
+            return artist_result
         except Exception as e:
             logger.error(f"Failed to fetch artist {mbid}: {e}")
             return None
+
+    async def _warm_release_group_cache(self, release_groups: list[dict[str, Any]]) -> None:
+        for rg in release_groups:
+            rg_id = rg.get("id")
+            if not rg_id:
+                continue
+            try:
+                await self.get_release_group_by_id(rg_id)
+            except Exception:
+                pass
 
     async def get_artist_release_groups(
         self,
@@ -179,20 +220,14 @@ class MusicBrainzArtistMixin:
         limit: int = 50
     ) -> tuple[list[dict[str, Any]], int]:
         try:
-            result = await mb_call(
-                musicbrainzngs.browse_release_groups,
-                artist=artist_mbid,
-                limit=limit,
-                offset=offset,
-                priority=RequestPriority.BACKGROUND_SYNC
+            result = await mb_api_get(
+                "/release-group",
+                params={"artist": artist_mbid, "limit": limit, "offset": offset},
+                priority=RequestPriority.BACKGROUND_SYNC,
             )
 
-            release_groups = []
-            total_count = 0
-
-            if result and "release-group-list" in result:
-                release_groups = result["release-group-list"]
-                total_count = int(result.get("release-group-count", 0))
+            release_groups = result.get("release-groups", [])
+            total_count = int(result.get("release-group-count", 0))
 
             return release_groups, total_count
         except Exception as e:

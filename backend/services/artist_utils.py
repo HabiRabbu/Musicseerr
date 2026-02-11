@@ -48,28 +48,29 @@ def detect_platform(url: str, rel_type: str) -> str:
 
 def extract_tags(mb_artist: dict[str, Any], limit: int = 10) -> list[str]:
     tags = []
-    if mb_tags := mb_artist.get("tag-list", []):
+    if mb_tags := mb_artist.get("tags", []):
         tags = [tag.get("name") for tag in mb_tags if tag.get("name")][:limit]
     return tags
 
 
 def extract_aliases(mb_artist: dict[str, Any], limit: int = 10) -> list[str]:
     aliases = []
-    if mb_aliases := mb_artist.get("alias-list", []):
+    if mb_aliases := mb_artist.get("aliases", []):
         aliases = [
-            alias.get("alias") or alias.get("name")
+            alias.get("name")
             for alias in mb_aliases
-            if alias.get("alias") or alias.get("name")
+            if alias.get("name")
         ][:limit]
     return aliases
 
 
-def extract_life_span(mb_artist: dict[str, Any]) -> Optional[dict[str, Any]]:
+def extract_life_span(mb_artist: dict[str, Any]) -> Optional[dict[str, Optional[str]]]:
     if life_span := mb_artist.get("life-span"):
+        ended = life_span.get("ended")
         return {
             "begin": life_span.get("begin"),
             "end": life_span.get("end"),
-            "ended": life_span.get("ended")
+            "ended": str(ended).lower() if ended is not None else None,
         }
     return None
 
@@ -77,10 +78,11 @@ def extract_life_span(mb_artist: dict[str, Any]) -> Optional[dict[str, Any]]:
 def extract_external_links(mb_artist: dict[str, Any]) -> list[dict[str, str]]:
     external_links = []
     seen_urls = set()
-    if url_rels := mb_artist.get("url-relation-list", []):
+    if url_rels := mb_artist.get("relations", []):
         for url_rel in url_rels:
             rel_type = url_rel.get("type", "")
-            target_url = url_rel.get("target", "")
+            url_obj = url_rel.get("url", {})
+            target_url = url_obj.get("resource", "") if isinstance(url_obj, dict) else ""
             if not target_url or target_url in seen_urls:
                 continue
             label = detect_platform(target_url, rel_type)
@@ -110,7 +112,7 @@ def categorize_release_groups(
             if primary_type not in included_primary_types:
                 continue
             if included_secondary_types is not None:
-                secondary_types = set(map(str.lower, rg.get("secondary-type-list", []) or []))
+                secondary_types = set(map(str.lower, rg.get("secondary-types", []) or []))
                 if not secondary_types:
                     if "studio" not in included_secondary_types:
                         continue
@@ -193,10 +195,11 @@ def extract_wiki_info(
 ) -> tuple[Optional[str], list[str]]:
     wikidata_id = None
     wiki_urls = []
-    if url_rels := mb_artist.get("url-relation-list", []):
+    if url_rels := mb_artist.get("relations", []):
         for url_rel in url_rels:
             url_type = url_rel.get("type")
-            wiki_url = url_rel.get("target")
+            url_obj = url_rel.get("url", {})
+            wiki_url = url_obj.get("resource", "") if isinstance(url_obj, dict) else ""
             if not wiki_url:
                 continue
             if url_type == "wikidata" and not wikidata_id:

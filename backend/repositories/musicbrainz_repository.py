@@ -1,10 +1,13 @@
 import asyncio
 import logging
 from typing import Optional
+
+import httpx
+
 from api.v1.schemas.search import SearchResult
 from services.preferences_service import PreferencesService
 from infrastructure.cache.memory_cache import CacheInterface
-from repositories.musicbrainz_base import mb_rate_limiter
+from repositories.musicbrainz_base import mb_rate_limiter, set_mb_http_client
 from repositories.musicbrainz_artist import MusicBrainzArtistMixin
 from repositories.musicbrainz_album import MusicBrainzAlbumMixin
 
@@ -12,9 +15,10 @@ logger = logging.getLogger(__name__)
 
 
 class MusicBrainzRepository(MusicBrainzArtistMixin, MusicBrainzAlbumMixin):
-    def __init__(self, cache: CacheInterface, preferences_service: PreferencesService):
+    def __init__(self, http_client: httpx.AsyncClient, cache: CacheInterface, preferences_service: PreferencesService):
         self._cache = cache
         self._preferences_service = preferences_service
+        set_mb_http_client(http_client)
 
     async def search_grouped(
         self,

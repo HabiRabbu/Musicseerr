@@ -1,13 +1,13 @@
 import logging
 from typing import Any, Optional
-import musicbrainzngs
+
 from api.v1.schemas.search import SearchResult
 from services.preferences_service import PreferencesService
 from infrastructure.cache.memory_cache import CacheInterface
 from infrastructure.cache.cache_keys import mb_album_search_key, mb_release_group_key, mb_release_key
 from infrastructure.queue.priority_queue import RequestPriority
 from repositories.musicbrainz_base import (
-    mb_call,
+    mb_api_get,
     mb_deduplicator,
     dedupe_by_id,
     should_include_release,
@@ -31,7 +31,7 @@ class MusicBrainzAlbumMixin:
             return None
 
         primary_type = rg.get("primary-type", "")
-        secondary_types = rg.get("secondary-type-list", [])
+        secondary_types = rg.get("secondary-types", [])
         if secondary_types:
             type_info = f"{primary_type} + {', '.join(secondary_types)}"
         else:
@@ -64,14 +64,16 @@ class MusicBrainzAlbumMixin:
         try:
             internal_limit = min(100, max(int(limit * 1.5), 25))
 
-            result = await mb_call(
-                musicbrainzngs.search_release_groups,
-                query=f'releasegroup:"{query}"^3 OR release:"{query}"^2 OR {query}',
-                limit=internal_limit,
-                offset=offset,
-                priority=RequestPriority.USER_INITIATED
+            result = await mb_api_get(
+                "/release-group",
+                params={
+                    "query": f'releasegroup:"{query}"^3 OR release:"{query}"^2 OR {query}',
+                    "limit": internal_limit,
+                    "offset": offset,
+                },
+                priority=RequestPriority.USER_INITIATED,
             )
-            release_groups = result.get("release-group-list", [])
+            release_groups = result.get("release-groups", [])
             release_groups = dedupe_by_id(release_groups)
 
             results = []
@@ -105,14 +107,16 @@ class MusicBrainzAlbumMixin:
         try:
             internal_limit = min(100, max(int(limit * 1.5), 25))
 
-            result = await mb_call(
-                musicbrainzngs.search_release_groups,
-                tag=tag.lower(),
-                limit=internal_limit,
-                offset=offset,
-                priority=RequestPriority.BACKGROUND_SYNC
+            result = await mb_api_get(
+                "/release-group",
+                params={
+                    "query": f"tag:{tag.lower()}",
+                    "limit": internal_limit,
+                    "offset": offset,
+                },
+                priority=RequestPriority.BACKGROUND_SYNC,
             )
-            release_groups = result.get("release-group-list", [])
+            release_groups = result.get("release-groups", [])
             release_groups = dedupe_by_id(release_groups)
 
             results = []
@@ -144,7 +148,7 @@ class MusicBrainzAlbumMixin:
         if cached is not None:
             return cached
 
-        includes_str = ",".join(sorted(includes))
+        includes_str = "+".join(sorted(includes))
         dedupe_key = f"mb:rg:{mbid}:{includes_str}"
         return await mb_deduplicator.dedupe(dedupe_key, lambda: self._fetch_release_group_by_id(mbid, includes, cache_key))
 
@@ -155,15 +159,16 @@ class MusicBrainzAlbumMixin:
         cache_key: str
     ) -> Optional[dict]:
         try:
-            result = await mb_call(
-                musicbrainzngs.get_release_group_by_id,
-                mbid,
-                includes=includes,
-                priority=RequestPriority.USER_INITIATED
+            inc_str = "+".join(sorted(includes))
+            result = await mb_api_get(
+                f"/release-group/{mbid}",
+                params={"inc": inc_str},
+                priority=RequestPriority.USER_INITIATED,
             )
-            release_group = result.get("release-group")
-            await self._cache.set(cache_key, release_group, ttl_seconds=3600)
-            return release_group
+            if not result:
+                return None
+            await self._cache.set(cache_key, result, ttl_seconds=3600)
+            return result
         except Exception as e:
             logger.error(f"Failed to fetch release group {mbid}: {e}")
             return None
@@ -182,7 +187,7 @@ class MusicBrainzAlbumMixin:
         if cached is not None:
             return cached
 
-        includes_str = ",".join(sorted(includes))
+        includes_str = "+".join(sorted(includes))
         dedupe_key = f"mb:release:{release_id}:{includes_str}"
         return await mb_deduplicator.dedupe(dedupe_key, lambda: self._fetch_release_by_id(release_id, includes, cache_key))
 
@@ -193,15 +198,16 @@ class MusicBrainzAlbumMixin:
         cache_key: str
     ) -> Optional[dict]:
         try:
-            result = await mb_call(
-                musicbrainzngs.get_release_by_id,
-                release_id,
-                includes=includes,
-                priority=RequestPriority.USER_INITIATED
+            inc_str = "+".join(sorted(includes))
+            result = await mb_api_get(
+                f"/release/{release_id}",
+                params={"inc": inc_str},
+                priority=RequestPriority.USER_INITIATED,
             )
-            release = result.get("release")
-            await self._cache.set(cache_key, release, ttl_seconds=3600)
-            return release
+            if not result:
+                return None
+            await self._cache.set(cache_key, result, ttl_seconds=3600)
+            return result
         except Exception as e:
             logger.error(f"Failed to fetch release {release_id}: {e}")
             return None
@@ -218,14 +224,12 @@ class MusicBrainzAlbumMixin:
 
         try:
             logger.info(f"[MB] Fetching release group for release {release_id[:8]}")
-            result = await mb_call(
-                musicbrainzngs.get_release_by_id,
-                release_id,
-                includes=["release-groups"],
-                priority=RequestPriority.BACKGROUND_SYNC
+            result = await mb_api_get(
+                f"/release/{release_id}",
+                params={"inc": "release-groups"},
+                priority=RequestPriority.BACKGROUND_SYNC,
             )
-            release = result.get("release", {})
-            rg = release.get("release-group", {})
+            rg = result.get("release-group", {})
             rg_id = rg.get("id")
             logger.info(f"[MB] Resolved release {release_id[:8]} -> release_group {rg_id}")
             await self._cache.set(cache_key, rg_id or "", ttl_seconds=86400)
@@ -237,8 +241,9 @@ class MusicBrainzAlbumMixin:
 
     @staticmethod
     def extract_youtube_url_from_relations(entity_data: dict) -> str | None:
-        for rel in entity_data.get("url-relation-list", []):
-            url = rel.get("target", "")
+        for rel in entity_data.get("relations", []):
+            url_obj = rel.get("url", {})
+            url = url_obj.get("resource", "") if isinstance(url_obj, dict) else ""
             if "youtube.com" in url or "youtu.be" in url:
                 return url
         return None
@@ -264,20 +269,21 @@ class MusicBrainzAlbumMixin:
     ) -> dict | None:
         if includes is None:
             includes = ["url-rels"]
-        cache_key = f"mb:recording:{recording_id}:{','.join(sorted(includes))}"
+        inc_str = "+".join(sorted(includes))
+        cache_key = f"mb:recording:{recording_id}:{inc_str}"
         cached = await self._cache.get(cache_key)
         if cached is not None:
             return cached
         try:
-            result = await mb_call(
-                musicbrainzngs.get_recording_by_id,
-                recording_id,
-                includes=includes,
+            result = await mb_api_get(
+                f"/recording/{recording_id}",
+                params={"inc": inc_str},
                 priority=RequestPriority.BACKGROUND_SYNC,
             )
-            recording = result.get("recording")
-            await self._cache.set(cache_key, recording, ttl_seconds=3600)
-            return recording
+            if not result:
+                return None
+            await self._cache.set(cache_key, result, ttl_seconds=3600)
+            return result
         except Exception as e:
             logger.error(f"Failed to fetch recording {recording_id}: {e}")
             return None

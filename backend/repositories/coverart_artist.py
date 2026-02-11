@@ -173,16 +173,17 @@ class ArtistImageFetcher:
             logger.warning(f"[IMG:Wikidata] MusicBrainz repository not available for {artist_id}")
             return None
         try:
-            artist_data = await self._mb_repo.get_artist_by_id(artist_id)
+            artist_data = await self._mb_repo.get_artist_relations(artist_id)
             if not artist_data:
                 logger.info(f"[IMG:Wikidata] No artist data from MB for {artist_id[:8]}")
                 return None
-            url_relations = artist_data.get("url-relation-list") or artist_data.get("url-rels")
+            url_relations = artist_data.get("relations", [])
             if url_relations:
                 for url_rel in url_relations:
                     if isinstance(url_rel, dict):
                         typ = url_rel.get("type") or url_rel.get("link_type")
-                        target = url_rel.get("target") or url_rel.get("url")
+                        url_obj = url_rel.get("url", {})
+                        target = url_obj.get("resource", "") if isinstance(url_obj, dict) else ""
                         if typ == "wikidata" and target:
                             logger.info(f"[IMG:Wikidata] Found URL for {artist_id[:8]}: {target}")
                             return target

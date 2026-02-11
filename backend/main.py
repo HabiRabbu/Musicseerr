@@ -33,8 +33,6 @@ from api.v1.routes import youtube as youtube_routes
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-logging.getLogger('musicbrainzngs').setLevel(logging.WARNING)
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

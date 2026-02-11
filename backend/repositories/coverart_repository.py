@@ -234,12 +234,13 @@ class CoverArtRepository:
                 if artist_data:
                     debug_info["musicbrainz"]["artist_found"] = True
                     debug_info["musicbrainz"]["artist_name"] = artist_data.get("name")
-                    url_relations = artist_data.get("url-relation-list") or artist_data.get("url-rels")
+                    url_relations = artist_data.get("relations", [])
                     if url_relations:
                         for url_rel in url_relations:
                             if isinstance(url_rel, dict):
                                 typ = url_rel.get("type") or url_rel.get("link_type")
-                                target = url_rel.get("target") or url_rel.get("url")
+                                url_obj = url_rel.get("url", {})
+                                target = url_obj.get("resource", "") if isinstance(url_obj, dict) else ""
                                 if typ == "wikidata" and target:
                                     debug_info["musicbrainz"]["has_wikidata_relation"] = True
                                     debug_info["musicbrainz"]["wikidata_url"] = target
