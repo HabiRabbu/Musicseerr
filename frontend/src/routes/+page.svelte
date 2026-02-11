@@ -43,8 +43,6 @@
 
 		if (!homeData) {
 			loading = true;
-		} else {
-			refreshing = true;
 		}
 
 		error = '';
@@ -73,7 +71,6 @@
 			}
 		} finally {
 			loading = false;
-			refreshing = false;
 		}
 	}
 
@@ -108,8 +105,18 @@
 		}
 	}
 
-	function handleRefresh() {
-		loadHomeData(true);
+	async function handleRefresh() {
+		refreshing = true;
+		isUpdating = true;
+		const minDelay = new Promise((r) => setTimeout(r, 500));
+		try {
+			await loadHomeData(true);
+		} finally {
+			await minDelay;
+			refreshing = false;
+			isUpdating = false;
+			lastUpdated = new Date();
+		}
 	}
 
 	function cleanup() {
