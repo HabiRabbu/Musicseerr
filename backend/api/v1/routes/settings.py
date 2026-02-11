@@ -4,7 +4,6 @@ from api.v1.schemas.settings import (
     UserPreferences, 
     LidarrSettings, 
     LidarrConnectionSettings,
-    SoularrConnectionSettings,
     JellyfinConnectionSettings,
     ListenBrainzConnectionSettings,
     YouTubeConnectionSettings,
@@ -165,31 +164,6 @@ async def update_lidarr_connection(settings: LidarrConnectionSettings):
 async def verify_lidarr_connection(settings: LidarrConnectionSettings):
     settings_service = get_settings_service()
     return await settings_service.verify_lidarr(settings)
-
-
-@router.get("/soularr", response_model=SoularrConnectionSettings)
-async def get_soularr_settings():
-    try:
-        preferences_service = get_preferences_service()
-        return preferences_service.get_soularr_connection()
-    except Exception as e:
-        logger.exception(f"Failed to get Soularr settings: {e}")
-        raise HTTPException(status_code=500, detail="Failed to retrieve Soularr settings")
-
-
-@router.put("/soularr", response_model=SoularrConnectionSettings)
-async def update_soularr_settings(settings: SoularrConnectionSettings):
-    try:
-        preferences_service = get_preferences_service()
-        preferences_service.save_soularr_connection(settings)
-        logger.info("Updated Soularr connection settings")
-        return settings
-    except ConfigurationError as e:
-        logger.warning(f"Configuration error updating Soularr settings: {e}")
-        raise HTTPException(status_code=400, detail="Invalid Soularr configuration")
-    except Exception as e:
-        logger.exception(f"Failed to save Soularr settings: {e}")
-        raise HTTPException(status_code=500, detail="Failed to save Soularr settings")
 
 
 @router.get("/jellyfin", response_model=JellyfinConnectionSettings)

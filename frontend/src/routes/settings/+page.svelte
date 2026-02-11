@@ -5,7 +5,6 @@
 	import SettingsCache from '$lib/components/settings/SettingsCache.svelte';
 	import SettingsLidarrConnection from '$lib/components/settings/SettingsLidarrConnection.svelte';
 	import SettingsLibrarySync from '$lib/components/settings/SettingsLibrarySync.svelte';
-	import SettingsSoularr from '$lib/components/settings/SettingsSoularr.svelte';
 	import SettingsJellyfin from '$lib/components/settings/SettingsJellyfin.svelte';
 	import SettingsListenBrainz from '$lib/components/settings/SettingsListenBrainz.svelte';
 	import SettingsYouTube from '$lib/components/settings/SettingsYouTube.svelte';
@@ -17,7 +16,6 @@
 		{ id: 'settings', label: 'Release Preferences', group: 'Preferences', icon: 'M12 1v6m0 6v6m-9-9h6m6 0h6M4.5 5.5l4 4m6 6l4 4m0-14l-4 4m-6 6l-4 4' },
 		{ id: 'lidarr', label: 'Library Sync', group: 'Library Management', icon: 'M9 18V5l12-2v13M6 18a3 3 0 100-6 3 3 0 000 6zM18 16a3 3 0 100-6 3 3 0 000 6z' },
 		{ id: 'lidarr-connection', label: 'Lidarr Connection', group: 'External Services', icon: 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z' },
-		{ id: 'soularr', label: 'Soularr', group: 'External Services', icon: 'M12 2a10 10 0 100 20 10 10 0 000-20zM10 8l6 4-6 4V8z' },
 		{ id: 'jellyfin', label: 'Jellyfin', group: 'External Services', icon: 'M2 7h20v15a2 2 0 01-2 2H4a2 2 0 01-2-2V7zM17 2l-5 5-5-5' },
 		{ id: 'listenbrainz', label: 'ListenBrainz', group: 'External Services', icon: 'M9 18V5l12-2v13M6 18a3 3 0 100-6 3 3 0 000 6zM18 16a3 3 0 100-6 3 3 0 000 6z' },
 		{ id: 'youtube', label: 'YouTube', group: 'External Services', icon: 'M22.54 6.42a2.78 2.78 0 00-1.94-2C18.88 4 12 4 12 4s-6.88 0-8.6.46a2.78 2.78 0 00-1.94 2A29 29 0 001 12a29 29 0 00.46 5.58 2.78 2.78 0 001.94 2C5.12 20 12 20 12 20s6.88 0 8.6-.46a2.78 2.78 0 001.94-2A29 29 0 0023 12a29 29 0 00-.46-5.58zM9.75 15.02V8.98L15.5 12l-5.75 3.02z' },
@@ -82,8 +80,6 @@
 					<SettingsLidarrConnection />
 				{:else if activeTab === 'lidarr'}
 					<SettingsLibrarySync />
-				{:else if activeTab === 'soularr'}
-					<SettingsSoularr />
 				{:else if activeTab === 'jellyfin'}
 					<SettingsJellyfin />
 				{:else if activeTab === 'listenbrainz'}

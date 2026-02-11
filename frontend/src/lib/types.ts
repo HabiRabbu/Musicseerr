@@ -176,12 +176,6 @@ export type LidarrConnectionSettings = {
 	root_folder_path: string;
 };
 
-export type SoularrConnectionSettings = {
-	soularr_url: string;
-	soularr_api_key: string;
-	trigger_soularr: boolean;
-};
-
 export type JellyfinConnectionSettings = {
 	jellyfin_url: string;
 	api_key: string;

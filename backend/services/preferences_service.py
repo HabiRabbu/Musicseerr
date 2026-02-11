@@ -7,7 +7,6 @@ from api.v1.schemas.settings import (
     UserPreferences,
     LidarrSettings,
     LidarrConnectionSettings,
-    SoularrConnectionSettings,
     JellyfinConnectionSettings,
     ListenBrainzConnectionSettings,
     YouTubeConnectionSettings,
@@ -133,33 +132,6 @@ class PreferencesService:
         except Exception as e:
             logger.error(f"Failed to save Lidarr connection settings: {e}")
             raise ConfigurationError(f"Failed to save Lidarr connection settings: {e}")
-
-    def get_soularr_connection(self) -> SoularrConnectionSettings:
-        config = self._load_config()
-        return SoularrConnectionSettings(
-            soularr_url=config.get("soularr_url", self._settings.soularr_url),
-            soularr_api_key=config.get("soularr_api_key", self._settings.soularr_api_key),
-            trigger_soularr=config.get("trigger_soularr", self._settings.trigger_soularr),
-        )
-
-    def save_soularr_connection(self, settings: SoularrConnectionSettings) -> None:
-        try:
-            config = self._load_config().copy()
-            config.update({
-                "soularr_url": settings.soularr_url,
-                "soularr_api_key": settings.soularr_api_key,
-                "trigger_soularr": settings.trigger_soularr,
-            })
-            self._save_config(config)
-
-            self._settings.soularr_url = settings.soularr_url
-            self._settings.soularr_api_key = settings.soularr_api_key
-            self._settings.trigger_soularr = settings.trigger_soularr
-
-            logger.info(f"Saved Soularr connection settings to {self._config_path}")
-        except Exception as e:
-            logger.error(f"Failed to save Soularr connection settings: {e}")
-            raise ConfigurationError(f"Failed to save Soularr connection settings: {e}")
 
     def get_jellyfin_connection(self) -> JellyfinConnectionSettings:
         config = self._load_config()

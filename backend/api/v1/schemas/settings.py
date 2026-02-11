@@ -47,26 +47,6 @@ class LidarrConnectionSettings(BaseModel):
         return v.rstrip("/")
 
 
-class SoularrConnectionSettings(BaseModel):
-    soularr_url: str = Field(
-        default="http://soularr:8181",
-        description="Soularr server URL"
-    )
-    soularr_api_key: str = Field(
-        default="",
-        description="Soularr API key"
-    )
-    trigger_soularr: bool = Field(
-        default=False,
-        description="Automatically trigger Soularr after adding to Lidarr"
-    )
-    
-    @field_validator("soularr_url")
-    @classmethod
-    def validate_url(cls, v: str) -> str:
-        return v.rstrip("/")
-
-
 class JellyfinConnectionSettings(BaseModel):
     jellyfin_url: str = Field(
         default="http://jellyfin:8096",

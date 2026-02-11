@@ -20,10 +20,6 @@ class Settings(BaseSettings):
     lidarr_url: str = Field(default="http://lidarr:8686")
     lidarr_api_key: str = Field(default="")
     
-    soularr_url: str = Field(default="http://soularr:8181")
-    soularr_api_key: str = Field(default="")
-    trigger_soularr: bool = Field(default=False)
-    
     jellyfin_url: str = Field(default="http://jellyfin:8096")
     
     contact_email: str = Field(
@@ -56,7 +52,7 @@ class Settings(BaseSettings):
     
     config_file_path: Path = Field(default=Path("/app/config/config.json"))
     
-    @field_validator("lidarr_url", "soularr_url", "jellyfin_url")
+    @field_validator("lidarr_url", "jellyfin_url")
     @classmethod
     def validate_url(cls, v: str) -> str:
         return v.rstrip("/")
@@ -66,7 +62,7 @@ class Settings(BaseSettings):
         errors = []
         warnings = []
 
-        for url_field in ['lidarr_url', 'soularr_url', 'jellyfin_url']:
+        for url_field in ['lidarr_url', 'jellyfin_url']:
             url = getattr(self, url_field, '')
             if url and not url.startswith(('http://', 'https://')):
                 errors.append(f"{url_field} must start with http:// or https://")
@@ -117,10 +113,7 @@ class Settings(BaseSettings):
         config_data = {
             "lidarr_url": self.lidarr_url,
             "lidarr_api_key": self.lidarr_api_key,
-            "soularr_url": self.soularr_url,
-            "soularr_api_key": self.soularr_api_key,
             "jellyfin_url": self.jellyfin_url,
-            "trigger_soularr": self.trigger_soularr,
             "contact_email": self.contact_email,
             "quality_profile_id": self.quality_profile_id,
             "metadata_profile_id": self.metadata_profile_id,
@@ -147,10 +140,7 @@ class Settings(BaseSettings):
             config_data.update({
                 "lidarr_url": self.lidarr_url,
                 "lidarr_api_key": self.lidarr_api_key,
-                "soularr_url": self.soularr_url,
-                "soularr_api_key": self.soularr_api_key,
                 "jellyfin_url": self.jellyfin_url,
-                "trigger_soularr": self.trigger_soularr,
                 "contact_email": self.contact_email,
                 "quality_profile_id": self.quality_profile_id,
                 "metadata_profile_id": self.metadata_profile_id,
