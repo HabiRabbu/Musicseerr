@@ -507,12 +507,14 @@ export type MoreByArtistResponse = {
 
 export type YouTubeLink = {
 	album_id: string;
-	video_id: string;
+	video_id: string | null;
 	album_name: string;
 	artist_name: string;
-	embed_url: string;
+	embed_url: string | null;
 	cover_url: string | null;
 	created_at: string;
+	is_manual: boolean;
+	track_count: number;
 };
 
 export type YouTubeLinkResponse = {
@@ -525,4 +527,25 @@ export type YouTubeLinkGenerateRequest = {
 	album_name: string;
 	album_id: string;
 	cover_url?: string | null;
+};
+
+export type YouTubeTrackLink = {
+	album_id: string;
+	track_number: number;
+	track_name: string;
+	video_id: string;
+	artist_name: string;
+	embed_url: string;
+	created_at: string;
+};
+
+export type YouTubeTrackLinkResponse = {
+	track_link: YouTubeTrackLink;
+	quota: YouTubeQuotaStatus;
+};
+
+export type YouTubeTrackLinkBatchResponse = {
+	track_links: YouTubeTrackLink[];
+	failed: { track_number: number; track_name: string; reason: string }[];
+	quota: YouTubeQuotaStatus;
 };

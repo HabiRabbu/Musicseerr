@@ -15,3 +15,13 @@ export function getErrorMessage(error: unknown, fallback: string = MESSAGES.ERRO
 	}
 	return fallback;
 }
+
+export async function throwOnApiError(res: Response, fallbackMessage: string): Promise<void> {
+	if (res.ok) return;
+	const err = await res.json().catch(() => null);
+	throw new Error(err?.detail?.message || err?.detail || fallbackMessage);
+}
+
+export function getCoverUrl(coverUrl: string | null | undefined, albumId: string): string {
+	return coverUrl || `/api/covers/release-group/${albumId}?size=250`;
+}

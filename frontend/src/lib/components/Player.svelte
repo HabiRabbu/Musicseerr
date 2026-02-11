@@ -60,8 +60,32 @@
 					</div>
 				{/if}
 				<div class="min-w-0">
-					<p class="text-sm font-semibold truncate">{playerStore.nowPlaying.albumName}</p>
-					<p class="text-xs opacity-60 truncate">{playerStore.nowPlaying.artistName}</p>
+					{#if playerStore.nowPlaying.trackName}
+						<p class="text-sm font-semibold truncate">{playerStore.nowPlaying.trackName}</p>
+						<p class="text-xs opacity-60 truncate">
+							<a href="/album/{playerStore.nowPlaying.albumId}" class="hover:underline">{playerStore.nowPlaying.albumName}</a>
+							{' — '}
+							{#if playerStore.nowPlaying.artistId}
+								<a href="/artist/{playerStore.nowPlaying.artistId}" class="hover:underline">{playerStore.nowPlaying.artistName}</a>
+							{:else}
+								{playerStore.nowPlaying.artistName}
+							{/if}
+						</p>
+					{:else}
+						<p class="text-sm font-semibold truncate">
+							<a href="/album/{playerStore.nowPlaying.albumId}" class="hover:underline">{playerStore.nowPlaying.albumName}</a>
+						</p>
+						<p class="text-xs opacity-60 truncate">
+							{#if playerStore.nowPlaying.artistId}
+								<a href="/artist/{playerStore.nowPlaying.artistId}" class="hover:underline">{playerStore.nowPlaying.artistName}</a>
+							{:else}
+								{playerStore.nowPlaying.artistName}
+							{/if}
+						</p>
+					{/if}
+					{#if playerStore.hasQueue}
+						<p class="text-xs opacity-40 truncate">Track {playerStore.currentTrackNumber} of {playerStore.queueLength}</p>
+					{/if}
 					{#if playerStore.playbackState === 'error'}
 						<p class="text-xs text-error truncate">Video unavailable</p>
 					{/if}
@@ -72,8 +96,30 @@
 			<div class="flex flex-col items-center justify-center flex-1 gap-1">
 				<!-- Transport Controls -->
 				<div class="flex items-center gap-3">
-					<!-- Previous (disabled for now) -->
-					<button class="btn btn-ghost btn-sm btn-circle opacity-30 cursor-not-allowed" disabled aria-label="Previous">
+					<!-- Shuffle -->
+					{#if playerStore.hasQueue}
+						<button
+							class="btn btn-ghost btn-sm btn-circle"
+							class:text-accent={playerStore.shuffleEnabled}
+							class:opacity-50={!playerStore.shuffleEnabled}
+							onclick={() => playerStore.toggleShuffle()}
+							aria-label="Toggle shuffle"
+						>
+							<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+								<path stroke-linecap="round" stroke-linejoin="round" d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5" />
+							</svg>
+						</button>
+					{/if}
+
+					<!-- Previous -->
+					<button
+						class="btn btn-ghost btn-sm btn-circle"
+						class:opacity-30={!playerStore.hasPrevious}
+						class:cursor-not-allowed={!playerStore.hasPrevious}
+						disabled={!playerStore.hasPrevious}
+						onclick={() => playerStore.previousTrack()}
+						aria-label="Previous"
+					>
 						<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
 							<path d="M6 6h2v12H6zm3.5 6l8.5 6V6z" />
 						</svg>
@@ -102,8 +148,15 @@
 						{/if}
 					</button>
 
-					<!-- Next (disabled for now) -->
-					<button class="btn btn-ghost btn-sm btn-circle opacity-30 cursor-not-allowed" disabled aria-label="Next">
+					<!-- Next -->
+					<button
+						class="btn btn-ghost btn-sm btn-circle"
+						class:opacity-30={!playerStore.hasNext}
+						class:cursor-not-allowed={!playerStore.hasNext}
+						disabled={!playerStore.hasNext}
+						onclick={() => playerStore.nextTrack()}
+						aria-label="Next"
+					>
 						<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
 							<path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z" />
 						</svg>

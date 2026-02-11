@@ -3,7 +3,18 @@ import logging
 from fastapi import APIRouter, Response
 
 from api.v1.schemas.discover import YouTubeQuotaResponse
-from api.v1.schemas.youtube import YouTubeLink, YouTubeLinkGenerateRequest, YouTubeLinkResponse
+from api.v1.schemas.youtube import (
+    YouTubeLink,
+    YouTubeLinkGenerateRequest,
+    YouTubeLinkResponse,
+    YouTubeLinkUpdateRequest,
+    YouTubeManualLinkRequest,
+    YouTubeTrackLink,
+    YouTubeTrackLinkBatchGenerateRequest,
+    YouTubeTrackLinkBatchResponse,
+    YouTubeTrackLinkGenerateRequest,
+    YouTubeTrackLinkResponse,
+)
 from core.dependencies import YouTubeServiceDep
 
 logger = logging.getLogger(__name__)
@@ -53,6 +64,94 @@ async def delete_link(
     youtube_service: YouTubeServiceDep,
 ) -> None:
     await youtube_service.delete_link(album_id)
+
+
+@router.put("/link/{album_id}", response_model=YouTubeLink)
+async def update_link(
+    album_id: str,
+    request: YouTubeLinkUpdateRequest,
+    youtube_service: YouTubeServiceDep,
+) -> YouTubeLink:
+    return await youtube_service.update_link(
+        album_id=album_id,
+        youtube_url=request.youtube_url,
+        album_name=request.album_name,
+        artist_name=request.artist_name,
+        cover_url=request.cover_url,
+    )
+
+
+@router.post("/manual", response_model=YouTubeLink)
+async def save_manual_link(
+    request: YouTubeManualLinkRequest,
+    youtube_service: YouTubeServiceDep,
+) -> YouTubeLink:
+    return await youtube_service.save_manual_link(
+        album_name=request.album_name,
+        artist_name=request.artist_name,
+        youtube_url=request.youtube_url,
+        cover_url=request.cover_url,
+        album_id=request.album_id,
+    )
+
+
+@router.post("/generate-track", response_model=YouTubeTrackLinkResponse)
+async def generate_track_link(
+    request: YouTubeTrackLinkGenerateRequest,
+    youtube_service: YouTubeServiceDep,
+) -> YouTubeTrackLinkResponse:
+    track_link = await youtube_service.generate_track_link(
+        album_id=request.album_id,
+        album_name=request.album_name,
+        artist_name=request.artist_name,
+        track_name=request.track_name,
+        track_number=request.track_number,
+    )
+    quota = youtube_service.get_quota_status()
+    return YouTubeTrackLinkResponse(
+        track_link=track_link,
+        quota=YouTubeQuotaResponse(**quota),
+    )
+
+
+@router.post("/generate-tracks", response_model=YouTubeTrackLinkBatchResponse)
+async def generate_track_links_batch(
+    request: YouTubeTrackLinkBatchGenerateRequest,
+    youtube_service: YouTubeServiceDep,
+) -> YouTubeTrackLinkBatchResponse:
+    tracks = [
+        {"track_name": t.track_name, "track_number": t.track_number}
+        for t in request.tracks
+    ]
+    generated, failed = await youtube_service.generate_track_links_batch(
+        album_id=request.album_id,
+        album_name=request.album_name,
+        artist_name=request.artist_name,
+        tracks=tracks,
+    )
+    quota = youtube_service.get_quota_status()
+    return YouTubeTrackLinkBatchResponse(
+        track_links=generated,
+        failed=failed,
+        quota=YouTubeQuotaResponse(**quota),
+    )
+
+
+@router.get("/track-links/{album_id}", response_model=list[YouTubeTrackLink])
+async def get_track_links(
+    album_id: str,
+    youtube_service: YouTubeServiceDep,
+) -> list[YouTubeTrackLink]:
+    return await youtube_service.get_track_links(album_id)
+
+
+@router.delete("/track-link/{album_id}/{track_number}", status_code=204)
+async def delete_track_link(
+    album_id: str,
+    track_number: int,
+    youtube_service: YouTubeServiceDep,
+) -> None:
+    await youtube_service.delete_track_link(album_id, track_number)
 
 
 @router.get("/quota", response_model=YouTubeQuotaResponse)

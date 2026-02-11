@@ -1,16 +1,21 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { goto } from '$app/navigation';
-	import { API, TOAST_DURATION } from '$lib/constants';
-	import { toastStore } from '$lib/stores/toast';
-	import { launchYouTubePlayback } from '$lib/player/launchYouTubePlayback';
+	import { API } from '$lib/constants';
 	import YouTubeIcon from '$lib/components/YouTubeIcon.svelte';
 	import AlbumImage from '$lib/components/AlbumImage.svelte';
+	import YouTubeLinkModal from '$lib/components/YouTubeLinkModal.svelte';
+	import YouTubeDetailModal from '$lib/components/YouTubeDetailModal.svelte';
 	import type { YouTubeLink } from '$lib/types';
 
 	let links = $state<YouTubeLink[]>([]);
 	let loading = $state(true);
-	let deleting = $state<string | null>(null);
+
+	let editModalOpen = $state(false);
+	let editingLink = $state<YouTubeLink | null>(null);
+
+	let detailModalOpen = $state(false);
+	let detailLink = $state<YouTubeLink | null>(null);
+	let returnToDetailAfterEdit = $state<YouTubeLink | null>(null);
 
 	async function fetchLinks(): Promise<void> {
 		loading = true;
@@ -22,39 +27,59 @@
 		}
 	}
 
-	async function deleteLink(albumId: string): Promise<void> {
-		deleting = albumId;
-		try {
-			const res = await fetch(API.youtube.deleteLink(albumId), { method: 'DELETE' });
-			if (res.ok) {
-				links = links.filter((l) => l.album_id !== albumId);
-				toastStore.show({ message: 'Link removed', type: 'success', duration: TOAST_DURATION });
-			}
-		} catch {
-			toastStore.show({ message: 'Failed to delete link', type: 'error', duration: TOAST_DURATION });
-		} finally {
-			deleting = null;
-		}
+	function openAddModal(): void {
+		editingLink = null;
+		editModalOpen = true;
 	}
 
-	async function playLink(link: YouTubeLink): Promise<void> {
-		try {
-			await launchYouTubePlayback(
-				{
-					albumId: link.album_id,
-					albumName: link.album_name,
-					artistName: link.artist_name,
-					coverUrl: link.cover_url || `/api/covers/release-group/${link.album_id}?size=250`,
-					videoId: link.video_id,
-					embedUrl: link.embed_url
-				},
-				{
-					onLoadError: () => {
-						toastStore.show({ message: 'Failed to load video', type: 'error', duration: TOAST_DURATION });
-					}
-				}
-			);
-		} catch {}
+	function openDetail(link: YouTubeLink): void {
+		detailLink = link;
+		detailModalOpen = true;
+	}
+
+	function handleDetailEdit(link: YouTubeLink): void {
+		returnToDetailAfterEdit = link;
+		detailModalOpen = false;
+		editingLink = link;
+		editModalOpen = true;
+	}
+
+	function handleDetailDelete(albumId: string): void {
+		links = links.filter((l) => l.album_id !== albumId);
+		detailLink = null;
+	}
+
+	function handleDetailClose(): void {
+		detailLink = null;
+	}
+
+	function handleEditModalSave(link: YouTubeLink): void {
+		if (editingLink) {
+			links = links.map((l) => (l.album_id === link.album_id ? link : l));
+		} else {
+			links = [link, ...links];
+		}
+		if (returnToDetailAfterEdit) {
+			const updated = links.find((l) => l.album_id === link.album_id);
+			if (updated) {
+				detailLink = updated;
+				detailModalOpen = true;
+			}
+			returnToDetailAfterEdit = null;
+		}
+		editingLink = null;
+	}
+
+	function handleEditModalClose(): void {
+		if (returnToDetailAfterEdit) {
+			const current = links.find((l) => l.album_id === returnToDetailAfterEdit!.album_id);
+			if (current) {
+				detailLink = current;
+				detailModalOpen = true;
+			}
+			returnToDetailAfterEdit = null;
+		}
+		editingLink = null;
 	}
 
 	onMount(() => {
@@ -81,21 +106,25 @@
 				</div>
 			{/each}
 		</div>
-	{:else if links.length === 0}
-		<div class="card bg-base-200">
-			<div class="card-body items-center text-center">
-				<YouTubeIcon class="h-12 w-12 opacity-20" />
-				<p class="text-lg opacity-60">No saved YouTube links</p>
-				<p class="text-sm opacity-40">Generate links from album pages and they'll appear here.</p>
-			</div>
-		</div>
 	{:else}
 		<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+			<button
+				class="card bg-base-100 w-full shadow-sm border-2 border-dashed border-base-content/20 hover:border-accent transition-colors cursor-pointer flex items-center justify-center aspect-square"
+				onclick={openAddModal}
+			>
+				<div class="flex flex-col items-center gap-2 opacity-60">
+					<svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+						<path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+					</svg>
+					<span class="text-sm font-medium">Add Link</span>
+				</div>
+			</button>
+
 			{#each links as link (link.album_id)}
 				<div
 					class="card bg-base-100 w-full shadow-sm group relative cursor-pointer transition-transform hover:scale-105 hover:shadow-lg active:scale-95"
-					onclick={() => goto(`/album/${link.album_id}`)}
-					onkeydown={(e) => e.key === 'Enter' && goto(`/album/${link.album_id}`)}
+					onclick={() => openDetail(link)}
+					onkeydown={(e) => e.key === 'Enter' && openDetail(link)}
 					role="button"
 					tabindex="0"
 				>
@@ -108,48 +137,49 @@
 							rounded="none"
 							className="w-full h-full"
 						/>
-						<!-- Play overlay -->
-							<button
-								class="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity"
-								onclick={(e) => { e.stopPropagation(); void playLink(link); }}
-								aria-label="Play {link.album_name}"
-							>
-							<div class="btn btn-circle btn-accent shadow-lg">
-								<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 ml-0.5" fill="currentColor" viewBox="0 0 24 24">
-									<path d="M8 5v14l11-7z" />
-								</svg>
-							</div>
-						</button>
-						<!-- YouTube badge -->
 						<div class="absolute top-2 left-2">
 							<div class="badge badge-sm gap-1" style="background-color: #FF0000; color: white; border: none;">
 								<YouTubeIcon class="h-3 w-3" />
 							</div>
 						</div>
+						{#if link.track_count > 0}
+							<div class="absolute top-2 right-2">
+								<div class="badge badge-sm badge-accent">{link.track_count} tracks</div>
+							</div>
+						{/if}
 					</figure>
 
 					<div class="card-body p-3">
 						<h2 class="card-title text-sm line-clamp-2 min-h-[2.5rem]">{link.album_name}</h2>
 						<p class="text-xs opacity-70 line-clamp-1">{link.artist_name}</p>
 					</div>
-
-					<!-- Delete button -->
-					<button
-						class="absolute bottom-2 right-2 btn btn-square btn-sm opacity-0 group-hover:opacity-100 transition-opacity duration-200 btn-error"
-						onclick={(e) => { e.stopPropagation(); deleteLink(link.album_id); }}
-						disabled={deleting === link.album_id}
-						aria-label="Delete link"
-					>
-						{#if deleting === link.album_id}
-							<span class="loading loading-spinner loading-xs"></span>
-						{:else}
-							<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-								<path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-							</svg>
-						{/if}
-					</button>
 				</div>
 			{/each}
 		</div>
+
+		{#if links.length === 0}
+			<div class="card bg-base-200 mt-4">
+				<div class="card-body items-center text-center">
+					<YouTubeIcon class="h-12 w-12 opacity-20" />
+					<p class="text-lg opacity-60">No saved YouTube links</p>
+					<p class="text-sm opacity-40">Generate links from album pages or add them manually.</p>
+				</div>
+			</div>
+		{/if}
 	{/if}
 </div>
+
+<YouTubeDetailModal
+	bind:open={detailModalOpen}
+	link={detailLink}
+	onclose={handleDetailClose}
+	onedit={handleDetailEdit}
+	ondelete={handleDetailDelete}
+/>
+
+<YouTubeLinkModal
+	bind:open={editModalOpen}
+	editLink={editingLink}
+	onclose={handleEditModalClose}
+	onsave={handleEditModalSave}
+/>

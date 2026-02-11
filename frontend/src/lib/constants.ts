@@ -72,7 +72,7 @@ export const API = {
 	},
 	search: {
 		artists: (query: string) => `/api/search/artists?query=${encodeURIComponent(query)}`,
-		albums: (query: string) => `/api/search/albums?query=${encodeURIComponent(query)}`
+		albums: (query: string) => `/api/search/albums?q=${encodeURIComponent(query)}`
 	},
 	home: () => '/api/home',
 	homeIntegrationStatus: () => '/api/home/integration-status',
@@ -91,6 +91,12 @@ export const API = {
 		link: (albumId: string) => `/api/youtube/link/${albumId}`,
 		links: () => '/api/youtube/links',
 		deleteLink: (albumId: string) => `/api/youtube/link/${albumId}`,
+		updateLink: (albumId: string) => `/api/youtube/link/${albumId}`,
+		manual: () => '/api/youtube/manual',
+		generateTrack: () => '/api/youtube/generate-track',
+		generateTracks: () => '/api/youtube/generate-tracks',
+		trackLinks: (albumId: string) => `/api/youtube/track-links/${albumId}`,
+		deleteTrackLink: (albumId: string, trackNumber: number) => `/api/youtube/track-link/${albumId}/${trackNumber}`,
 		quota: () => '/api/youtube/quota'
 	},
 	queue: () => '/api/queue',

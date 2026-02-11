@@ -28,4 +28,18 @@ export interface NowPlaying {
 	sourceType: SourceType;
 	videoId?: string;
 	embedUrl?: string;
+	trackName?: string;
+	artistId?: string;
+}
+
+export interface QueueItem {
+	videoId: string;
+	trackName: string;
+	artistName: string;
+	trackNumber: number;
+	albumId: string;
+	albumName: string;
+	coverUrl: string | null;
+	sourceType: SourceType;
+	artistId?: string;
 }

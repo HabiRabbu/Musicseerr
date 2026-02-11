@@ -9,6 +9,7 @@ export type YouTubePlaybackPayload = {
 	videoId: string;
 	coverUrl?: string | null;
 	embedUrl?: string;
+	artistId?: string;
 };
 
 type LaunchYouTubePlaybackOptions = {
@@ -30,7 +31,8 @@ export async function launchYouTubePlayback(
 		coverUrl: payload.coverUrl ?? null,
 		sourceType: 'youtube',
 		videoId: payload.videoId,
-		embedUrl: payload.embedUrl ?? `https://www.youtube.com/embed/${payload.videoId}`
+		embedUrl: payload.embedUrl ?? `https://www.youtube.com/embed/${payload.videoId}`,
+		artistId: payload.artistId
 	});
 
 	await tick();

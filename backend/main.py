@@ -12,11 +12,12 @@ from core.dependencies import (
     cleanup_app_state
 )
 from core.tasks import start_cache_cleanup_task, start_library_sync_task, start_disk_cache_cleanup_task, start_home_cache_warming_task, start_discover_cache_warming_task
-from core.exceptions import ResourceNotFoundError, ExternalServiceError
+from core.exceptions import ResourceNotFoundError, ExternalServiceError, ValidationError
 from core.exception_handlers import (
     resource_not_found_handler,
     external_service_error_handler,
     circuit_open_error_handler,
+    validation_error_handler,
     general_exception_handler
 )
 from infrastructure.resilience.retry import CircuitOpenError
@@ -144,6 +145,7 @@ app = FastAPI(
 
 app.add_exception_handler(ResourceNotFoundError, resource_not_found_handler)
 app.add_exception_handler(ExternalServiceError, external_service_error_handler)
+app.add_exception_handler(ValidationError, validation_error_handler)
 app.add_exception_handler(CircuitOpenError, circuit_open_error_handler)
 app.add_exception_handler(Exception, general_exception_handler)
 

@@ -44,7 +44,14 @@ declare namespace YT {
 
 let apiLoaded = false;
 let apiLoading = false;
-const apiReadyCallbacks: (() => void)[] = [];
+const apiReadyQueue: { resolve: () => void; reject: (err: Error) => void }[] = [];
+
+function flushQueue(error?: Error): void {
+	const pending = apiReadyQueue.splice(0);
+	for (const { resolve, reject } of pending) {
+		error ? reject(error) : resolve();
+	}
+}
 
 function loadYouTubeAPI(): Promise<void> {
 	if (typeof window !== 'undefined' && window.YT?.Player) {
@@ -55,19 +62,14 @@ function loadYouTubeAPI(): Promise<void> {
 	if (apiLoaded) return Promise.resolve();
 
 	return new Promise((resolve, reject) => {
-		if (apiLoading) {
-			apiReadyCallbacks.push(resolve);
-			return;
-		}
+		apiReadyQueue.push({ resolve, reject });
+		if (apiLoading) return;
 
 		apiLoading = true;
-		apiReadyCallbacks.push(resolve);
 
 		const timeout = setTimeout(() => {
 			apiLoading = false;
-			const err = new Error('YouTube IFrame API failed to load (timeout)');
-			apiReadyCallbacks.length = 0;
-			reject(err);
+			flushQueue(new Error('YouTube IFrame API failed to load (timeout)'));
 		}, 15000);
 
 		const existingCallback = window.onYouTubeIframeAPIReady;
@@ -76,20 +78,19 @@ function loadYouTubeAPI(): Promise<void> {
 			existingCallback?.();
 			apiLoaded = true;
 			apiLoading = false;
-			apiReadyCallbacks.forEach((cb) => cb());
-			apiReadyCallbacks.length = 0;
+			flushQueue();
 		};
 
-		const script = document.createElement('script');
-		script.src = 'https://www.youtube.com/iframe_api';
-		script.onerror = () => {
-			clearTimeout(timeout);
-			apiLoading = false;
-			const err = new Error('Failed to load YouTube IFrame API script');
-			apiReadyCallbacks.length = 0;
-			reject(err);
-		};
-		document.head.appendChild(script);
+		if (!document.querySelector('script[src="https://www.youtube.com/iframe_api"]')) {
+			const script = document.createElement('script');
+			script.src = 'https://www.youtube.com/iframe_api';
+			script.onerror = () => {
+				clearTimeout(timeout);
+				apiLoading = false;
+				flushQueue(new Error('Failed to load YouTube IFrame API script'));
+			};
+			document.head.appendChild(script);
+		}
 	});
 }
 
@@ -134,6 +135,10 @@ export class YouTubePlaybackSource implements PlaybackSource {
 					},
 					events: {
 						onReady: () => {
+							if (this.destroyed) {
+								resolve();
+								return;
+							}
 							this.player?.setVolume(this.pendingVolume);
 							this.readyCallbacks.forEach((cb) => cb());
 							this.startProgressPolling();

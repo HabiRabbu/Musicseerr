@@ -2,16 +2,19 @@
 	import { onDestroy } from 'svelte';
 	import { browser } from '$app/environment';
 	import { goto } from '$app/navigation';
-	import type { AlbumBasicInfo, AlbumTracksInfo, SimilarAlbumsResponse, MoreByArtistResponse } from '$lib/types';
+	import type { AlbumBasicInfo, AlbumTracksInfo, SimilarAlbumsResponse, MoreByArtistResponse, YouTubeTrackLink, YouTubeLink, YouTubeQuotaStatus } from '$lib/types';
 	import { colors } from '$lib/colors';
 	import { libraryStore } from '$lib/stores/library';
+	import { API } from '$lib/constants';
 	import AlbumImage from '$lib/components/AlbumImage.svelte';
 	import Toast from '$lib/components/Toast.svelte';
 	import DiscoveryAlbumCarousel from '$lib/components/DiscoveryAlbumCarousel.svelte';
 	import { requestAlbum } from '$lib/utils/albumRequest';
 	import { formatDuration, formatTotalDuration } from '$lib/utils/formatting';
 	import { integrationStore } from '$lib/stores/integration';
-	import AlbumPlayButton from '$lib/components/AlbumPlayButton.svelte';
+	import { playerStore } from '$lib/stores/player.svelte';
+	import AlbumYouTubeBar from '$lib/components/AlbumYouTubeBar.svelte';
+	import TrackPlayButton from '$lib/components/TrackPlayButton.svelte';
 
 	export let data: { albumId: string };
 
@@ -26,6 +29,12 @@
 	let moreByArtist: MoreByArtistResponse | null = null;
 	let similarAlbums: SimilarAlbumsResponse | null = null;
 	let loadingDiscovery = true;
+
+	let trackLinks: YouTubeTrackLink[] = [];
+	let albumLink: YouTubeLink | null = null;
+	let quota: YouTubeQuotaStatus | null = null;
+
+	$: trackLinkMap = new Map(trackLinks.map(tl => [tl.track_number, tl]));
 
 	let currentAlbumId: string | null = null;
 
@@ -46,6 +55,9 @@
 		loadingDiscovery = true;
 		moreByArtist = null;
 		similarAlbums = null;
+		trackLinks = [];
+		albumLink = null;
+		quota = null;
 	}
 
 	async function loadAlbum() {
@@ -53,6 +65,7 @@
 		if (album) {
 			fetchTracksInfo();
 			fetchDiscoveryData();
+			fetchYouTubeData();
 		}
 	}
 
@@ -100,6 +113,34 @@
 		} finally {
 			loadingDiscovery = false;
 		}
+	}
+
+	async function fetchYouTubeData() {
+		try {
+			const [linkRes, tracksRes] = await Promise.all([
+				fetch(API.youtube.link(data.albumId)),
+				fetch(API.youtube.trackLinks(data.albumId))
+			]);
+			if (linkRes.status === 200) albumLink = await linkRes.json();
+			if (tracksRes.ok) trackLinks = await tracksRes.json();
+		} catch {}
+	}
+
+	function handleTrackGenerated(link: YouTubeTrackLink): void {
+		trackLinks = [...trackLinks.filter((tl) => tl.track_number !== link.track_number), link]
+			.sort((a, b) => a.track_number - b.track_number);
+	}
+
+	function handleTrackLinksUpdate(links: YouTubeTrackLink[]): void {
+		trackLinks = links;
+	}
+
+	function handleAlbumLinkUpdate(link: YouTubeLink): void {
+		albumLink = link;
+	}
+
+	function handleQuotaUpdate(q: YouTubeQuotaStatus): void {
+		quota = q;
 	}
 
 	async function handleRequest() {
@@ -282,15 +323,6 @@
 								{/if}
 							</button>
 						{/if}
-
-						{#if $integrationStore.youtube}
-							<AlbumPlayButton
-								artistName={album.artist_name}
-								albumName={album.title}
-								albumId={album.musicbrainz_id}
-								coverUrl={album.cover_url}
-							/>
-						{/if}
 					</div>
 				</div>
 			</div>
@@ -314,26 +346,71 @@
 				</div>
 			{:else if tracksInfo && tracksInfo.tracks.length > 0}
 				<div class="space-y-3">
-					<h2 class="text-xl sm:text-2xl font-bold">Tracks</h2>
+					<div class="flex items-center justify-between flex-wrap gap-2">
+						<h2 class="text-xl sm:text-2xl font-bold">Tracks</h2>
+						{#if quota}
+							<div class="flex items-center gap-2">
+								<progress class="progress progress-accent w-20 h-1.5" value={quota.used} max={quota.limit}></progress>
+								<span class="text-xs opacity-60">{quota.remaining}/{quota.limit}</span>
+							</div>
+						{/if}
+					</div>
+
+					{#if $integrationStore.youtube}
+						<AlbumYouTubeBar
+							albumId={album.musicbrainz_id}
+							albumName={album.title}
+							artistName={album.artist_name}
+							artistId={album.artist_id}
+							coverUrl={album.cover_url ?? null}
+							tracks={tracksInfo.tracks}
+							{trackLinks}
+							{albumLink}
+							onTrackLinksUpdate={handleTrackLinksUpdate}
+							onAlbumLinkUpdate={handleAlbumLinkUpdate}
+							onQuotaUpdate={handleQuotaUpdate}
+						/>
+					{/if}
 					
 					<div class="bg-base-200 rounded-box overflow-hidden">
 						<ul class="list">
 							{#each tracksInfo.tracks as track, index}
-								<li class="list-row hover:bg-base-300/50 transition-colors p-3 sm:p-4">
+								{@const tl = trackLinkMap.get(track.position) ?? null}
+								{@const isCurrentlyPlaying = playerStore.nowPlaying?.albumId === album.musicbrainz_id && playerStore.currentQueueItem?.trackNumber === track.position && playerStore.isPlaying}
+								<li
+									class="hover:bg-base-300/50 transition-colors p-3 sm:p-4"
+									style={isCurrentlyPlaying ? `background-color: ${colors.accent}20;` : ''}
+								>
 									<div class="flex items-center gap-4 w-full">
-										<div class="text-base-content/60 font-medium w-8 text-center flex-shrink-0">
+										<div class="font-medium w-8 text-center flex-shrink-0 {isCurrentlyPlaying ? '' : 'text-base-content/60'}" style={isCurrentlyPlaying ? `color: ${colors.accent};` : ''}>
 											{track.position}
 										</div>
 
 										<div class="flex-1 min-w-0">
-											<div class="font-medium truncate">
+											<div class="font-medium truncate" style={isCurrentlyPlaying ? `color: ${colors.accent};` : ''}>
 												{track.title}
 											</div>
 										</div>
 
-										<div class="text-base-content/60 text-sm flex-shrink-0 ml-auto">
+										<div class="text-base-content/60 text-sm flex-shrink-0">
 											{formatDuration(track.length)}
 										</div>
+
+										{#if $integrationStore.youtube}
+											<TrackPlayButton
+												trackNumber={track.position}
+												trackName={track.title}
+												trackLink={tl}
+												allTrackLinks={trackLinks}
+												albumId={album.musicbrainz_id}
+												albumName={album.title}
+												artistName={album.artist_name}
+												coverUrl={album.cover_url ?? null}
+												artistId={album.artist_id}
+												onGenerated={handleTrackGenerated}
+												onQuotaUpdate={handleQuotaUpdate}
+											/>
+										{/if}
 									</div>
 								</li>
 							{/each}
