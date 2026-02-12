@@ -233,7 +233,9 @@ def get_library_service() -> LibraryService:
     library_cache = get_library_cache()
     cover_repo = get_coverart_repository()
     preferences_service = get_preferences_service()
-    return LibraryService(lidarr_repo, library_cache, cover_repo, preferences_service)
+    memory_cache = get_cache()
+    disk_cache = get_disk_cache()
+    return LibraryService(lidarr_repo, library_cache, cover_repo, preferences_service, memory_cache, disk_cache)
 
 
 @lru_cache(maxsize=1)

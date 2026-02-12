@@ -189,11 +189,30 @@ class ArtistService:
         artist_id = validate_mbid(artist_id, "artist")
         cached = await self._get_cached_artist(artist_id)
         if cached:
+            await self._refresh_library_flags(cached)
             return cached
         logger.debug(f"Cache MISS (Disk): Artist {artist_id[:8]}... - fetching from API")
         artist_info = await self._build_artist_from_musicbrainz(artist_id, include_extended=False)
         await self._save_artist_to_cache(artist_id, artist_info)
         return artist_info
+
+    async def _refresh_library_flags(self, artist_info: ArtistInfo) -> None:
+        try:
+            library_mbids, requested_mbids, artist_mbids = await asyncio.gather(
+                self._lidarr_repo.get_library_mbids(include_release_ids=False),
+                self._lidarr_repo.get_requested_mbids(),
+                self._lidarr_repo.get_artist_mbids(),
+            )
+            for release_list in (artist_info.albums, artist_info.singles, artist_info.eps):
+                for rg in release_list:
+                    rg_id = (rg.get("id") or "").lower()
+                    if not rg_id:
+                        continue
+                    rg["in_library"] = rg_id in library_mbids
+                    rg["requested"] = rg_id in requested_mbids and not rg["in_library"]
+            artist_info.in_library = artist_info.musicbrainz_id.lower() in artist_mbids
+        except Exception as e:
+            logger.warning(f"Failed to refresh library flags: {e}")
 
     async def _get_cached_artist(self, artist_id: str) -> Optional[ArtistInfo]:
         cache_key = f"artist_info:{artist_id}"

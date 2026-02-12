@@ -15,6 +15,8 @@
 	import { playerStore } from '$lib/stores/player.svelte';
 	import AlbumYouTubeBar from '$lib/components/AlbumYouTubeBar.svelte';
 	import TrackPlayButton from '$lib/components/TrackPlayButton.svelte';
+	import DeleteAlbumModal from '$lib/components/DeleteAlbumModal.svelte';
+	import ArtistRemovedModal from '$lib/components/ArtistRemovedModal.svelte';
 
 	export let data: { albumId: string };
 
@@ -25,6 +27,11 @@
 	let loadingTracks: boolean = true;
 	let showToast = false;
 	let requesting = false;
+	let showDeleteModal = false;
+	let showArtistRemovedModal = false;
+	let removedArtistName = '';
+	let toastMessage = 'Added to Library';
+	let toastType: 'success' | 'error' | 'info' | 'warning' = 'success';
 
 	let moreByArtist: MoreByArtistResponse | null = null;
 	let similarAlbums: SimilarAlbumsResponse | null = null;
@@ -38,7 +45,10 @@
 
 	let currentAlbumId: string | null = null;
 
-	$: isRequested = album && !album.in_library && (album.requested || libraryStore.isRequested(album.musicbrainz_id));
+	$: inLibrary = $libraryStore.initialized
+		? libraryStore.isInLibrary(album?.musicbrainz_id)
+		: (album?.in_library ?? false);
+	$: isRequested = album && !inLibrary && (album.requested || libraryStore.isRequested(album.musicbrainz_id));
 
 	$: if (browser && data.albumId && data.albumId !== currentAlbumId) {
 		currentAlbumId = data.albumId;
@@ -154,10 +164,32 @@
 			if (result.success && album) {
 				album.requested = true;
 				album = album;
+				toastMessage = 'Added to Library';
+				toastType = 'success';
 				showToast = true;
 			}
 		} finally {
 			requesting = false;
+		}
+	}
+
+	function handleDeleteClick() {
+		showDeleteModal = true;
+	}
+
+	function handleDeleted(result: { artist_removed: boolean; artist_name?: string | null }) {
+		showDeleteModal = false;
+		if (album) {
+			album.in_library = false;
+			album.requested = false;
+			album = album;
+		}
+		toastMessage = 'Removed from Library';
+		toastType = 'success';
+		showToast = true;
+		if (result.artist_removed && result.artist_name) {
+			removedArtistName = result.artist_name;
+			showArtistRemovedModal = true;
 		}
 	}
 
@@ -291,13 +323,22 @@
 					</div>
 
 					<div class="pt-4 flex flex-wrap items-start gap-3">
-						{#if album.in_library}
+						{#if inLibrary}
 							<div class="badge badge-lg gap-2" style="background-color: {colors.accent}; color: {colors.secondary};">
 								<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
 									<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
 								</svg>
 								In Library
 							</div>
+							<button
+								class="btn btn-sm btn-error btn-outline gap-1"
+								on:click={handleDeleteClick}
+							>
+								<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+									<path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+								</svg>
+								Remove
+							</button>
 						{:else if isRequested}
 							<div class="badge badge-lg gap-2" style="background-color: #F59E0B; color: {colors.secondary};">
 								<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -305,6 +346,15 @@
 								</svg>
 								Requested
 							</div>
+							<button
+								class="btn btn-sm btn-error btn-outline gap-1"
+								on:click={handleDeleteClick}
+							>
+								<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+									<path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+								</svg>
+								Remove
+							</button>
 						{:else}
 							<button
 								class="btn btn-lg gap-2"
@@ -452,4 +502,21 @@
 	{/if}
 </div>
 
-<Toast bind:show={showToast} message="Added to Library" />
+<Toast bind:show={showToast} message={toastMessage} type={toastType} />
+
+{#if showDeleteModal && album}
+	<DeleteAlbumModal
+		albumTitle={album.title}
+		artistName={album.artist_name}
+		musicbrainzId={album.musicbrainz_id}
+		ondeleted={handleDeleted}
+		onclose={() => { showDeleteModal = false; }}
+	/>
+{/if}
+
+{#if showArtistRemovedModal}
+	<ArtistRemovedModal
+		artistName={removedArtistName}
+		onclose={() => { showArtistRemovedModal = false; }}
+	/>
+{/if}

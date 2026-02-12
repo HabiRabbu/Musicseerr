@@ -136,6 +136,15 @@ class LidarrRepositoryProtocol(Protocol):
     async def get_library_mbids(self, include_release_ids: bool = True) -> set[str]:
         ...
 
+    async def get_requested_mbids(self) -> set[str]:
+        ...
+
+    async def delete_album(self, album_id: int, delete_files: bool = False) -> bool:
+        ...
+
+    async def delete_artist(self, artist_id: int, delete_files: bool = False) -> bool:
+        ...
+
 
 class WikidataRepositoryProtocol(Protocol):
     

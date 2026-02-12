@@ -14,6 +14,7 @@
 	import SimilarArtistsCarousel from '$lib/components/SimilarArtistsCarousel.svelte';
 	import TopSongsList from '$lib/components/TopSongsList.svelte';
 	import TopAlbumsList from '$lib/components/TopAlbumsList.svelte';
+	import ArtistRemovedModal from '$lib/components/ArtistRemovedModal.svelte';
 	import { requestAlbum } from '$lib/utils/albumRequest';
 	import { getArtistDiscoveryCache, setArtistDiscoveryCache } from '$lib/stores/discoveryCache';
 
@@ -25,6 +26,8 @@
 	let error: string | null = null;
 	let showToast = false;
 	let toastMessage = 'Added to Library';
+	let showArtistRemovedModal = false;
+	let removedArtistName = '';
 	let requestingAlbums = new Set<string>();
 	let abortController: AbortController | null = null;
 	let albumsCollapsed = false;
@@ -295,6 +298,17 @@
 		}
 	}
 
+	function handleReleaseRemoved(result: { artist_removed: boolean; artist_name?: string | null }) {
+		if (!artist) return;
+
+		if (result.artist_removed) {
+			artist.in_library = false;
+			removedArtistName = result.artist_name || artist.name;
+			showArtistRemovedModal = true;
+			artist = artist;
+		}
+	}
+
 
 	function goBack() {
 		if (browser && window.history.length > 1) {
@@ -391,7 +405,9 @@
 					collapsed={albumsCollapsed}
 					requestingIds={requestingAlbums}
 					showLoadingIndicator={hasMoreReleases || loadingMoreReleases}
+					artistName={artist.name}
 					onRequest={handleRequest}
+					onRemoved={handleReleaseRemoved}
 					onToggleCollapse={() => (albumsCollapsed = !albumsCollapsed)}
 				/>
 			{/if}
@@ -403,7 +419,9 @@
 					collapsed={epsCollapsed}
 					requestingIds={requestingAlbums}
 					showLoadingIndicator={hasMoreReleases || loadingMoreReleases}
+					artistName={artist.name}
 					onRequest={handleRequest}
+					onRemoved={handleReleaseRemoved}
 					onToggleCollapse={() => (epsCollapsed = !epsCollapsed)}
 				/>
 			{/if}
@@ -415,7 +433,9 @@
 					collapsed={singlesCollapsed}
 					requestingIds={requestingAlbums}
 					showLoadingIndicator={hasMoreReleases || loadingMoreReleases}
+					artistName={artist.name}
 					onRequest={handleRequest}
+					onRemoved={handleReleaseRemoved}
 					onToggleCollapse={() => (singlesCollapsed = !singlesCollapsed)}
 				/>
 			{/if}
@@ -429,3 +449,12 @@
 
 
 <Toast bind:show={showToast} message={toastMessage} />
+
+{#if showArtistRemovedModal}
+	<ArtistRemovedModal
+		artistName={removedArtistName}
+		onclose={() => {
+			showArtistRemovedModal = false;
+		}}
+	/>
+{/if}

@@ -65,6 +65,7 @@ export type ReleaseGroup = {
 	year?: number;
 	first_release_date?: string;
 	in_library: boolean;
+	requested?: boolean;
 };
 
 export type ExternalLink = {

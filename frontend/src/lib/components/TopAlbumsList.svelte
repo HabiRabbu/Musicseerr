@@ -4,9 +4,9 @@
 	import type { TopAlbum } from '$lib/types';
 	import { colors } from '$lib/colors';
 	import { libraryStore } from '$lib/stores/library';
-	import { STATUS_COLORS } from '$lib/constants';
 	import { requestAlbum } from '$lib/utils/albumRequest';
 	import AlbumImage from './AlbumImage.svelte';
+	import LibraryBadge from './LibraryBadge.svelte';
 
 	interface Props {
 		albums: TopAlbum[];
@@ -19,11 +19,13 @@
 	
 	let libraryMbids = $state(new Set<string>());
 	let requestedMbids = $state(new Set<string>());
+	let storeInitialized = $state(false);
 	
 	onMount(() => {
 		const unsubscribe = libraryStore.subscribe(state => {
 			libraryMbids = new Set(state.mbidSet);
 			requestedMbids = new Set(state.requestedSet);
+			storeInitialized = state.initialized;
 		});
 		return unsubscribe;
 	});
@@ -34,6 +36,7 @@
 
 	function isInLibrary(album: TopAlbum): boolean {
 		const mbid = album.release_group_mbid?.toLowerCase();
+		if (storeInitialized) return mbid ? libraryMbids.has(mbid) : false;
 		return album.in_library || (mbid ? libraryMbids.has(mbid) : false);
 	}
 
@@ -104,23 +107,23 @@
 						<div class="w-12 h-12 flex-shrink-0 relative">
 							<AlbumImage mbid={album.release_group_mbid} alt={album.title} size="full" className="w-12 h-12 rounded" />
 							{#if isInLibrary(album)}
-								<div 
-									class="absolute -bottom-1 -right-1 rounded-full p-0.5"
-									style="background-color: {colors.accent};"
-								>
-									<svg xmlns="http://www.w3.org/2000/svg" class="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke={colors.secondary} stroke-width="3">
-										<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
-									</svg>
-								</div>
+								<LibraryBadge
+									status="library"
+									musicbrainzId={album.release_group_mbid}
+									albumTitle={album.title}
+									artistName={album.artist_name || 'Unknown'}
+									size="sm"
+									positioning="absolute -bottom-1 -right-1"
+								/>
 							{:else if isRequested(album)}
-								<div 
-									class="absolute -bottom-1 -right-1 rounded-full p-0.5"
-									style="background-color: {STATUS_COLORS.REQUESTED};"
-								>
-									<svg xmlns="http://www.w3.org/2000/svg" class="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke={colors.secondary} stroke-width="2">
-										<path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-									</svg>
-								</div>
+								<LibraryBadge
+									status="requested"
+									musicbrainzId={album.release_group_mbid}
+									albumTitle={album.title}
+									artistName={album.artist_name || 'Unknown'}
+									size="sm"
+									positioning="absolute -bottom-1 -right-1"
+								/>
 							{/if}
 						</div>
 					{:else}
@@ -169,3 +172,4 @@
 		</div>
 	{/if}
 </div>
+

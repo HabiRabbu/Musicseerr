@@ -18,24 +18,60 @@ const initialState: LibraryState = {
 	initialized: false
 };
 
+type LibraryCacheData = {
+	mbids: string[];
+	requested: string[];
+};
+
 function createLibraryStore() {
-	const { subscribe, set, update } = writable<LibraryState>(initialState);
-	const cache = createLocalStorageCache<string[]>(CACHE_KEYS.LIBRARY_MBIDS, CACHE_TTL.LIBRARY);
+	const { subscribe, update } = writable<LibraryState>(initialState);
+	const cache = createLocalStorageCache<LibraryCacheData | string[]>(
+		CACHE_KEYS.LIBRARY_MBIDS,
+		CACHE_TTL.LIBRARY
+	);
+
+	function normalizeCachedData(data: LibraryCacheData | string[]): LibraryCacheData {
+		if (Array.isArray(data)) {
+			return { mbids: data, requested: [] };
+		}
+		return {
+			mbids: data.mbids ?? [],
+			requested: data.requested ?? []
+		};
+	}
+
+	function persistState(mbidSet: Set<string>, requestedSet: Set<string>) {
+		cache.set({
+			mbids: [...mbidSet],
+			requested: [...requestedSet]
+		});
+	}
 
 	async function initialize() {
 		const state = get({ subscribe });
 		if (state.initialized || state.loading) return;
 
 		const cached = cache.get();
-		if (cached && cached.data.length > 0) {
+		if (cached) {
+			const normalized = normalizeCachedData(cached.data);
+			const mbids = normalized.mbids.map((m) => m.toLowerCase());
+			const requested = normalized.requested.map((m) => m.toLowerCase());
+
+			if (mbids.length === 0 && requested.length === 0) {
+				await fetchLibraryMbids(false);
+				return;
+			}
+
 			update((s) => ({
 				...s,
-				mbidSet: new Set(cached.data),
+				mbidSet: new Set(mbids),
+				requestedSet: new Set(requested),
 				lastUpdated: cached.timestamp,
 				initialized: true
 			}));
 
-			if (cache.isStale(cached.timestamp)) {
+			const BACKGROUND_REFRESH_TTL = 30_000;
+			if (Date.now() - cached.timestamp > BACKGROUND_REFRESH_TTL) {
 				fetchLibraryMbids(true);
 			}
 		} else {
@@ -54,16 +90,18 @@ function createLibraryStore() {
 
 			const data = await res.json();
 			const mbids: string[] = (data.mbids || []).map((m: string) => m.toLowerCase());
+			const requested: string[] = (data.requested_mbids || []).map((m: string) => m.toLowerCase());
 
 			update((s) => ({
 				...s,
 				mbidSet: new Set(mbids),
+				requestedSet: new Set(requested),
 				loading: false,
 				lastUpdated: Date.now(),
 				initialized: true
 			}));
 
-			cache.set(mbids);
+			cache.set({ mbids, requested });
 		} catch (e) {
 			console.error('Failed to fetch library MBIDs:', e);
 			if (!background) {
@@ -84,6 +122,18 @@ function createLibraryStore() {
 			newSet.add(mbid.toLowerCase());
 			const newRequested = new Set(s.requestedSet);
 			newRequested.delete(mbid.toLowerCase());
+			persistState(newSet, newRequested);
+			return { ...s, mbidSet: newSet, requestedSet: newRequested };
+		});
+	}
+
+	function removeMbid(mbid: string) {
+		update((s) => {
+			const newSet = new Set(s.mbidSet);
+			newSet.delete(mbid.toLowerCase());
+			const newRequested = new Set(s.requestedSet);
+			newRequested.delete(mbid.toLowerCase());
+			persistState(newSet, newRequested);
 			return { ...s, mbidSet: newSet, requestedSet: newRequested };
 		});
 	}
@@ -95,6 +145,7 @@ function createLibraryStore() {
 			}
 			const newSet = new Set(s.requestedSet);
 			newSet.add(mbid.toLowerCase());
+			persistState(s.mbidSet, newSet);
 			return { ...s, requestedSet: newSet };
 		});
 	}
@@ -115,6 +166,7 @@ function createLibraryStore() {
 		refresh,
 		isInLibrary,
 		addMbid,
+		removeMbid,
 		isRequested,
 		addRequested,
 		updateCacheTTL: cache.updateTTL

@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { colors } from '$lib/colors';
-	import { STATUS_COLORS } from '$lib/constants';
 	import AlbumImage from './AlbumImage.svelte';
+	import LibraryBadge from './LibraryBadge.svelte';
 
 	interface Release {
 		id: string;
@@ -12,16 +12,30 @@
 		requested?: boolean;
 	}
 
+	interface RemoveResult {
+		artist_removed: boolean;
+		artist_name?: string | null;
+	}
+
 	export let title: string;
 	export let releases: Release[];
 	export let collapsed: boolean = false;
 	export let requestingIds: Set<string>;
 	export let showLoadingIndicator: boolean = false;
+	export let artistName: string = 'Unknown';
 	export let onRequest: (id: string, title?: string) => void;
 	export let onToggleCollapse: () => void;
+	export let onRemoved: ((result: RemoveResult) => void) | undefined = undefined;
 
 	function goToAlbum(albumId: string) {
 		goto(`/album/${albumId}`);
+	}
+
+	function handleDeleted(rg: Release, result: RemoveResult) {
+		rg.in_library = false;
+		rg.requested = false;
+		releases = releases;
+		onRemoved?.(result);
 	}
 </script>
 
@@ -68,41 +82,23 @@
 						</button>
 						<div class="flex items-center flex-shrink-0 ml-auto mr-3 sm:mr-4">
 							{#if rg.in_library}
-								<div
-									class="w-8 h-8 sm:w-10 sm:h-10 rounded-full shadow-sm flex items-center justify-center"
-									style="background-color: {colors.accent};"
-								>
-									<svg
-										xmlns="http://www.w3.org/2000/svg"
-										class="h-4 w-4 sm:h-5 sm:w-5"
-										fill="none"
-										viewBox="0 0 24 24"
-										stroke={colors.secondary}
-										stroke-width="3"
-									>
-										<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
-									</svg>
-								</div>
+								<LibraryBadge
+									status="library"
+									musicbrainzId={rg.id}
+									albumTitle={rg.title}
+									{artistName}
+									size="lg"
+									ondeleted={(result) => handleDeleted(rg, result)}
+								/>
 							{:else if rg.requested}
-								<div
-									class="w-8 h-8 sm:w-10 sm:h-10 rounded-full shadow-sm flex items-center justify-center"
-									style="background-color: {STATUS_COLORS.REQUESTED};"
-								>
-									<svg
-										xmlns="http://www.w3.org/2000/svg"
-										class="h-4 w-4 sm:h-5 sm:w-5"
-										fill="none"
-										viewBox="0 0 24 24"
-										stroke={colors.secondary}
-										stroke-width="2"
-									>
-										<path
-											stroke-linecap="round"
-											stroke-linejoin="round"
-											d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-										/>
-									</svg>
-								</div>
+								<LibraryBadge
+									status="requested"
+									musicbrainzId={rg.id}
+									albumTitle={rg.title}
+									{artistName}
+									size="lg"
+									ondeleted={(result) => handleDeleted(rg, result)}
+								/>
 							{:else}
 								<button
 									class="w-8 h-8 sm:w-10 sm:h-10 rounded-full opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity duration-200 border-none flex items-center justify-center shadow-sm"

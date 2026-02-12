@@ -68,7 +68,9 @@ export const API = {
 	library: {
 		mbids: () => '/api/library/mbids',
 		albums: () => '/api/library/albums',
-		artists: () => '/api/library/artists'
+		artists: () => '/api/library/artists',
+		removeAlbumPreview: (mbid: string) => `/api/library/album/${mbid}/removal-preview`,
+		removeAlbum: (mbid: string) => `/api/library/album/${mbid}`
 	},
 	search: {
 		artists: (query: string) => `/api/search/artists?query=${encodeURIComponent(query)}`,

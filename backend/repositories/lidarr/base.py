@@ -66,7 +66,15 @@ class LidarrBase:
                 json=json_data,
             )
 
-            if method == "GET" and response.status_code != 200:
+            if method == "DELETE" and response.status_code in (200, 202, 204):
+                if response.status_code == 204 or not response.content:
+                    return None
+            elif method == "DELETE":
+                raise ExternalServiceError(
+                    f"Lidarr {method} failed ({response.status_code})",
+                    response.text
+                )
+            elif method == "GET" and response.status_code != 200:
                 raise ExternalServiceError(
                     f"Lidarr {method} failed ({response.status_code})",
                     response.text
@@ -93,6 +101,9 @@ class LidarrBase:
 
     async def _put(self, endpoint: str, data: dict[str, Any]) -> Any:
         return await self._request("PUT", endpoint, json_data=data)
+
+    async def _delete(self, endpoint: str, params: Optional[dict[str, Any]] = None) -> Any:
+        return await self._request("DELETE", endpoint, params=params)
 
     async def _post_command(self, body: dict[str, Any]) -> Any:
         try:

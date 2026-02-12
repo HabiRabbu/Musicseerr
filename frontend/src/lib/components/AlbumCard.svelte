@@ -3,17 +3,20 @@
 	import { colors } from '$lib/colors';
 	import { goto } from '$app/navigation';
 	import { libraryStore } from '$lib/stores/library';
-	import { STATUS_COLORS } from '$lib/constants';
 	import { requestAlbum } from '$lib/utils/albumRequest';
 	import { formatListenCount } from '$lib/utils/formatting';
 	import AlbumImage from './AlbumImage.svelte';
+	import LibraryBadge from './LibraryBadge.svelte';
 
 	export let album: Album;
 	export let onadded: (() => void) | undefined = undefined;
+	export let onremoved: (() => void) | undefined = undefined;
 
 	let requesting = false;
 
-	$: inLibrary = album.in_library || libraryStore.isInLibrary(album.musicbrainz_id);
+	$: inLibrary = $libraryStore.initialized
+		? libraryStore.isInLibrary(album.musicbrainz_id)
+		: (album.in_library || false);
 	$: isRequested =
 		!inLibrary && (album.requested || libraryStore.isRequested(album.musicbrainz_id));
 
@@ -28,6 +31,13 @@
 		} finally {
 			requesting = false;
 		}
+	}
+
+	function handleDeleted() {
+		album.in_library = false;
+		album.requested = false;
+		album = album;
+		onremoved?.();
 	}
 
 	function handleClick() {
@@ -69,41 +79,23 @@
 	</figure>
 
 	{#if inLibrary}
-		<div
-			class="absolute top-2 right-2 rounded-full p-1.5 shadow-lg"
-			style="background-color: {colors.accent};"
-		>
-			<svg
-				xmlns="http://www.w3.org/2000/svg"
-				class="h-4 w-4"
-				fill="none"
-				viewBox="0 0 24 24"
-				stroke={colors.secondary}
-				stroke-width="3"
-			>
-				<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
-			</svg>
-		</div>
+		<LibraryBadge
+			status="library"
+			musicbrainzId={album.musicbrainz_id}
+			albumTitle={album.title}
+			artistName={album.artist || 'Unknown'}
+			positioning="absolute top-2 right-2"
+			ondeleted={handleDeleted}
+		/>
 	{:else if isRequested}
-		<div
-			class="absolute top-2 right-2 rounded-full p-1.5 shadow-lg"
-			style="background-color: {STATUS_COLORS.REQUESTED};"
-		>
-			<svg
-				xmlns="http://www.w3.org/2000/svg"
-				class="h-4 w-4"
-				fill="none"
-				viewBox="0 0 24 24"
-				stroke={colors.secondary}
-				stroke-width="2"
-			>
-				<path
-					stroke-linecap="round"
-					stroke-linejoin="round"
-					d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-				/>
-			</svg>
-		</div>
+		<LibraryBadge
+			status="requested"
+			musicbrainzId={album.musicbrainz_id}
+			albumTitle={album.title}
+			artistName={album.artist || 'Unknown'}
+			positioning="absolute top-2 right-2"
+			ondeleted={handleDeleted}
+		/>
 	{/if}
 
 	<div class="card-body p-3">
@@ -154,3 +146,4 @@
 		</button>
 	{/if}
 </div>
+

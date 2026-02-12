@@ -199,6 +199,16 @@ class LidarrArtistRepository(LidarrBase):
             logger.warning(f"Error getting artist {artist_id}: {e}")
             return None
 
+    async def delete_artist(self, artist_id: int, delete_files: bool = False) -> bool:
+        try:
+            params = {"deleteFiles": str(delete_files).lower(), "addImportListExclusion": "false"}
+            await self._delete(f"/api/v1/artist/{artist_id}", params=params)
+            logger.info(f"Deleted artist ID {artist_id} (deleteFiles={delete_files})")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to delete artist {artist_id}: {e}")
+            raise
+
     async def _ensure_artist_exists(self, artist_mbid: str, artist_name_hint: Optional[str] = None) -> dict[str, Any]:
         try:
             items = await self._get("/api/v1/artist", params={"mbId": artist_mbid})

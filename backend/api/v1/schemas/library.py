@@ -55,3 +55,15 @@ class LibraryStatsResponse(BaseModel):
     last_sync: Optional[int] = Field(None, description="Unix timestamp of last sync")
     db_size_bytes: int
     db_size_mb: float
+
+
+class AlbumRemoveResponse(BaseModel):
+    success: bool
+    artist_removed: bool = False
+    artist_name: Optional[str] = None
+
+
+class AlbumRemovePreviewResponse(BaseModel):
+    success: bool
+    artist_will_be_removed: bool = False
+    artist_name: Optional[str] = None

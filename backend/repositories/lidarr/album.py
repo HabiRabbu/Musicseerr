@@ -183,6 +183,16 @@ class LidarrAlbumRepository(LidarrHistoryRepository):
             logger.warning(f"Error getting album by foreign ID {album_mbid}: {e}")
             return None
 
+    async def delete_album(self, album_id: int, delete_files: bool = False) -> bool:
+        try:
+            params = {"deleteFiles": str(delete_files).lower(), "addImportListExclusion": "false"}
+            await self._delete(f"/api/v1/album/{album_id}", params=params)
+            logger.info(f"Deleted album ID {album_id} (deleteFiles={delete_files})")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to delete album {album_id}: {e}")
+            raise
+
     async def add_album(self, musicbrainz_id: str, artist_repo) -> dict:
         if not musicbrainz_id or not isinstance(musicbrainz_id, str):
             raise ExternalServiceError("Invalid MBID provided")
@@ -236,7 +246,7 @@ class LidarrAlbumRepository(LidarrHistoryRepository):
                     "artistId": artist_id,
                     "foreignAlbumId": musicbrainz_id,
                     "monitored": True,
-                    "anyReleaseOk": True,
+                    "anyReleaseOk": False,
                     "profileId": profile_id,
                     "addOptions": {"addType": "automatic", "searchForNewAlbum": True},
                 }
@@ -270,6 +280,7 @@ class LidarrAlbumRepository(LidarrHistoryRepository):
 
         await self._wait_for_artist_commands_to_complete(artist_id, timeout=600.0)
         await self._monitor_artist_and_album(artist_id, album_id, musicbrainz_id, album_title)
+        await self._select_preferred_release(album_obj)
 
         try:
             await self._post_command({"name": "AlbumSearch", "albumIds": [album_id]})
@@ -289,8 +300,9 @@ class LidarrAlbumRepository(LidarrHistoryRepository):
             except Exception:
                 pass
 
-        await self._cache.clear_prefix("library_mbids:")
-        await self._cache.clear_prefix("artist_mbids")
+        await self._cache.clear_prefix("lidarr:library:mbids:")
+        await self._cache.clear_prefix("lidarr:artists:mbids")
+        await self._cache.clear_prefix("lidarr_requested")
 
         msg = "Album added & monitored" if action == "added" else "Album exists; monitored ensured"
         return {
@@ -367,3 +379,46 @@ class LidarrAlbumRepository(LidarrHistoryRepository):
                         f"Failed to set monitoring status after {max_attempts} attempts: {str(e)}"
                     )
                 await asyncio.sleep(5.0)
+
+    async def _select_preferred_release(self, album_obj: dict) -> None:
+        releases = album_obj.get("releases") or []
+        if len(releases) <= 1:
+            return
+
+        best = self._pick_best_release(releases)
+        if not best:
+            return
+
+        already_monitored = next((r for r in releases if r.get("monitored")), None)
+        if already_monitored and already_monitored.get("id") == best.get("id"):
+            return
+
+        album_id = album_obj["id"]
+        try:
+            for r in releases:
+                r["monitored"] = r.get("id") == best.get("id")
+            album_obj["releases"] = releases
+            album_obj["anyReleaseOk"] = False
+            await self._put(f"/api/v1/album/{album_id}", album_obj)
+            logger.info(
+                f"Selected release: {best.get('title', 'Unknown')} "
+                f"({best.get('format', '?')}, {best.get('trackCount', '?')} tracks)"
+            )
+        except Exception as e:
+            logger.warning(f"Failed to set preferred release: {e}")
+
+    @staticmethod
+    def _pick_best_release(releases: list[dict]) -> Optional[dict]:
+        FORMAT_PRIORITY = ["Digital Media", "CD"]
+
+        def score(r: dict) -> tuple:
+            fmt = (r.get("format") or "").strip()
+            try:
+                priority = FORMAT_PRIORITY.index(fmt)
+            except ValueError:
+                priority = len(FORMAT_PRIORITY)
+            medium_count = r.get("mediumCount", 1) or 1
+            track_count = r.get("trackCount", 0) or 0
+            return (priority, medium_count, track_count)
+
+        return min(releases, key=score, default=None)
