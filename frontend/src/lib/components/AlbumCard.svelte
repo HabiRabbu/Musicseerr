@@ -24,7 +24,11 @@
 		e.stopPropagation();
 		requesting = true;
 		try {
-			const result = await requestAlbum(album.musicbrainz_id);
+			const result = await requestAlbum(album.musicbrainz_id, {
+				artist: album.artist ?? undefined,
+				album: album.title,
+				year: album.year ?? undefined
+			});
 			if (result.success) {
 				onadded?.();
 			}

@@ -145,6 +145,27 @@ class LidarrRepositoryProtocol(Protocol):
     async def delete_artist(self, artist_id: int, delete_files: bool = False) -> bool:
         ...
 
+    async def get_queue_details(
+        self, include_artist: bool = True, include_album: bool = True
+    ) -> list[dict[str, Any]]:
+        ...
+
+    async def remove_queue_item(
+        self, queue_id: int, remove_from_client: bool = True
+    ) -> bool:
+        ...
+
+    async def trigger_album_search(self, album_ids: list[int]) -> Optional[dict[str, Any]]:
+        ...
+
+    async def get_history_for_album(
+        self,
+        album_id: int,
+        include_album: bool = True,
+        include_artist: bool = True,
+    ) -> list[dict[str, Any]]:
+        ...
+
 
 class WikidataRepositoryProtocol(Protocol):
     

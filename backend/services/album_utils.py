@@ -10,7 +10,7 @@ def parse_year(date_str: Optional[str]) -> Optional[int]:
 
 
 def find_primary_release(release_group: dict) -> Optional[dict]:
-    releases = release_group.get("release-list", [])
+    releases = release_group.get("releases") or release_group.get("release-list", [])
     for release in releases:
         if release.get("status") == "Official":
             return release
@@ -33,12 +33,12 @@ def extract_artist_info(release_group: dict) -> tuple[str, str]:
 def extract_tracks(release_data: dict) -> tuple[list[Track], int]:
     tracks = []
     total_length = 0
-    medium_list = release_data.get("medium-list", [])
+    medium_list = release_data.get("media") or release_data.get("medium-list", [])
     for medium in medium_list:
-        track_list = medium.get("track-list", [])
+        track_list = medium.get("tracks") or medium.get("track-list", [])
         for track in track_list:
             recording = track.get("recording", {})
-            length_ms = recording.get("length")
+            length_ms = track.get("length") or recording.get("length")
             if length_ms:
                 try:
                     total_length += int(length_ms)
@@ -46,8 +46,8 @@ def extract_tracks(release_data: dict) -> tuple[list[Track], int]:
                     pass
             tracks.append(
                 Track(
-                    position=int(track.get("position", 0)),
-                    title=recording.get("title", "Unknown"),
+                    position=int(track.get("position") or track.get("number", 0)),
+                    title=recording.get("title") or track.get("title", "Unknown"),
                     length=int(length_ms) if length_ms else None,
                     recording_id=recording.get("id"),
                 )
@@ -56,7 +56,7 @@ def extract_tracks(release_data: dict) -> tuple[list[Track], int]:
 
 
 def extract_label(release_data: dict) -> Optional[str]:
-    label_info_list = release_data.get("label-info-list", [])
+    label_info_list = release_data.get("label-info") or release_data.get("label-info-list", [])
     if label_info_list:
         label_obj = label_info_list[0].get("label")
         if label_obj:

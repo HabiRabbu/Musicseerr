@@ -47,8 +47,8 @@
 		</div>
 	{/if}
 
-	<div class="flex-1 min-w-0">
-		<p class="font-medium text-sm truncate">{song.title}</p>
-		<p class="text-xs text-base-content/60 truncate">{song.release_name || 'Unknown Album'}</p>
+	<div class="flex-1 min-w-0 grid grid-cols-2 items-center gap-4">
+		<p class="font-medium text-sm truncate min-w-0">{song.title}</p>
+		<p class="text-xs text-base-content/60 truncate min-w-0 text-right">{song.release_name || 'Unknown Album'}</p>
 	</div>
 </div>

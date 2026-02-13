@@ -9,13 +9,15 @@ from .library import LidarrLibraryRepository
 from .artist import LidarrArtistRepository
 from .album import LidarrAlbumRepository
 from .config import LidarrConfigRepository
+from .queue import LidarrQueueRepository
 
 
 class LidarrRepository(
     LidarrLibraryRepository,
     LidarrArtistRepository,
     LidarrAlbumRepository,
-    LidarrConfigRepository
+    LidarrConfigRepository,
+    LidarrQueueRepository
 ):
     def __init__(
         self,

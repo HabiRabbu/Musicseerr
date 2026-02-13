@@ -29,6 +29,7 @@ from api.v1.routes import (
 from api.v1.routes import cache as cache_routes
 from api.v1.routes import cache_status as cache_status_routes
 from api.v1.routes import youtube as youtube_routes
+from api.v1.routes import requests_page as requests_page_routes
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -67,11 +68,11 @@ async def lifespan(app: FastAPI):
             
             exc = task.exception()
             if exc:
-                logger.error(f"Cache warming failed: {exc}", exc_info=exc)
+                logger.error("Cache warming failed: %s", exc, exc_info=exc)
         except asyncio.CancelledError:
             logger.info("Cache warming was cancelled")
         except Exception as e:
-            logger.error(f"Error checking cache warming task: {e}")
+            logger.error("Error checking cache warming task: %s", e)
     
     cache_task = asyncio.create_task(
         warm_library_cache(library_service, get_album_service(), get_library_cache())
@@ -100,17 +101,37 @@ async def lifespan(app: FastAPI):
                     logger.warning("No cached artists/albums to resume sync with, clearing state")
                     await library_cache.clear_sync_state()
             except Exception as e:
-                logger.error(f"Failed to resume interrupted sync: {e}")
+                logger.error("Failed to resume interrupted sync: %s", e)
                 await status_service.complete_sync(str(e))
 
         resume_task = asyncio.create_task(resume_sync())
-        resume_task.add_done_callback(lambda t: logger.info("Resume sync task completed") if not t.exception() else logger.error(f"Resume sync failed: {t.exception()}"))
+        resume_task.add_done_callback(lambda t: logger.info("Resume sync task completed") if not t.exception() else logger.error("Resume sync failed: %s", t.exception()))
 
     from core.dependencies import get_home_service
     start_home_cache_warming_task(get_home_service())
 
     from core.dependencies import get_discover_service
     start_discover_cache_warming_task(get_discover_service())
+
+    from core.dependencies import get_requests_page_service
+    requests_page_service = get_requests_page_service()
+
+    async def sync_request_statuses():
+        try:
+            await asyncio.sleep(10)
+            await requests_page_service.sync_request_statuses()
+            logger.info("Request status sync completed on startup")
+        except asyncio.CancelledError:
+            logger.info("Request status sync was cancelled during shutdown")
+        except Exception as e:
+            logger.error("Request status sync failed: %s", e)
+
+    sync_task = asyncio.create_task(sync_request_statuses())
+    sync_task.add_done_callback(
+        lambda t: None if t.cancelled() else (
+            logger.error("Request sync failed: %s", t.exception()) if t.exception() else None
+        )
+    )
     
     logger.info("Musicseerr started successfully")
     
@@ -119,15 +140,21 @@ async def lifespan(app: FastAPI):
     finally:
         logger.info("Shutting down Musicseerr...")
 
+        sync_task.cancel()
+        try:
+            await sync_task
+        except asyncio.CancelledError:
+            pass
+
         try:
             await request_queue.stop()
         except Exception as e:
-            logger.error(f"Error stopping request queue: {e}")
+            logger.error("Error stopping request queue: %s", e)
 
         try:
             await cleanup_app_state()
         except Exception as e:
-            logger.error(f"Error during cleanup: {e}")
+            logger.error("Error during cleanup: %s", e)
         
         logger.info("Musicseerr shut down successfully")
 
@@ -170,5 +197,6 @@ app.include_router(discover.router)
 app.include_router(youtube_routes.router)
 app.include_router(cache_routes.router)
 app.include_router(cache_status_routes.router)
+app.include_router(requests_page_routes.router)
 
 mount_frontend(app)

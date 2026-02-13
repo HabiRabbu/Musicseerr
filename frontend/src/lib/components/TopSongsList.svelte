@@ -11,7 +11,7 @@
 	let { songs, loading = false, configured = true }: Props = $props();
 </script>
 
-<div class="flex flex-col">
+<div class="flex flex-col min-w-0">
 	<h3 class="text-lg font-semibold mb-3">Popular Songs</h3>
 
 	{#if loading}
@@ -20,9 +20,9 @@
 				<div class="flex items-center gap-3 p-2">
 					<div class="skeleton w-6 h-4"></div>
 					<div class="skeleton w-12 h-12 rounded"></div>
-					<div class="flex-1">
-						<div class="skeleton h-4 w-3/4 mb-1"></div>
-						<div class="skeleton h-3 w-1/2"></div>
+					<div class="flex-1 flex items-center gap-4">
+						<div class="skeleton h-4 w-1/2"></div>
+						<div class="skeleton h-3 w-1/3 ml-auto"></div>
 					</div>
 				</div>
 			{/each}

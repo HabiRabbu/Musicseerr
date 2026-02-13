@@ -11,8 +11,13 @@
 	import YouTubeIcon from '$lib/components/YouTubeIcon.svelte';
 	import { onMount, onDestroy } from 'svelte';
 	import { cancelPendingImages } from '$lib/utils/lazyImage';
+	import { fetchActiveRequestCount, type RequestCountChangedDetail } from '$lib/utils/requestsApi';
+	import { fromStore } from 'svelte/store';
 	
 	let query = '';
+	let activeRequestCount = $state(0);
+	let requestCountInterval: ReturnType<typeof setInterval> | null = null;
+	let requestsPageActive = false;
 	let modalQuery = '';
 	let userDropdown: HTMLDetailsElement;
 
@@ -26,18 +31,58 @@
 		}
 	}
 
+	async function pollRequestCount() {
+		try {
+			activeRequestCount = await fetchActiveRequestCount();
+		} catch {
+			// ignore errors silently
+		}
+	}
+
+	function handleRequestCountChanged(event: Event) {
+		const detail = (event as CustomEvent<RequestCountChangedDetail>).detail;
+		if (typeof detail?.count === 'number') {
+			activeRequestCount = detail.count;
+			return;
+		}
+
+		void pollRequestCount();
+	}
+
+	function handleRequestsPageActive(event: Event) {
+		const active = (event as CustomEvent<boolean>).detail;
+		requestsPageActive = active;
+		if (active) {
+			if (requestCountInterval) {
+				clearInterval(requestCountInterval);
+				requestCountInterval = null;
+			}
+		} else {
+			if (!requestCountInterval) {
+				requestCountInterval = setInterval(pollRequestCount, 10_000);
+			}
+		}
+	}
+
 	onMount(() => {
 		initCacheTTLs();
 		libraryStore.initialize();
 		void integrationStore.ensureLoaded();
 		document.addEventListener('click', handleClickOutside);
 		document.addEventListener('keydown', handleGlobalKeydown);
+		window.addEventListener('request-count-changed', handleRequestCountChanged);
+		window.addEventListener('requests-page-active', handleRequestsPageActive);
 		void restorePlayerSession();
+		void pollRequestCount();
+		requestCountInterval = setInterval(pollRequestCount, 10_000);
 	});
 
 	onDestroy(() => {
 		document.removeEventListener('click', handleClickOutside);
 		document.removeEventListener('keydown', handleGlobalKeydown);
+		window.removeEventListener('request-count-changed', handleRequestCountChanged);
+		window.removeEventListener('requests-page-active', handleRequestsPageActive);
+		if (requestCountInterval) clearInterval(requestCountInterval);
 	});
 
 	function handleGlobalKeydown(e: KeyboardEvent): void {
@@ -108,7 +153,8 @@
 		goto('/settings');
 	}
 
-	$: lidarrConfigured = $integrationStore.lidarr || !$integrationStore.loaded;
+	const integrations = fromStore(integrationStore);
+	const lidarrConfigured = $derived(integrations.current.lidarr || !integrations.current.loaded);
 </script>
 
 <div data-theme="musicseerr">
@@ -243,7 +289,8 @@
 					</li>
 				{/if}
 
-				{#if $integrationStore.youtube}
+				{#if integrations.current.youtube}
+					<div class="divider my-0"></div>
 					<li>
 						<a
 							href="/library/youtube"
@@ -252,6 +299,29 @@
 						>
 							<YouTubeIcon class="h-6 w-6" />
 							<span class="is-drawer-close:hidden">YouTube</span>
+						</a>
+					</li>
+				{/if}
+
+				{#if lidarrConfigured}
+					<div class="divider my-0"></div>
+					<li>
+						<a
+							href="/requests"
+							class="is-drawer-close:tooltip is-drawer-close:tooltip-right"
+							data-tip="Requests"
+						>
+							<div class="relative">
+								<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-6 w-6">
+									<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+									<polyline points="7 10 12 15 17 10"></polyline>
+									<line x1="12" y1="15" x2="12" y2="3"></line>
+								</svg>
+								{#if activeRequestCount > 0}
+									<span class="absolute -top-2 -right-2 badge badge-info badge-xs w-4 h-4 p-0 text-[10px] font-bold">{activeRequestCount}</span>
+								{/if}
+							</div>
+							<span class="is-drawer-close:hidden">Requests</span>
 						</a>
 					</li>
 				{/if}

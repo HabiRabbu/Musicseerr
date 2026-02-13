@@ -34,6 +34,8 @@ from services.artist_discovery_service import ArtistDiscoveryService
 from services.album_discovery_service import AlbumDiscoveryService
 from services.discover_service import DiscoverService
 from services.youtube_service import YouTubeService
+from services.requests_page_service import RequestsPageService
+from infrastructure.cache.request_history import RequestHistoryStore
 
 logger = logging.getLogger(__name__)
 
@@ -221,10 +223,28 @@ def get_request_queue() -> RequestQueue:
 
 
 @lru_cache(maxsize=1)
+def get_request_history_store() -> RequestHistoryStore:
+    settings = get_settings()
+    return RequestHistoryStore(db_path=settings.library_db_path)
+
+
+@lru_cache(maxsize=1)
 def get_request_service() -> RequestService:
     lidarr_repo = get_lidarr_repository()
     request_queue = get_request_queue()
-    return RequestService(lidarr_repo, request_queue)
+    request_history = get_request_history_store()
+    return RequestService(lidarr_repo, request_queue, request_history)
+
+
+@lru_cache(maxsize=1)
+def get_requests_page_service() -> RequestsPageService:
+    lidarr_repo = get_lidarr_repository()
+    request_history = get_request_history_store()
+    return RequestsPageService(
+        lidarr_repo=lidarr_repo,
+        request_history=request_history,
+        library_mbids_fn=lidarr_repo.get_library_mbids,
+    )
 
 
 @lru_cache(maxsize=1)
@@ -396,6 +416,8 @@ AlbumDiscoveryServiceDep = Annotated[AlbumDiscoveryService, Depends(get_album_di
 DiscoverServiceDep = Annotated[DiscoverService, Depends(get_discover_service)]
 YouTubeRepositoryDep = Annotated[YouTubeRepository, Depends(get_youtube_repo)]
 YouTubeServiceDep = Annotated[YouTubeService, Depends(get_youtube_service)]
+RequestHistoryStoreDep = Annotated[RequestHistoryStore, Depends(get_request_history_store)]
+RequestsPageServiceDep = Annotated[RequestsPageService, Depends(get_requests_page_service)]
 
 
 async def init_app_state(app) -> None:
@@ -432,5 +454,7 @@ async def cleanup_app_state() -> None:
     get_youtube_repo.cache_clear()
     get_youtube_service.cache_clear()
     get_discover_service.cache_clear()
+    get_request_history_store.cache_clear()
+    get_requests_page_service.cache_clear()
 
     logger.info("Application state cleaned up")

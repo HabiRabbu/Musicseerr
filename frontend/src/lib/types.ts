@@ -544,3 +544,60 @@ export type YouTubeTrackLinkBatchResponse = {
 	failed: { track_number: number; track_name: string; reason: string }[];
 	quota: YouTubeQuotaStatus;
 };
+
+// -- Request types --
+
+export type StatusMessage = {
+	title?: string | null;
+	messages: string[];
+};
+
+export type ActiveRequestItem = {
+	musicbrainz_id: string;
+	artist_name: string;
+	album_title: string;
+	artist_mbid?: string | null;
+	year?: number | null;
+	cover_url?: string | null;
+	requested_at: string;
+	status: string;
+	progress?: number | null;
+	eta?: string | null;
+	size?: number | null;
+	size_remaining?: number | null;
+	download_status?: string | null;
+	download_state?: string | null;
+	status_messages?: StatusMessage[] | null;
+	error_message?: string | null;
+	lidarr_queue_id?: number | null;
+};
+
+export type RequestHistoryItem = {
+	musicbrainz_id: string;
+	artist_name: string;
+	album_title: string;
+	artist_mbid?: string | null;
+	year?: number | null;
+	cover_url?: string | null;
+	requested_at: string;
+	completed_at?: string | null;
+	status: string;
+	in_library: boolean;
+};
+
+export type ActiveRequestsResponse = {
+	items: ActiveRequestItem[];
+	count: number;
+};
+
+export type RequestHistoryResponse = {
+	items: RequestHistoryItem[];
+	total: number;
+	page: number;
+	page_size: number;
+	total_pages: number;
+};
+
+export type RequestCountChangedDetail = {
+	count?: number;
+};

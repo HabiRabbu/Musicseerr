@@ -246,7 +246,7 @@ class LidarrAlbumRepository(LidarrHistoryRepository):
                     "artistId": artist_id,
                     "foreignAlbumId": musicbrainz_id,
                     "monitored": True,
-                    "anyReleaseOk": False,
+                    "anyReleaseOk": True,
                     "profileId": profile_id,
                     "addOptions": {"addType": "automatic", "searchForNewAlbum": True},
                 }
@@ -280,7 +280,6 @@ class LidarrAlbumRepository(LidarrHistoryRepository):
 
         await self._wait_for_artist_commands_to_complete(artist_id, timeout=600.0)
         await self._monitor_artist_and_album(artist_id, album_id, musicbrainz_id, album_title)
-        await self._select_preferred_release(album_obj)
 
         try:
             await self._post_command({"name": "AlbumSearch", "albumIds": [album_id]})
@@ -379,46 +378,3 @@ class LidarrAlbumRepository(LidarrHistoryRepository):
                         f"Failed to set monitoring status after {max_attempts} attempts: {str(e)}"
                     )
                 await asyncio.sleep(5.0)
-
-    async def _select_preferred_release(self, album_obj: dict) -> None:
-        releases = album_obj.get("releases") or []
-        if len(releases) <= 1:
-            return
-
-        best = self._pick_best_release(releases)
-        if not best:
-            return
-
-        already_monitored = next((r for r in releases if r.get("monitored")), None)
-        if already_monitored and already_monitored.get("id") == best.get("id"):
-            return
-
-        album_id = album_obj["id"]
-        try:
-            for r in releases:
-                r["monitored"] = r.get("id") == best.get("id")
-            album_obj["releases"] = releases
-            album_obj["anyReleaseOk"] = False
-            await self._put(f"/api/v1/album/{album_id}", album_obj)
-            logger.info(
-                f"Selected release: {best.get('title', 'Unknown')} "
-                f"({best.get('format', '?')}, {best.get('trackCount', '?')} tracks)"
-            )
-        except Exception as e:
-            logger.warning(f"Failed to set preferred release: {e}")
-
-    @staticmethod
-    def _pick_best_release(releases: list[dict]) -> Optional[dict]:
-        FORMAT_PRIORITY = ["Digital Media", "CD"]
-
-        def score(r: dict) -> tuple:
-            fmt = (r.get("format") or "").strip()
-            try:
-                priority = FORMAT_PRIORITY.index(fmt)
-            except ValueError:
-                priority = len(FORMAT_PRIORITY)
-            medium_count = r.get("mediumCount", 1) or 1
-            track_count = r.get("trackCount", 0) or 0
-            return (priority, medium_count, track_count)
-
-        return min(releases, key=score, default=None)

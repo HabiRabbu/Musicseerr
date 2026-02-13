@@ -1079,7 +1079,7 @@ class DiscoverService:
                     artist_mbid = a["id"]
                     break
 
-            releases = rg_data.get("release-list", [])
+            releases = rg_data.get("releases") or rg_data.get("release-list", [])
             if releases:
                 first_release = releases[0]
                 enrichment.release_date = first_release.get("date")
@@ -1095,10 +1095,10 @@ class DiscoverService:
                             youtube_url = self._mb_repo.youtube_url_to_embed(yt_raw)
 
                         if not youtube_url:
-                            tracks = release_data.get("medium-list", [])
+                            tracks = release_data.get("media") or release_data.get("medium-list", [])
                             recordings_checked = 0
                             for medium in tracks:
-                                for track in medium.get("track-list", []):
+                                for track in medium.get("tracks") or medium.get("track-list", []):
                                     if recordings_checked >= 3:
                                         break
                                     rec = track.get("recording", {})

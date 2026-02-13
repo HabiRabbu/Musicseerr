@@ -159,7 +159,11 @@
 		requesting = true;
 
 		try {
-			const result = await requestAlbum(album.musicbrainz_id);
+			const result = await requestAlbum(album.musicbrainz_id, {
+				artist: album.artist_name ?? undefined,
+				album: album.title,
+				year: album.year ?? undefined
+			});
 
 			if (result.success && album) {
 				album.requested = true;

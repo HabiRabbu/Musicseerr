@@ -1,4 +1,5 @@
 import logging
+import time
 from typing import Optional
 from api.v1.schemas.album import AlbumInfo, AlbumBasicInfo, AlbumTracksInfo, Track
 from repositories.protocols import LidarrRepositoryProtocol, MusicBrainzRepositoryProtocol
@@ -29,6 +30,7 @@ class AlbumService:
         self._cache = memory_cache
         self._disk_cache = disk_cache
         self._preferences_service = preferences_service
+        self._revalidation_timestamps: dict[str, float] = {}
 
     async def is_album_cached(self, release_group_id: str) -> bool:
         cache_key = f"album_info:{release_group_id}"
@@ -46,7 +48,7 @@ class AlbumService:
         cached_info = await self._cache.get(cache_key)
         if cached_info:
             logger.info(f"Cache HIT (RAM): Album {release_group_id[:8]}... - instant load")
-            return cached_info
+            return await self._revalidate_library_status(release_group_id, cached_info)
         
         logger.debug(f"Cache MISS (RAM): Album {release_group_id[:8]}...")
         
@@ -54,6 +56,7 @@ class AlbumService:
         if disk_data:
             logger.info(f"Cache HIT (Disk): Album {release_group_id[:8]}... - loading from persistent cache")
             album_info = AlbumInfo(**disk_data)
+            album_info = await self._revalidate_library_status(release_group_id, album_info)
             advanced_settings = self._preferences_service.get_advanced_settings()
             ttl = advanced_settings.cache_ttl_album_library if album_info.in_library else advanced_settings.cache_ttl_album_non_library
             await self._cache.set(cache_key, album_info, ttl_seconds=ttl)
@@ -61,6 +64,25 @@ class AlbumService:
         
         logger.debug(f"Cache MISS (Disk): Album {release_group_id[:8]}...")
         return None
+
+    async def _revalidate_library_status(self, release_group_id: str, album_info: AlbumInfo) -> AlbumInfo:
+        _REVALIDATION_COOLDOWN = 60
+        now = time.monotonic()
+        last = self._revalidation_timestamps.get(release_group_id, 0.0)
+        if now - last < _REVALIDATION_COOLDOWN:
+            return album_info
+
+        library_mbids = await self._lidarr_repo.get_library_mbids(include_release_ids=True)
+        self._revalidation_timestamps[release_group_id] = time.monotonic()
+        current_in_library = release_group_id.lower() in library_mbids
+        if current_in_library != album_info.in_library:
+            logger.info(
+                f"Library status changed for album {release_group_id[:8]}...: "
+                f"{album_info.in_library} -> {current_in_library}, updating caches"
+            )
+            album_info.in_library = current_in_library
+            await self._save_album_to_cache(release_group_id, album_info)
+        return album_info
 
     async def _save_album_to_cache(self, release_group_id: str, album_info: AlbumInfo) -> None:
         cache_key = f"album_info:{release_group_id}"

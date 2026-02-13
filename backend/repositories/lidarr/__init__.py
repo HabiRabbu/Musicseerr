@@ -4,6 +4,7 @@ from .artist import LidarrArtistRepository
 from .history import LidarrHistoryRepository
 from .album import LidarrAlbumRepository
 from .config import LidarrConfigRepository
+from .queue import LidarrQueueRepository
 from .repository import LidarrRepository
 
 __all__ = [
@@ -13,5 +14,6 @@ __all__ = [
     "LidarrHistoryRepository",
     "LidarrAlbumRepository",
     "LidarrConfigRepository",
+    "LidarrQueueRepository",
     "LidarrRepository",
 ]

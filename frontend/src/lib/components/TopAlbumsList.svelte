@@ -58,7 +58,11 @@
 		requestingIds = new Set([...requestingIds, id]);
 		
 		try {
-			await requestAlbum(id);
+			await requestAlbum(id, {
+				artist: album.artist_name ?? undefined,
+				album: album.title ?? undefined,
+				year: album.year ?? undefined
+			});
 		} finally {
 			const newSet = new Set(requestingIds);
 			newSet.delete(id);
@@ -67,7 +71,7 @@
 	}
 </script>
 
-<div class="flex flex-col">
+<div class="flex flex-col min-w-0">
 	<h3 class="text-lg font-semibold mb-3">Popular Albums</h3>
 
 	{#if loading}
@@ -172,4 +176,3 @@
 		</div>
 	{/if}
 </div>
-

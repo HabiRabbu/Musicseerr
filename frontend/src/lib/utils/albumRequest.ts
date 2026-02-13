@@ -1,21 +1,37 @@
 import { errorModal } from '$lib/stores/errorModal';
 import { libraryStore } from '$lib/stores/library';
+import { notifyRequestCountChanged } from '$lib/utils/requestsApi';
 
-export interface AlbumRequestResult {
+export type AlbumRequestResult = {
 	success: boolean;
 	error?: string;
-}
+};
 
-export async function requestAlbum(musicbrainzId: string): Promise<AlbumRequestResult> {
+export type AlbumRequestContext = {
+	artist?: string;
+	album?: string;
+	year?: number | null;
+};
+
+export async function requestAlbum(
+	musicbrainzId: string,
+	context?: AlbumRequestContext
+): Promise<AlbumRequestResult> {
 	try {
-		const res = await fetch('/api/request', {
+		const res = await fetch('/api/requests/new', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ musicbrainz_id: musicbrainzId })
+			body: JSON.stringify({
+				musicbrainz_id: musicbrainzId,
+				artist: context?.artist ?? undefined,
+				album: context?.album ?? undefined,
+				year: context?.year ?? undefined
+			})
 		});
 
 		if (res.ok) {
 			libraryStore.addRequested(musicbrainzId);
+			notifyRequestCountChanged();
 			return { success: true };
 		}
 
@@ -56,6 +72,7 @@ export function createRequestHandler() {
 	async function handleRequest(
 		id: string,
 		options?: {
+			context?: AlbumRequestContext;
 			onSuccess?: () => void;
 			onError?: (error: string) => void;
 			updateLocalState?: () => void;
@@ -67,7 +84,7 @@ export function createRequestHandler() {
 		requestingIds = requestingIds;
 
 		try {
-			const result = await requestAlbum(id);
+			const result = await requestAlbum(id, options?.context);
 
 			if (result.success) {
 				options?.updateLocalState?.();

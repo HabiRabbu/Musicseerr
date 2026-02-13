@@ -280,7 +280,10 @@
 		requestingAlbums = requestingAlbums;
 
 		try {
-			const result = await requestAlbum(albumId);
+			const result = await requestAlbum(albumId, {
+				artist: artist?.name,
+				album: albumTitle
+			});
 
 			if (result.success && artist) {
 				const allReleases = [...artist.albums, ...artist.singles, ...artist.eps];
@@ -360,17 +363,16 @@
 			{/if}
 
 			<!-- Discovery Section: Top Albums & Top Songs side by side -->
-			<div class="flex flex-col md:flex-row gap-6 mt-8">
-				<div class="flex-1">
+			<div class="flex flex-col md:flex-row gap-6 mt-8 md:items-stretch">
+				<div class="flex-1 min-w-0">
 					<TopAlbumsList 
 						albums={topAlbums?.albums || []} 
 						loading={loadingDiscovery} 
 						configured={topAlbums?.configured ?? true} 
 					/>
 				</div>
-				<div class="hidden md:block w-px bg-base-content/15 self-stretch"></div>
-				<div class="block md:hidden h-px bg-base-content/15 w-full"></div>
-				<div class="flex-1">
+				<div class="shrink-0 bg-base-content/25 h-px w-full md:w-px md:h-auto md:self-stretch" aria-hidden="true"></div>
+				<div class="flex-1 min-w-0">
 					<TopSongsList 
 						songs={topSongs?.songs || []} 
 						loading={loadingDiscovery} 
