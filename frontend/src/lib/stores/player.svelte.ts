@@ -1,9 +1,21 @@
 import type { PlaybackSource, PlaybackState, NowPlaying, QueueItem } from '$lib/player/types';
-import { YouTubePlaybackSource } from '$lib/player/YouTubePlaybackSource';
+import { createPlaybackSource } from '$lib/player/createSource';
+import { playbackToast } from '$lib/stores/playbackToast.svelte';
 
 const VOLUME_STORAGE_KEY = 'musicseerr_player_volume';
 const SESSION_STORAGE_KEY = 'musicseerr_player_session';
-const PLAYER_ELEMENT_ID = 'yt-player-embed';
+const MAX_CONSECUTIVE_ERRORS = 3;
+const ERROR_SKIP_DELAY_MS = 2000;
+const SESSION_PERSIST_INTERVAL_MS = 5000;
+
+type StoredSession = {
+	nowPlaying: NowPlaying;
+	queue: QueueItem[];
+	currentIndex: number;
+	progress: number;
+	shuffleEnabled: boolean;
+	shuffleOrder: number[];
+};
 
 function getStoredVolume(): number {
 	try {
@@ -19,18 +31,20 @@ function storeVolume(volume: number): void {
 	} catch {}
 }
 
-function getStoredSession(): NowPlaying | null {
+function getStoredSession(): StoredSession | null {
 	try {
 		const stored = localStorage.getItem(SESSION_STORAGE_KEY);
-		if (stored) return JSON.parse(stored);
+		if (!stored) return null;
+		const parsed = JSON.parse(stored);
+		if (parsed && parsed.nowPlaying) return parsed as StoredSession;
 	} catch {}
 	return null;
 }
 
-function storeSession(nowPlaying: NowPlaying | null): void {
+function storeSessionData(data: StoredSession | null): void {
 	try {
-		if (nowPlaying) {
-			localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(nowPlaying));
+		if (data) {
+			localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(data));
 		} else {
 			localStorage.removeItem(SESSION_STORAGE_KEY);
 		}
@@ -60,6 +74,10 @@ function createPlayerStore() {
 	let currentIndex = $state(0);
 	let shuffleEnabled = $state(false);
 	let shuffleOrder = $state<number[]>([]);
+
+	let consecutiveErrors = 0;
+	let errorSkipTimeout: ReturnType<typeof setTimeout> | null = null;
+	let lastPersistTime = 0;
 
 	const isPlaying = $derived(playbackState === 'playing');
 	const isBuffering = $derived(playbackState === 'buffering' || playbackState === 'loading');
@@ -113,6 +131,11 @@ function createPlayerStore() {
 		const item = queue[index];
 		if (!item) return;
 
+		if (errorSkipTimeout) {
+			clearTimeout(errorSkipTimeout);
+			errorSkipTimeout = null;
+		}
+
 		currentSource?.destroy();
 		currentIndex = index;
 		playbackState = 'loading';
@@ -120,7 +143,7 @@ function createPlayerStore() {
 		duration = 0;
 
 		const gen = ++loadGeneration;
-		const source = new YouTubePlaybackSource(PLAYER_ELEMENT_ID);
+		const source = createPlaybackSource(item.sourceType);
 		currentSource = source;
 
 		const metadata: NowPlaying = {
@@ -132,23 +155,97 @@ function createPlayerStore() {
 			videoId: item.videoId,
 			trackName: item.trackName,
 			artistId: item.artistId,
+			streamUrl: item.streamUrl,
+			format: item.format,
 		};
 		nowPlaying = metadata;
-		storeSession(metadata);
+		persistSession();
 		subscribeToSource(source, gen);
 		source.setVolume(volume);
 
 		try {
-			await source.load({ videoId: item.videoId });
+			await source.load({
+				videoId: item.videoId,
+				url: item.streamUrl,
+				format: item.format,
+			});
+			if (gen === loadGeneration) {
+				source.play();
+			}
 		} catch {
-			if (gen === loadGeneration) playbackState = 'error';
+			if (gen === loadGeneration) handleTrackError(gen);
 		}
+	}
+
+	function handleTrackError(gen: number): void {
+		if (gen !== loadGeneration) return;
+		consecutiveErrors++;
+		playbackState = 'error';
+
+		const trackName = nowPlaying?.trackName ?? 'Unknown track';
+
+		if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
+			playbackToast.show(`Multiple tracks failed — playback stopped`, 'error');
+			currentSource?.destroy();
+			currentSource = null;
+			nowPlaying = null;
+			playbackState = 'idle';
+			isPlayerVisible = false;
+			progress = 0;
+			duration = 0;
+			queue = [];
+			currentIndex = 0;
+			shuffleOrder = [];
+			shuffleEnabled = false;
+			consecutiveErrors = 0;
+			storeSessionData(null);
+			return;
+		}
+
+		const nextIdx = getNextIndex();
+		if (nextIdx !== null) {
+			playbackToast.show(`"${trackName}" unavailable — skipping…`, 'warning');
+			errorSkipTimeout = setTimeout(() => {
+				errorSkipTimeout = null;
+				if (gen === loadGeneration) void loadQueueItem(nextIdx);
+			}, ERROR_SKIP_DELAY_MS);
+		} else {
+			playbackToast.show(`"${trackName}" unavailable`, 'error');
+		}
+	}
+
+	function prefetchNextTrack(): void {
+		const nextIdx = getNextIndex();
+		if (nextIdx === null) return;
+		const nextItem = queue[nextIdx];
+		if (!nextItem?.streamUrl) return;
+		if (nextItem.sourceType === 'youtube') return;
+		void fetch(nextItem.streamUrl, { method: 'HEAD' }).catch(() => {});
+	}
+
+	function persistSession(): void {
+		if (!nowPlaying) {
+			storeSessionData(null);
+			return;
+		}
+		storeSessionData({
+			nowPlaying,
+			queue,
+			currentIndex,
+			progress,
+			shuffleEnabled,
+			shuffleOrder,
+		});
 	}
 
 	function subscribeToSource(source: PlaybackSource, gen: number): void {
 		source.onStateChange((state) => {
 			if (gen !== loadGeneration) return;
 			playbackState = state;
+			if (state === 'playing') {
+				consecutiveErrors = 0;
+				prefetchNextTrack();
+			}
 			if (state === 'ended') {
 				const nextIdx = getNextIndex();
 				if (nextIdx !== null) {
@@ -164,7 +261,7 @@ function createPlayerStore() {
 					queue = [];
 					currentIndex = 0;
 					shuffleOrder = [];
-					storeSession(null);
+					storeSessionData(null);
 				}
 			}
 		});
@@ -173,11 +270,16 @@ function createPlayerStore() {
 			if (gen !== loadGeneration) return;
 			progress = currentTime;
 			duration = totalDuration;
+			const now = Date.now();
+			if (now - lastPersistTime >= SESSION_PERSIST_INTERVAL_MS) {
+				lastPersistTime = now;
+				persistSession();
+			}
 		});
 
 		source.onError(() => {
 			if (gen !== loadGeneration) return;
-			playbackState = 'error';
+			handleTrackError(gen);
 		});
 	}
 
@@ -247,9 +349,10 @@ function createPlayerStore() {
 			queue = [];
 			currentIndex = 0;
 			shuffleOrder = [];
+			consecutiveErrors = 0;
 			subscribeToSource(source, gen);
 			source.setVolume(volume);
-			storeSession(metadata);
+			persistSession();
 		},
 
 		playQueue(items: QueueItem[], startIndex: number = 0, shuffle: boolean = false): void {
@@ -257,6 +360,7 @@ function createPlayerStore() {
 			queue = items;
 			shuffleEnabled = shuffle;
 			isPlayerVisible = true;
+			consecutiveErrors = 0;
 
 			if (shuffle) {
 				shuffleOrder = shuffleArray(items.length);
@@ -303,6 +407,7 @@ function createPlayerStore() {
 
 		pause(): void {
 			currentSource?.pause();
+			persistSession();
 		},
 
 		togglePlay(): void {
@@ -316,6 +421,7 @@ function createPlayerStore() {
 		seekTo(seconds: number): void {
 			currentSource?.seekTo(seconds);
 			progress = seconds;
+			persistSession();
 		},
 
 		setVolume(level: number): void {
@@ -326,6 +432,11 @@ function createPlayerStore() {
 		},
 
 		stop(): void {
+			if (errorSkipTimeout) {
+				clearTimeout(errorSkipTimeout);
+				errorSkipTimeout = null;
+			}
+			loadGeneration++;
 			currentSource?.destroy();
 			currentSource = null;
 			nowPlaying = null;
@@ -337,11 +448,68 @@ function createPlayerStore() {
 			currentIndex = 0;
 			shuffleOrder = [];
 			shuffleEnabled = false;
-			storeSession(null);
+			consecutiveErrors = 0;
+			storeSessionData(null);
 		},
 
-		restoreSession(): NowPlaying | null {
+		restoreSession(): StoredSession | null {
 			return getStoredSession();
+		},
+
+		resumeSession(): void {
+			const session = getStoredSession();
+			if (!session) return;
+			const { nowPlaying: stored, queue: storedQueue, currentIndex: storedIndex, progress: storedProgress, shuffleEnabled: storedShuffle, shuffleOrder: storedOrder } = session;
+			if (stored.sourceType === 'youtube') return;
+			if (!storedQueue.length) return;
+
+			queue = storedQueue;
+			shuffleEnabled = storedShuffle;
+			shuffleOrder = storedOrder;
+			isPlayerVisible = true;
+			consecutiveErrors = 0;
+
+			const item = storedQueue[storedIndex];
+			if (!item) return;
+
+			currentSource?.destroy();
+			currentIndex = storedIndex;
+			playbackState = 'loading';
+			progress = 0;
+			duration = 0;
+
+			const gen = ++loadGeneration;
+			const source = createPlaybackSource(item.sourceType);
+			currentSource = source;
+			nowPlaying = stored;
+			subscribeToSource(source, gen);
+			source.setVolume(volume);
+
+			const resumePos = storedProgress;
+			let resumed = false;
+			source.onStateChange((state) => {
+				if (resumed || gen !== loadGeneration) return;
+				if (state === 'playing') {
+					resumed = true;
+					if (resumePos > 0) source.seekTo(resumePos);
+					source.pause();
+				}
+			});
+
+			void source.load({
+				videoId: item.videoId,
+				url: item.streamUrl,
+				format: item.format,
+			}).then(() => {
+				if (gen === loadGeneration) {
+					source.play();
+				}
+			}).catch(() => {
+				if (gen === loadGeneration) {
+					playbackState = 'error';
+					storeSessionData(null);
+				}
+			});
 		}
 	};
 }

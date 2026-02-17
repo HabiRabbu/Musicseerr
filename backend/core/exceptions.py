@@ -31,3 +31,7 @@ class ConfigurationError(MusicseerrException):
 
 class CacheError(MusicseerrException):
     pass
+
+
+class PlaybackNotAllowedError(ExternalServiceError):
+    pass

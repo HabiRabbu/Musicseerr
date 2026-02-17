@@ -12,6 +12,10 @@ services:
     volumes:
       - ./config:/app/config  # Persistent app configuration
       - ./cache:/app/cache    # Cover art & metadata cache
+      # Optional: mount your music library for local file playback
+      # The left side is the host path to your music (same as Lidarr's root folder).
+      # The right side (/music) must match the "Music Directory Path" in Settings > Local Files.
+      # - /path/to/music:/music:ro
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8688/health"]

@@ -57,6 +57,10 @@ class HomeService:
     def _is_youtube_enabled(self) -> bool:
         yt_settings = self._preferences.get_youtube_connection()
         return yt_settings.enabled and bool(yt_settings.api_key)
+
+    def _is_local_files_enabled(self) -> bool:
+        lf_settings = self._preferences.get_local_files_connection()
+        return lf_settings.enabled and bool(lf_settings.music_path)
     
     def _get_listenbrainz_username(self) -> str | None:
         lb_settings = self._preferences.get_listenbrainz_connection()
@@ -68,6 +72,7 @@ class HomeService:
             "jellyfin": self._is_jellyfin_enabled(),
             "lidarr": self._is_lidarr_configured(),
             "youtube": self._is_youtube_enabled(),
+            "localfiles": self._is_local_files_enabled(),
         }
 
     async def get_genre_artist(self, genre_name: str) -> str | None:

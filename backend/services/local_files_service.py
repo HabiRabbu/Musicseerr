@@ -1,0 +1,512 @@
+import asyncio
+import logging
+import os
+import shutil
+from collections.abc import AsyncGenerator
+from pathlib import Path
+from typing import Any
+
+import aiofiles
+
+from api.v1.schemas.local_files import (
+    FormatInfo,
+    LocalAlbumMatch,
+    LocalAlbumSummary,
+    LocalPaginatedResponse,
+    LocalStorageStats,
+    LocalTrackInfo,
+)
+from api.v1.schemas.settings import LocalFilesVerifyResponse
+from core.exceptions import ExternalServiceError, ResourceNotFoundError
+from infrastructure.cache.memory_cache import CacheInterface
+from infrastructure.constants import STREAM_CHUNK_SIZE
+from repositories.lidarr.repository import LidarrRepository
+from services.preferences_service import PreferencesService
+
+logger = logging.getLogger(__name__)
+
+AUDIO_EXTENSIONS: set[str] = {
+    ".flac", ".mp3", ".ogg", ".m4a", ".aac", ".wav", ".wma", ".opus",
+}
+
+CONTENT_TYPE_MAP: dict[str, str] = {
+    ".flac": "audio/flac",
+    ".mp3": "audio/mpeg",
+    ".ogg": "audio/ogg",
+    ".m4a": "audio/mp4",
+    ".aac": "audio/aac",
+    ".wav": "audio/wav",
+    ".wma": "audio/x-ms-wma",
+    ".opus": "audio/opus",
+}
+
+
+class LocalFilesService:
+    _STORAGE_STATS_TTL = 300
+    _ALBUM_LIST_TTL = 120
+
+    def __init__(
+        self,
+        lidarr_repo: LidarrRepository,
+        preferences_service: PreferencesService,
+        cache: CacheInterface,
+    ):
+        self._lidarr = lidarr_repo
+        self._preferences = preferences_service
+        self._cache = cache
+
+    def _get_config(self) -> tuple[str, str]:
+        settings = self._preferences.get_local_files_connection()
+        return settings.music_path, settings.lidarr_root_path
+
+    def _remap_path(self, lidarr_path: str) -> Path:
+        music_path, lidarr_root = self._get_config()
+        lidarr_root = lidarr_root.rstrip("/")
+        lidarr_root_parts = Path(lidarr_root).parts
+        lidarr_path_obj = Path(lidarr_path)
+        lidarr_path_parts = lidarr_path_obj.parts
+
+        if (
+            len(lidarr_path_parts) >= len(lidarr_root_parts)
+            and lidarr_path_parts[: len(lidarr_root_parts)] == lidarr_root_parts
+        ):
+            relative = Path(*lidarr_path_parts[len(lidarr_root_parts):])
+        else:
+            relative = Path(lidarr_path.lstrip("/"))
+        return Path(music_path) / relative
+
+    async def _fetch_all_albums(self) -> list[dict[str, Any]]:
+        cache_key = "local_files_all_albums"
+        cached = await self._cache.get(cache_key)
+        if cached is not None:
+            return cached
+        data = await self._lidarr.get_all_albums()
+        if data:
+            await self._cache.set(
+                cache_key, data, ttl_seconds=self._ALBUM_LIST_TTL
+            )
+        return data or []
+
+    def _resolve_and_validate_path(self, lidarr_path: str) -> Path:
+        music_path, _ = self._get_config()
+        resolved = self._remap_path(lidarr_path)
+        canonical = resolved.resolve()
+        music_root = Path(music_path).resolve()
+
+        if not canonical.is_relative_to(music_root):
+            raise PermissionError("Path outside music directory")
+        if not canonical.exists():
+            raise ResourceNotFoundError(f"File not found: {canonical.name}")
+        return canonical
+
+    async def get_track_file_path(self, track_file_id: int) -> str:
+        try:
+            data = await self._lidarr.get_track_file(track_file_id)
+            if not data:
+                raise ResourceNotFoundError(f"Track file {track_file_id} not found in Lidarr")
+            path = data.get("path", "")
+            return path
+        except ResourceNotFoundError:
+            raise
+        except Exception as e:
+            raise ExternalServiceError(f"Failed to get track file from Lidarr: {e}")
+
+    async def stream_track(
+        self,
+        track_file_id: int,
+        range_header: str | None = None,
+    ) -> tuple[AsyncGenerator[bytes, None], dict[str, str], int]:
+        lidarr_path = await self.get_track_file_path(track_file_id)
+        file_path = self._resolve_and_validate_path(lidarr_path)
+
+        suffix = file_path.suffix.lower()
+        if suffix not in AUDIO_EXTENSIONS:
+            raise ExternalServiceError(
+                f"Unsupported audio format: {suffix or 'unknown'}"
+            )
+
+        try:
+            stat_result = await asyncio.to_thread(file_path.stat)
+        except OSError as exc:
+            raise ResourceNotFoundError(
+                f"Cannot access file: {file_path.name} ({exc})"
+            )
+
+        file_size = stat_result.st_size
+        content_type = CONTENT_TYPE_MAP.get(suffix, "application/octet-stream")
+
+        if range_header and range_header.startswith("bytes="):
+            range_spec = range_header[6:]
+            start_str, _, end_str = range_spec.partition("-")
+
+            try:
+                if not start_str and end_str:
+                    suffix_len = int(end_str)
+                    start = max(0, file_size - suffix_len)
+                    end = file_size - 1
+                elif start_str and not end_str:
+                    start = int(start_str)
+                    end = file_size - 1
+                elif start_str and end_str:
+                    start = int(start_str)
+                    end = int(end_str)
+                else:
+                    raise ValueError("Empty range")
+            except ValueError:
+                return self._iter_file(file_path, 0, file_size), {
+                    "Content-Type": content_type,
+                    "Content-Length": str(file_size),
+                    "Accept-Ranges": "bytes",
+                }, 200
+
+            end = min(end, file_size - 1)
+            if start < 0 or start > end or start >= file_size:
+                raise ExternalServiceError(
+                    f"Range not satisfiable: {range_header} (file size: {file_size})"
+                )
+
+            length = end - start + 1
+
+            headers = {
+                "Content-Type": content_type,
+                "Content-Length": str(length),
+                "Content-Range": f"bytes {start}-{end}/{file_size}",
+                "Accept-Ranges": "bytes",
+            }
+            return self._iter_file(file_path, start, length), headers, 206
+
+        headers = {
+            "Content-Type": content_type,
+            "Content-Length": str(file_size),
+            "Accept-Ranges": "bytes",
+        }
+        return self._iter_file(file_path, 0, file_size), headers, 200
+
+    async def _iter_file(
+        self, path: Path, offset: int, length: int
+    ) -> AsyncGenerator[bytes, None]:
+        remaining = length
+        try:
+            async with aiofiles.open(path, "rb") as f:
+                await f.seek(offset)
+                while remaining > 0:
+                    chunk_size = min(STREAM_CHUNK_SIZE, remaining)
+                    data = await f.read(chunk_size)
+                    if not data:
+                        break
+                    remaining -= len(data)
+                    yield data
+        except OSError as exc:
+            logger.warning(
+                "Local file read error mid-stream",
+                extra={"path": str(path), "error": str(exc)},
+            )
+
+    async def get_album_track_files(
+        self, lidarr_album_id: int
+    ) -> list[dict[str, Any]]:
+        data = await self._lidarr.get_track_files_by_album(lidarr_album_id)
+        if not data:
+            return []
+
+        track_files = []
+        for tf in data:
+            path_str: str = tf.get("path", "")
+            suffix = Path(path_str).suffix.lower().lstrip(".")
+            quality = tf.get("quality", {})
+            quality_detail = quality.get("quality", {})
+
+            track_files.append({
+                "track_file_id": tf.get("id"),
+                "path": path_str,
+                "size_bytes": tf.get("size", 0),
+                "format": suffix if suffix else "unknown",
+                "bitrate": quality_detail.get("bitrate"),
+                "date_added": tf.get("dateAdded"),
+            })
+
+        return track_files
+
+    async def _build_track_list(
+        self, album_id: int
+    ) -> tuple[list[LocalTrackInfo], int, dict[str, int]]:
+        tracks = await self._lidarr.get_album_tracks(album_id)
+        track_files = await self.get_album_track_files(album_id)
+
+        file_map: dict[int, dict[str, Any]] = {
+            tf["track_file_id"]: tf for tf in track_files if tf.get("track_file_id")
+        }
+
+        result: list[LocalTrackInfo] = []
+        total_size = 0
+        format_counts: dict[str, int] = {}
+
+        for track in tracks:
+            tf_id = track.get("track_file_id")
+            has_file = track.get("has_file", False)
+            if not has_file or not tf_id:
+                continue
+
+            tf = file_map.get(tf_id, {})
+            fmt = tf.get("format", "unknown")
+            size = tf.get("size_bytes", 0)
+            total_size += size
+            format_counts[fmt] = format_counts.get(fmt, 0) + 1
+
+            result.append(LocalTrackInfo(
+                track_file_id=tf_id,
+                title=track.get("title", "Unknown"),
+                track_number=track.get("position", 0),
+                duration_seconds=(track.get("duration_ms", 0) or 0) / 1000.0,
+                size_bytes=size,
+                format=fmt,
+                bitrate=tf.get("bitrate"),
+                date_added=tf.get("date_added"),
+            ))
+
+        return result, total_size, format_counts
+
+    async def match_album_by_mbid(
+        self, musicbrainz_id: str
+    ) -> LocalAlbumMatch:
+        album_data = await self._lidarr.get_album_details(musicbrainz_id)
+        if not album_data:
+            return LocalAlbumMatch(found=False)
+
+        album_id: int = album_data.get("id", 0)
+        if not album_id:
+            return LocalAlbumMatch(found=False)
+
+        result_tracks, total_size, format_counts = await self._build_track_list(album_id)
+        primary_format = max(format_counts, key=lambda k: format_counts[k]) if format_counts else None
+
+        return LocalAlbumMatch(
+            found=bool(result_tracks),
+            tracks=result_tracks,
+            total_size_bytes=total_size,
+            primary_format=primary_format,
+        )
+
+    def _library_album_to_summary(
+        self, item: Any, album_id: int, track_file_count: int
+    ) -> LocalAlbumSummary:
+        artist_data = item.get("artist", {})
+        year = None
+        if date := item.get("releaseDate"):
+            try:
+                year = int(date.split("-")[0])
+            except ValueError:
+                pass
+
+        cover_url = None
+        images = item.get("images", [])
+        for img in images:
+            if img.get("coverType") == "cover":
+                cover_url = img.get("remoteUrl") or img.get("url")
+                break
+        if not cover_url and images:
+            cover_url = images[0].get("remoteUrl") or images[0].get("url")
+
+        total_size = item.get("statistics", {}).get("sizeOnDisk", 0)
+
+        return LocalAlbumSummary(
+            lidarr_album_id=album_id,
+            musicbrainz_id=item.get("foreignAlbumId", ""),
+            name=item.get("title", "Unknown"),
+            artist_name=artist_data.get("artistName", "Unknown"),
+            artist_mbid=artist_data.get("foreignArtistId"),
+            year=year,
+            track_count=track_file_count,
+            total_size_bytes=total_size,
+            cover_url=cover_url,
+            date_added=item.get("added"),
+        )
+
+    async def get_albums(
+        self,
+        limit: int = 50,
+        offset: int = 0,
+        sort_by: str = "name",
+        search_query: str | None = None,
+    ) -> LocalPaginatedResponse:
+        all_albums = await self._fetch_all_albums()
+
+        albums_with_files: list[dict[str, Any]] = []
+        for item in all_albums:
+            stats = item.get("statistics", {})
+            track_file_count = stats.get("trackFileCount", 0)
+            if track_file_count > 0:
+                albums_with_files.append(item)
+
+        if search_query:
+            q = search_query.lower()
+            albums_with_files = [
+                a for a in albums_with_files
+                if q in a.get("title", "").lower()
+                or q in a.get("artist", {}).get("artistName", "").lower()
+            ]
+
+        if sort_by == "date_added":
+            albums_with_files.sort(
+                key=lambda a: a.get("added", ""),
+                reverse=True,
+            )
+        elif sort_by == "year":
+            albums_with_files.sort(
+                key=lambda a: a.get("releaseDate", "") or "",
+                reverse=True,
+            )
+        else:
+            albums_with_files.sort(
+                key=lambda a: a.get("title", "").lower(),
+            )
+
+        total = len(albums_with_files)
+        page_items = albums_with_files[offset : offset + limit]
+
+        summaries = [
+            self._library_album_to_summary(
+                item,
+                item.get("id", 0),
+                item.get("statistics", {}).get("trackFileCount", 0),
+            )
+            for item in page_items
+        ]
+
+        return LocalPaginatedResponse(
+            items=summaries, total=total, offset=offset, limit=limit
+        )
+
+    async def get_album_tracks_by_id(
+        self, lidarr_album_id: int
+    ) -> list[LocalTrackInfo]:
+        result, _, _ = await self._build_track_list(lidarr_album_id)
+        return result
+
+    async def search(self, query: str) -> list[LocalAlbumSummary]:
+        result = await self.get_albums(
+            limit=50, offset=0, search_query=query
+        )
+        return result.items
+
+    async def get_recently_added(
+        self, limit: int = 20
+    ) -> list[LocalAlbumSummary]:
+        result = await self.get_albums(
+            limit=limit, offset=0, sort_by="date_added"
+        )
+        return result.items
+
+    async def get_storage_stats(self) -> LocalStorageStats:
+        cache_key = "local_files_storage_stats"
+        cached = await self._cache.get(cache_key)
+        if cached and isinstance(cached, dict):
+            try:
+                return LocalStorageStats(**cached)
+            except Exception:
+                pass
+
+        music_path, _ = self._get_config()
+        root = Path(music_path)
+        if not root.exists():
+            return LocalStorageStats()
+        stats = await asyncio.to_thread(self._scan_storage_sync, root)
+
+        await self._cache.set(
+            cache_key, stats.model_dump(), ttl_seconds=self._STORAGE_STATS_TTL
+        )
+        return stats
+
+    def _scan_storage_sync(self, root: Path) -> LocalStorageStats:
+        total_tracks = 0
+        total_size = 0
+        format_breakdown: dict[str, dict[str, int]] = {}
+        album_dirs: set[str] = set()
+        artist_dirs: set[str] = set()
+
+        try:
+            for dirpath, _dirs, files in os.walk(root):
+                rel = Path(dirpath).relative_to(root)
+                parts = rel.parts
+                if len(parts) >= 1:
+                    artist_dirs.add(parts[0])
+                if len(parts) >= 2:
+                    album_dirs.add(f"{parts[0]}/{parts[1]}")
+
+                for fname in files:
+                    ext = Path(fname).suffix.lower()
+                    if ext not in AUDIO_EXTENSIONS:
+                        continue
+                    total_tracks += 1
+                    fp = Path(dirpath) / fname
+                    try:
+                        sz = fp.stat().st_size
+                    except OSError:
+                        sz = 0
+                    total_size += sz
+
+                    fmt = ext.lstrip(".")
+                    if fmt not in format_breakdown:
+                        format_breakdown[fmt] = {"count": 0, "size_bytes": 0}
+                    format_breakdown[fmt]["count"] += 1
+                    format_breakdown[fmt]["size_bytes"] += sz
+
+        except PermissionError:
+            logger.warning("Permission denied scanning music directory")
+
+        disk = shutil.disk_usage(root)
+
+        typed_breakdown: dict[str, FormatInfo] = {}
+        for fmt_name, fmt_data in format_breakdown.items():
+            typed_breakdown[fmt_name] = FormatInfo(
+                count=fmt_data["count"],
+                size_bytes=fmt_data["size_bytes"],
+                size_human=self._human_size(fmt_data["size_bytes"]),
+            )
+
+        return LocalStorageStats(
+            total_tracks=total_tracks,
+            total_albums=len(album_dirs),
+            total_artists=len(artist_dirs),
+            total_size_bytes=total_size,
+            total_size_human=self._human_size(total_size),
+            disk_free_bytes=disk.free,
+            disk_free_human=self._human_size(disk.free),
+            format_breakdown=typed_breakdown,
+        )
+
+    @staticmethod
+    def _human_size(size_bytes: int) -> str:
+        size = float(size_bytes)
+        for unit in ("B", "KB", "MB", "GB", "TB"):
+            if abs(size) < 1024.0:
+                return f"{size:.1f} {unit}"
+            size /= 1024.0
+        return f"{size:.1f} PB"
+
+    async def verify_path(self, music_path_str: str) -> LocalFilesVerifyResponse:
+        return await asyncio.to_thread(self._verify_path_sync, music_path_str)
+
+    def _verify_path_sync(self, music_path_str: str) -> LocalFilesVerifyResponse:
+        music_path = Path(music_path_str)
+        if not music_path.exists():
+            return LocalFilesVerifyResponse(success=False, message=f"Path does not exist: {music_path_str}")
+        if not music_path.is_dir():
+            return LocalFilesVerifyResponse(success=False, message=f"Path is not a directory: {music_path_str}")
+        if not os.access(music_path, os.R_OK):
+            return LocalFilesVerifyResponse(success=False, message=f"Path is not readable: {music_path_str}")
+
+        track_count = 0
+        try:
+            for _root, _dirs, files in os.walk(music_path):
+                track_count += sum(1 for f in files if Path(f).suffix.lower() in AUDIO_EXTENSIONS)
+                if track_count > 50000:
+                    break
+        except PermissionError:
+            return LocalFilesVerifyResponse(success=False, message="Permission denied while scanning directory")
+
+        return LocalFilesVerifyResponse(
+            success=True,
+            message=f"Connected — {track_count:,} audio files found",
+            track_count=track_count,
+        )

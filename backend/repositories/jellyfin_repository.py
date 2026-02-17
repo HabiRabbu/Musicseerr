@@ -1,8 +1,9 @@
 import httpx
 import logging
 from typing import Any
-from core.exceptions import ExternalServiceError
+from core.exceptions import ExternalServiceError, ResourceNotFoundError
 from infrastructure.cache.memory_cache import CacheInterface
+from infrastructure.cache.persistent_cache import LibraryCache
 from infrastructure.resilience.retry import with_retry, CircuitBreaker
 from repositories.jellyfin_models import JellyfinItem, JellyfinUser, parse_item, parse_user
 
@@ -23,10 +24,12 @@ class JellyfinRepository:
         cache: CacheInterface,
         base_url: str = "",
         api_key: str = "",
-        user_id: str = ""
+        user_id: str = "",
+        library_cache: LibraryCache | None = None,
     ):
         self._client = http_client
         self._cache = cache
+        self._library_cache = library_cache
         self._base_url = base_url.rstrip("/") if base_url else ""
         self._api_key = api_key
         self._user_id = user_id
@@ -187,7 +190,8 @@ class JellyfinRepository:
         params: dict[str, Any],
         error_msg: str,
         ttl: int = 300,
-        filter_fn=None
+        filter_fn=None,
+        raise_on_error: bool = False,
     ) -> list[JellyfinItem]:
         cached = await self._cache.get(cache_key)
         if cached:
@@ -195,6 +199,8 @@ class JellyfinRepository:
         try:
             result = await self._get(endpoint, params=params)
             if not result:
+                if raise_on_error:
+                    raise ExternalServiceError(f"{error_msg}: empty response from Jellyfin")
                 logger.warning(f"{error_msg}: _get returned None/empty")
                 return []
             raw_items = result.get("Items", []) if isinstance(result, dict) else result
@@ -202,8 +208,12 @@ class JellyfinRepository:
             if items:
                 await self._cache.set(cache_key, items, ttl_seconds=ttl)
             return items
+        except ExternalServiceError:
+            raise
         except Exception as e:
             logger.error(f"{error_msg}: {e}")
+            if raise_on_error:
+                raise ExternalServiceError(f"{error_msg}: {e}") from e
             return []
 
     async def get_recently_played(self, user_id: str | None = None, limit: int = 20) -> list[JellyfinItem]:
@@ -290,6 +300,9 @@ class JellyfinRepository:
             logger.error(f"Failed to get artists by genre: {e}")
             return []
     
+    def get_auth_headers(self) -> dict[str, str]:
+        return {"X-Emby-Token": self._api_key}
+
     def get_image_url(self, item_id: str, image_tag: str | None = None) -> str | None:
         if not self._base_url or not item_id:
             return None
@@ -299,3 +312,307 @@ class JellyfinRepository:
             url += f"?tag={image_tag}"
         
         return url
+
+    async def _post(
+        self,
+        endpoint: str,
+        json_data: dict[str, Any] | None = None,
+    ) -> Any:
+        return await self._request("POST", endpoint, json_data=json_data)
+
+    async def get_albums(
+        self,
+        limit: int = 50,
+        offset: int = 0,
+        sort_by: str = "SortName",
+        genre: str | None = None,
+    ) -> tuple[list[JellyfinItem], int]:
+        uid = self._user_id
+        params: dict[str, Any] = {
+            "includeItemTypes": "MusicAlbum",
+            "recursive": "true",
+            "sortBy": sort_by,
+            "sortOrder": "Ascending",
+            "limit": limit,
+            "startIndex": offset,
+            "enableUserData": "true",
+            "Fields": "ProviderIds,ChildCount",
+        }
+        if uid:
+            params["userId"] = uid
+        if genre:
+            params["genres"] = genre
+        cache_key = f"jellyfin_albums:{uid}:{limit}:{offset}:{sort_by}:{genre}"
+        cached = await self._cache.get(cache_key)
+        if cached:
+            return cached
+
+        try:
+            result = await self._get("/Items", params=params)
+            if not result:
+                return [], 0
+            raw_items = result.get("Items", [])
+            total = result.get("TotalRecordCount", len(raw_items))
+            items = [parse_item(i) for i in raw_items]
+            pair = (items, total)
+            if items:
+                await self._cache.set(cache_key, pair, ttl_seconds=120)
+            return pair
+        except Exception as e:
+            logger.error("Failed to get albums: %s", e)
+            return [], 0
+
+    async def get_album_tracks(self, album_id: str) -> list[JellyfinItem]:
+        uid = self._user_id
+        params: dict[str, Any] = {
+            "albumIds": album_id,
+            "includeItemTypes": "Audio",
+            "sortBy": "IndexNumber",
+            "sortOrder": "Ascending",
+            "recursive": "true",
+            "enableUserData": "true",
+            "Fields": "ProviderIds,MediaStreams",
+        }
+        if uid:
+            params["userId"] = uid
+        cache_key = f"jellyfin_album_tracks:{album_id}"
+        return await self._fetch_items(
+            "/Items",
+            cache_key,
+            params,
+            f"Failed to get tracks for album {album_id}",
+            ttl=120,
+            raise_on_error=True,
+        )
+
+    async def get_album_detail(self, album_id: str) -> JellyfinItem | None:
+        uid = self._user_id
+        params: dict[str, Any] = {"Fields": "ProviderIds,ChildCount"}
+        if uid:
+            params["userId"] = uid
+        try:
+            result = await self._get(f"/Items/{album_id}", params=params)
+            return parse_item(result) if result else None
+        except Exception as e:
+            logger.error(f"Failed to get album detail {album_id}: {e}")
+            return None
+
+    async def get_album_by_mbid(self, musicbrainz_id: str) -> JellyfinItem | None:
+        index = await self.build_mbid_index()
+        jellyfin_id = index.get(musicbrainz_id)
+        if jellyfin_id:
+            return await self.get_album_detail(jellyfin_id)
+
+        try:
+            results = await self.search_items(musicbrainz_id, item_types="MusicAlbum")
+            for item in results:
+                if not item.provider_ids:
+                    continue
+                if (
+                    item.provider_ids.get("MusicBrainzReleaseGroup") == musicbrainz_id
+                    or item.provider_ids.get("MusicBrainzAlbum") == musicbrainz_id
+                ):
+                    return item
+        except Exception as e:
+            logger.debug(f"MBID search fallback failed for {musicbrainz_id}: {e}")
+
+        return None
+
+    async def get_artists(
+        self, limit: int = 50, offset: int = 0
+    ) -> list[JellyfinItem]:
+        params: dict[str, Any] = {
+            "limit": limit,
+            "startIndex": offset,
+            "enableUserData": "true",
+            "Fields": "ProviderIds",
+        }
+        if self._user_id:
+            params["userId"] = self._user_id
+        cache_key = f"jellyfin_artists:{self._user_id}:{limit}:{offset}"
+        return await self._fetch_items(
+            "/Artists", cache_key, params, "Failed to get artists", ttl=120
+        )
+
+    async def build_mbid_index(self) -> dict[str, str]:
+        cache_key = f"jellyfin_mbid_index:{self._user_id or 'default'}"
+        cached = await self._cache.get(cache_key)
+        if cached:
+            return cached
+
+        if self._library_cache:
+            sqlite_index = await self._library_cache.load_jellyfin_mbid_index(
+                max_age_seconds=3600
+            )
+            if sqlite_index:
+                await self._cache.set(cache_key, sqlite_index, ttl_seconds=3600)
+                logger.info(
+                    f"Loaded MBID index from SQLite with {len(sqlite_index)} entries"
+                )
+                return sqlite_index
+
+        index: dict[str, str] = {}
+        try:
+            offset = 0
+            batch_size = 500
+            while True:
+                params: dict[str, Any] = {
+                    "includeItemTypes": "MusicAlbum",
+                    "recursive": "true",
+                    "Fields": "ProviderIds",
+                    "limit": batch_size,
+                    "startIndex": offset,
+                }
+                if self._user_id:
+                    params["userId"] = self._user_id
+
+                result = await self._get("/Items", params=params)
+                if not result:
+                    break
+
+                items = result.get("Items", [])
+                if not items:
+                    break
+
+                for item in items:
+                    provider_ids = item.get("ProviderIds", {})
+                    item_id = item.get("Id")
+                    if not item_id:
+                        continue
+                    rg_mbid = provider_ids.get("MusicBrainzReleaseGroup")
+                    if rg_mbid:
+                        index[rg_mbid] = item_id
+                    release_mbid = provider_ids.get("MusicBrainzAlbum")
+                    if release_mbid:
+                        index[release_mbid] = item_id
+
+                total = result.get("TotalRecordCount", 0)
+                offset += batch_size
+                if offset >= total:
+                    break
+
+            if index:
+                await self._cache.set(cache_key, index, ttl_seconds=3600)
+                if self._library_cache:
+                    await self._library_cache.save_jellyfin_mbid_index(index)
+            logger.info(f"Built Jellyfin MBID index with {len(index)} entries")
+        except Exception as e:
+            logger.error(f"Failed to build MBID index: {e}")
+
+        return index
+
+    async def search_items(
+        self,
+        query: str,
+        item_types: str = "MusicAlbum,Audio,MusicArtist",
+    ) -> list[JellyfinItem]:
+        params: dict[str, Any] = {
+            "searchTerm": query,
+            "includeItemTypes": item_types,
+            "limit": 50,
+            "Fields": "ProviderIds",
+        }
+        if self._user_id:
+            params["userId"] = self._user_id
+        try:
+            result = await self._get("/Search/Hints", params=params)
+            if not result:
+                return []
+            raw_items = result.get("SearchHints", [])
+            return [parse_item(item) for item in raw_items]
+        except Exception as e:
+            logger.error(f"Jellyfin search failed for '{query}': {e}")
+            return []
+
+    async def get_library_stats(self) -> dict[str, Any]:
+        cache_key = "jellyfin_library_stats"
+        cached = await self._cache.get(cache_key)
+        if cached:
+            return cached
+
+        stats: dict[str, Any] = {"total_albums": 0, "total_artists": 0, "total_tracks": 0}
+        try:
+            for item_type, key in [
+                ("MusicAlbum", "total_albums"),
+                ("MusicArtist", "total_artists"),
+                ("Audio", "total_tracks"),
+            ]:
+                params: dict[str, Any] = {
+                    "includeItemTypes": item_type,
+                    "recursive": "true",
+                    "limit": 0,
+                }
+                if self._user_id:
+                    params["userId"] = self._user_id
+                result = await self._get("/Items", params=params)
+                if result:
+                    stats[key] = result.get("TotalRecordCount", 0)
+
+            await self._cache.set(cache_key, stats, ttl_seconds=600)
+        except Exception as e:
+            logger.error(f"Failed to get library stats: {e}")
+
+        return stats
+
+    def get_stream_url(
+        self, item_id: str, audio_codec: str = "aac", bitrate: int = 128000
+    ) -> str:
+        container = audio_codec if audio_codec != "vorbis" else "ogg"
+        parts = [
+            f"{self._base_url}/Audio/{item_id}/universal",
+            f"?container={container}",
+            f"&audioCodec={audio_codec}",
+            f"&audioBitRate={bitrate}",
+            f"&maxAudioChannels=2",
+            f"&transcodingContainer={container}",
+            f"&transcodingProtocol=http",
+        ]
+        if self._user_id:
+            parts.append(f"&userId={self._user_id}")
+        return "".join(parts)
+
+    async def get_playback_info(self, item_id: str) -> dict[str, Any]:
+        params: dict[str, Any] = {}
+        if self._user_id:
+            params["userId"] = self._user_id
+        result = await self._get(f"/Items/{item_id}/PlaybackInfo", params=params)
+        if not result:
+            raise ResourceNotFoundError(f"Playback info not found for {item_id}")
+        return result
+
+    async def report_playback_start(
+        self, item_id: str, play_session_id: str
+    ) -> None:
+        body: dict[str, Any] = {
+            "ItemId": item_id,
+            "PlaySessionId": play_session_id,
+            "CanSeek": True,
+            "PlayMethod": "Transcode",
+        }
+        await self._post("/Sessions/Playing", json_data=body)
+
+    async def report_playback_progress(
+        self,
+        item_id: str,
+        play_session_id: str,
+        position_ticks: int,
+        is_paused: bool,
+    ) -> None:
+        body: dict[str, Any] = {
+            "ItemId": item_id,
+            "PlaySessionId": play_session_id,
+            "PositionTicks": position_ticks,
+            "IsPaused": is_paused,
+            "CanSeek": True,
+        }
+        await self._post("/Sessions/Playing/Progress", json_data=body)
+
+    async def report_playback_stopped(
+        self, item_id: str, play_session_id: str, position_ticks: int
+    ) -> None:
+        body: dict[str, Any] = {
+            "ItemId": item_id,
+            "PlaySessionId": play_session_id,
+            "PositionTicks": position_ticks,
+        }
+        await self._post("/Sessions/Playing/Stopped", json_data=body)

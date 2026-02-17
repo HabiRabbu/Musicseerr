@@ -1,6 +1,6 @@
 import { tick } from 'svelte';
 import { playerStore } from '$lib/stores/player.svelte';
-import { YouTubePlaybackSource } from '$lib/player/YouTubePlaybackSource';
+import { createPlaybackSource } from '$lib/player/createSource';
 
 export type YouTubePlaybackPayload = {
 	albumId: string;
@@ -23,7 +23,7 @@ export async function launchYouTubePlayback(
 ): Promise<void> {
 	const { stopOnError = true, onLoadError } = options;
 
-	const source = new YouTubePlaybackSource('yt-player-embed');
+	const source = createPlaybackSource('youtube');
 	playerStore.playAlbum(source, {
 		albumId: payload.albumId,
 		albumName: payload.albumName,

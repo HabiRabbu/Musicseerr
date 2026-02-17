@@ -54,6 +54,8 @@ export const STATUS_COLORS = {
 
 export const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+export const YOUTUBE_PLAYER_ELEMENT_ID = 'yt-player-embed';
+
 export const API = {
 	artist: {
 		basic: (id: string) => `/api/artist/${id}`,
@@ -73,7 +75,7 @@ export const API = {
 		removeAlbum: (mbid: string) => `/api/library/album/${mbid}`
 	},
 	search: {
-		artists: (query: string) => `/api/search/artists?query=${encodeURIComponent(query)}`,
+		artists: (query: string) => `/api/search/artists?q=${encodeURIComponent(query)}`,
 		albums: (query: string) => `/api/search/albums?q=${encodeURIComponent(query)}`
 	},
 	home: () => '/api/home',
@@ -102,7 +104,45 @@ export const API = {
 		quota: () => '/api/youtube/quota'
 	},
 	queue: () => '/api/queue',
-	settings: () => '/api/settings'
+	settings: () => '/api/settings',
+	settingsLocalFiles: () => '/api/settings/local-files',
+	settingsLocalFilesVerify: () => '/api/settings/local-files/verify',
+	stream: {
+		jellyfin: (itemId: string, format = 'aac', bitrate = 128000) =>
+			`/api/stream/jellyfin/${itemId}?format=${format}&bitrate=${bitrate}`,
+		jellyfinStart: (itemId: string) => `/api/stream/jellyfin/${itemId}/start`,
+		jellyfinProgress: (itemId: string) => `/api/stream/jellyfin/${itemId}/progress`,
+		jellyfinStop: (itemId: string) => `/api/stream/jellyfin/${itemId}/stop`,
+		local: (trackId: number | string) => `/api/stream/local/${trackId}`
+	},
+	jellyfinLibrary: {
+		albumMatch: (mbid: string) => `/api/jellyfin/albums/match/${mbid}`,
+		albums: (limit = 50, offset = 0, sortBy = 'SortName', genre?: string) => {
+			let url = `/api/jellyfin/albums?limit=${limit}&offset=${offset}&sort_by=${sortBy}`;
+			if (genre) url += `&genre=${encodeURIComponent(genre)}`;
+			return url;
+		},
+		albumDetail: (id: string) => `/api/jellyfin/albums/${id}`,
+		albumTracks: (id: string) => `/api/jellyfin/albums/${id}/tracks`,
+		search: (query: string) => `/api/jellyfin/search?q=${encodeURIComponent(query)}`,
+		artists: (limit = 50, offset = 0) => `/api/jellyfin/artists?limit=${limit}&offset=${offset}`,
+		recent: () => '/api/jellyfin/recent',
+		favorites: () => '/api/jellyfin/favorites',
+		genres: () => '/api/jellyfin/genres',
+		stats: () => '/api/jellyfin/stats'
+	},
+	local: {
+		albumMatch: (mbid: string) => `/api/local/albums/match/${mbid}`,
+		albums: (limit = 50, offset = 0, sortBy = 'name', q?: string) => {
+			let url = `/api/local/albums?limit=${limit}&offset=${offset}&sort_by=${sortBy}`;
+			if (q) url += `&q=${encodeURIComponent(q)}`;
+			return url;
+		},
+		albumTracks: (id: number | string) => `/api/local/albums/${id}/tracks`,
+		search: (query: string) => `/api/local/search?q=${encodeURIComponent(query)}`,
+		recent: () => '/api/local/recent',
+		stats: () => '/api/local/stats'
+	}
 } as const;
 
 export const MESSAGES = {

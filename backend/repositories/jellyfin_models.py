@@ -4,6 +4,8 @@ from typing import Any
 
 @dataclass
 class JellyfinItem:
+    """Represents a Jellyfin library item (artist, album, or track)."""
+
     id: str
     name: str
     type: str
@@ -17,6 +19,14 @@ class JellyfinItem:
     album_id: str | None = None
     artist_id: str | None = None
     provider_ids: dict[str, str] | None = None
+    index_number: int | None = None
+    duration_ticks: int | None = None
+    codec: str | None = None
+    bitrate: int | None = None
+    year: int | None = None
+    sort_name: str | None = None
+    album_count: int | None = None
+    child_count: int | None = None
 
 
 @dataclass
@@ -29,14 +39,16 @@ def parse_item(item: dict[str, Any]) -> JellyfinItem:
     user_data = item.get("UserData", {})
     provider_ids = item.get("ProviderIds", {})
 
+    artist_items = item.get("ArtistItems")
+
     artist_name = None
-    if artists := item.get("ArtistItems"):
-        artist_name = artists[0].get("Name") if artists else None
+    if artist_items:
+        artist_name = artist_items[0].get("Name")
     elif album_artist := item.get("AlbumArtist"):
         artist_name = album_artist
 
     return JellyfinItem(
-        id=item.get("Id", ""),
+        id=item.get("Id") or item.get("ItemId", ""),
         name=item.get("Name", "Unknown"),
         type=item.get("Type", "Unknown"),
         artist_name=artist_name,
@@ -47,9 +59,27 @@ def parse_item(item: dict[str, Any]) -> JellyfinItem:
         image_tag=item.get("ImageTags", {}).get("Primary"),
         parent_id=item.get("ParentId"),
         album_id=item.get("AlbumId"),
-        artist_id=item.get("ArtistItems", [{}])[0].get("Id") if item.get("ArtistItems") else None,
+        artist_id=artist_items[0].get("Id") if artist_items else None,
         provider_ids=provider_ids if provider_ids else None,
+        index_number=item.get("IndexNumber"),
+        duration_ticks=item.get("RunTimeTicks"),
+        codec=_extract_codec(item),
+        bitrate=item.get("Bitrate"),
+        year=item.get("ProductionYear"),
+        sort_name=item.get("SortName"),
+        album_count=item.get("AlbumCount"),
+        child_count=item.get("ChildCount"),
     )
+
+
+def _extract_codec(item: dict[str, Any]) -> str | None:
+    media_streams = item.get("MediaStreams")
+    if media_streams:
+        for stream in media_streams:
+            if stream.get("Type") == "Audio":
+                return stream.get("Codec")
+    container = item.get("Container")
+    return container if container else None
 
 
 def parse_user(user: dict[str, Any]) -> JellyfinUser:

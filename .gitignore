@@ -28,6 +28,7 @@ frontend/dist/
 frontend/.vite/
 
 # Docker / local config
+docker-compose.yml
 config/config.json
 !config/config.example.json
 *.pid

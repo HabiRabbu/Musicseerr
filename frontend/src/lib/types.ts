@@ -601,3 +601,124 @@ export type RequestHistoryResponse = {
 export type RequestCountChangedDetail = {
 	count?: number;
 };
+
+// -- Jellyfin library types --
+
+export type JellyfinTrackInfo = {
+	jellyfin_id: string;
+	title: string;
+	track_number: number;
+	duration_seconds: number;
+	album_name: string;
+	artist_name: string;
+	codec?: string | null;
+	bitrate?: number | null;
+};
+
+export type JellyfinAlbumMatch = {
+	found: boolean;
+	jellyfin_album_id?: string | null;
+	tracks: JellyfinTrackInfo[];
+};
+
+export type JellyfinAlbumSummary = {
+	jellyfin_id: string;
+	name: string;
+	artist_name: string;
+	year?: number | null;
+	track_count: number;
+	image_url?: string | null;
+	musicbrainz_id?: string | null;
+	artist_musicbrainz_id?: string | null;
+};
+
+export type JellyfinPaginatedResponse = {
+	items: JellyfinAlbumSummary[];
+	total: number;
+	offset: number;
+	limit: number;
+};
+
+export type JellyfinSearchResponse = {
+	albums: JellyfinAlbumSummary[];
+	artists: JellyfinArtistSummary[];
+	tracks: JellyfinTrackInfo[];
+};
+
+export type JellyfinLibraryStats = {
+	total_tracks: number;
+	total_albums: number;
+	total_artists: number;
+};
+
+export type JellyfinArtistSummary = {
+	jellyfin_id: string;
+	name: string;
+	image_url?: string | null;
+	album_count: number;
+	musicbrainz_id?: string | null;
+};
+
+// -- Local files types --
+
+export type LocalTrackInfo = {
+	track_file_id: number;
+	title: string;
+	track_number: number;
+	duration_seconds?: number | null;
+	size_bytes: number;
+	format: string;
+	bitrate?: number | null;
+	date_added?: string | null;
+};
+
+export type LocalAlbumMatch = {
+	found: boolean;
+	tracks: LocalTrackInfo[];
+	total_size_bytes: number;
+	primary_format?: string | null;
+};
+
+export type LocalAlbumSummary = {
+	lidarr_album_id: number;
+	musicbrainz_id: string;
+	name: string;
+	artist_name: string;
+	artist_mbid?: string | null;
+	year?: number | null;
+	track_count: number;
+	total_size_bytes: number;
+	primary_format?: string | null;
+	cover_url?: string | null;
+	date_added?: string | null;
+};
+
+export type LocalPaginatedResponse = {
+	items: LocalAlbumSummary[];
+	total: number;
+	offset: number;
+	limit: number;
+};
+
+export type FormatInfo = {
+	count: number;
+	size_bytes: number;
+	size_human: string;
+};
+
+export type LocalStorageStats = {
+	total_tracks: number;
+	total_albums: number;
+	total_artists: number;
+	total_size_bytes: number;
+	total_size_human: string;
+	disk_free_bytes: number;
+	disk_free_human: string;
+	format_breakdown: Record<string, FormatInfo>;
+};
+
+export type LocalFilesConnectionSettings = {
+	enabled: boolean;
+	music_path: string;
+	lidarr_root_path: string;
+};

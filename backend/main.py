@@ -30,6 +30,9 @@ from api.v1.routes import cache as cache_routes
 from api.v1.routes import cache_status as cache_status_routes
 from api.v1.routes import youtube as youtube_routes
 from api.v1.routes import requests_page as requests_page_routes
+from api.v1.routes import stream as stream_routes
+from api.v1.routes import jellyfin_library as jellyfin_library_routes
+from api.v1.routes import local_library as local_library_routes
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -112,6 +115,17 @@ async def lifespan(app: FastAPI):
 
     from core.dependencies import get_discover_service
     start_discover_cache_warming_task(get_discover_service())
+
+    from core.tasks import warm_jellyfin_mbid_index
+    from core.dependencies import get_jellyfin_repository
+    jellyfin_settings = preferences_service.get_jellyfin_connection()
+    if jellyfin_settings.enabled:
+        mbid_task = asyncio.create_task(warm_jellyfin_mbid_index(get_jellyfin_repository()))
+        mbid_task.add_done_callback(
+            lambda t: None if t.cancelled() else (
+                logger.error("Jellyfin MBID index warming failed: %s", t.exception()) if t.exception() else None
+            )
+        )
 
     from core.dependencies import get_requests_page_service
     requests_page_service = get_requests_page_service()
@@ -198,5 +212,8 @@ app.include_router(youtube_routes.router)
 app.include_router(cache_routes.router)
 app.include_router(cache_status_routes.router)
 app.include_router(requests_page_routes.router)
+app.include_router(stream_routes.router)
+app.include_router(jellyfin_library_routes.router)
+app.include_router(local_library_routes.router)
 
 mount_frontend(app)

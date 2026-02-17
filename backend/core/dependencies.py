@@ -35,6 +35,10 @@ from services.album_discovery_service import AlbumDiscoveryService
 from services.discover_service import DiscoverService
 from services.youtube_service import YouTubeService
 from services.requests_page_service import RequestsPageService
+from services.stream_service import StreamService
+from services.jellyfin_playback_service import JellyfinPlaybackService
+from services.local_files_service import LocalFilesService
+from services.jellyfin_library_service import JellyfinLibraryService
 from infrastructure.cache.request_history import RequestHistoryStore
 
 logger = logging.getLogger(__name__)
@@ -130,6 +134,7 @@ def get_listenbrainz_repository() -> ListenBrainzRepository:
 @lru_cache(maxsize=1)
 def get_jellyfin_repository() -> JellyfinRepository:
     cache = get_cache()
+    library_cache = get_library_cache()
     http_client = _get_configured_http_client()
     preferences = get_preferences_service()
     jf_settings = preferences.get_jellyfin_connection()
@@ -139,6 +144,7 @@ def get_jellyfin_repository() -> JellyfinRepository:
         base_url=jf_settings.jellyfin_url if jf_settings.enabled else "",
         api_key=jf_settings.api_key if jf_settings.enabled else "",
         user_id=jf_settings.user_id if jf_settings.enabled else "",
+        library_cache=library_cache,
     )
 
 
@@ -389,6 +395,33 @@ def get_discover_service() -> DiscoverService:
     )
 
 
+@lru_cache(maxsize=1)
+def get_stream_service() -> StreamService:
+    jellyfin_repo = get_jellyfin_repository()
+    http_client = _get_configured_http_client()
+    return StreamService(jellyfin_repo, http_client)
+
+
+@lru_cache(maxsize=1)
+def get_jellyfin_playback_service() -> JellyfinPlaybackService:
+    jellyfin_repo = get_jellyfin_repository()
+    return JellyfinPlaybackService(jellyfin_repo)
+
+
+@lru_cache(maxsize=1)
+def get_local_files_service() -> LocalFilesService:
+    lidarr_repo = get_lidarr_repository()
+    preferences_service = get_preferences_service()
+    cache = get_cache()
+    return LocalFilesService(lidarr_repo, preferences_service, cache)
+
+
+@lru_cache(maxsize=1)
+def get_jellyfin_library_service() -> JellyfinLibraryService:
+    jellyfin_repo = get_jellyfin_repository()
+    return JellyfinLibraryService(jellyfin_repo)
+
+
 CacheDep = Annotated[CacheInterface, Depends(get_cache)]
 DiskCacheDep = Annotated[DiskMetadataCache, Depends(get_disk_cache)]
 LibraryCacheDep = Annotated[LibraryCache, Depends(get_library_cache)]
@@ -418,6 +451,10 @@ YouTubeRepositoryDep = Annotated[YouTubeRepository, Depends(get_youtube_repo)]
 YouTubeServiceDep = Annotated[YouTubeService, Depends(get_youtube_service)]
 RequestHistoryStoreDep = Annotated[RequestHistoryStore, Depends(get_request_history_store)]
 RequestsPageServiceDep = Annotated[RequestsPageService, Depends(get_requests_page_service)]
+StreamServiceDep = Annotated[StreamService, Depends(get_stream_service)]
+JellyfinPlaybackServiceDep = Annotated[JellyfinPlaybackService, Depends(get_jellyfin_playback_service)]
+LocalFilesServiceDep = Annotated[LocalFilesService, Depends(get_local_files_service)]
+JellyfinLibraryServiceDep = Annotated[JellyfinLibraryService, Depends(get_jellyfin_library_service)]
 
 
 async def init_app_state(app) -> None:
@@ -456,5 +493,9 @@ async def cleanup_app_state() -> None:
     get_discover_service.cache_clear()
     get_request_history_store.cache_clear()
     get_requests_page_service.cache_clear()
+    get_stream_service.cache_clear()
+    get_jellyfin_playback_service.cache_clear()
+    get_local_files_service.cache_clear()
+    get_jellyfin_library_service.cache_clear()
 
     logger.info("Application state cleaned up")

@@ -118,6 +118,27 @@ class HomeSettings(BaseModel):
     )
 
 
+class LocalFilesConnectionSettings(BaseModel):
+    enabled: bool = Field(
+        default=False,
+        description="Whether local file playback is enabled"
+    )
+    music_path: str = Field(
+        default="/music",
+        description="Container-internal path to mounted music directory"
+    )
+    lidarr_root_path: str = Field(
+        default="/music",
+        description="Lidarr root folder path (used to map file paths)"
+    )
+
+
+class LocalFilesVerifyResponse(BaseModel):
+    success: bool = Field(description="Whether the path is valid and readable")
+    message: str = Field(description="Status message")
+    track_count: int = Field(default=0, description="Number of audio files found")
+
+
 class LidarrSettings(BaseModel):
     sync_frequency: Literal["manual", "5min", "10min", "30min", "1hr"] = Field(
         default="10min",

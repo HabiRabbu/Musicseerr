@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { playerStore } from '$lib/stores/player.svelte';
 	import YouTubePlayer from '$lib/components/YouTubePlayer.svelte';
+	import JellyfinIcon from '$lib/components/JellyfinIcon.svelte';
 
 	function formatTime(seconds: number): string {
 		if (!seconds || isNaN(seconds)) return '0:00';
@@ -17,6 +18,12 @@
 	function handleVolume(e: Event): void {
 		const target = e.target as HTMLInputElement;
 		playerStore.setVolume(Number(target.value));
+	}
+
+	const MBID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+	function isAlbumLinkable(id: string | undefined): boolean {
+		return !!id && MBID_RE.test(id);
 	}
 
 	function openInYouTube(): void {
@@ -63,7 +70,11 @@
 					{#if playerStore.nowPlaying.trackName}
 						<p class="text-sm font-semibold truncate">{playerStore.nowPlaying.trackName}</p>
 						<p class="text-xs opacity-60 truncate">
-							<a href="/album/{playerStore.nowPlaying.albumId}" class="hover:underline">{playerStore.nowPlaying.albumName}</a>
+							{#if isAlbumLinkable(playerStore.nowPlaying.albumId)}
+								<a href="/album/{playerStore.nowPlaying.albumId}" class="hover:underline">{playerStore.nowPlaying.albumName}</a>
+							{:else}
+								{playerStore.nowPlaying.albumName}
+							{/if}
 							{' — '}
 							{#if playerStore.nowPlaying.artistId}
 								<a href="/artist/{playerStore.nowPlaying.artistId}" class="hover:underline">{playerStore.nowPlaying.artistName}</a>
@@ -73,7 +84,11 @@
 						</p>
 					{:else}
 						<p class="text-sm font-semibold truncate">
-							<a href="/album/{playerStore.nowPlaying.albumId}" class="hover:underline">{playerStore.nowPlaying.albumName}</a>
+							{#if isAlbumLinkable(playerStore.nowPlaying.albumId)}
+								<a href="/album/{playerStore.nowPlaying.albumId}" class="hover:underline">{playerStore.nowPlaying.albumName}</a>
+							{:else}
+								{playerStore.nowPlaying.albumName}
+							{/if}
 						</p>
 						<p class="text-xs opacity-60 truncate">
 							{#if playerStore.nowPlaying.artistId}
@@ -87,7 +102,7 @@
 						<p class="text-xs opacity-40 truncate">Track {playerStore.currentTrackNumber} of {playerStore.queueLength}</p>
 					{/if}
 					{#if playerStore.playbackState === 'error'}
-						<p class="text-xs text-error truncate">Video unavailable</p>
+						<p class="text-xs text-error truncate">Track unavailable</p>
 					{/if}
 				</div>
 			</div>
@@ -208,6 +223,18 @@
 								<path stroke-linecap="round" stroke-linejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
 							</svg>
 						</button>
+					</div>
+				{:else if playerStore.nowPlaying.sourceType === 'jellyfin'}
+					<div class="hidden sm:flex items-center gap-2" style="color: rgb(var(--brand-jellyfin))">
+						<JellyfinIcon class="h-5 w-5" />
+						<span class="text-sm font-medium">Jellyfin</span>
+					</div>
+				{:else if playerStore.nowPlaying.sourceType === 'howler'}
+					<div class="hidden sm:flex items-center gap-2" style="color: rgb(var(--brand-localfiles))">
+						<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+							<path stroke-linecap="round" stroke-linejoin="round" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
+						</svg>
+						<span class="text-sm font-medium">Local{#if playerStore.currentQueueItem?.format}<span class="badge badge-xs badge-ghost ml-1 uppercase">{playerStore.currentQueueItem.format}</span>{/if}</span>
 					</div>
 				{/if}
 			</div>

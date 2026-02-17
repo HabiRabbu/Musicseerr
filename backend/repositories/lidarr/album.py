@@ -10,6 +10,12 @@ logger = logging.getLogger(__name__)
 
 
 class LidarrAlbumRepository(LidarrHistoryRepository):
+    async def get_all_albums(self) -> list[dict[str, Any]]:
+        data = await self._get("/api/v1/album")
+        if not data or not isinstance(data, list):
+            return []
+        return data
+
     async def search_for_album(self, term: str) -> list[dict]:
         params = {"term": term}
         return await self._get("/api/v1/album/lookup", params=params)
@@ -173,6 +179,40 @@ class LidarrAlbumRepository(LidarrHistoryRepository):
 
         except Exception as e:
             logger.debug(f"Failed to get tracks from Lidarr for album ID {album_id}: {e}")
+            return []
+
+    async def get_track_file(self, track_file_id: int) -> dict[str, Any] | None:
+        cache_key = f"lidarr_trackfile:{track_file_id}"
+        cached = await self._cache.get(cache_key)
+        if cached is not None:
+            return cached
+
+        try:
+            data = await self._get(f"/api/v1/trackfile/{track_file_id}")
+            if data:
+                await self._cache.set(cache_key, data, ttl_seconds=600)
+            return data
+        except Exception as e:
+            logger.error("Failed to get track file %s: %s", track_file_id, e)
+            return None
+
+    async def get_track_files_by_album(self, album_id: int) -> list[dict[str, Any]]:
+        cache_key = f"lidarr_album_trackfiles_raw:{album_id}"
+        cached = await self._cache.get(cache_key)
+        if cached is not None:
+            return cached
+
+        try:
+            data = await self._get(
+                "/api/v1/trackfile",
+                params={"albumId": album_id},
+            )
+            if not data or not isinstance(data, list):
+                return []
+            await self._cache.set(cache_key, data, ttl_seconds=300)
+            return data
+        except Exception as e:
+            logger.error("Failed to get track files for album %s: %s", album_id, e)
             return []
 
     async def _get_album_by_foreign_id(self, album_mbid: str) -> Optional[dict[str, Any]]:

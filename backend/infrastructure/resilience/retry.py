@@ -4,7 +4,7 @@ import random
 import time
 from enum import Enum
 from functools import wraps
-from typing import Callable, TypeVar, ParamSpec, Optional
+from typing import Awaitable, Callable, TypeVar, ParamSpec, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +40,10 @@ class CircuitBreaker:
     def is_open(self) -> bool:
         if self.state == CircuitState.OPEN:
             if time.time() - self.last_failure_time > self.timeout:
-                logger.info(f"Circuit breaker '{self.name}' transitioning to HALF_OPEN")
+                logger.info(
+                    "Circuit breaker '%s' transitioning to HALF_OPEN",
+                    self.name,
+                )
                 self.state = CircuitState.HALF_OPEN
                 self.success_count = 0
                 return False
@@ -51,7 +54,11 @@ class CircuitBreaker:
         if self.state == CircuitState.HALF_OPEN:
             self.success_count += 1
             if self.success_count >= self.success_threshold:
-                logger.info(f"Circuit breaker '{self.name}' closing after {self.success_count} successes")
+                logger.info(
+                    "Circuit breaker '%s' closing after %d successes",
+                    self.name,
+                    self.success_count,
+                )
                 self.state = CircuitState.CLOSED
                 self.failure_count = 0
                 self.success_count = 0
@@ -62,7 +69,10 @@ class CircuitBreaker:
         self.last_failure_time = time.time()
         
         if self.state == CircuitState.HALF_OPEN:
-            logger.warning(f"Circuit breaker '{self.name}' reopening after failure in HALF_OPEN")
+            logger.warning(
+                "Circuit breaker '%s' reopening after failure in HALF_OPEN",
+                self.name,
+            )
             self.state = CircuitState.OPEN
             self.failure_count = 0
             self.success_count = 0
@@ -70,7 +80,9 @@ class CircuitBreaker:
             self.failure_count += 1
             if self.failure_count >= self.failure_threshold:
                 logger.error(
-                    f"Circuit breaker '{self.name}' opening after {self.failure_count} failures"
+                    "Circuit breaker '%s' opening after %d failures",
+                    self.name,
+                    self.failure_count,
                 )
                 self.state = CircuitState.OPEN
     
@@ -84,7 +96,7 @@ class CircuitBreaker:
         }
     
     def reset(self):
-        logger.info(f"Circuit breaker '{self.name}' manually reset")
+        logger.info("Circuit breaker '%s' manually reset", self.name)
         self.state = CircuitState.CLOSED
         self.failure_count = 0
         self.success_count = 0
@@ -104,7 +116,10 @@ def with_retry(
     circuit_breaker: Optional[CircuitBreaker] = None,
     retriable_exceptions: tuple = (Exception,)
 ):
-    def decorator(func: Callable[P, T]) -> Callable[P, T]:
+    if max_attempts < 1:
+        raise ValueError("max_attempts must be >= 1")
+
+    def decorator(func: Callable[P, Awaitable[T]]) -> Callable[P, Awaitable[T]]:
         @wraps(func)
         async def wrapper(*args: P.args, **kwargs: P.kwargs) -> T:
             service_name = circuit_breaker.name if circuit_breaker else "unknown"
@@ -112,12 +127,15 @@ def with_retry(
             start_time = time.time()
             
             if circuit_breaker and circuit_breaker.is_open():
-                error_msg = f"Circuit breaker '{circuit_breaker.name}' is OPEN"
+                error_msg = "Circuit breaker '%s' is OPEN"
                 logger.warning(
                     error_msg,
+                    circuit_breaker.name,
                     extra={"service_name": service_name, "function": func_name}
                 )
-                raise CircuitOpenError(error_msg)
+                raise CircuitOpenError(
+                    f"Circuit breaker '{circuit_breaker.name}' is OPEN"
+                )
             
             last_exception = None
             
@@ -134,7 +152,10 @@ def with_retry(
                     if attempt > 1:
                         total_elapsed_ms = int((time.time() - start_time) * 1000)
                         logger.info(
-                            f"{func_name} succeeded on attempt {attempt}/{max_attempts}",
+                            "%s succeeded on attempt %d/%d",
+                            func_name,
+                            attempt,
+                            max_attempts,
                             extra={
                                 "service_name": service_name,
                                 "function": func_name,
@@ -157,7 +178,10 @@ def with_retry(
                     if attempt >= max_attempts:
                         total_elapsed_ms = int((time.time() - start_time) * 1000)
                         logger.error(
-                            f"{func_name} failed after {max_attempts} attempts: {e}",
+                            "%s failed after %d attempts: %s",
+                            func_name,
+                            max_attempts,
+                            e,
                             extra={
                                 "service_name": service_name,
                                 "function": func_name,
@@ -176,8 +200,12 @@ def with_retry(
                         delay *= (0.5 + random.random())
                     
                     logger.warning(
-                        f"{func_name} attempt {attempt}/{max_attempts} failed: {e}. "
-                        f"Retrying in {delay:.2f}s...",
+                        "%s attempt %d/%d failed: %s. Retrying in %.2fs...",
+                        func_name,
+                        attempt,
+                        max_attempts,
+                        e,
+                        delay,
                         extra={
                             "service_name": service_name,
                             "function": func_name,

@@ -8,18 +8,29 @@ from api.v1.schemas.settings import (
     ListenBrainzConnectionSettings,
     YouTubeConnectionSettings,
     HomeSettings,
-    LidarrVerifyResponse
+    LidarrVerifyResponse,
+    LocalFilesConnectionSettings,
+    LocalFilesVerifyResponse,
 )
 from api.v1.schemas.advanced_settings import AdvancedSettingsFrontend, FrontendCacheTTLs
 from core.dependencies import (
     get_preferences_service,
     get_settings_service,
     get_youtube_repo,
+    get_local_files_service,
+    get_jellyfin_repository,
+    get_stream_service,
+    get_jellyfin_playback_service,
+    get_jellyfin_library_service,
+    get_home_service,
+    get_home_charts_service,
+    get_library_cache,
 )
 from core.exceptions import ConfigurationError
 from repositories.jellyfin_repository import JellyfinRepository
 from repositories.listenbrainz_repository import ListenBrainzRepository
 from repositories.youtube import YouTubeRepository
+from services.local_files_service import LocalFilesService
 from services.preferences_service import PreferencesService
 from services.settings_service import SettingsService
 
@@ -182,6 +193,17 @@ async def update_jellyfin_settings(settings: JellyfinConnectionSettings):
         preferences_service = get_preferences_service()
         preferences_service.save_jellyfin_connection(settings)
         JellyfinRepository.reset_circuit_breaker()
+
+        get_jellyfin_repository.cache_clear()
+        get_stream_service.cache_clear()
+        get_jellyfin_playback_service.cache_clear()
+        get_jellyfin_library_service.cache_clear()
+        get_home_service.cache_clear()
+        get_home_charts_service.cache_clear()
+
+        library_cache = get_library_cache()
+        await library_cache.clear_jellyfin_mbid_index()
+
         settings_service = get_settings_service()
         await settings_service.clear_home_cache()
         logger.info("Updated Jellyfin connection settings")
@@ -308,3 +330,41 @@ async def update_home_settings(settings: HomeSettings):
     except Exception as e:
         logger.exception(f"Failed to save home settings: {e}")
         raise HTTPException(status_code=500, detail="Failed to save home settings")
+
+
+@router.get("/local-files", response_model=LocalFilesConnectionSettings)
+async def get_local_files_settings(
+    preferences_service: PreferencesService = Depends(get_preferences_service),
+):
+    try:
+        return preferences_service.get_local_files_connection()
+    except Exception as e:
+        logger.exception("Failed to get local files settings: %s", e)
+        raise HTTPException(status_code=500, detail="Failed to retrieve local files settings")
+
+
+@router.put("/local-files", response_model=LocalFilesConnectionSettings)
+async def update_local_files_settings(
+    settings: LocalFilesConnectionSettings,
+    preferences_service: PreferencesService = Depends(get_preferences_service),
+    settings_service: SettingsService = Depends(get_settings_service),
+):
+    try:
+        preferences_service.save_local_files_connection(settings)
+        await settings_service.clear_local_files_cache()
+        logger.info("Updated local files settings")
+        return settings
+    except ConfigurationError as e:
+        logger.warning("Configuration error updating local files settings: %s", e)
+        raise HTTPException(status_code=400, detail="Invalid local files configuration")
+    except Exception as e:
+        logger.exception("Failed to save local files settings: %s", e)
+        raise HTTPException(status_code=500, detail="Failed to save local files settings")
+
+
+@router.post("/local-files/verify", response_model=LocalFilesVerifyResponse)
+async def verify_local_files_connection(
+    settings: LocalFilesConnectionSettings,
+    local_service: LocalFilesService = Depends(get_local_files_service),
+) -> LocalFilesVerifyResponse:
+    return await local_service.verify_path(settings.music_path)

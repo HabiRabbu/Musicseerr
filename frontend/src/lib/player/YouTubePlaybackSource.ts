@@ -111,7 +111,7 @@ export class YouTubePlaybackSource implements PlaybackSource {
 		this.elementId = elementId;
 	}
 
-	async load(info: { videoId?: string; url?: string; token?: string }): Promise<void> {
+	async load(info: { videoId?: string; url?: string; token?: string; format?: string }): Promise<void> {
 		if (!info.videoId) throw new Error('videoId is required for YouTube source');
 
 		await loadYouTubeAPI();

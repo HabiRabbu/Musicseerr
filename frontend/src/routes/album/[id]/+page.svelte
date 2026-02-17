@@ -1,8 +1,7 @@
 <script lang="ts">
-	import { onDestroy } from 'svelte';
 	import { browser } from '$app/environment';
 	import { goto } from '$app/navigation';
-	import type { AlbumBasicInfo, AlbumTracksInfo, SimilarAlbumsResponse, MoreByArtistResponse, YouTubeTrackLink, YouTubeLink, YouTubeQuotaStatus } from '$lib/types';
+	import type { AlbumBasicInfo, AlbumTracksInfo, SimilarAlbumsResponse, MoreByArtistResponse, YouTubeTrackLink, YouTubeLink, YouTubeQuotaStatus, JellyfinAlbumMatch, LocalAlbumMatch } from '$lib/types';
 	import { colors } from '$lib/colors';
 	import { libraryStore } from '$lib/stores/library';
 	import { API } from '$lib/constants';
@@ -14,9 +13,17 @@
 	import { integrationStore } from '$lib/stores/integration';
 	import { playerStore } from '$lib/stores/player.svelte';
 	import AlbumYouTubeBar from '$lib/components/AlbumYouTubeBar.svelte';
+	import AlbumSourceBar from '$lib/components/AlbumSourceBar.svelte';
 	import TrackPlayButton from '$lib/components/TrackPlayButton.svelte';
+	import TrackSourceButton from '$lib/components/TrackSourceButton.svelte';
+	import JellyfinIcon from '$lib/components/JellyfinIcon.svelte';
+	import LocalFilesIcon from '$lib/components/LocalFilesIcon.svelte';
 	import DeleteAlbumModal from '$lib/components/DeleteAlbumModal.svelte';
 	import ArtistRemovedModal from '$lib/components/ArtistRemovedModal.svelte';
+	import { launchJellyfinPlayback } from '$lib/player/launchJellyfinPlayback';
+	import { launchLocalPlayback } from '$lib/player/launchLocalPlayback';
+	import { getCoverUrl } from '$lib/utils/errorHandling';
+	import type { PlaybackMeta } from '$lib/player/types';
 
 	export let data: { albumId: string };
 
@@ -41,7 +48,14 @@
 	let albumLink: YouTubeLink | null = null;
 	let quota: YouTubeQuotaStatus | null = null;
 
+	let jellyfinMatch: JellyfinAlbumMatch | null = null;
+	let localMatch: LocalAlbumMatch | null = null;
+	let loadingJellyfin = false;
+	let loadingLocal = false;
+
 	$: trackLinkMap = new Map(trackLinks.map(tl => [tl.track_number, tl]));
+	$: jellyfinTrackMap = new Map(jellyfinMatch?.tracks.map(t => [t.track_number, t]) ?? []);
+	$: localTrackMap = new Map(localMatch?.tracks.map(t => [t.track_number, t]) ?? []);
 
 	let currentAlbumId: string | null = null;
 
@@ -68,6 +82,10 @@
 		trackLinks = [];
 		albumLink = null;
 		quota = null;
+		jellyfinMatch = null;
+		localMatch = null;
+		loadingJellyfin = false;
+		loadingLocal = false;
 	}
 
 	async function loadAlbum() {
@@ -76,6 +94,9 @@
 			fetchTracksInfo();
 			fetchDiscoveryData();
 			fetchYouTubeData();
+			await integrationStore.ensureLoaded();
+			fetchJellyfinAlbumData();
+			fetchLocalAlbumData();
 		}
 	}
 
@@ -134,6 +155,36 @@
 			if (linkRes.status === 200) albumLink = await linkRes.json();
 			if (tracksRes.ok) trackLinks = await tracksRes.json();
 		} catch {}
+	}
+
+	async function fetchJellyfinAlbumData() {
+		if (!$integrationStore.jellyfin) return;
+		loadingJellyfin = true;
+		try {
+			const res = await fetch(API.jellyfinLibrary.albumMatch(data.albumId));
+			if (res.ok) {
+				jellyfinMatch = await res.json();
+			}
+		} catch (e) {
+			console.error('Failed to fetch Jellyfin album data:', e);
+		} finally {
+			loadingJellyfin = false;
+		}
+	}
+
+	async function fetchLocalAlbumData() {
+		if (!$integrationStore.localfiles) return;
+		loadingLocal = true;
+		try {
+			const res = await fetch(API.local.albumMatch(data.albumId));
+			if (res.ok) {
+				localMatch = await res.json();
+			}
+		} catch (e) {
+			console.error('Failed to fetch local album data:', e);
+		} finally {
+			loadingLocal = false;
+		}
 	}
 
 	function handleTrackGenerated(link: YouTubeTrackLink): void {
@@ -211,7 +262,29 @@
 		}
 	}
 
-	onDestroy(() => {});
+	function getPlaybackMeta() {
+		return {
+			albumId: album!.musicbrainz_id,
+			albumName: album!.title,
+			artistName: album!.artist_name,
+			coverUrl: getCoverUrl(album!.cover_url ?? null, album!.musicbrainz_id),
+			artistId: album!.artist_id
+		};
+	}
+
+	function playSource<T extends { track_number: number }>(
+		match: { tracks: T[] } | null,
+		launcher: (tracks: T[], startIndex: number, shuffle: boolean, meta: PlaybackMeta) => void,
+		opts: { startTrack?: number; shuffle?: boolean } = {}
+	): void {
+		if (!match?.tracks.length) return;
+		let idx = 0;
+		if (opts.startTrack !== undefined) {
+			idx = match.tracks.findIndex((t) => t.track_number === opts.startTrack);
+			if (idx === -1) return;
+		}
+		launcher(match.tracks, idx, opts.shuffle ?? false, getPlaybackMeta());
+	}
 </script>
 
 <div class="w-full px-2 sm:px-4 lg:px-8 py-4 sm:py-8 max-w-7xl mx-auto">
@@ -425,12 +498,55 @@
 							onQuotaUpdate={handleQuotaUpdate}
 						/>
 					{/if}
+
+					{#if $integrationStore.jellyfin}
+						{#if loadingJellyfin}
+							<div class="skeleton h-14 w-full rounded-box"></div>
+						{:else if jellyfinMatch?.found}
+							<AlbumSourceBar
+								sourceLabel="Jellyfin"
+								sourceColor="rgb(var(--brand-jellyfin))"
+								trackCount={jellyfinMatch.tracks.length}
+								totalTracks={tracksInfo.tracks.length}
+							onPlayAll={() => playSource(jellyfinMatch, launchJellyfinPlayback)}
+							onShuffle={() => playSource(jellyfinMatch, launchJellyfinPlayback, { shuffle: true })}
+							>
+								{#snippet icon()}
+									<JellyfinIcon class="h-5 w-5" />
+								{/snippet}
+							</AlbumSourceBar>
+						{/if}
+					{/if}
+
+					{#if $integrationStore.localfiles}
+						{#if loadingLocal}
+							<div class="skeleton h-14 w-full rounded-box"></div>
+						{:else if localMatch?.found}
+							<AlbumSourceBar
+								sourceLabel="Local Files"
+								sourceColor="rgb(var(--brand-localfiles))"
+								trackCount={localMatch.tracks.length}
+								totalTracks={tracksInfo.tracks.length}
+								extraBadge={localMatch.primary_format?.toUpperCase() ?? null}
+							onPlayAll={() => playSource(localMatch, launchLocalPlayback)}
+							onShuffle={() => playSource(localMatch, launchLocalPlayback, { shuffle: true })}
+							>
+								{#snippet icon()}
+									<LocalFilesIcon class="h-5 w-5" />
+								{/snippet}
+							</AlbumSourceBar>
+						{/if}
+					{/if}
 					
 					<div class="bg-base-200 rounded-box overflow-hidden">
 						<ul class="list">
 							{#each tracksInfo.tracks as track, index}
 								{@const tl = trackLinkMap.get(track.position) ?? null}
+								{@const jellyfinTrack = jellyfinTrackMap.get(track.position) ?? null}
+								{@const localTrack = localTrackMap.get(track.position) ?? null}
 								{@const isCurrentlyPlaying = playerStore.nowPlaying?.albumId === album.musicbrainz_id && playerStore.currentQueueItem?.trackNumber === track.position && playerStore.isPlaying}
+								{@const showJellyfinBtn = $integrationStore.jellyfin && jellyfinMatch?.found}
+								{@const showLocalBtn = $integrationStore.localfiles && localMatch?.found}
 								<li
 									class="hover:bg-base-300/50 transition-colors p-3 sm:p-4"
 									style={isCurrentlyPlaying ? `background-color: ${colors.accent}20;` : ''}
@@ -450,20 +566,50 @@
 											{formatDuration(track.length)}
 										</div>
 
-										{#if $integrationStore.youtube}
-											<TrackPlayButton
-												trackNumber={track.position}
-												trackName={track.title}
-												trackLink={tl}
-												allTrackLinks={trackLinks}
-												albumId={album.musicbrainz_id}
-												albumName={album.title}
-												artistName={album.artist_name}
-												coverUrl={album.cover_url ?? null}
-												artistId={album.artist_id}
-												onGenerated={handleTrackGenerated}
-												onQuotaUpdate={handleQuotaUpdate}
-											/>
+										{#if $integrationStore.youtube || showJellyfinBtn || showLocalBtn}
+											<div class="flex items-center gap-1.5 flex-shrink-0 ml-auto">
+												{#if $integrationStore.youtube}
+													<TrackPlayButton
+														trackNumber={track.position}
+														trackName={track.title}
+														trackLink={tl}
+														allTrackLinks={trackLinks}
+														albumId={album.musicbrainz_id}
+														albumName={album.title}
+														artistName={album.artist_name}
+														coverUrl={album.cover_url ?? null}
+														artistId={album.artist_id}
+														onGenerated={handleTrackGenerated}
+														onQuotaUpdate={handleQuotaUpdate}
+													/>
+												{/if}
+
+												{#if showJellyfinBtn}
+													<TrackSourceButton
+														available={jellyfinTrack !== null}
+														sourceColor="rgb(var(--brand-jellyfin))"
+												onclick={() => playSource(jellyfinMatch, launchJellyfinPlayback, { startTrack: track.position })}
+														ariaLabel={jellyfinTrack ? 'Play on Jellyfin' : 'Not available on Jellyfin'}
+													>
+														{#snippet icon()}
+															<JellyfinIcon class="h-4 w-4" />
+														{/snippet}
+													</TrackSourceButton>
+												{/if}
+
+												{#if showLocalBtn}
+													<TrackSourceButton
+														available={localTrack !== null}
+														sourceColor="rgb(var(--brand-localfiles))"
+												onclick={() => playSource(localMatch, launchLocalPlayback, { startTrack: track.position })}
+														ariaLabel={localTrack ? 'Play local file' : 'Not available locally'}
+													>
+														{#snippet icon()}
+														<LocalFilesIcon class="h-4 w-4" />
+														{/snippet}
+													</TrackSourceButton>
+												{/if}
+											</div>
 										{/if}
 									</div>
 								</li>

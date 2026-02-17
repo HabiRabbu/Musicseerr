@@ -11,14 +11,9 @@ from core.config import Settings, get_settings
 from core.exceptions import ExternalServiceError
 from infrastructure.cache.memory_cache import InMemoryCache, CacheInterface
 from infrastructure.http.client import get_http_client
+from repositories.jellyfin_models import JellyfinUser
 
 logger = logging.getLogger(__name__)
-
-
-@dataclass
-class JellyfinUser:
-    id: str
-    name: str
 
 
 @dataclass
@@ -195,3 +190,8 @@ class SettingsService:
         total = cleared_home + cleared_jf + cleared_lb
         logger.info(f"Cleared {total} home/integration cache entries")
         return total
+
+    async def clear_local_files_cache(self) -> int:
+        cleared = await self._cache.clear_prefix("local_files_")
+        logger.info(f"Cleared {cleared} local files cache entries")
+        return cleared

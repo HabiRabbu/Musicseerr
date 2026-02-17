@@ -74,13 +74,13 @@
 </script>
 
 {#if generating}
-	<button class="btn btn-sm btn-ghost rounded-lg gap-1.5 ml-auto flex-shrink-0" disabled aria-label="Generating link">
+	<button class="btn btn-sm btn-ghost rounded-lg gap-1.5 flex-shrink-0" disabled aria-label="Generating link">
 		<span class="loading loading-spinner loading-xs"></span>
 		<YouTubeIcon class="h-4 w-4" />
 	</button>
 {:else}
 	<button
-		class="btn btn-sm rounded-lg gap-1.5 ml-auto flex-shrink-0"
+		class="btn btn-sm rounded-lg gap-1.5 flex-shrink-0"
 		style={hasLink ? 'background-color: #FF0000; color: white; border: none;' : ''}
 		class:btn-ghost={!hasLink}
 		onclick={handleClick}

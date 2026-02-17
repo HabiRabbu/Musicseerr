@@ -10,7 +10,8 @@ from api.v1.schemas.settings import (
     JellyfinConnectionSettings,
     ListenBrainzConnectionSettings,
     YouTubeConnectionSettings,
-    HomeSettings
+    HomeSettings,
+    LocalFilesConnectionSettings,
 )
 from api.v1.schemas.advanced_settings import AdvancedSettings
 from core.config import Settings
@@ -219,3 +220,14 @@ class PreferencesService:
         except Exception as e:
             logger.error(f"Failed to save home settings: {e}")
             raise ConfigurationError(f"Failed to save home settings: {e}")
+
+    def get_local_files_connection(self) -> LocalFilesConnectionSettings:
+        return self._get_section("local_files_settings", LocalFilesConnectionSettings)
+
+    def save_local_files_connection(self, settings: LocalFilesConnectionSettings) -> None:
+        try:
+            self._save_section("local_files_settings", settings)
+            logger.info("Saved local files settings to %s", self._config_path)
+        except Exception as e:
+            logger.error("Failed to save local files settings: %s", e)
+            raise ConfigurationError(f"Failed to save local files settings: {e}")

@@ -203,3 +203,14 @@ async def warm_discover_cache_periodically(
 def start_discover_cache_warming_task(discover_service: 'DiscoverService') -> asyncio.Task:
     return asyncio.create_task(warm_discover_cache_periodically(discover_service))
 
+
+async def warm_jellyfin_mbid_index(jellyfin_repo: 'JellyfinRepository') -> None:
+    from repositories.jellyfin_repository import JellyfinRepository as _JR
+
+    await asyncio.sleep(8)
+    try:
+        index = await jellyfin_repo.build_mbid_index()
+        logger.info("Jellyfin MBID index warmed with %d entries", len(index))
+    except Exception as e:
+        logger.warning("Jellyfin MBID index warming failed: %s", e)
+
