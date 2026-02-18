@@ -24,12 +24,13 @@ async def get_local_albums(
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
     sort_by: Literal["name", "date_added", "year"] = "name",
+    sort_order: Literal["asc", "desc"] = Query(default="asc"),
     q: str | None = Query(default=None, min_length=1),
     service: LocalFilesService = Depends(get_local_files_service),
 ) -> LocalPaginatedResponse:
     try:
         return await service.get_albums(
-            limit=limit, offset=offset, sort_by=sort_by, search_query=q
+            limit=limit, offset=offset, sort_by=sort_by, sort_order=sort_order, search_query=q
         )
     except ExternalServiceError as e:
         logger.error("Failed to get local albums: %s", e)

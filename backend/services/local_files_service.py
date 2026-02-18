@@ -327,6 +327,7 @@ class LocalFilesService:
         limit: int = 50,
         offset: int = 0,
         sort_by: str = "name",
+        sort_order: str = "asc",
         search_query: str | None = None,
     ) -> LocalPaginatedResponse:
         all_albums = await self._fetch_all_albums()
@@ -346,19 +347,21 @@ class LocalFilesService:
                 or q in a.get("artist", {}).get("artistName", "").lower()
             ]
 
+        descending = sort_order == "desc"
         if sort_by == "date_added":
             albums_with_files.sort(
-                key=lambda a: a.get("added", ""),
-                reverse=True,
+                key=lambda a: a.get("added", "") or "",
+                reverse=descending,
             )
         elif sort_by == "year":
             albums_with_files.sort(
                 key=lambda a: a.get("releaseDate", "") or "",
-                reverse=True,
+                reverse=descending,
             )
         else:
             albums_with_files.sort(
                 key=lambda a: a.get("title", "").lower(),
+                reverse=descending,
             )
 
         total = len(albums_with_files)
@@ -392,10 +395,46 @@ class LocalFilesService:
     async def get_recently_added(
         self, limit: int = 20
     ) -> list[LocalAlbumSummary]:
-        result = await self.get_albums(
-            limit=limit, offset=0, sort_by="date_added"
-        )
-        return result.items
+        recently_imported = await self._lidarr.get_recently_imported(limit=limit)
+        if not recently_imported:
+            return []
+
+        all_albums = await self._fetch_all_albums()
+        album_lookup: dict[str, dict[str, Any]] = {}
+        for album in all_albums:
+            mbid = album.get("foreignAlbumId")
+            if mbid:
+                album_lookup[mbid] = album
+
+        summaries: list[LocalAlbumSummary] = []
+        for lib_album in recently_imported:
+            mbid = lib_album.musicbrainz_id
+            full = album_lookup.get(mbid) if mbid else None
+            if full:
+                stats = full.get("statistics", {})
+                if stats.get("trackFileCount", 0) == 0:
+                    continue
+                summaries.append(
+                    self._library_album_to_summary(
+                        full,
+                        full.get("id", 0),
+                        stats.get("trackFileCount", 0),
+                    )
+                )
+            else:
+                summaries.append(
+                    LocalAlbumSummary(
+                        lidarr_album_id=0,
+                        musicbrainz_id=mbid or "",
+                        name=lib_album.album or "Unknown",
+                        artist_name=lib_album.artist,
+                        artist_mbid=lib_album.artist_mbid,
+                        year=lib_album.year,
+                        cover_url=lib_album.cover_url,
+                        date_added=str(lib_album.date_added) if lib_album.date_added else None,
+                    )
+                )
+        return summaries
 
     async def get_storage_stats(self) -> LocalStorageStats:
         cache_key = "local_files_storage_stats"

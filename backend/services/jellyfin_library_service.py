@@ -53,10 +53,11 @@ class JellyfinLibraryService:
         limit: int = 50,
         offset: int = 0,
         sort_by: str = "SortName",
+        sort_order: str = "Ascending",
         genre: str | None = None,
     ) -> tuple[list[JellyfinAlbumSummary], int]:
         items, total = await self._jellyfin.get_albums(
-            limit=limit, offset=offset, sort_by=sort_by, genre=genre
+            limit=limit, offset=offset, sort_by=sort_by, sort_order=sort_order, genre=genre
         )
         return [self._item_to_album_summary(i) for i in items], total
 

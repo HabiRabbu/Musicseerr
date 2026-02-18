@@ -2,11 +2,14 @@
 	import { onMount, onDestroy } from 'svelte';
 	import { API } from '$lib/constants';
 	import AlbumImage from '$lib/components/AlbumImage.svelte';
+	import PlayIcon from '$lib/components/PlayIcon.svelte';
 	import SourceAlbumModal from '$lib/components/SourceAlbumModal.svelte';
+	import { launchJellyfinPlayback } from '$lib/player/launchJellyfinPlayback';
 	import type {
 		JellyfinAlbumSummary,
 		JellyfinPaginatedResponse,
-		JellyfinLibraryStats
+		JellyfinLibraryStats,
+		JellyfinTrackInfo
 	} from '$lib/types';
 
 	let albums = $state<JellyfinAlbumSummary[]>([]);
@@ -20,10 +23,12 @@
 	let fetchError = $state('');
 
 	let sortBy = $state<'SortName' | 'DateCreated' | 'ProductionYear'>('SortName');
+	let sortOrder = $state<'Ascending' | 'Descending'>('Ascending');
 	let selectedGenre = $state('');
 	let searchQuery = $state('');
 	let searchTimeout: ReturnType<typeof setTimeout> | null = null;
 	let fetchId = 0;
+	let playingAlbumId = $state<string | null>(null);
 
 	let detailModalOpen = $state(false);
 	let selectedAlbum = $state<JellyfinAlbumSummary | null>(null);
@@ -55,7 +60,7 @@
 				}
 			} else {
 				const res = await fetch(
-					API.jellyfinLibrary.albums(PAGE_SIZE, offset, sortBy, selectedGenre || undefined)
+					API.jellyfinLibrary.albums(PAGE_SIZE, offset, sortBy, selectedGenre || undefined, sortOrder)
 				);
 				if (id !== fetchId) return;
 				if (res.ok) {
@@ -104,7 +109,16 @@
 	}
 
 	function handleSortChange(e: Event): void {
-		sortBy = (e.target as HTMLSelectElement).value as typeof sortBy;
+		const newSort = (e.target as HTMLSelectElement).value as typeof sortBy;
+		if (newSort !== sortBy) {
+			sortBy = newSort;
+			sortOrder = newSort === 'SortName' ? 'Ascending' : 'Descending';
+		}
+		fetchAlbums(true);
+	}
+
+	function toggleSortOrder(): void {
+		sortOrder = sortOrder === 'Ascending' ? 'Descending' : 'Ascending';
 		fetchAlbums(true);
 	}
 
@@ -123,6 +137,25 @@
 	function loadMore(): void {
 		if (!loadingMore && albums.length < total) {
 			fetchAlbums(false);
+		}
+	}
+
+	async function quickPlay(album: JellyfinAlbumSummary, e: Event): Promise<void> {
+		e.stopPropagation();
+		playingAlbumId = album.jellyfin_id;
+		try {
+			const res = await fetch(API.jellyfinLibrary.albumTracks(album.jellyfin_id));
+			if (!res.ok) return;
+			const tracks: JellyfinTrackInfo[] = await res.json();
+			if (tracks.length === 0) return;
+			launchJellyfinPlayback(tracks, 0, false, {
+				albumId: album.musicbrainz_id || album.jellyfin_id,
+				albumName: album.name,
+				artistName: album.artist_name,
+				coverUrl: album.image_url ?? ''
+			});
+		} catch {} finally {
+			playingAlbumId = null;
 		}
 	}
 
@@ -227,6 +260,26 @@
 				<option value="DateCreated" selected={sortBy === 'DateCreated'}>Date Added</option>
 				<option value="ProductionYear" selected={sortBy === 'ProductionYear'}>Year</option>
 			</select>
+			<button
+				class="btn btn-sm btn-ghost btn-square"
+				onclick={toggleSortOrder}
+				aria-label="Toggle sort order"
+				title={sortOrder === 'Ascending' ? 'Ascending' : 'Descending'}
+			>
+				<svg
+					xmlns="http://www.w3.org/2000/svg"
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="2"
+					stroke-linecap="round"
+					stroke-linejoin="round"
+					class="h-4 w-4 transition-transform {sortOrder === 'Descending' ? 'rotate-180' : ''}"
+				>
+					<path d="M12 5v14"></path>
+					<path d="M18 13l-6 6-6-6"></path>
+				</svg>
+			</button>
 			{#if genres.length > 0}
 				<select class="select select-sm" onchange={handleGenreChange}>
 					<option value="">All Genres</option>
@@ -308,6 +361,19 @@
 								<div class="badge badge-sm badge-ghost">{album.year}</div>
 							</div>
 						{/if}
+						<div class="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+							<button
+								class="btn btn-circle btn-sm btn-primary shadow-md"
+								onclick={(e) => quickPlay(album, e)}
+								aria-label="Play {album.name}"
+							>
+								{#if playingAlbumId === album.jellyfin_id}
+									<span class="loading loading-spinner loading-xs"></span>
+								{:else}
+									<PlayIcon class="h-4 w-4" />
+								{/if}
+							</button>
+						</div>
 					</figure>
 
 					<div class="card-body p-3">

@@ -2,8 +2,15 @@
 	import { onMount, onDestroy } from 'svelte';
 	import { API } from '$lib/constants';
 	import AlbumImage from '$lib/components/AlbumImage.svelte';
+	import PlayIcon from '$lib/components/PlayIcon.svelte';
 	import SourceAlbumModal from '$lib/components/SourceAlbumModal.svelte';
-	import type { LocalAlbumSummary, LocalPaginatedResponse, LocalStorageStats } from '$lib/types';
+	import { launchLocalPlayback } from '$lib/player/launchLocalPlayback';
+	import type {
+		LocalAlbumSummary,
+		LocalPaginatedResponse,
+		LocalStorageStats,
+		LocalTrackInfo
+	} from '$lib/types';
 
 	let albums = $state<LocalAlbumSummary[]>([]);
 	let recentAlbums = $state<LocalAlbumSummary[]>([]);
@@ -14,9 +21,11 @@
 	let fetchError = $state('');
 
 	let sortBy = $state<'name' | 'date_added' | 'year'>('name');
+	let sortOrder = $state<'asc' | 'desc'>('asc');
 	let searchQuery = $state('');
 	let searchTimeout: ReturnType<typeof setTimeout> | null = null;
 	let fetchId = 0;
+	let playingAlbumId = $state<number | null>(null);
 
 	let detailModalOpen = $state(false);
 	let selectedAlbum = $state<LocalAlbumSummary | null>(null);
@@ -39,7 +48,8 @@
 				PAGE_SIZE,
 				offset,
 				sortBy,
-				searchQuery.trim() || undefined
+				searchQuery.trim() || undefined,
+				sortOrder
 			);
 			const res = await fetch(url);
 			if (id !== fetchId) return;
@@ -82,7 +92,16 @@
 	}
 
 	function handleSortChange(e: Event): void {
-		sortBy = (e.target as HTMLSelectElement).value as typeof sortBy;
+		const newSort = (e.target as HTMLSelectElement).value as typeof sortBy;
+		if (newSort !== sortBy) {
+			sortBy = newSort;
+			sortOrder = newSort === 'name' ? 'asc' : 'desc';
+		}
+		fetchAlbums(true);
+	}
+
+	function toggleSortOrder(): void {
+		sortOrder = sortOrder === 'asc' ? 'desc' : 'asc';
 		fetchAlbums(true);
 	}
 
@@ -103,6 +122,25 @@
 		if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
 		if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 		return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+	}
+
+	async function quickPlay(album: LocalAlbumSummary, e: Event): Promise<void> {
+		e.stopPropagation();
+		playingAlbumId = album.lidarr_album_id;
+		try {
+			const res = await fetch(API.local.albumTracks(album.lidarr_album_id));
+			if (!res.ok) return;
+			const tracks: LocalTrackInfo[] = await res.json();
+			if (tracks.length === 0) return;
+			launchLocalPlayback(tracks, 0, false, {
+				albumId: album.musicbrainz_id || String(album.lidarr_album_id),
+				albumName: album.name,
+				artistName: album.artist_name,
+				coverUrl: album.cover_url ?? ''
+			});
+		} catch {} finally {
+			playingAlbumId = null;
+		}
 	}
 
 	onMount(() => {
@@ -138,25 +176,25 @@
 	</div>
 
 	{#if stats}
-		<div class="flex flex-wrap gap-3 mb-6">
-			<div class="stat bg-base-200 rounded-box p-3 min-w-0">
+		<div class="stats stats-vertical sm:stats-horizontal shadow-sm w-full mb-6 bg-base-200">
+			<div class="stat px-4 py-3">
 				<div class="stat-title text-xs">Tracks</div>
 				<div class="stat-value text-lg">{stats.total_tracks.toLocaleString()}</div>
 			</div>
-			<div class="stat bg-base-200 rounded-box p-3 min-w-0">
+			<div class="stat px-4 py-3">
 				<div class="stat-title text-xs">Artists</div>
 				<div class="stat-value text-lg">{stats.total_artists}</div>
 			</div>
-			<div class="stat bg-base-200 rounded-box p-3 min-w-0">
+			<div class="stat px-4 py-3">
 				<div class="stat-title text-xs">Total Size</div>
 				<div class="stat-value text-lg">{stats.total_size_human}</div>
 			</div>
-			<div class="stat bg-base-200 rounded-box p-3 min-w-0">
+			<div class="stat px-4 py-3">
 				<div class="stat-title text-xs">Disk Free</div>
 				<div class="stat-value text-lg">{stats.disk_free_human}</div>
 			</div>
 			{#if Object.keys(stats.format_breakdown).length > 0}
-				<div class="stat bg-base-200 rounded-box p-3 min-w-0">
+				<div class="stat px-4 py-3">
 					<div class="stat-title text-xs">Formats</div>
 					<div class="flex gap-1 mt-1 flex-wrap">
 						{#each Object.entries(stats.format_breakdown) as [fmt, info]}
@@ -216,6 +254,26 @@
 				<option value="date_added" selected={sortBy === 'date_added'}>Date Added</option>
 				<option value="year" selected={sortBy === 'year'}>Year</option>
 			</select>
+			<button
+				class="btn btn-sm btn-ghost btn-square"
+				onclick={toggleSortOrder}
+				aria-label="Toggle sort order"
+				title={sortOrder === 'asc' ? 'Ascending' : 'Descending'}
+			>
+				<svg
+					xmlns="http://www.w3.org/2000/svg"
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="2"
+					stroke-linecap="round"
+					stroke-linejoin="round"
+					class="h-4 w-4 transition-transform {sortOrder === 'desc' ? 'rotate-180' : ''}"
+				>
+					<path d="M12 5v14"></path>
+					<path d="M18 13l-6 6-6-6"></path>
+				</svg>
+			</button>
 			{#if !loading}
 				<span class="text-sm opacity-50">{total} results</span>
 			{/if}
@@ -280,6 +338,8 @@
 									class="h-3 w-3"
 								>
 									<path d="M3 18v-6a9 9 0 0 1 18 0v6"></path>
+									<path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3z"></path>
+									<path d="M3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"></path>
 								</svg>
 							</div>
 						</div>
@@ -289,10 +349,23 @@
 							</div>
 						{/if}
 						{#if album.year}
-							<div class="absolute bottom-2 right-2">
+							<div class="absolute bottom-2 left-2">
 								<div class="badge badge-sm badge-ghost">{album.year}</div>
 							</div>
 						{/if}
+						<div class="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+							<button
+								class="btn btn-circle btn-sm btn-primary shadow-md"
+								onclick={(e) => quickPlay(album, e)}
+								aria-label="Play {album.name}"
+							>
+								{#if playingAlbumId === album.lidarr_album_id}
+									<span class="loading loading-spinner loading-xs"></span>
+								{:else}
+									<PlayIcon class="h-4 w-4" />
+								{/if}
+							</button>
+						</div>
 					</figure>
 
 					<div class="card-body p-3">

@@ -117,8 +117,8 @@ export const API = {
 	},
 	jellyfinLibrary: {
 		albumMatch: (mbid: string) => `/api/jellyfin/albums/match/${mbid}`,
-		albums: (limit = 50, offset = 0, sortBy = 'SortName', genre?: string) => {
-			let url = `/api/jellyfin/albums?limit=${limit}&offset=${offset}&sort_by=${sortBy}`;
+		albums: (limit = 50, offset = 0, sortBy = 'SortName', genre?: string, sortOrder = 'Ascending') => {
+			let url = `/api/jellyfin/albums?limit=${limit}&offset=${offset}&sort_by=${sortBy}&sort_order=${sortOrder}`;
 			if (genre) url += `&genre=${encodeURIComponent(genre)}`;
 			return url;
 		},
@@ -133,8 +133,8 @@ export const API = {
 	},
 	local: {
 		albumMatch: (mbid: string) => `/api/local/albums/match/${mbid}`,
-		albums: (limit = 50, offset = 0, sortBy = 'name', q?: string) => {
-			let url = `/api/local/albums?limit=${limit}&offset=${offset}&sort_by=${sortBy}`;
+		albums: (limit = 50, offset = 0, sortBy = 'name', q?: string, sortOrder = 'asc') => {
+			let url = `/api/local/albums?limit=${limit}&offset=${offset}&sort_by=${sortBy}&sort_order=${sortOrder}`;
 			if (q) url += `&q=${encodeURIComponent(q)}`;
 			return url;
 		},

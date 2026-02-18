@@ -325,6 +325,7 @@ class JellyfinRepository:
         limit: int = 50,
         offset: int = 0,
         sort_by: str = "SortName",
+        sort_order: str = "Ascending",
         genre: str | None = None,
     ) -> tuple[list[JellyfinItem], int]:
         uid = self._user_id
@@ -332,7 +333,7 @@ class JellyfinRepository:
             "includeItemTypes": "MusicAlbum",
             "recursive": "true",
             "sortBy": sort_by,
-            "sortOrder": "Ascending",
+            "sortOrder": sort_order,
             "limit": limit,
             "startIndex": offset,
             "enableUserData": "true",
@@ -342,7 +343,7 @@ class JellyfinRepository:
             params["userId"] = uid
         if genre:
             params["genres"] = genre
-        cache_key = f"jellyfin_albums:{uid}:{limit}:{offset}:{sort_by}:{genre}"
+        cache_key = f"jellyfin_albums:{uid}:{limit}:{offset}:{sort_by}:{sort_order}:{genre}"
         cached = await self._cache.get(cache_key)
         if cached:
             return cached

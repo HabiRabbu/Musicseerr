@@ -144,7 +144,7 @@
 
 {#if open && link}
 	<dialog class="modal modal-open">
-		<div class="modal-box max-w-2xl p-0 overflow-hidden">
+		<div class="modal-box max-w-4xl p-0 overflow-hidden">
 			<div class="flex gap-5 p-6 pb-4">
 				<div class="flex-shrink-0">
 					{#if canNavigate}
@@ -155,7 +155,7 @@
 								alt={link.album_name}
 								size="xl"
 								rounded="none"
-								className="w-36 h-36"
+								className="w-48 h-48"
 							/>
 						</button>
 					{:else}
@@ -166,7 +166,7 @@
 								alt={link.album_name}
 								size="xl"
 								rounded="none"
-								className="w-36 h-36"
+								className="w-48 h-48"
 							/>
 						</div>
 					{/if}
@@ -240,7 +240,7 @@
 
 			<div class="divider my-0 px-6"></div>
 
-			<div class="px-6 pt-3 pb-5 max-h-96 overflow-y-auto">
+			<div class="px-6 pt-3 pb-5 max-h-[28rem] overflow-y-auto">
 				{#if loadingTracks}
 					<div class="flex justify-center py-6">
 						<span class="loading loading-spinner loading-md"></span>

@@ -9,6 +9,19 @@
 
 	let links = $state<YouTubeLink[]>([]);
 	let loading = $state(true);
+	let searchQuery = $state('');
+
+	let filteredLinks = $derived(
+		searchQuery.trim()
+			? links.filter((l) => {
+					const q = searchQuery.trim().toLowerCase();
+					return (
+						l.album_name.toLowerCase().includes(q) ||
+						l.artist_name.toLowerCase().includes(q)
+					);
+				})
+			: links
+	);
 
 	let editModalOpen = $state(false);
 	let editingLink = $state<YouTubeLink | null>(null);
@@ -94,6 +107,21 @@
 		<span class="badge badge-neutral">{links.length}</span>
 	</div>
 
+	{#if !loading && links.length > 0}
+		<div class="flex flex-wrap items-center gap-3 mb-4">
+			<input
+				type="text"
+				placeholder="Search links..."
+				class="input input-sm w-48"
+				bind:value={searchQuery}
+				aria-label="Search YouTube links"
+			/>
+			{#if searchQuery.trim()}
+				<span class="text-sm opacity-50">{filteredLinks.length} results</span>
+			{/if}
+		</div>
+	{/if}
+
 	{#if loading}
 		<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
 			{#each Array(12) as _}
@@ -120,7 +148,7 @@
 				</div>
 			</button>
 
-			{#each links as link (link.album_id)}
+			{#each filteredLinks as link (link.album_id)}
 				<div
 					class="card bg-base-100 w-full shadow-sm group relative cursor-pointer transition-transform hover:scale-105 hover:shadow-lg active:scale-95"
 					onclick={() => openDetail(link)}
@@ -157,7 +185,14 @@
 			{/each}
 		</div>
 
-		{#if links.length === 0}
+		{#if filteredLinks.length === 0 && links.length > 0}
+			<div class="card bg-base-200 mt-4">
+				<div class="card-body items-center text-center">
+					<p class="text-lg opacity-60">No matching links</p>
+					<p class="text-sm opacity-40">Try a different search term.</p>
+				</div>
+			</div>
+		{:else if links.length === 0}
 			<div class="card bg-base-200 mt-4">
 				<div class="card-body items-center text-center">
 					<YouTubeIcon class="h-12 w-12 opacity-20" />

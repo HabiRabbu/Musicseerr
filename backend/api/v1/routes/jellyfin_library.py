@@ -27,12 +27,13 @@ async def get_jellyfin_albums(
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
     sort_by: Literal["SortName", "DateCreated", "PlayCount", "ProductionYear"] = Query(default="SortName"),
+    sort_order: Literal["Ascending", "Descending"] = Query(default="Ascending"),
     genre: str | None = Query(default=None),
     service: JellyfinLibraryService = Depends(get_jellyfin_library_service),
 ) -> JellyfinPaginatedResponse:
     try:
         items, total = await service.get_albums(
-            limit=limit, offset=offset, sort_by=sort_by, genre=genre
+            limit=limit, offset=offset, sort_by=sort_by, sort_order=sort_order, genre=genre
         )
         return JellyfinPaginatedResponse(
             items=items, total=total, offset=offset, limit=limit
