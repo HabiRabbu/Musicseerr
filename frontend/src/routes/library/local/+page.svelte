@@ -4,6 +4,11 @@
 	import AlbumImage from '$lib/components/AlbumImage.svelte';
 	import PlayIcon from '$lib/components/PlayIcon.svelte';
 	import SourceAlbumModal from '$lib/components/SourceAlbumModal.svelte';
+	import {
+		getLocalFilesSidebarCachedData,
+		isLocalFilesSidebarCacheStale,
+		setLocalFilesSidebarCachedData
+	} from '$lib/utils/localFilesCache';
 	import { launchLocalPlayback } from '$lib/player/launchLocalPlayback';
 	import type {
 		LocalAlbumSummary,
@@ -25,6 +30,7 @@
 	let searchQuery = $state('');
 	let searchTimeout: ReturnType<typeof setTimeout> | null = null;
 	let fetchId = 0;
+	let sidebarAbortController: AbortController | null = null;
 	let playingAlbumId = $state<number | null>(null);
 
 	let detailModalOpen = $state(false);
@@ -70,16 +76,61 @@
 		}
 	}
 
-	async function fetchSidebar(): Promise<void> {
-		const [recentRes, statsRes] = await Promise.allSettled([
-			fetch(API.local.recent()),
-			fetch(API.local.stats())
-		]);
+	function applySidebarData(data: {
+		recentAlbums: LocalAlbumSummary[];
+		stats: LocalStorageStats | null;
+	}): void {
+		recentAlbums = data.recentAlbums;
+		stats = data.stats;
+	}
 
-		if (recentRes.status === 'fulfilled' && recentRes.value.ok)
-			recentAlbums = await recentRes.value.json();
-		if (statsRes.status === 'fulfilled' && statsRes.value.ok)
-			stats = await statsRes.value.json();
+	async function fetchSidebar(forceRefresh: boolean = false): Promise<void> {
+		const cached = getLocalFilesSidebarCachedData();
+		if (cached && !forceRefresh) {
+			applySidebarData(cached.data);
+			if (!isLocalFilesSidebarCacheStale(cached.timestamp)) {
+				return;
+			}
+		}
+
+		if (sidebarAbortController) {
+			sidebarAbortController.abort();
+		}
+		sidebarAbortController = new AbortController();
+
+		try {
+			const [recentRes, statsRes] = await Promise.allSettled([
+				fetch(API.local.recent(), { signal: sidebarAbortController.signal }),
+				fetch(API.local.stats(), { signal: sidebarAbortController.signal })
+			]);
+
+			let nextRecentAlbums = recentAlbums;
+			let nextStats = stats;
+			let hasFreshData = false;
+
+			if (recentRes.status === 'fulfilled' && recentRes.value.ok) {
+				nextRecentAlbums = await recentRes.value.json();
+				hasFreshData = true;
+			}
+			if (statsRes.status === 'fulfilled' && statsRes.value.ok) {
+				nextStats = await statsRes.value.json();
+				hasFreshData = true;
+			}
+
+			recentAlbums = nextRecentAlbums;
+			stats = nextStats;
+
+			if (hasFreshData) {
+				setLocalFilesSidebarCachedData({
+					recentAlbums: nextRecentAlbums,
+					stats: nextStats
+				});
+			}
+		} catch (e) {
+			if (e instanceof Error && e.name === 'AbortError') {
+				return;
+			}
+		}
 	}
 
 	function openDetail(album: LocalAlbumSummary): void {
@@ -150,6 +201,10 @@
 
 	onDestroy(() => {
 		if (searchTimeout) clearTimeout(searchTimeout);
+		if (sidebarAbortController) {
+			sidebarAbortController.abort();
+			sidebarAbortController = null;
+		}
 	});
 </script>
 

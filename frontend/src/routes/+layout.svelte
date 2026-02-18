@@ -303,7 +303,7 @@
 							class="is-drawer-close:tooltip is-drawer-close:tooltip-right"
 							data-tip="YouTube"
 						>
-							<YouTubeIcon class="h-6 w-6" />
+							<YouTubeIcon class="h-6 w-6 text-error" />
 							<span class="is-drawer-close:hidden">YouTube</span>
 						</a>
 					</li>

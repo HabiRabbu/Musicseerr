@@ -216,14 +216,25 @@ class JellyfinRepository:
                 raise ExternalServiceError(f"{error_msg}: {e}") from e
             return []
 
-    async def get_recently_played(self, user_id: str | None = None, limit: int = 20) -> list[JellyfinItem]:
+    async def get_recently_played(
+        self,
+        user_id: str | None = None,
+        limit: int = 20,
+        ttl_seconds: int = 300,
+    ) -> list[JellyfinItem]:
         uid = user_id or self._user_id
         if not uid:
             return []
         params = {"userId": uid, "includeItemTypes": "Audio", "sortBy": "DatePlayed",
                   "sortOrder": "Descending", "isPlayed": "true", "enableUserData": "true",
                   "limit": limit, "recursive": "true", "Fields": "ProviderIds"}
-        return await self._fetch_items("/Items", f"jellyfin_recent:{uid}:{limit}", params, "Failed to get recently played")
+        return await self._fetch_items(
+            "/Items",
+            f"jellyfin_recent:{uid}:{limit}",
+            params,
+            "Failed to get recently played",
+            ttl=ttl_seconds,
+        )
 
     async def get_favorite_artists(self, user_id: str | None = None, limit: int = 20) -> list[JellyfinItem]:
         uid = user_id or self._user_id
@@ -232,13 +243,24 @@ class JellyfinRepository:
         params = {"userId": uid, "isFavorite": "true", "enableUserData": "true", "limit": limit, "Fields": "ProviderIds"}
         return await self._fetch_items("/Artists", f"jellyfin_fav_artists:{uid}:{limit}", params, "Failed to get favorite artists")
 
-    async def get_favorite_albums(self, user_id: str | None = None, limit: int = 20) -> list[JellyfinItem]:
+    async def get_favorite_albums(
+        self,
+        user_id: str | None = None,
+        limit: int = 20,
+        ttl_seconds: int = 300,
+    ) -> list[JellyfinItem]:
         uid = user_id or self._user_id
         if not uid:
             return []
         params = {"userId": uid, "includeItemTypes": "MusicAlbum", "isFavorite": "true",
                   "enableUserData": "true", "limit": limit, "recursive": "true"}
-        return await self._fetch_items("/Items", f"jellyfin_fav_albums:{uid}:{limit}", params, "Failed to get favorite albums")
+        return await self._fetch_items(
+            "/Items",
+            f"jellyfin_fav_albums:{uid}:{limit}",
+            params,
+            "Failed to get favorite albums",
+            ttl=ttl_seconds,
+        )
 
     async def get_most_played_artists(self, user_id: str | None = None, limit: int = 20) -> list[JellyfinItem]:
         uid = user_id or self._user_id
@@ -270,7 +292,7 @@ class JellyfinRepository:
             logger.error(f"Failed to get recently added: {e}")
             return []
 
-    async def get_genres(self, user_id: str | None = None) -> list[str]:
+    async def get_genres(self, user_id: str | None = None, ttl_seconds: int = 3600) -> list[str]:
         uid = user_id or self._user_id
         cache_key = f"jellyfin_genres:{uid}"
         cached = await self._cache.get(cache_key)
@@ -282,7 +304,7 @@ class JellyfinRepository:
             if not result:
                 return []
             genres = [item.get("Name", "") for item in result.get("Items", []) if item.get("Name")]
-            await self._cache.set(cache_key, genres, ttl_seconds=3600)
+            await self._cache.set(cache_key, genres, ttl_seconds=ttl_seconds)
             return genres
         except Exception as e:
             logger.error(f"Failed to get genres: {e}")
@@ -525,7 +547,7 @@ class JellyfinRepository:
             logger.error(f"Jellyfin search failed for '{query}': {e}")
             return []
 
-    async def get_library_stats(self) -> dict[str, Any]:
+    async def get_library_stats(self, ttl_seconds: int = 600) -> dict[str, Any]:
         cache_key = "jellyfin_library_stats"
         cached = await self._cache.get(cache_key)
         if cached:
@@ -549,7 +571,7 @@ class JellyfinRepository:
                 if result:
                     stats[key] = result.get("TotalRecordCount", 0)
 
-            await self._cache.set(cache_key, stats, ttl_seconds=600)
+            await self._cache.set(cache_key, stats, ttl_seconds=ttl_seconds)
         except Exception as e:
             logger.error(f"Failed to get library stats: {e}")
 

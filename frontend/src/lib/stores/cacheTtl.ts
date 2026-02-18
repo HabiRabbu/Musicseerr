@@ -5,6 +5,8 @@ import { updateDiscoverCacheTTL } from '$lib/utils/discoverCache';
 import { updateDiscoveryCacheTTL } from '$lib/stores/discoveryCache';
 import { updateDiscoverQueueCacheTTL } from '$lib/utils/discoverQueueCache';
 import { updateSearchCacheTTL } from '$lib/stores/search';
+import { updateJellyfinSidebarCacheTTL } from '$lib/utils/jellyfinLibraryCache';
+import { updateLocalFilesSidebarCacheTTL } from '$lib/utils/localFilesCache';
 import { libraryStore } from '$lib/stores/library';
 import { recentlyAddedStore } from '$lib/stores/recentlyAdded';
 
@@ -15,6 +17,8 @@ export interface CacheTTLs {
 	recentlyAdded: number;
 	discoverQueue: number;
 	search: number;
+	localFilesSidebar: number;
+	jellyfinSidebar: number;
 }
 
 const DEFAULTS: CacheTTLs = {
@@ -23,7 +27,9 @@ const DEFAULTS: CacheTTLs = {
 	library: CACHE_TTL.LIBRARY,
 	recentlyAdded: CACHE_TTL.RECENTLY_ADDED,
 	discoverQueue: CACHE_TTL.DISCOVER_QUEUE,
-	search: CACHE_TTL.SEARCH
+	search: CACHE_TTL.SEARCH,
+	localFilesSidebar: CACHE_TTL.LOCAL_FILES_SIDEBAR,
+	jellyfinSidebar: CACHE_TTL.JELLYFIN_SIDEBAR
 };
 
 let resolved: CacheTTLs = { ...DEFAULTS };
@@ -37,6 +43,8 @@ function applyTTLs(ttls: CacheTTLs): void {
 	updateDiscoveryCacheTTL(ttls.discover);
 	updateDiscoverQueueCacheTTL(ttls.discoverQueue);
 	updateSearchCacheTTL(ttls.search);
+	updateLocalFilesSidebarCacheTTL(ttls.localFilesSidebar);
+	updateJellyfinSidebarCacheTTL(ttls.jellyfinSidebar);
 }
 
 export async function initCacheTTLs(): Promise<void> {
@@ -53,7 +61,9 @@ export async function initCacheTTLs(): Promise<void> {
 				library: data.library ?? DEFAULTS.library,
 				recentlyAdded: data.recently_added ?? DEFAULTS.recentlyAdded,
 				discoverQueue: data.discover_queue ?? DEFAULTS.discoverQueue,
-				search: data.search ?? DEFAULTS.search
+				search: data.search ?? DEFAULTS.search,
+				localFilesSidebar: data.local_files_sidebar ?? DEFAULTS.localFilesSidebar,
+				jellyfinSidebar: data.jellyfin_sidebar ?? DEFAULTS.jellyfinSidebar
 			};
 			applyTTLs(resolved);
 		}

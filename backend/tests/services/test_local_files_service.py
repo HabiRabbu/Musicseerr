@@ -1,6 +1,7 @@
 import asyncio
 import pytest
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from core.exceptions import ExternalServiceError, ResourceNotFoundError
@@ -20,6 +21,10 @@ def _make_preferences(music_path: str = "/music", lidarr_root: str = "/music") -
     settings.music_path = music_path
     settings.lidarr_root_path = lidarr_root
     prefs.get_local_files_connection.return_value = settings
+    advanced = MagicMock()
+    advanced.cache_ttl_local_files_recently_added = 120
+    advanced.cache_ttl_local_files_storage_stats = 300
+    prefs.get_advanced_settings.return_value = advanced
     return prefs
 
 
@@ -162,6 +167,69 @@ async def test_get_albums_caches_lidarr_response(service):
     assert cache.set.called
     call_args = cache.set.call_args
     assert call_args[0][0] == "local_files_all_albums"
+
+
+@pytest.mark.asyncio
+async def test_get_recently_added_uses_cache(service):
+    svc, lidarr, music_dir, cache = service
+    cache.get = AsyncMock(return_value=[
+        {
+            "lidarr_album_id": 10,
+            "musicbrainz_id": "mbid-10",
+            "name": "Cached Album",
+            "artist_name": "Cached Artist",
+            "track_count": 12,
+            "total_size_bytes": 123456,
+            "artist_mbid": None,
+            "year": 2024,
+            "primary_format": "flac",
+            "cover_url": None,
+            "date_added": "2026-02-17T00:00:00Z",
+        }
+    ])
+    lidarr.get_recently_imported = AsyncMock(return_value=[])
+
+    result = await svc.get_recently_added(limit=20)
+
+    assert len(result) == 1
+    assert result[0].name == "Cached Album"
+    lidarr.get_recently_imported.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_get_recently_added_caches_result(service):
+    svc, lidarr, music_dir, cache = service
+    cache.get = AsyncMock(return_value=None)
+    lidarr.get_recently_imported = AsyncMock(return_value=[
+        SimpleNamespace(
+            musicbrainz_id="mbid-123",
+            album="Album From Lidarr",
+            artist="Artist From Lidarr",
+            artist_mbid=None,
+            year=2023,
+            cover_url=None,
+            date_added=None,
+        )
+    ])
+    lidarr.get_all_albums = AsyncMock(return_value=[
+        {
+            "id": 123,
+            "title": "Album From Lidarr",
+            "artist": {"artistName": "Artist From Lidarr"},
+            "statistics": {"trackFileCount": 7, "sizeOnDisk": 987654},
+            "foreignAlbumId": "mbid-123",
+            "releaseDate": "2023-01-01",
+            "added": "2026-02-17T00:00:00Z",
+        }
+    ])
+
+    result = await svc.get_recently_added(limit=20)
+
+    assert len(result) == 1
+    assert result[0].lidarr_album_id == 123
+    cache.set.assert_called()
+    cache_key = cache.set.call_args[0][0]
+    assert cache_key == "local_files_recently_added:20"
 
 
 @pytest.mark.asyncio

@@ -102,6 +102,9 @@
 				</div>
 			</div>
 			<div class="collapse-content">
+				<div class="alert alert-info alert-soft mb-4">
+					<span class="text-sm">Frontend TTLs control browser-side cache freshness. Lower values refresh page sections sooner; higher values make return navigation feel faster.</span>
+				</div>
 				<div class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 pt-2">
 					<fieldset class="fieldset">
 						<legend class="fieldset-legend">Home Page</legend>
@@ -151,6 +154,22 @@
 						</label>
 						<p class="label text-base-content/50">Default: 5 minutes</p>
 					</fieldset>
+					<fieldset class="fieldset">
+						<legend class="fieldset-legend">Local Files Sidebar</legend>
+						<label class="input w-full">
+							<input type="number" bind:value={settings.frontend_ttl_local_files_sidebar} min="1" max="60" class="grow" />
+							<span class="label">min</span>
+						</label>
+						<p class="label text-base-content/50">Default: 2 minutes</p>
+					</fieldset>
+					<fieldset class="fieldset">
+						<legend class="fieldset-legend">Jellyfin Sidebar</legend>
+						<label class="input w-full">
+							<input type="number" bind:value={settings.frontend_ttl_jellyfin_sidebar} min="1" max="60" class="grow" />
+							<span class="label">min</span>
+						</label>
+						<p class="label text-base-content/50">Default: 2 minutes</p>
+					</fieldset>
 				</div>
 			</div>
 		</div>
@@ -174,6 +193,9 @@
 				</div>
 			</div>
 			<div class="collapse-content">
+				<div class="alert alert-info alert-soft mb-4">
+					<span class="text-sm">Server-side TTLs control API/data cache freshness for all clients. Lower values fetch from upstream services more often; higher values reduce backend/API load.</span>
+				</div>
 				<div class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 pt-2">
 					<fieldset class="fieldset">
 						<legend class="fieldset-legend">Library Albums</legend>
@@ -222,6 +244,54 @@
 							<span class="label">hours</span>
 						</label>
 						<p class="label text-base-content/50">Covers & enrichment (default: 24h)</p>
+					</fieldset>
+					<fieldset class="fieldset">
+						<legend class="fieldset-legend">Local Recent (Backend)</legend>
+						<label class="input w-full">
+							<input type="number" bind:value={settings.cache_ttl_local_files_recently_added} min="1" max="60" class="grow" />
+							<span class="label">min</span>
+						</label>
+						<p class="label text-base-content/50">Default: 2 minutes</p>
+					</fieldset>
+					<fieldset class="fieldset">
+						<legend class="fieldset-legend">Local Stats (Backend)</legend>
+						<label class="input w-full">
+							<input type="number" bind:value={settings.cache_ttl_local_files_storage_stats} min="1" max="60" class="grow" />
+							<span class="label">min</span>
+						</label>
+						<p class="label text-base-content/50">Default: 5 minutes</p>
+					</fieldset>
+					<fieldset class="fieldset">
+						<legend class="fieldset-legend">Jellyfin Recent (Backend)</legend>
+						<label class="input w-full">
+							<input type="number" bind:value={settings.cache_ttl_jellyfin_recently_played} min="1" max="60" class="grow" />
+							<span class="label">min</span>
+						</label>
+						<p class="label text-base-content/50">Default: 5 minutes</p>
+					</fieldset>
+					<fieldset class="fieldset">
+						<legend class="fieldset-legend">Jellyfin Favorites (Backend)</legend>
+						<label class="input w-full">
+							<input type="number" bind:value={settings.cache_ttl_jellyfin_favorites} min="1" max="60" class="grow" />
+							<span class="label">min</span>
+						</label>
+						<p class="label text-base-content/50">Default: 5 minutes</p>
+					</fieldset>
+					<fieldset class="fieldset">
+						<legend class="fieldset-legend">Jellyfin Genres (Backend)</legend>
+						<label class="input w-full">
+							<input type="number" bind:value={settings.cache_ttl_jellyfin_genres} min="1" max="1440" class="grow" />
+							<span class="label">min</span>
+						</label>
+						<p class="label text-base-content/50">Default: 60 minutes</p>
+					</fieldset>
+					<fieldset class="fieldset">
+						<legend class="fieldset-legend">Jellyfin Stats (Backend)</legend>
+						<label class="input w-full">
+							<input type="number" bind:value={settings.cache_ttl_jellyfin_library_stats} min="1" max="60" class="grow" />
+							<span class="label">min</span>
+						</label>
+						<p class="label text-base-content/50">Default: 10 minutes</p>
 					</fieldset>
 				</div>
 			</div>

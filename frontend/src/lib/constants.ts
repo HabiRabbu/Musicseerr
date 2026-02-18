@@ -1,6 +1,8 @@
 export const CACHE_KEYS = {
 	LIBRARY_MBIDS: 'musicseerr_library_mbids',
 	RECENTLY_ADDED: 'musicseerr_recently_added',
+	LOCAL_FILES_SIDEBAR: 'musicseerr_local_files_sidebar',
+	JELLYFIN_SIDEBAR: 'musicseerr_jellyfin_sidebar',
 	HOME_CACHE: 'musicseerr_home_cache',
 	DISCOVER_CACHE: 'musicseerr_discover_cache',
 	DISCOVER_QUEUE: 'musicseerr_discover_queue'
@@ -10,6 +12,8 @@ export const CACHE_TTL = {
 	DEFAULT: 5 * 60 * 1000,
 	LIBRARY: 5 * 60 * 1000,
 	RECENTLY_ADDED: 5 * 60 * 1000,
+	LOCAL_FILES_SIDEBAR: 2 * 60 * 1000,
+	JELLYFIN_SIDEBAR: 2 * 60 * 1000,
 	HOME: 5 * 60 * 1000,
 	DISCOVER: 30 * 60 * 1000,
 	DISCOVER_QUEUE: 24 * 60 * 60 * 1000,

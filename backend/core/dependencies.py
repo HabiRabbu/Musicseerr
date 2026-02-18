@@ -419,7 +419,8 @@ def get_local_files_service() -> LocalFilesService:
 @lru_cache(maxsize=1)
 def get_jellyfin_library_service() -> JellyfinLibraryService:
     jellyfin_repo = get_jellyfin_repository()
-    return JellyfinLibraryService(jellyfin_repo)
+    preferences_service = get_preferences_service()
+    return JellyfinLibraryService(jellyfin_repo, preferences_service)
 
 
 CacheDep = Annotated[CacheInterface, Depends(get_cache)]

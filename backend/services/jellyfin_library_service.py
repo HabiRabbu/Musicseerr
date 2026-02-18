@@ -12,13 +12,48 @@ from api.v1.schemas.jellyfin import (
 )
 from repositories.jellyfin_repository import JellyfinRepository
 from repositories.jellyfin_models import JellyfinItem
+from services.preferences_service import PreferencesService
 
 logger = logging.getLogger(__name__)
 
 
 class JellyfinLibraryService:
-    def __init__(self, jellyfin_repo: JellyfinRepository):
+    _DEFAULT_RECENTLY_PLAYED_TTL = 300
+    _DEFAULT_FAVORITES_TTL = 300
+    _DEFAULT_GENRES_TTL = 3600
+    _DEFAULT_STATS_TTL = 600
+
+    def __init__(
+        self,
+        jellyfin_repo: JellyfinRepository,
+        preferences_service: PreferencesService,
+    ):
         self._jellyfin = jellyfin_repo
+        self._preferences = preferences_service
+
+    def _get_recently_played_ttl(self) -> int:
+        try:
+            return self._preferences.get_advanced_settings().cache_ttl_jellyfin_recently_played
+        except Exception:
+            return self._DEFAULT_RECENTLY_PLAYED_TTL
+
+    def _get_favorites_ttl(self) -> int:
+        try:
+            return self._preferences.get_advanced_settings().cache_ttl_jellyfin_favorites
+        except Exception:
+            return self._DEFAULT_FAVORITES_TTL
+
+    def _get_genres_ttl(self) -> int:
+        try:
+            return self._preferences.get_advanced_settings().cache_ttl_jellyfin_genres
+        except Exception:
+            return self._DEFAULT_GENRES_TTL
+
+    def _get_stats_ttl(self) -> int:
+        try:
+            return self._preferences.get_advanced_settings().cache_ttl_jellyfin_library_stats
+        except Exception:
+            return self._DEFAULT_STATS_TTL
 
     def _item_to_album_summary(self, item: JellyfinItem) -> JellyfinAlbumSummary:
         pids = item.provider_ids or {}
@@ -141,7 +176,11 @@ class JellyfinLibraryService:
         return JellyfinSearchResponse(albums=albums, artists=artists, tracks=tracks)
 
     async def get_recently_played(self, limit: int = 20) -> list[JellyfinAlbumSummary]:
-        items = await self._jellyfin.get_recently_played(limit=limit)
+        ttl_seconds = self._get_recently_played_ttl()
+        items = await self._jellyfin.get_recently_played(
+            limit=limit,
+            ttl_seconds=ttl_seconds,
+        )
         seen_album_ids: set[str] = set()
         unique_album_ids: list[str] = []
         for item in items:
@@ -170,14 +209,20 @@ class JellyfinLibraryService:
         ]
 
     async def get_favorites(self, limit: int = 20) -> list[JellyfinAlbumSummary]:
-        items = await self._jellyfin.get_favorite_albums(limit=limit)
+        ttl_seconds = self._get_favorites_ttl()
+        items = await self._jellyfin.get_favorite_albums(
+            limit=limit,
+            ttl_seconds=ttl_seconds,
+        )
         return [self._item_to_album_summary(i) for i in items]
 
     async def get_genres(self) -> list[str]:
-        return await self._jellyfin.get_genres()
+        ttl_seconds = self._get_genres_ttl()
+        return await self._jellyfin.get_genres(ttl_seconds=ttl_seconds)
 
     async def get_stats(self) -> JellyfinLibraryStats:
-        raw = await self._jellyfin.get_library_stats()
+        ttl_seconds = self._get_stats_ttl()
+        raw = await self._jellyfin.get_library_stats(ttl_seconds=ttl_seconds)
         return JellyfinLibraryStats(
             total_tracks=raw.get("total_tracks", 0),
             total_albums=raw.get("total_albums", 0),

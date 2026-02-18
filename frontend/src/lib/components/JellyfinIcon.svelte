@@ -4,12 +4,15 @@
 
 <svg
 	xmlns="http://www.w3.org/2000/svg"
-	viewBox="0 0 512 512"
-	fill="currentColor"
+	viewBox="0 0 24 24"
+	fill="none"
+	stroke="currentColor"
+	stroke-width="2"
+	stroke-linecap="round"
+	stroke-linejoin="round"
 	class={className}
 	aria-hidden="true"
 >
-	<path
-		d="M256 0C114.6 0 0 114.6 0 256s114.6 256 256 256 256-114.6 256-256S397.4 0 256 0zm120.5 325.7c-2.3 13.5-13.5 24.7-27 27-30.3 5.2-60.7 5.2-93.5 5.2s-63.2 0-93.5-5.2c-13.5-2.3-24.7-13.5-27-27-5.2-25.5-5.2-55.5-5.2-69.7s0-44.2 5.2-69.7c2.3-13.5 13.5-24.7 27-27 30.3-5.2 60.7-5.2 93.5-5.2s63.2 0 93.5 5.2c13.5 2.3 24.7 13.5 27 27 5.2 25.5 5.2 55.5 5.2 69.7s0 44.2-5.2 69.7zM224 192v128l96-64-96-64z"
-	/>
+	<rect x="2" y="7" width="20" height="15" rx="2" ry="2"></rect>
+	<polyline points="17 2 12 7 7 2"></polyline>
 </svg>

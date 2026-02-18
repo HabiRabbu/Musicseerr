@@ -4,6 +4,11 @@
 	import AlbumImage from '$lib/components/AlbumImage.svelte';
 	import PlayIcon from '$lib/components/PlayIcon.svelte';
 	import SourceAlbumModal from '$lib/components/SourceAlbumModal.svelte';
+	import {
+		getJellyfinSidebarCachedData,
+		isJellyfinSidebarCacheStale,
+		setJellyfinSidebarCachedData
+	} from '$lib/utils/jellyfinLibraryCache';
 	import { launchJellyfinPlayback } from '$lib/player/launchJellyfinPlayback';
 	import type {
 		JellyfinAlbumSummary,
@@ -28,6 +33,7 @@
 	let searchQuery = $state('');
 	let searchTimeout: ReturnType<typeof setTimeout> | null = null;
 	let fetchId = 0;
+	let sidebarAbortController: AbortController | null = null;
 	let playingAlbumId = $state<string | null>(null);
 
 	let detailModalOpen = $state(false);
@@ -81,22 +87,81 @@
 		}
 	}
 
-	async function fetchSidebar(): Promise<void> {
-		const [recentRes, favRes, genreRes, statsRes] = await Promise.allSettled([
-			fetch(API.jellyfinLibrary.recent()),
-			fetch(API.jellyfinLibrary.favorites()),
-			fetch(API.jellyfinLibrary.genres()),
-			fetch(API.jellyfinLibrary.stats())
-		]);
+	function applySidebarData(data: {
+		recentAlbums: JellyfinAlbumSummary[];
+		favoriteAlbums: JellyfinAlbumSummary[];
+		genres: string[];
+		stats: JellyfinLibraryStats | null;
+	}): void {
+		recentAlbums = data.recentAlbums;
+		favoriteAlbums = data.favoriteAlbums;
+		genres = data.genres;
+		stats = data.stats;
+	}
 
-		if (recentRes.status === 'fulfilled' && recentRes.value.ok)
-			recentAlbums = await recentRes.value.json();
-		if (favRes.status === 'fulfilled' && favRes.value.ok)
-			favoriteAlbums = await favRes.value.json();
-		if (genreRes.status === 'fulfilled' && genreRes.value.ok)
-			genres = await genreRes.value.json();
-		if (statsRes.status === 'fulfilled' && statsRes.value.ok)
-			stats = await statsRes.value.json();
+	async function fetchSidebar(forceRefresh: boolean = false): Promise<void> {
+		const cached = getJellyfinSidebarCachedData();
+		if (cached && !forceRefresh) {
+			applySidebarData(cached.data);
+			if (!isJellyfinSidebarCacheStale(cached.timestamp)) {
+				return;
+			}
+		}
+
+		if (sidebarAbortController) {
+			sidebarAbortController.abort();
+		}
+		sidebarAbortController = new AbortController();
+
+		try {
+			const [recentRes, favRes, genreRes, statsRes] = await Promise.allSettled([
+				fetch(API.jellyfinLibrary.recent(), { signal: sidebarAbortController.signal }),
+				fetch(API.jellyfinLibrary.favorites(), { signal: sidebarAbortController.signal }),
+				fetch(API.jellyfinLibrary.genres(), { signal: sidebarAbortController.signal }),
+				fetch(API.jellyfinLibrary.stats(), { signal: sidebarAbortController.signal })
+			]);
+
+			let nextRecentAlbums = recentAlbums;
+			let nextFavoriteAlbums = favoriteAlbums;
+			let nextGenres = genres;
+			let nextStats = stats;
+			let hasFreshData = false;
+
+			if (recentRes.status === 'fulfilled' && recentRes.value.ok) {
+				nextRecentAlbums = await recentRes.value.json();
+				hasFreshData = true;
+			}
+			if (favRes.status === 'fulfilled' && favRes.value.ok) {
+				nextFavoriteAlbums = await favRes.value.json();
+				hasFreshData = true;
+			}
+			if (genreRes.status === 'fulfilled' && genreRes.value.ok) {
+				nextGenres = await genreRes.value.json();
+				hasFreshData = true;
+			}
+			if (statsRes.status === 'fulfilled' && statsRes.value.ok) {
+				nextStats = await statsRes.value.json();
+				hasFreshData = true;
+			}
+
+			recentAlbums = nextRecentAlbums;
+			favoriteAlbums = nextFavoriteAlbums;
+			genres = nextGenres;
+			stats = nextStats;
+
+			if (hasFreshData) {
+				setJellyfinSidebarCachedData({
+					recentAlbums: nextRecentAlbums,
+					favoriteAlbums: nextFavoriteAlbums,
+					genres: nextGenres,
+					stats: nextStats
+				});
+			}
+		} catch (e) {
+			if (e instanceof Error && e.name === 'AbortError') {
+				return;
+			}
+		}
 	}
 
 	function openDetail(album: JellyfinAlbumSummary): void {
@@ -166,6 +231,10 @@
 
 	onDestroy(() => {
 		if (searchTimeout) clearTimeout(searchTimeout);
+		if (sidebarAbortController) {
+			sidebarAbortController.abort();
+			sidebarAbortController = null;
+		}
 	});
 </script>
 

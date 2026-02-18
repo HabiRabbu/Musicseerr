@@ -42,8 +42,9 @@ CONTENT_TYPE_MAP: dict[str, str] = {
 
 
 class LocalFilesService:
-    _STORAGE_STATS_TTL = 300
+    _DEFAULT_STORAGE_STATS_TTL = 300
     _ALBUM_LIST_TTL = 120
+    _DEFAULT_RECENTLY_ADDED_TTL = 120
 
     def __init__(
         self,
@@ -58,6 +59,18 @@ class LocalFilesService:
     def _get_config(self) -> tuple[str, str]:
         settings = self._preferences.get_local_files_connection()
         return settings.music_path, settings.lidarr_root_path
+
+    def _get_recently_added_ttl(self) -> int:
+        try:
+            return self._preferences.get_advanced_settings().cache_ttl_local_files_recently_added
+        except Exception:
+            return self._DEFAULT_RECENTLY_ADDED_TTL
+
+    def _get_storage_stats_ttl(self) -> int:
+        try:
+            return self._preferences.get_advanced_settings().cache_ttl_local_files_storage_stats
+        except Exception:
+            return self._DEFAULT_STORAGE_STATS_TTL
 
     def _remap_path(self, lidarr_path: str) -> Path:
         music_path, lidarr_root = self._get_config()
@@ -395,8 +408,24 @@ class LocalFilesService:
     async def get_recently_added(
         self, limit: int = 20
     ) -> list[LocalAlbumSummary]:
+        ttl_seconds = self._get_recently_added_ttl()
+        cache_key = f"local_files_recently_added:{limit}"
+        cached = await self._cache.get(cache_key)
+        if isinstance(cached, list):
+            try:
+                return [
+                    LocalAlbumSummary(**item)
+                    for item in cached
+                    if isinstance(item, dict)
+                ]
+            except Exception:
+                pass
+
         recently_imported = await self._lidarr.get_recently_imported(limit=limit)
         if not recently_imported:
+            await self._cache.set(
+                cache_key, [], ttl_seconds=ttl_seconds
+            )
             return []
 
         all_albums = await self._fetch_all_albums()
@@ -434,9 +463,16 @@ class LocalFilesService:
                         date_added=str(lib_album.date_added) if lib_album.date_added else None,
                     )
                 )
+
+        await self._cache.set(
+            cache_key,
+            [summary.model_dump() for summary in summaries],
+            ttl_seconds=ttl_seconds,
+        )
         return summaries
 
     async def get_storage_stats(self) -> LocalStorageStats:
+        ttl_seconds = self._get_storage_stats_ttl()
         cache_key = "local_files_storage_stats"
         cached = await self._cache.get(cache_key)
         if cached and isinstance(cached, dict):
@@ -452,7 +488,7 @@ class LocalFilesService:
         stats = await asyncio.to_thread(self._scan_storage_sync, root)
 
         await self._cache.set(
-            cache_key, stats.model_dump(), ttl_seconds=self._STORAGE_STATS_TTL
+            cache_key, stats.model_dump(), ttl_seconds=ttl_seconds
         )
         return stats
 

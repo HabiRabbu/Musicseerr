@@ -105,6 +105,8 @@ async def get_frontend_cache_ttls():
             recently_added=backend_settings.frontend_ttl_recently_added,
             discover_queue=backend_settings.frontend_ttl_discover_queue,
             search=backend_settings.frontend_ttl_search,
+            local_files_sidebar=backend_settings.frontend_ttl_local_files_sidebar,
+            jellyfin_sidebar=backend_settings.frontend_ttl_jellyfin_sidebar,
         )
     except Exception as e:
         logger.exception(f"Failed to get frontend cache TTLs: {e}")
