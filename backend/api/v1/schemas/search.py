@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Literal, Optional
 from pydantic import BaseModel, Field
 
 
@@ -13,6 +13,7 @@ class SearchResult(BaseModel):
     cover_url: Optional[str] = None
     disambiguation: Optional[str] = None
     type_info: Optional[str] = None
+    score: int = 0
 
 
 class SearchResponse(BaseModel):
@@ -36,3 +37,19 @@ class EnrichmentResponse(BaseModel):
     artists: list[ArtistEnrichment] = Field(default_factory=list)
     albums: list[AlbumEnrichment] = Field(default_factory=list)
     listenbrainz_enabled: bool = False
+
+
+class SuggestResult(BaseModel):
+    type: Literal["artist", "album"]
+    title: str
+    artist: Optional[str] = None
+    year: Optional[int] = None
+    musicbrainz_id: str
+    in_library: bool = False
+    requested: bool = False
+    disambiguation: Optional[str] = None
+    score: int = 0
+
+
+class SuggestResponse(BaseModel):
+    results: list[SuggestResult] = Field(default_factory=list)

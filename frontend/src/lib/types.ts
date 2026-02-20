@@ -40,6 +40,18 @@ export type SearchResults = {
 	albums: Album[];
 };
 
+export type SuggestResult = {
+	type: 'artist' | 'album';
+	title: string;
+	artist?: string | null;
+	year?: number | null;
+	musicbrainz_id: string;
+	in_library: boolean;
+	requested?: boolean;
+	disambiguation?: string | null;
+	score: number;
+};
+
 export type ArtistEnrichment = {
 	musicbrainz_id: string;
 	release_group_count?: number | null;

@@ -11,6 +11,7 @@ from repositories.musicbrainz_base import (
     mb_api_get,
     mb_deduplicator,
     dedupe_by_id,
+    get_score,
 )
 
 logger = logging.getLogger(__name__)
@@ -49,6 +50,7 @@ class MusicBrainzArtistMixin:
             in_library=False,
             disambiguation=artist.get("disambiguation") or None,
             type_info=artist.get("type") or None,
+            score=get_score(artist),
         )
 
     async def search_artists(

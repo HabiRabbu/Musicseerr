@@ -1,7 +1,8 @@
 import asyncio
 import logging
+from math import ceil
 from typing import Optional
-from api.v1.schemas.search import SearchResult, SearchResponse
+from api.v1.schemas.search import SearchResult, SearchResponse, SuggestResult, SuggestResponse
 from repositories.protocols import MusicBrainzRepositoryProtocol, LidarrRepositoryProtocol, CoverArtRepositoryProtocol
 from services.preferences_service import PreferencesService
 from infrastructure.http.deduplication import deduplicate
@@ -128,3 +129,62 @@ class SearchService:
                 item.requested = mbid_lower in queued_mbids and not item.in_library
 
         return results
+
+    @deduplicate(lambda self, query, limit=5: f"suggest:{query.strip().lower()}:{limit}")
+    async def suggest(self, query: str, limit: int = 5) -> SuggestResponse:
+        query = query.strip()
+        if len(query) < 2:
+            return SuggestResponse()
+
+        prefs = self._preferences_service.get_preferences()
+        included_secondary_types = set(t.lower() for t in prefs.secondary_types)
+        bucket_limit = ceil(limit * 0.6)
+
+        try:
+            grouped = await self._mb_repo.search_grouped(
+                query,
+                limits={"artists": bucket_limit, "albums": bucket_limit},
+                included_secondary_types=included_secondary_types,
+            )
+        except Exception as e:
+            logger.warning("MusicBrainz suggest failed (query_len=%d): %s", len(query), type(e).__name__)
+            return SuggestResponse()
+
+        grouped = grouped or {"artists": [], "albums": []}
+
+        try:
+            library_mbids = await self._lidarr_repo.get_library_mbids(include_release_ids=True)
+        except Exception as e:
+            logger.warning("Lidarr library fetch failed during suggest: %s", type(e).__name__)
+            library_mbids = set()
+        library_mbids = library_mbids or set()
+
+        try:
+            queue_items = await self._lidarr_repo.get_queue()
+            queued_mbids = {item.musicbrainz_id.lower() for item in queue_items if item.musicbrainz_id}
+        except Exception as e:
+            logger.warning("Lidarr queue fetch failed during suggest: %s", type(e).__name__)
+            queued_mbids = set()
+
+        for item in grouped.get("albums", []):
+            mbid_lower = (item.musicbrainz_id or "").lower()
+            item.in_library = mbid_lower in library_mbids
+            item.requested = mbid_lower in queued_mbids and not item.in_library
+
+        suggestions: list[SuggestResult] = []
+        for item in grouped.get("artists", []) + grouped.get("albums", []):
+            suggestions.append(SuggestResult(
+                type=item.type,
+                title=item.title,
+                artist=item.artist,
+                year=item.year,
+                musicbrainz_id=item.musicbrainz_id,
+                in_library=item.in_library,
+                requested=item.requested,
+                disambiguation=item.disambiguation,
+                score=item.score,
+            ))
+
+        type_order = {"artist": 0, "album": 1}
+        suggestions.sort(key=lambda s: (-s.score, type_order.get(s.type, 2), s.title.lower()))
+        return SuggestResponse(results=suggestions[:limit])

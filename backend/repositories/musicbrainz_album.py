@@ -10,6 +10,7 @@ from repositories.musicbrainz_base import (
     mb_api_get,
     mb_deduplicator,
     dedupe_by_id,
+    get_score,
     should_include_release,
     extract_artist_name,
     parse_year,
@@ -46,6 +47,7 @@ class MusicBrainzAlbumMixin:
             in_library=False,
             type_info=type_info,
             disambiguation=rg.get("disambiguation") or None,
+            score=get_score(rg),
         )
 
     async def search_albums(

@@ -1,6 +1,7 @@
 import logging
+import time
 from fastapi import APIRouter, Query, Path, BackgroundTasks, Depends
-from api.v1.schemas.search import SearchResponse, EnrichmentResponse
+from api.v1.schemas.search import SearchResponse, EnrichmentResponse, SuggestResponse
 from core.dependencies import get_search_service, get_coverart_repository, get_search_enrichment_service
 from services.search_service import SearchService
 from services.search_enrichment_service import SearchEnrichmentService
@@ -47,6 +48,22 @@ async def search(
             "250"
         )
     
+    return result
+
+
+@router.get("/suggest", response_model=SuggestResponse)
+async def suggest(
+    q: str = Query(..., min_length=2, description="Search query"),
+    limit: int = Query(5, ge=1, le=10, description="Max results"),
+    search_service: SearchService = Depends(get_search_service),
+) -> SuggestResponse:
+    stripped = q.strip()
+    if len(stripped) < 2:
+        return SuggestResponse()
+    start = time.monotonic()
+    result = await search_service.suggest(query=stripped, limit=limit)
+    elapsed_ms = (time.monotonic() - start) * 1000
+    logger.debug("Suggest query_len=%d results=%d time_ms=%.1f", len(stripped), len(result.results), elapsed_ms)
     return result
 
 

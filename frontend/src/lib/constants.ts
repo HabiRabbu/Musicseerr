@@ -80,7 +80,9 @@ export const API = {
 	},
 	search: {
 		artists: (query: string) => `/api/search/artists?q=${encodeURIComponent(query)}`,
-		albums: (query: string) => `/api/search/albums?q=${encodeURIComponent(query)}`
+		albums: (query: string) => `/api/search/albums?q=${encodeURIComponent(query)}`,
+		suggest: (query: string, limit = 5) =>
+			`/api/search/suggest?q=${encodeURIComponent(query.trim())}&limit=${limit}`
 	},
 	home: () => '/api/home',
 	homeIntegrationStatus: () => '/api/home/integration-status',
@@ -104,7 +106,8 @@ export const API = {
 		generateTrack: () => '/api/youtube/generate-track',
 		generateTracks: () => '/api/youtube/generate-tracks',
 		trackLinks: (albumId: string) => `/api/youtube/track-links/${albumId}`,
-		deleteTrackLink: (albumId: string, trackNumber: number) => `/api/youtube/track-link/${albumId}/${trackNumber}`,
+		deleteTrackLink: (albumId: string, trackNumber: number) =>
+			`/api/youtube/track-link/${albumId}/${trackNumber}`,
 		quota: () => '/api/youtube/quota'
 	},
 	queue: () => '/api/queue',
@@ -121,7 +124,13 @@ export const API = {
 	},
 	jellyfinLibrary: {
 		albumMatch: (mbid: string) => `/api/jellyfin/albums/match/${mbid}`,
-		albums: (limit = 50, offset = 0, sortBy = 'SortName', genre?: string, sortOrder = 'Ascending') => {
+		albums: (
+			limit = 50,
+			offset = 0,
+			sortBy = 'SortName',
+			genre?: string,
+			sortOrder = 'Ascending'
+		) => {
 			let url = `/api/jellyfin/albums?limit=${limit}&offset=${offset}&sort_by=${sortBy}&sort_order=${sortOrder}`;
 			if (genre) url += `&genre=${encodeURIComponent(genre)}`;
 			return url;
