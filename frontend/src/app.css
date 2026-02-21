@@ -9,7 +9,9 @@
 	--color-base-200: #161d12;
 	--color-base-100: #0d120a;
 	--color-primary: #aed5f2;
+	--color-primary-content: #071520;
 	--color-accent: #bbdb9b;
+	--color-accent-content: #0f1a0a;
 }
 
 :root {
