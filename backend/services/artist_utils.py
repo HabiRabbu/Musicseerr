@@ -1,49 +1,52 @@
 from typing import Any, Optional, Callable
 
-_PLATFORM_PATTERNS = {
-    "instagram.com": "Instagram",
-    "twitter.com": "Twitter",
-    "x.com": "Twitter",
-    "facebook.com": "Facebook",
-    "youtube.com": "YouTube",
-    "youtu.be": "YouTube",
-    "spotify.com": "Spotify",
-    "deezer.com": "Deezer",
-    "apple.com": "Apple Music",
-    "music.apple.com": "Apple Music",
-    "tidal.com": "Tidal",
-    "amazon.": "Amazon",
-    "bandcamp.com": "Bandcamp",
+_PLATFORM_PATTERNS: dict[str, tuple[str, str]] = {
+    "instagram.com": ("Instagram", "social"),
+    "twitter.com": ("Twitter", "social"),
+    "x.com": ("Twitter", "social"),
+    "facebook.com": ("Facebook", "social"),
+    "youtube.com": ("YouTube", "music"),
+    "youtu.be": ("YouTube", "music"),
+    "spotify.com": ("Spotify", "music"),
+    "deezer.com": ("Deezer", "music"),
+    "apple.com/music": ("Apple Music", "music"),
+    "music.apple.com": ("Apple Music", "music"),
+    "tidal.com": ("Tidal", "music"),
+    "amazon.com": ("Amazon", "music"),
+    "bandcamp.com": ("Bandcamp", "music"),
+    "soundcloud.com": ("SoundCloud", "music"),
+    "last.fm": ("Last.fm", "info"),
+    "lastfm.": ("Last.fm", "info"),
+    "wikipedia.org": ("Wikipedia", "info"),
 }
 
-_LINK_TYPE_LABELS = {
-    "official homepage": "Official Website",
-    "wikipedia": "Wikipedia",
-    "wikidata": "Wikidata",
-    "discogs": "Discogs",
-    "allmusic": "AllMusic",
-    "bandcamp": "Bandcamp",
-    "last.fm": "Last.fm",
-    "youtube": "YouTube",
-    "soundcloud": "SoundCloud",
-    "instagram": "Instagram",
-    "twitter": "Twitter",
-    "facebook": "Facebook",
+_LINK_TYPE_LABELS: dict[str, tuple[str, str]] = {
+    "official homepage": ("Official Website", "info"),
+    "wikipedia": ("Wikipedia", "info"),
+    "last.fm": ("Last.fm", "info"),
+    "bandcamp": ("Bandcamp", "music"),
+    "youtube": ("YouTube", "music"),
+    "soundcloud": ("SoundCloud", "music"),
+    "instagram": ("Instagram", "social"),
+    "twitter": ("Twitter", "social"),
+    "facebook": ("Facebook", "social"),
+}
+
+_ALLOWED_LABELS = {
+    "Spotify", "Apple Music", "YouTube", "Bandcamp", "SoundCloud",
+    "Deezer", "Tidal", "Amazon",
+    "Instagram", "Twitter", "Facebook",
+    "Official Website", "Wikipedia", "Last.fm",
 }
 
 
-def detect_platform(url: str, rel_type: str) -> str:
+def detect_platform(url: str, rel_type: str) -> tuple[str, str]:
+    """Return (label, category) for a URL + relation type."""
     url_lower = url.lower()
-    for pattern, platform in _PLATFORM_PATTERNS.items():
+    for pattern, result in _PLATFORM_PATTERNS.items():
         if pattern in url_lower:
-            return platform
-    if rel_type == "social network":
-        return "Social Media"
-    elif rel_type == "free streaming":
-        return "Streaming"
-    elif rel_type == "purchase for download":
-        return "Purchase"
-    return _LINK_TYPE_LABELS.get(rel_type, rel_type.title())
+            return result
+    return _LINK_TYPE_LABELS.get(rel_type, (rel_type.title(), "other"))
 
 
 def extract_tags(mb_artist: dict[str, Any], limit: int = 10) -> list[str]:
@@ -76,18 +79,22 @@ def extract_life_span(mb_artist: dict[str, Any]) -> Optional[dict[str, Optional[
 
 
 def extract_external_links(mb_artist: dict[str, Any]) -> list[dict[str, str]]:
-    external_links = []
-    seen_urls = set()
+    external_links: list[dict[str, str]] = []
+    seen_labels: set[str] = set()
     if url_rels := mb_artist.get("relations", []):
         for url_rel in url_rels:
             rel_type = url_rel.get("type", "")
             url_obj = url_rel.get("url", {})
             target_url = url_obj.get("resource", "") if isinstance(url_obj, dict) else ""
-            if not target_url or target_url in seen_urls:
+            if not target_url:
                 continue
-            label = detect_platform(target_url, rel_type)
-            external_links.append({"type": rel_type, "url": target_url, "label": label})
-            seen_urls.add(target_url)
+            label, category = detect_platform(target_url, rel_type)
+            if label not in _ALLOWED_LABELS or label in seen_labels:
+                continue
+            external_links.append(
+                {"type": rel_type, "url": target_url, "label": label, "category": category}
+            )
+            seen_labels.add(label)
     return external_links
 
 

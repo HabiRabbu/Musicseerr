@@ -6,6 +6,7 @@ class ExternalLink(BaseModel):
     type: str
     url: str
     label: str
+    category: str = "other"
 
 
 class ArtistInfo(BaseModel):

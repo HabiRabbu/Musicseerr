@@ -14,6 +14,7 @@
 	import { playerStore } from '$lib/stores/player.svelte';
 	import AlbumYouTubeBar from '$lib/components/AlbumYouTubeBar.svelte';
 	import AlbumSourceBar from '$lib/components/AlbumSourceBar.svelte';
+	import BackButton from '$lib/components/BackButton.svelte';
 	import TrackPlayButton from '$lib/components/TrackPlayButton.svelte';
 	import TrackSourceButton from '$lib/components/TrackSourceButton.svelte';
 	import JellyfinIcon from '$lib/components/JellyfinIcon.svelte';
@@ -248,14 +249,6 @@
 		}
 	}
 
-	function goBack() {
-		if (browser && window.history.length > 1) {
-			window.history.back();
-		} else {
-			goto('/');
-		}
-	}
-
 	function goToArtist() {
 		if (album?.artist_id) {
 			goto(`/artist/${album.artist_id}`);
@@ -288,15 +281,9 @@
 </script>
 
 <div class="w-full px-2 sm:px-4 lg:px-8 py-4 sm:py-8 max-w-7xl mx-auto">
-	<button 
-		on:click={goBack}
-		class="btn btn-ghost btn-circle mb-4"
-		aria-label="Go back"
-	>
-		<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-			<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
-		</svg>
-	</button>
+	<div class="mb-4">
+		<BackButton />
+	</div>
 
 	{#if error}
 		<div class="flex items-center justify-center min-h-[50vh]">

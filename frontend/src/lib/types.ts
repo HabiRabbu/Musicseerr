@@ -84,6 +84,7 @@ export type ExternalLink = {
 	type: string;
 	url: string;
 	label: string;
+	category?: string;
 };
 
 export type ArtistInfo = {

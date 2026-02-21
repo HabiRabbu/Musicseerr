@@ -7,7 +7,6 @@
 	import ArtistHeaderSkeleton from '$lib/components/ArtistHeaderSkeleton.svelte';
 	import AlbumGridSkeleton from '$lib/components/AlbumGridSkeleton.svelte';
 	import ReleaseList from '$lib/components/ReleaseList.svelte';
-	import ExternalLinksCarousel from '$lib/components/ExternalLinksCarousel.svelte';
 	import Toast from '$lib/components/Toast.svelte';
 	import ArtistHero from '$lib/components/ArtistHero.svelte';
 	import ArtistDescription from '$lib/components/ArtistDescription.svelte';
@@ -55,8 +54,6 @@
 			return yearB - yearA;
 		});
 	}
-
-	$: validLinks = artist?.external_links.filter((link) => link.url && link.url.trim() !== '') || [];
 
 	async function fetchArtist(force = false) {
 		if (!artist) loadingBasic = true;
@@ -311,27 +308,9 @@
 			artist = artist;
 		}
 	}
-
-
-	function goBack() {
-		if (browser && window.history.length > 1) {
-			window.history.back();
-		} else {
-			goto('/');
-		}
-	}
 </script>
 
 <div class="w-full px-2 sm:px-4 lg:px-8 py-4 sm:py-8 max-w-7xl mx-auto">
-	<button 
-		on:click={goBack}
-		class="btn btn-ghost btn-circle mb-4"
-		aria-label="Go back"
-	>
-		<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-			<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
-		</svg>
-	</button>
 
 	{#if error}
 		<div class="flex items-center justify-center min-h-[50vh]">
@@ -346,10 +325,28 @@
 		</div>
 	{:else if artist}
 		<div class="space-y-4 sm:space-y-6 lg:space-y-8">
-			<ArtistHero {artist} />
+			<ArtistHero {artist} showBackButton />
+
+			<div class="flex flex-wrap items-center gap-x-4 gap-y-2 justify-center sm:justify-start">
+				{#if artist.country}
+					<span class="text-sm text-base-content/80 flex items-center gap-1.5">
+						<span>🌍</span> {artist.country}
+					</span>
+				{/if}
+				{#if artist.life_span?.begin}
+					<span class="text-sm text-base-content/80 flex items-center gap-1.5">
+						<span>📅</span> {artist.life_span.begin}{#if artist.life_span.end}&nbsp;–&nbsp;{artist.life_span.end}{/if}
+					</span>
+				{/if}
+				{#if artist.albums.length + artist.eps.length + artist.singles.length > 0}
+					<span class="text-sm text-base-content/80 flex items-center gap-1.5">
+						<span>💿</span> {artist.albums.length + artist.eps.length + artist.singles.length} releases
+					</span>
+				{/if}
+			</div>
 
 			{#if artist.tags.length > 0}
-				<div class="flex flex-wrap gap-2 justify-center sm:justify-start">
+				<div class="flex flex-wrap gap-2 justify-center sm:justify-start -mt-2">
 					{#each artist.tags.slice(0, 10) as tag}
 						<span class="badge badge-lg" style="background-color: {colors.primary}; color: {colors.secondary};">{tag}</span>
 					{/each}
@@ -357,10 +354,6 @@
 			{/if}
 
 			<ArtistDescription description={artist.description} loading={loadingExtended} />
-
-			{#if validLinks.length > 0}
-				<ExternalLinksCarousel links={validLinks} />
-			{/if}
 
 			<!-- Discovery Section: Top Albums & Top Songs side by side -->
 			<div class="flex flex-col md:flex-row gap-6 mt-8 md:items-stretch">

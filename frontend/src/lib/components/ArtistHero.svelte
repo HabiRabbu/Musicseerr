@@ -1,8 +1,11 @@
 <script lang="ts">
 	import type { ArtistInfo } from '$lib/types';
 	import { extractDominantColor, DEFAULT_GRADIENT } from '$lib/utils/colors';
+	import ArtistLinks from './ArtistLinks.svelte';
+	import BackButton from './BackButton.svelte';
 
 	export let artist: ArtistInfo;
+	export let showBackButton: boolean = false;
 
 	let heroGradient = DEFAULT_GRADIENT;
 	let heroImageLoaded = false;
@@ -24,10 +27,10 @@
 		);
 	}
 
-	$: releaseCount = artist.albums.length + artist.eps.length + artist.singles.length;
+	$: validLinks = artist.external_links.filter((link) => link.url && link.url.trim() !== '');
 </script>
 
-<div class="relative -mx-2 sm:-mx-4 lg:-mx-8 -mt-4 sm:-mt-8 overflow-hidden">
+<div class="relative -mx-2 sm:-mx-4 lg:-mx-8 -mt-4 sm:-mt-8 overflow-hidden bg-gradient-to-b from-primary/15 via-primary/5 to-transparent">
 	{#if artist.fanart_url && !fanartError}
 		<div class="absolute inset-0">
 			<img
@@ -48,8 +51,13 @@
 		></div>
 	{/if}
 
-	<div class="relative z-10 px-4 sm:px-8 lg:px-12 pt-16 pb-8 sm:pt-20 sm:pb-12">
+	<div class="relative z-10 px-4 sm:px-8 lg:px-12 pt-6 pb-8 sm:pt-8 sm:pb-12">
 		<div class="max-w-7xl mx-auto">
+			{#if showBackButton}
+				<div class="mb-4">
+					<BackButton />
+				</div>
+			{/if}
 			<div class="flex flex-col sm:flex-row items-center sm:items-end gap-6 sm:gap-8">
 				<div class="flex-shrink-0">
 					<div class="relative">
@@ -121,26 +129,9 @@
 						<p class="text-base-content/60 text-sm sm:text-base mb-3">({artist.disambiguation})</p>
 					{/if}
 
-					<div class="flex flex-wrap justify-center sm:justify-start gap-2 mt-3">
-						{#if artist.country}
-							<div class="badge badge-lg badge-ghost gap-1">
-								<span class="text-sm">🌍</span>
-								{artist.country}
-							</div>
-						{/if}
-						{#if artist.life_span?.begin}
-							<div class="badge badge-lg badge-ghost gap-1">
-								<span class="text-sm">📅</span>
-								{artist.life_span.begin}{#if artist.life_span.end} - {artist.life_span.end}{/if}
-							</div>
-						{/if}
-						{#if releaseCount > 0}
-							<div class="badge badge-lg badge-ghost gap-1">
-								<span class="text-sm">💿</span>
-								{releaseCount} releases
-							</div>
-						{/if}
-					</div>
+					{#if validLinks.length > 0}
+						<ArtistLinks links={validLinks} />
+					{/if}
 				</div>
 			</div>
 		</div>
