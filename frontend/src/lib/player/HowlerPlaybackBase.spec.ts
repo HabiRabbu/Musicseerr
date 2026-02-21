@@ -167,7 +167,7 @@ describe('HowlerPlaybackBase', () => {
 		expect(readyCb).toHaveBeenCalledOnce();
 	});
 
-	it('fires error callbacks on Howl loaderror event', async () => {
+	it('rejects with LOAD_ERROR on Howl loaderror event', async () => {
 		const errorCb = vi.fn();
 		source.onError(errorCb);
 
@@ -180,9 +180,7 @@ describe('HowlerPlaybackBase', () => {
 			expect.objectContaining({ code: 'LOAD_ERROR' })
 		);
 
-		expect(errorCb).toHaveBeenCalledWith(
-			expect.objectContaining({ code: 'LOAD_ERROR', message: 'Network error' })
-		);
+		expect(errorCb).not.toHaveBeenCalled();
 	});
 
 	it('fires state callbacks on Howl play/pause/end events', async () => {
@@ -226,7 +224,7 @@ describe('HowlerPlaybackBase', () => {
 		await vi.advanceTimersByTimeAsync(15_000);
 		await assertion;
 
-		expect(errorCb).toHaveBeenCalledWith(expect.objectContaining({ code: 'LOAD_TIMEOUT' }));
+		expect(errorCb).not.toHaveBeenCalled();
 
 		vi.useRealTimers();
 	});

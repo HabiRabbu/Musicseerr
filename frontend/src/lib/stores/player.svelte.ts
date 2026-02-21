@@ -485,24 +485,17 @@ function createPlayerStore() {
 			subscribeToSource(source, gen);
 			source.setVolume(volume);
 
-			const resumePos = storedProgress;
-			let resumed = false;
-			source.onStateChange((state) => {
-				if (resumed || gen !== loadGeneration) return;
-				if (state === 'playing') {
-					resumed = true;
-					if (resumePos > 0) source.seekTo(resumePos);
-					source.pause();
-				}
-			});
-
 			void source.load({
 				videoId: item.videoId,
 				url: item.streamUrl,
 				format: item.format,
 			}).then(() => {
-				if (gen === loadGeneration) {
-					source.play();
+				if (gen !== loadGeneration) return;
+				playbackState = 'paused';
+				duration = source.getDuration();
+				if (storedProgress > 0) {
+					source.seekTo(storedProgress);
+					progress = storedProgress;
 				}
 			}).catch(() => {
 				if (gen === loadGeneration) {

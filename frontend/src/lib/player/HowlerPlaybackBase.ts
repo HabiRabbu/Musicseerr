@@ -78,7 +78,6 @@ export abstract class HowlerPlaybackBase implements PlaybackSource {
 				settled = true;
 				this.loadTimeoutHandle = null;
 				const err = { code: 'LOAD_TIMEOUT', message: 'Audio load timed out' };
-				this.errorCallbacks.forEach((cb) => cb(err));
 				reject(err);
 			}, HowlerPlaybackBase.LOAD_TIMEOUT_MS);
 
@@ -122,7 +121,6 @@ export abstract class HowlerPlaybackBase implements PlaybackSource {
 						code: 'LOAD_ERROR',
 						message: typeof error === 'string' ? error : 'Failed to load audio'
 					};
-					this.errorCallbacks.forEach((cb) => cb(err));
 					reject(err);
 				});
 			});
