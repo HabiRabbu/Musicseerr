@@ -521,29 +521,17 @@
 
 	{#if $errorModal.show}
 		<dialog class="modal modal-open">
-			<div class="modal-box bg-base-300">
-				<h3 class="text-lg font-bold text-primary mb-4 flex items-center">
-					<svg
-						xmlns="http://www.w3.org/2000/svg"
-						viewBox="0 0 24 24"
-						fill="none"
-						stroke="currentColor"
-						stroke-width="2"
-						stroke-linecap="round"
-						stroke-linejoin="round"
-						class="icon"
-					>
-						<path
-							stroke-linecap="round"
-							stroke-linejoin="round"
-							d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-						/>
-					</svg>
-					{$errorModal.title}
-				</h3>
-				<p class="py-4 text-base-content">{$errorModal.message}</p>
-				{#if $errorModal.details}
-					<div class="alert bg-primary text-accent-content mb-4">
+			<div class="modal-box bg-base-200 border border-base-300 shadow-xl max-w-md">
+				<button
+					class="btn btn-sm btn-circle btn-ghost absolute right-3 top-3 opacity-60 hover:opacity-100"
+					onclick={() => errorModal.hide()}
+					aria-label="Close"
+				>
+					✕
+				</button>
+
+				<div class="flex flex-col items-center text-center pt-2 pb-1">
+					<div class="bg-error/10 rounded-full p-3 mb-4">
 						<svg
 							xmlns="http://www.w3.org/2000/svg"
 							viewBox="0 0 24 24"
@@ -552,19 +540,49 @@
 							stroke-width="2"
 							stroke-linecap="round"
 							stroke-linejoin="round"
-							class="icon"
+							class="h-8 w-8 text-error"
 						>
-							<path
+							<path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+						</svg>
+					</div>
+
+					<h3 class="text-lg font-bold text-base-content mb-2">
+						{$errorModal.title}
+					</h3>
+
+					<p class="text-sm text-base-content/70 leading-relaxed">
+						{$errorModal.message}
+					</p>
+				</div>
+
+				{#if $errorModal.details}
+					<div class="mt-4 rounded-box bg-base-300/60 border border-base-300 p-4">
+						<div class="flex gap-3 items-start">
+							<svg
+								xmlns="http://www.w3.org/2000/svg"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="2"
 								stroke-linecap="round"
 								stroke-linejoin="round"
-								d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-							/>
-						</svg>
-						<span class="text-sm">{$errorModal.details}</span>
+								class="h-5 w-5 text-info flex-shrink-0 mt-0.5"
+							>
+								<circle cx="12" cy="12" r="10" />
+								<path d="M12 16v-4" />
+								<path d="M12 8h.01" />
+							</svg>
+							<p class="text-sm text-base-content/80 leading-relaxed text-left">
+								{$errorModal.details}
+							</p>
+						</div>
 					</div>
 				{/if}
-				<div class="modal-action">
-					<button class="btn btn-accent" onclick={() => errorModal.hide()}>Got it</button>
+
+				<div class="modal-action justify-center mt-5">
+					<button class="btn btn-accent btn-sm px-6" onclick={() => errorModal.hide()}>
+						Dismiss
+					</button>
 				</div>
 			</div>
 			<form method="dialog" class="modal-backdrop" onclick={() => errorModal.hide()}>

@@ -15,6 +15,7 @@ __pycache__/
 
 # Python virtual environments
 .venv/
+.pytest_cache
 backend/.venv/
 backend/.ruff*
 venv/
@@ -53,17 +54,10 @@ config/config.json
 /dump.txt
 /dump*.txt
 /manage.sh
-frontend/dump_be.txt
 .gitignore
 .gitignore
-frontend/dump_fe.txt
-frontend/dump.txt
 
 # Local Info
-/LidarrDocs.json
-/mbngsdocs.txt
 /todos.md
-CLAUDE.md
 AGENTS.md
-
 Docs/
