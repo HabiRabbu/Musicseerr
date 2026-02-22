@@ -331,6 +331,14 @@ export type LidarrVerifyResponse = {
 	root_folders: RootFolder[];
 };
 
+export type LidarrMetadataProfilePreferences = {
+	profile_id: number;
+	profile_name: string;
+	primary_types: string[];
+	secondary_types: string[];
+	release_statuses: string[];
+};
+
 export type TrendingTimeRange = {
 	range_key: string;
 	label: string;

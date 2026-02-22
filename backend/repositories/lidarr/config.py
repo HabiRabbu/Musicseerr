@@ -43,5 +43,13 @@ class LidarrConfigRepository(LidarrBase):
     async def get_metadata_profiles(self) -> list[dict[str, Any]]:
         return await self._get("/api/v1/metadataprofile")
 
+    async def get_metadata_profile(self, profile_id: int) -> dict[str, Any]:
+        return await self._get(f"/api/v1/metadataprofile/{profile_id}")
+
+    async def update_metadata_profile(
+        self, profile_id: int, profile_data: dict[str, Any]
+    ) -> dict[str, Any]:
+        return await self._put(f"/api/v1/metadataprofile/{profile_id}", profile_data)
+
     async def get_root_folders(self) -> list[dict[str, Any]]:
         return await self._get("/api/v1/rootfolder")

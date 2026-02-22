@@ -169,3 +169,25 @@ class LidarrVerifyResponse(BaseModel):
         default_factory=list,
         description="Available root folders"
     )
+
+
+class LidarrMetadataProfileSummary(BaseModel):
+    id: int = Field(description="Lidarr metadata profile ID")
+    name: str = Field(description="Lidarr metadata profile name")
+
+
+class LidarrMetadataProfilePreferences(BaseModel):
+    profile_id: int = Field(description="Lidarr metadata profile ID")
+    profile_name: str = Field(description="Lidarr metadata profile name")
+    primary_types: list[str] = Field(
+        default_factory=list,
+        description="Primary release types enabled in Lidarr profile"
+    )
+    secondary_types: list[str] = Field(
+        default_factory=list,
+        description="Secondary release types enabled in Lidarr profile"
+    )
+    release_statuses: list[str] = Field(
+        default_factory=list,
+        description="Release statuses enabled in Lidarr profile"
+    )

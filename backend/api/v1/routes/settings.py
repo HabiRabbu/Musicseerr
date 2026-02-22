@@ -11,6 +11,8 @@ from api.v1.schemas.settings import (
     LidarrVerifyResponse,
     LocalFilesConnectionSettings,
     LocalFilesVerifyResponse,
+    LidarrMetadataProfilePreferences,
+    LidarrMetadataProfileSummary,
 )
 from api.v1.schemas.advanced_settings import AdvancedSettingsFrontend, FrontendCacheTTLs
 from core.dependencies import (
@@ -26,7 +28,7 @@ from core.dependencies import (
     get_home_charts_service,
     get_library_cache,
 )
-from core.exceptions import ConfigurationError
+from core.exceptions import ConfigurationError, ExternalServiceError
 from repositories.jellyfin_repository import JellyfinRepository
 from repositories.listenbrainz_repository import ListenBrainzRepository
 from repositories.youtube import YouTubeRepository
@@ -177,6 +179,72 @@ async def update_lidarr_connection(settings: LidarrConnectionSettings):
 async def verify_lidarr_connection(settings: LidarrConnectionSettings):
     settings_service = get_settings_service()
     return await settings_service.verify_lidarr(settings)
+
+
+@router.get(
+    "/lidarr/metadata-profiles",
+    response_model=list[LidarrMetadataProfileSummary],
+)
+async def list_lidarr_metadata_profiles():
+    try:
+        settings_service = get_settings_service()
+        return await settings_service.list_lidarr_metadata_profiles()
+    except ExternalServiceError as e:
+        logger.warning(f"Lidarr metadata profiles list failed: {e}")
+        raise HTTPException(status_code=502, detail=str(e))
+    except Exception as e:
+        logger.exception(f"Failed to list Lidarr metadata profiles: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to list metadata profiles from Lidarr",
+        )
+
+
+@router.get(
+    "/lidarr/metadata-profile/preferences",
+    response_model=LidarrMetadataProfilePreferences,
+)
+async def get_lidarr_metadata_profile_preferences(
+    profile_id: int | None = None,
+):
+    try:
+        settings_service = get_settings_service()
+        return await settings_service.get_lidarr_metadata_profile_preferences(
+            profile_id=profile_id
+        )
+    except ExternalServiceError as e:
+        logger.warning(f"Lidarr metadata profile fetch failed: {e}")
+        raise HTTPException(status_code=502, detail=str(e))
+    except Exception as e:
+        logger.exception(f"Failed to get Lidarr metadata profile preferences: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to fetch metadata profile from Lidarr",
+        )
+
+
+@router.put(
+    "/lidarr/metadata-profile/preferences",
+    response_model=LidarrMetadataProfilePreferences,
+)
+async def update_lidarr_metadata_profile_preferences(
+    preferences: UserPreferences,
+    profile_id: int | None = None,
+):
+    try:
+        settings_service = get_settings_service()
+        return await settings_service.update_lidarr_metadata_profile(
+            preferences, profile_id=profile_id
+        )
+    except ExternalServiceError as e:
+        logger.warning(f"Lidarr metadata profile update failed: {e}")
+        raise HTTPException(status_code=502, detail=str(e))
+    except Exception as e:
+        logger.exception(f"Failed to update Lidarr metadata profile: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to update metadata profile in Lidarr",
+        )
 
 
 @router.get("/jellyfin", response_model=JellyfinConnectionSettings)

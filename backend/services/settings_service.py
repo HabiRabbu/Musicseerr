@@ -6,6 +6,8 @@ from api.v1.schemas.settings import (
     JellyfinConnectionSettings,
     ListenBrainzConnectionSettings,
     LidarrVerifyResponse,
+    LidarrMetadataProfilePreferences,
+    UserPreferences,
 )
 from core.config import Settings, get_settings
 from core.exceptions import ExternalServiceError
@@ -195,3 +197,147 @@ class SettingsService:
         cleared = await self._cache.clear_prefix("local_files_")
         logger.info(f"Cleared {cleared} local files cache entries")
         return cleared
+
+    def _create_lidarr_repo(self) -> "LidarrRepository":
+        from repositories.lidarr import LidarrRepository
+
+        app_settings = get_settings()
+        if not app_settings.lidarr_url or not app_settings.lidarr_api_key:
+            raise ExternalServiceError("Lidarr is not configured")
+
+        http_client = get_http_client(app_settings)
+        temp_cache = InMemoryCache(max_entries=100)
+        return LidarrRepository(
+            settings=app_settings,
+            http_client=http_client,
+            cache=temp_cache,
+        )
+
+    @staticmethod
+    def _lidarr_profile_to_preferences(profile: dict) -> LidarrMetadataProfilePreferences:
+        primary = [
+            item["albumType"]["name"].lower()
+            for item in profile.get("primaryAlbumTypes", [])
+            if item.get("allowed")
+        ]
+        secondary = [
+            item["albumType"]["name"].lower()
+            for item in profile.get("secondaryAlbumTypes", [])
+            if item.get("allowed")
+        ]
+        statuses = [
+            item["releaseStatus"]["name"].lower()
+            for item in profile.get("releaseStatuses", [])
+            if item.get("allowed")
+        ]
+        return LidarrMetadataProfilePreferences(
+            profile_id=profile["id"],
+            profile_name=profile.get("name", "Unknown"),
+            primary_types=primary,
+            secondary_types=secondary,
+            release_statuses=statuses,
+        )
+
+    @staticmethod
+    def _apply_preferences_to_profile(
+        profile: dict, preferences: UserPreferences
+    ) -> dict:
+        for item in profile.get("primaryAlbumTypes", []):
+            name = item["albumType"]["name"].lower()
+            item["allowed"] = name in preferences.primary_types
+        for item in profile.get("secondaryAlbumTypes", []):
+            name = item["albumType"]["name"].lower()
+            item["allowed"] = name in preferences.secondary_types
+        for item in profile.get("releaseStatuses", []):
+            name = item["releaseStatus"]["name"].lower()
+            item["allowed"] = name in preferences.release_statuses
+        return profile
+
+    def _resolve_profile_id(self, profile_id: int | None) -> int:
+        if profile_id is not None:
+            return profile_id
+        connection = self._preferences_service.get_lidarr_connection()
+        return connection.metadata_profile_id
+
+    async def list_lidarr_metadata_profiles(
+        self,
+    ) -> list[dict]:
+        repo = self._create_lidarr_repo()
+        try:
+            profiles = await repo.get_metadata_profiles()
+        except Exception as e:
+            logger.error(f"Failed to list Lidarr metadata profiles: {e}")
+            raise ExternalServiceError(
+                f"Failed to list Lidarr metadata profiles: {e}"
+            )
+        return [{"id": p["id"], "name": p["name"]} for p in profiles]
+
+    async def get_lidarr_metadata_profile_preferences(
+        self,
+        profile_id: int | None = None,
+    ) -> LidarrMetadataProfilePreferences:
+        resolved_id = self._resolve_profile_id(profile_id)
+
+        repo = self._create_lidarr_repo()
+        try:
+            profile = await repo.get_metadata_profile(resolved_id)
+        except Exception as e:
+            logger.error(f"Failed to fetch Lidarr metadata profile {resolved_id}: {e}")
+            raise ExternalServiceError(
+                f"Failed to fetch Lidarr metadata profile: {e}"
+            )
+
+        return self._lidarr_profile_to_preferences(profile)
+
+    async def update_lidarr_metadata_profile(
+        self,
+        preferences: UserPreferences,
+        profile_id: int | None = None,
+    ) -> LidarrMetadataProfilePreferences:
+        resolved_id = self._resolve_profile_id(profile_id)
+
+        repo = self._create_lidarr_repo()
+        try:
+            profile = await repo.get_metadata_profile(resolved_id)
+        except Exception as e:
+            logger.error(f"Failed to fetch Lidarr metadata profile {resolved_id}: {e}")
+            raise ExternalServiceError(
+                f"Failed to fetch Lidarr metadata profile: {e}"
+            )
+
+        updated_profile = self._apply_preferences_to_profile(profile, preferences)
+
+        validations = [
+            (
+                "primaryAlbumTypes",
+                "primary album type",
+                "e.g. Album",
+            ),
+            (
+                "secondaryAlbumTypes",
+                "secondary album type",
+                "e.g. Studio",
+            ),
+            (
+                "releaseStatuses",
+                "release status",
+                "e.g. Official",
+            ),
+        ]
+        for key, label, example in validations:
+            if not any(item.get("allowed") for item in updated_profile.get(key, [])):
+                raise ExternalServiceError(
+                    f"Lidarr requires at least one {label} to be enabled. "
+                    f"Please enable at least one ({example}) before syncing."
+                )
+
+        try:
+            result = await repo.update_metadata_profile(resolved_id, updated_profile)
+        except Exception as e:
+            logger.error(f"Failed to update Lidarr metadata profile {resolved_id}: {e}")
+            raise ExternalServiceError(
+                f"Failed to update Lidarr metadata profile: {e}"
+            )
+
+        logger.info(f"Updated Lidarr metadata profile '{result.get('name')}' (ID: {resolved_id})")
+        return self._lidarr_profile_to_preferences(result)
