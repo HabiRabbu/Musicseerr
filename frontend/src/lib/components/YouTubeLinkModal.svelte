@@ -5,6 +5,7 @@
 	import AlbumImage from '$lib/components/AlbumImage.svelte';
 	import { throwOnApiError } from '$lib/utils/errorHandling';
 	import type { YouTubeLink, Album } from '$lib/types';
+	import { X } from 'lucide-svelte';
 
 	interface Props {
 		open: boolean;
@@ -145,7 +146,7 @@
 {#if open}
 	<dialog class="modal modal-open">
 		<div class="modal-box max-w-md">
-			<button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" onclick={handleClose}>✕</button>
+			<button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" onclick={handleClose}><X class="h-4 w-4" /></button>
 
 			<h3 class="text-lg font-bold flex items-center gap-2 mb-4">
 				<YouTubeIcon class="h-5 w-5 text-red-500" />

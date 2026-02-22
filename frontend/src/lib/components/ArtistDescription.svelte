@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { ChevronUp, ChevronDown } from 'lucide-svelte';
 	import { colors } from '$lib/colors';
 	import { onMount } from 'svelte';
 
@@ -46,16 +47,7 @@
 					on:click={() => (descriptionExpanded = false)}
 				>
 					Show Less
-					<svg
-						xmlns="http://www.w3.org/2000/svg"
-						class="h-4 w-4"
-						fill="none"
-						viewBox="0 0 24 24"
-						stroke="currentColor"
-						stroke-width="2"
-					>
-						<path stroke-linecap="round" stroke-linejoin="round" d="M5 15l7-7 7 7" />
-					</svg>
+					<ChevronUp class="h-4 w-4" />
 				</button>
 			{:else}
 				<div
@@ -72,16 +64,7 @@
 						on:click={() => (descriptionExpanded = true)}
 					>
 						Read More
-						<svg
-							xmlns="http://www.w3.org/2000/svg"
-							class="h-4 w-4"
-							fill="none"
-							viewBox="0 0 24 24"
-							stroke="currentColor"
-							stroke-width="2"
-						>
-							<path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
-						</svg>
+						<ChevronDown class="h-4 w-4" />
 					</button>
 				{/if}
 			{/if}

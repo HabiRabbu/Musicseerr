@@ -1,6 +1,5 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
-	import PlayIcon from '$lib/components/PlayIcon.svelte';
 
 	interface Props {
 		available: boolean;
@@ -20,7 +19,7 @@
 		{onclick}
 		aria-label={ariaLabel}
 	>
-		<PlayIcon />
+		<Play class="h-4 w-4 fill-current" />
 		{@render icon()}
 	</button>
 {:else}

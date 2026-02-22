@@ -4,8 +4,8 @@
 	import { launchTrackPlayback } from '$lib/player/launchTrackPlayback';
 	import { launchYouTubePlayback } from '$lib/player/launchYouTubePlayback';
 	import YouTubeIcon from '$lib/components/YouTubeIcon.svelte';
-	import PlayIcon from '$lib/components/PlayIcon.svelte';
 	import { throwOnApiError, getCoverUrl } from '$lib/utils/errorHandling';
+	import { Link, Download, Search , Play} from 'lucide-svelte';
 	import type { Track, YouTubeLink, YouTubeLinkResponse, YouTubeTrackLink, YouTubeTrackLinkBatchResponse, YouTubeQuotaStatus } from '$lib/types';
 
 	interface Props {
@@ -158,14 +158,14 @@
 		<div class="flex gap-2 flex-wrap">
 			{#if hasAnyTrackLinks}
 				<button class="btn btn-sm btn-accent gap-1.5 shadow-sm" onclick={playAll}>
-					<PlayIcon />
+					<Play class="h-4 w-4 fill-current" />
 					Play All
 				</button>
 			{/if}
 
 			{#if albumLink}
 				<button class="btn btn-sm btn-ghost gap-1.5" onclick={() => void playAlbumLink()}>
-					<PlayIcon />
+					<Play class="h-4 w-4 fill-current" />
 					Full Album
 				</button>
 			{:else}
@@ -173,9 +173,7 @@
 					{#if generatingAlbumLink}
 						<span class="loading loading-spinner loading-sm"></span>
 					{:else}
-						<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-							<path stroke-linecap="round" stroke-linejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-						</svg>
+						<Link class="h-4 w-4" />
 					{/if}
 					Album Link
 				</button>
@@ -186,9 +184,7 @@
 					{#if batchGenerating}
 						<span class="loading loading-spinner loading-sm"></span>
 					{:else}
-						<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-							<path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-						</svg>
+						<Download class="h-4 w-4" />
 					{/if}
 					All Tracks
 				</button>
@@ -200,9 +196,7 @@
 				rel="noopener noreferrer"
 				class="btn btn-sm btn-ghost gap-1.5"
 			>
-				<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-					<path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-				</svg>
+				<Search class="h-4 w-4" />
 				Search
 			</a>
 		</div>

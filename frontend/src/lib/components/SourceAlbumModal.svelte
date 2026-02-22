@@ -1,11 +1,11 @@
 <script lang="ts">
+	import { Shuffle, Play, X } from 'lucide-svelte';
 	import { goto } from '$app/navigation';
 	import { API } from '$lib/constants';
 	import { playerStore } from '$lib/stores/player.svelte';
 	import { launchJellyfinPlayback } from '$lib/player/launchJellyfinPlayback';
 	import { launchLocalPlayback } from '$lib/player/launchLocalPlayback';
 	import AlbumImage from '$lib/components/AlbumImage.svelte';
-	import PlayIcon from '$lib/components/PlayIcon.svelte';
 	import type { JellyfinTrackInfo, LocalTrackInfo, JellyfinAlbumSummary, LocalAlbumSummary } from '$lib/types';
 
 	type SourceType = 'jellyfin' | 'local';
@@ -266,31 +266,18 @@
 
 				<button
 					class="btn btn-sm btn-circle btn-ghost self-start -mr-2 -mt-2"
-					onclick={handleClose}>✕</button
+					onclick={handleClose}><X class="h-4 w-4" /></button
 				>
 			</div>
 
 			<div class="flex items-center gap-2 px-6 pb-4 flex-wrap">
 				{#if trackCount > 0}
 					<button class="btn btn-sm btn-accent gap-1" onclick={() => playAll(false)}>
-						<PlayIcon class="h-4 w-4" />
+						<Play class="h-4 w-4 fill-current" />
 						Play All
 					</button>
 					<button class="btn btn-sm btn-ghost gap-1" onclick={() => playAll(true)}>
-						<svg
-							xmlns="http://www.w3.org/2000/svg"
-							class="h-4 w-4"
-							fill="none"
-							viewBox="0 0 24 24"
-							stroke="currentColor"
-							stroke-width="2"
-						>
-							<path
-								stroke-linecap="round"
-								stroke-linejoin="round"
-								d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5"
-							/>
-						</svg>
+						<Shuffle class="h-4 w-4" />
 						Shuffle
 					</button>
 				{/if}
@@ -341,11 +328,9 @@
 									{/if}
 								{/if}
 							<span class={playing ? 'text-accent' : ''}>
-									<PlayIcon
-										class="h-4 w-4 flex-shrink-0 transition-opacity {playing
+									<Play class="h-4 w-4 flex-shrink-0 transition-opacity {playing
 											? 'opacity-100'
-											: 'text-accent opacity-0 group-hover/track:opacity-100'}"
-									/>
+											: 'text-accent opacity-0 group-hover/track:opacity-100'} fill-current" />
 								</span>
 							</button>
 						{/each}

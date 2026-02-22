@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { X, Play, Info, ArrowRight, BookOpen } from 'lucide-svelte';
 	import { goto } from '$app/navigation';
 	import { fly } from 'svelte/transition';
 	import { API } from '$lib/constants';
@@ -340,7 +341,7 @@
 								<div class="dq-progress-bar-fill" style="width: {progressFraction * 100}%"></div>
 							</div>
 							<span class="dq-progress">{progressText}</span>
-							<button class="btn btn-sm btn-circle btn-ghost" onclick={handleClose}>✕</button>
+							<button class="btn btn-sm btn-circle btn-ghost" onclick={handleClose}><X class="h-4 w-4" /></button>
 						</div>
 					</div>
 
@@ -433,7 +434,7 @@
 								class:tab-active={mobileTab === 'video'}
 								onclick={() => (mobileTab = 'video')}
 							>
-								▶ Video
+								<Play class="h-3 w-3" /> Video
 							</button>
 							<button
 								role="tab"
@@ -441,7 +442,7 @@
 								class:tab-active={mobileTab === 'info'}
 								onclick={() => (mobileTab = 'info')}
 							>
-								ℹ Info
+								<Info class="h-3 w-3" /> Info
 							</button>
 							<button
 								role="tab"
@@ -449,7 +450,7 @@
 								class:tab-active={mobileTab === 'bio'}
 								onclick={() => (mobileTab = 'bio')}
 							>
-								📖 Bio
+								<BookOpen class="h-3 w-3" /> Bio
 							</button>
 						</div>
 
@@ -480,16 +481,7 @@
 					<!-- Footer -->
 					<div class="dq-footer">
 						<button class="btn btn-sm dq-ignore-btn" onclick={handleIgnore}>
-							<svg
-								xmlns="http://www.w3.org/2000/svg"
-								viewBox="0 0 20 20"
-								fill="currentColor"
-								class="h-4 w-4"
-							>
-								<path
-									d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z"
-								/>
-							</svg>
+							<X class="h-4 w-4" />
 							Not for me
 						</button>
 						<div class="dq-footer-actions">
@@ -502,7 +494,7 @@
 							{#if isLastItem}
 								<button class="btn btn-primary" onclick={handleGenerateNew}> New Queue </button>
 							{:else}
-								<button class="btn btn-primary dq-next-btn" onclick={handleNext}> Next → </button>
+								<button class="btn btn-primary dq-next-btn" onclick={handleNext}>Next <ArrowRight class="h-4 w-4" /></button>
 							{/if}
 						</div>
 					</div>

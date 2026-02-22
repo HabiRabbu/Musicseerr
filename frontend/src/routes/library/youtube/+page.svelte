@@ -6,6 +6,7 @@
 	import YouTubeLinkModal from '$lib/components/YouTubeLinkModal.svelte';
 	import YouTubeDetailModal from '$lib/components/YouTubeDetailModal.svelte';
 	import type { YouTubeLink } from '$lib/types';
+	import { Plus } from 'lucide-svelte';
 
 	let links = $state<YouTubeLink[]>([]);
 	let loading = $state(true);
@@ -141,9 +142,7 @@
 				onclick={openAddModal}
 			>
 				<div class="flex flex-col items-center gap-2 opacity-60">
-					<svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-						<path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
-					</svg>
+					<Plus class="h-10 w-10" />
 					<span class="text-sm font-medium">Add Link</span>
 				</div>
 			</button>

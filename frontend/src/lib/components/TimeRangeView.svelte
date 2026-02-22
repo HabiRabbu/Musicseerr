@@ -5,6 +5,7 @@
 	import ArtistImage from './ArtistImage.svelte';
 	import { formatListenCount } from '$lib/utils/formatting';
 	import type { HomeAlbum, HomeArtist } from '$lib/types';
+	import { ChevronLeft, ChevronDown, Check } from 'lucide-svelte';
 
 	type TimeRangeKey = 'this_week' | 'this_month' | 'this_year' | 'all_time';
 	type ItemType = 'album' | 'artist';
@@ -128,16 +129,7 @@
 <div class="container mx-auto p-4 md:p-6 lg:p-8">
 	<div class="mb-6 flex items-center gap-4">
 		<button class="btn btn-circle btn-ghost" on:click={() => goto('/')} aria-label="Back to home">
-			<svg
-				xmlns="http://www.w3.org/2000/svg"
-				fill="none"
-				viewBox="0 0 24 24"
-				stroke-width="2"
-				stroke="currentColor"
-				class="h-6 w-6"
-			>
-				<path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
-			</svg>
+			<ChevronLeft class="h-6 w-6" />
 		</button>
 		<div>
 			<h1 class="text-3xl font-bold">{title}</h1>
@@ -174,18 +166,7 @@
 							<span class="text-sm text-base-content/50">
 								{isExpanded ? 'Show less' : 'View all'}
 							</span>
-							<svg
-								xmlns="http://www.w3.org/2000/svg"
-								viewBox="0 0 20 20"
-								fill="currentColor"
-								class="h-5 w-5 transition-transform {isExpanded ? 'rotate-180' : ''}"
-							>
-								<path
-									fill-rule="evenodd"
-									d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z"
-									clip-rule="evenodd"
-								/>
-							</svg>
+							<ChevronDown class="h-5 w-5 transition-transform {isExpanded ? 'rotate-180' : ''}" />
 						</div>
 					</button>
 
@@ -226,9 +207,7 @@
 										</div>
 										{#if featured.in_library}
 											<div class="badge badge-success absolute right-3 top-3">
-												<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-3 w-3">
-													<path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
-												</svg>
+												<Check class="h-3 w-3" />
 												In Library
 											</div>
 										{/if}
@@ -267,9 +246,7 @@
 												/>
 												{#if item.in_library}
 													<div class="badge badge-success badge-sm absolute right-1 top-1">
-														<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-3 w-3">
-															<path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
-														</svg>
+														<Check class="h-3 w-3" />
 													</div>
 												{/if}
 												<div class="badge badge-neutral badge-sm absolute bottom-1 left-1 font-bold">#{rank}</div>
@@ -279,9 +256,7 @@
 												<ArtistImage mbid={item.mbid || ''} alt={item.name} size="md" lazy={false} />
 												{#if item.in_library}
 													<div class="badge badge-success badge-sm absolute right-1 top-1">
-														<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-3 w-3">
-															<path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
-														</svg>
+														<Check class="h-3 w-3" />
 													</div>
 												{/if}
 												<div class="badge badge-neutral badge-sm absolute bottom-1 left-1 font-bold">#{rank}</div>
@@ -328,9 +303,7 @@
 												/>
 												{#if item.in_library}
 													<div class="badge badge-success badge-sm absolute right-1 top-1">
-														<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-3 w-3">
-															<path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
-														</svg>
+														<Check class="h-3 w-3" />
 													</div>
 												{/if}
 												<div class="badge badge-sm absolute bottom-1 left-1 font-bold {rank <= 3 ? 'badge-primary' : 'badge-neutral'}">#{rank}</div>
@@ -346,9 +319,7 @@
 												/>
 												{#if item.in_library}
 													<div class="badge badge-success badge-sm absolute right-1 top-1">
-														<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-3 w-3">
-															<path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
-														</svg>
+														<Check class="h-3 w-3" />
 													</div>
 												{/if}
 												<div class="badge badge-sm absolute bottom-1 left-1 font-bold {rank <= 3 ? 'badge-primary' : 'badge-neutral'}">#{rank}</div>

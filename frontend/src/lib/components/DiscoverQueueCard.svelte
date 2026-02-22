@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { Music, Play } from 'lucide-svelte';
 	import { getQueueCachedData } from '$lib/utils/discoverQueueCache';
 
 	let { onLaunch }: { onLaunch: () => void } = $props();
@@ -14,38 +15,14 @@
 <div class="discover-queue-card">
 	<div class="discover-queue-content">
 		<div class="discover-queue-icon">
-			<svg
-				xmlns="http://www.w3.org/2000/svg"
-				viewBox="0 0 24 24"
-				fill="none"
-				stroke="currentColor"
-				stroke-width="1.5"
-				stroke-linecap="round"
-				stroke-linejoin="round"
-				class="h-10 w-10"
-			>
-				<path d="M9 18V5l12-2v13" />
-				<circle cx="6" cy="18" r="3" />
-				<circle cx="18" cy="16" r="3" />
-			</svg>
+			<Music class="h-10 w-10" strokeWidth={1.5} />
 		</div>
 		<div class="discover-queue-text">
 			<h3 class="text-xl font-bold text-base-content">Discover Queue</h3>
 			<p class="text-sm text-base-content/60">Find new music tailored to your taste</p>
 		</div>
 		<button class="btn btn-primary btn-lg" onclick={onLaunch}>
-			<svg
-				xmlns="http://www.w3.org/2000/svg"
-				viewBox="0 0 24 24"
-				fill="none"
-				stroke="currentColor"
-				stroke-width="2"
-				stroke-linecap="round"
-				stroke-linejoin="round"
-				class="h-5 w-5"
-			>
-				<polygon points="5 3 19 12 5 21 5 3" />
-			</svg>
+			<Play class="h-5 w-5" strokeWidth={2} />
 			{hasCachedQueue ? 'Resume Discover Queue' : 'Launch Discover Queue'}
 		</button>
 	</div>

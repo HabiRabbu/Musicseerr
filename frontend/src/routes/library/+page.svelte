@@ -10,6 +10,7 @@
 	import Pagination from '$lib/components/Pagination.svelte';
 	import { recentlyAddedStore } from '$lib/stores/recentlyAdded';
 	import type { Artist, Album } from '$lib/types';
+	import { CircleX, X, RefreshCw, ChevronRight } from 'lucide-svelte';
 
 	type LibraryArtist = {
 		name: string;
@@ -178,16 +179,12 @@
 <div class="container mx-auto p-4 md:p-6 lg:p-8">
 	{#if error}
 		<div class="alert alert-error mb-6">
-			<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 shrink-0 stroke-current" fill="none" viewBox="0 0 24 24">
-				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
-			</svg>
+			<CircleX class="h-6 w-6 shrink-0" />
 			<span>{error}</span>
 			<div class="flex gap-2">
 				<button class="btn btn-sm" onclick={() => { error = null; loadLibrary(); }}>Retry</button>
 				<button class="btn btn-sm btn-circle btn-ghost" onclick={() => error = null} aria-label="Dismiss">
-					<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-					</svg>
+					<X class="h-4 w-4" />
 				</button>
 			</div>
 		</div>
@@ -205,18 +202,7 @@
 			</p>
 		</div>
 		<button class="btn btn-sm btn-primary gap-1" onclick={syncLibrary} disabled={syncing}>
-			<svg
-				xmlns="http://www.w3.org/2000/svg"
-				viewBox="0 0 20 20"
-				fill="currentColor"
-				class="h-4 w-4 {syncing ? 'animate-spin' : ''}"
-			>
-				<path
-					fill-rule="evenodd"
-					d="M15.312 11.424a5.5 5.5 0 01-9.201 2.466l-.312-.311h2.433a.75.75 0 000-1.5H3.989a.75.75 0 00-.75.75v4.242a.75.75 0 001.5 0v-2.43l.31.31a7 7 0 0011.712-3.138.75.75 0 00-1.449-.39zm1.23-3.723a.75.75 0 00.219-.53V2.929a.75.75 0 00-1.5 0v2.43l-.31-.31A7 7 0 003.239 8.188a.75.75 0 101.448.389A5.5 5.5 0 0113.89 6.11l.311.31h-2.432a.75.75 0 000 1.5h4.243a.75.75 0 00.53-.219z"
-					clip-rule="evenodd"
-				/>
-			</svg>
+			<RefreshCw class="h-4 w-4 {syncing ? 'animate-spin' : ''}" />
 			<span class="hidden sm:inline">{syncing ? 'Syncing...' : 'Sync Library'}</span>
 		</button>
 	</div>
@@ -249,9 +235,7 @@
 		<div class="flex justify-between items-center mb-4">
 			<a href="/library/artists" class="flex items-center gap-2 hover:text-primary transition-colors group">
 				<h2 class="text-2xl font-semibold">Artists</h2>
-				<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5 transition-transform group-hover:translate-x-1">
-					<path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
-				</svg>
+				<ChevronRight class="w-5 h-5 transition-transform group-hover:translate-x-1" />
 			</a>
 		</div>
 		{#if loadingArtists}
@@ -282,9 +266,7 @@
 		<div class="flex justify-between items-center mb-4">
 			<a href="/library/albums" class="flex items-center gap-2 hover:text-primary transition-colors group">
 				<h2 class="text-2xl font-semibold">Albums</h2>
-				<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5 transition-transform group-hover:translate-x-1">
-					<path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
-				</svg>
+				<ChevronRight class="w-5 h-5 transition-transform group-hover:translate-x-1" />
 			</a>
 			{#if !loadingAlbums && totalAlbumPages > 1}
 				<Pagination current={currentAlbumPage} total={totalAlbumPages} onchange={(p) => currentAlbumPage = p} />

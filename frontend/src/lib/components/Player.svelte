@@ -2,6 +2,7 @@
 	import { playerStore } from '$lib/stores/player.svelte';
 	import YouTubePlayer from '$lib/components/YouTubePlayer.svelte';
 	import JellyfinIcon from '$lib/components/JellyfinIcon.svelte';
+	import { X, Music, Shuffle, SkipBack, AlertCircle, Pause, Play, SkipForward, Volume2, ExternalLink } from 'lucide-svelte';
 
 	function formatTime(seconds: number): string {
 		if (!seconds || isNaN(seconds)) return '0:00';
@@ -45,9 +46,7 @@
 			onclick={() => playerStore.stop()}
 			aria-label="Close player"
 		>
-			<svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-				<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-			</svg>
+			<X class="h-3.5 w-3.5" />
 		</button>
 
 		<div class="flex items-center h-full px-4 gap-4 max-w-screen-2xl mx-auto">
@@ -61,9 +60,7 @@
 					/>
 				{:else}
 					<div class="w-[60px] h-[60px] rounded-lg shadow-lg bg-base-200 flex items-center justify-center flex-shrink-0">
-						<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 opacity-40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
-						</svg>
+						<Music class="h-6 w-6 opacity-40" />
 					</div>
 				{/if}
 				<div class="min-w-0">
@@ -120,9 +117,7 @@
 							onclick={() => playerStore.toggleShuffle()}
 							aria-label="Toggle shuffle"
 						>
-							<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-								<path stroke-linecap="round" stroke-linejoin="round" d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5" />
-							</svg>
+							<Shuffle class="h-4 w-4" />
 						</button>
 					{/if}
 
@@ -135,9 +130,7 @@
 						onclick={() => playerStore.previousTrack()}
 						aria-label="Previous"
 					>
-						<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
-							<path d="M6 6h2v12H6zm3.5 6l8.5 6V6z" />
-						</svg>
+						<SkipBack class="h-4 w-4 fill-current" />
 					</button>
 
 					<!-- Play/Pause -->
@@ -147,19 +140,13 @@
 						aria-label={playerStore.playbackState === 'error' ? 'Close' : playerStore.isPlaying ? 'Pause' : 'Play'}
 					>
 						{#if playerStore.playbackState === 'error'}
-							<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-								<path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M12 3a9 9 0 100 18 9 9 0 000-18z" />
-							</svg>
+							<AlertCircle class="h-5 w-5" />
 						{:else if playerStore.isBuffering}
 							<span class="loading loading-spinner loading-sm"></span>
 						{:else if playerStore.isPlaying}
-							<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
-								<path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z" />
-							</svg>
+							<Pause class="h-5 w-5 fill-current" />
 						{:else}
-							<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 ml-0.5" fill="currentColor" viewBox="0 0 24 24">
-								<path d="M8 5v14l11-7z" />
-							</svg>
+							<Play class="h-5 w-5 ml-0.5 fill-current" />
 						{/if}
 					</button>
 
@@ -172,9 +159,7 @@
 						onclick={() => playerStore.nextTrack()}
 						aria-label="Next"
 					>
-						<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
-							<path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z" />
-						</svg>
+						<SkipForward class="h-4 w-4 fill-current" />
 					</button>
 				</div>
 
@@ -197,9 +182,7 @@
 			<div class="flex items-center gap-3 w-1/4 justify-end">
 				<!-- Volume -->
 				<div class="hidden sm:flex items-center gap-1.5">
-					<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 opacity-60 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-						<path stroke-linecap="round" stroke-linejoin="round" d="M15.536 8.464a5 5 0 010 7.072M12 6.253v11.494m0-11.494A5.978 5.978 0 007.582 8.83L4 12l3.582 3.17A5.978 5.978 0 0012 17.747" />
-					</svg>
+					<Volume2 class="h-4 w-4 opacity-60 flex-shrink-0" />
 					<input
 						type="range"
 						class="range range-xs w-20"
@@ -219,9 +202,7 @@
 					<!-- Open in YouTube -->
 					<div class="tooltip tooltip-left" data-tip="Open in YouTube">
 						<button class="btn btn-ghost btn-sm btn-circle" onclick={openInYouTube} aria-label="Open in YouTube">
-							<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-								<path stroke-linecap="round" stroke-linejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-							</svg>
+							<ExternalLink class="h-4 w-4" />
 						</button>
 					</div>
 				{:else if playerStore.nowPlaying.sourceType === 'jellyfin'}
@@ -231,9 +212,7 @@
 					</div>
 				{:else if playerStore.nowPlaying.sourceType === 'howler'}
 					<div class="hidden sm:flex items-center gap-2" style="color: rgb(var(--brand-localfiles))">
-						<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-							<path stroke-linecap="round" stroke-linejoin="round" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
-						</svg>
+						<Music class="h-5 w-5" />
 						<span class="text-sm font-medium">Local{#if playerStore.currentQueueItem?.format}<span class="badge badge-xs badge-ghost ml-1 uppercase">{playerStore.currentQueueItem.format}</span>{/if}</span>
 					</div>
 				{/if}

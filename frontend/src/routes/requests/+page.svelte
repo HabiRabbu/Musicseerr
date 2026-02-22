@@ -6,6 +6,7 @@
 	import Toast from '$lib/components/Toast.svelte';
 	import type { ActiveRequestItem, RequestHistoryItem } from '$lib/types';
 	import {
+	import { TriangleAlert, CheckCircle, Clock } from 'lucide-svelte';
 		fetchActiveRequests,
 		fetchRequestHistory,
 		cancelRequest,
@@ -218,9 +219,7 @@
 		<div in:fade={{ duration: 200 }}>
 			{#if activeError}
 				<div class="alert alert-warning mb-4">
-					<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-						<path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-					</svg>
+					<TriangleAlert class="h-5 w-5" />
 					<span>{activeError}</span>
 					<button class="btn btn-sm" onclick={loadActive}>Retry</button>
 				</div>
@@ -245,9 +244,7 @@
 				</div>
 			{:else if activeItems.length === 0}
 				<div class="flex flex-col items-center justify-center min-h-[200px] text-center py-12">
-					<svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 text-base-content/20 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1">
-						<path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-					</svg>
+					<CheckCircle class="h-16 w-16 text-base-content/20 mb-4" />
 					<h2 class="text-xl font-semibold mb-2 text-base-content/50">No active requests</h2>
 					<p class="text-base-content/40">Search for albums and request them to see downloads here</p>
 				</div>
@@ -308,9 +305,7 @@
 				</div>
 			{:else if historyItems.length === 0}
 				<div class="flex flex-col items-center justify-center min-h-[200px] text-center py-12">
-					<svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 text-base-content/20 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1">
-						<path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-					</svg>
+					<Clock class="h-16 w-16 text-base-content/20 mb-4" />
 					<h2 class="text-xl font-semibold mb-2 text-base-content/50">No request history</h2>
 					<p class="text-base-content/40">Completed and failed requests will appear here</p>
 				</div>

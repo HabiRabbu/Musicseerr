@@ -5,6 +5,7 @@
 	import GenreArtistCard from '$lib/components/GenreArtistCard.svelte';
 	import GenreAlbumCard from '$lib/components/GenreAlbumCard.svelte';
 	import type { GenreDetailResponse } from '$lib/types';
+	import { ArrowLeft, BookOpen, Star, Music2 } from 'lucide-svelte';
 
 	let genreName = $state('');
 	let genreData: GenreDetailResponse | null = $state(null);
@@ -137,13 +138,11 @@
 	<div class="container mx-auto p-4 max-w-7xl relative" style="z-index: 1;">
 		<div class="mb-8">
 			<a href="/" class="btn btn-ghost btn-sm gap-2 mb-4 -ml-2">
-				<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4">
-					<path fill-rule="evenodd" d="M17 10a.75.75 0 01-.75.75H5.612l4.158 3.96a.75.75 0 11-1.04 1.08l-5.5-5.25a.75.75 0 010-1.08l5.5-5.25a.75.75 0 111.04 1.08L5.612 9.25H16.25A.75.75 0 0117 10z" clip-rule="evenodd" />
-				</svg>
+				<ArrowLeft class="w-4 h-4" />
 				Back
 			</a>
 			<div class="flex items-center gap-4">
-				<div class="w-20 h-20 rounded-2xl bg-gradient-to-br from-primary/30 to-secondary/30 flex items-center justify-center text-4xl">🎵</div>
+				<div class="w-20 h-20 rounded-2xl bg-gradient-to-br from-primary/30 to-secondary/30 flex items-center justify-center text-4xl"><Music2 class="h-10 w-10" /></div>
 				<div>
 					<h1 class="text-4xl font-bold capitalize">{genreName || 'Genre'}</h1>
 					{#if genreData}
@@ -182,7 +181,7 @@
 				<section class="mb-12">
 					<div class="flex items-center gap-3 mb-6">
 						<div class="w-10 h-10 rounded-xl bg-success/20 flex items-center justify-center text-success">
-							<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path d="M10.75 16.82A7.462 7.462 0 0115 15.5c.71 0 1.396.098 2.046.282A.75.75 0 0018 15.06v-11a.75.75 0 00-.546-.721A9.006 9.006 0 0015 3a8.963 8.963 0 00-4.25 1.065V16.82zM9.25 4.065A8.963 8.963 0 005 3c-.85 0-1.673.118-2.454.339A.75.75 0 002 4.06v11a.75.75 0 00.954.721A7.506 7.506 0 015 15.5c1.579 0 3.042.487 4.25 1.32V4.065z" /></svg>
+							<BookOpen class="w-5 h-5" />
 						</div>
 						<div>
 							<h2 class="text-2xl font-bold">From Your Library</h2>
@@ -214,7 +213,7 @@
 			<section>
 				<div class="flex items-center gap-3 mb-6">
 					<div class="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center text-primary">
-						<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path fill-rule="evenodd" d="M10.868 2.884c-.321-.772-1.415-.772-1.736 0l-1.83 4.401-4.753.381c-.833.067-1.171 1.107-.536 1.651l3.62 3.102-1.106 4.637c-.194.813.691 1.456 1.405 1.02L10 15.591l4.069 2.485c.713.436 1.598-.207 1.404-1.02l-1.106-4.637 3.62-3.102c.635-.544.297-1.584-.536-1.65l-4.752-.382-1.831-4.401Z" clip-rule="evenodd" /></svg>
+						<Star class="w-5 h-5" />
 					</div>
 					<div>
 						<h2 class="text-2xl font-bold">Popular in {genreName}</h2>

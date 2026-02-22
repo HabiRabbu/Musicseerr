@@ -2,6 +2,7 @@
   import { goto } from '$app/navigation';
   import { page } from '$app/stores';
   import { colors } from '$lib/colors';
+  import { ChevronRight } from 'lucide-svelte';
 
   let imgError = false;
   
@@ -31,9 +32,7 @@
         <span class="text-sm font-bold block text-center drop-shadow-lg truncate" style="color: {colors.accent};">ARTISTS</span>
         <div class="flex items-center gap-1">
           <span class="text-xs font-semibold text-center drop-shadow-lg" style="color: {colors.accent};">View More</span>
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 drop-shadow-lg" fill="none" viewBox="0 0 24 24" stroke={colors.accent} stroke-width="2.5">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
-          </svg>
+          <ChevronRight class="h-3 w-3 drop-shadow-lg" color={colors.accent} strokeWidth={2.5} />
         </div>
       </div>
     </div>

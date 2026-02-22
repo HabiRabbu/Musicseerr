@@ -2,6 +2,7 @@
 	import type { Artist } from '$lib/types';
 	import { goto } from '$app/navigation';
 	import { formatListenCount } from '$lib/utils/formatting';
+	import { Music2 } from 'lucide-svelte';
 	import ArtistImage from './ArtistImage.svelte';
 
 	export let artist: Artist;
@@ -35,7 +36,7 @@
 			{/if}
 			{#if artist.listen_count != null}
 				<span class="badge badge-sm badge-primary badge-outline" title="ListenBrainz plays">
-					♪ {formatListenCount(artist.listen_count, true)}
+					<Music2 class="inline h-3 w-3" /> {formatListenCount(artist.listen_count, true)}
 				</span>
 			{/if}
 		</div>

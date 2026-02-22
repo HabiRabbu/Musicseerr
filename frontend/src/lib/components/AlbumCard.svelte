@@ -5,6 +5,7 @@
 	import { libraryStore } from '$lib/stores/library';
 	import { requestAlbum } from '$lib/utils/albumRequest';
 	import { formatListenCount } from '$lib/utils/formatting';
+	import { Download, Music2 } from 'lucide-svelte';
 	import AlbumImage from './AlbumImage.svelte';
 	import LibraryBadge from './LibraryBadge.svelte';
 
@@ -114,9 +115,9 @@
 
 		{#if album.listen_count != null}
 			<div class="flex items-center gap-1 mt-1">
-				<span class="badge badge-sm badge-primary badge-outline" title="ListenBrainz plays">
-					♪ {formatListenCount(album.listen_count, true)}
-				</span>
+			<span class="badge badge-sm badge-primary badge-outline" title="ListenBrainz plays">
+				<Music2 class="inline h-3 w-3" /> {formatListenCount(album.listen_count, true)}
+			</span>
 			</div>
 		{/if}
 	</div>
@@ -132,20 +133,7 @@
 			{#if requesting}
 				<span class="loading loading-spinner loading-sm" style="color: {colors.secondary};"></span>
 			{:else}
-				<svg
-					xmlns="http://www.w3.org/2000/svg"
-					class="h-5 w-5"
-					fill="none"
-					viewBox="0 0 24 24"
-					stroke={colors.secondary}
-					stroke-width="2.5"
-				>
-					<path
-						stroke-linecap="round"
-						stroke-linejoin="round"
-						d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
-					/>
-				</svg>
+				<Download class="h-5 w-5" color={colors.secondary} strokeWidth={2.5} />
 			{/if}
 		</button>
 	{/if}

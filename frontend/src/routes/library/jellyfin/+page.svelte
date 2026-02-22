@@ -2,7 +2,6 @@
 	import { onMount, onDestroy } from 'svelte';
 	import { API } from '$lib/constants';
 	import AlbumImage from '$lib/components/AlbumImage.svelte';
-	import PlayIcon from '$lib/components/PlayIcon.svelte';
 	import SourceAlbumModal from '$lib/components/SourceAlbumModal.svelte';
 	import {
 		getJellyfinSidebarCachedData,
@@ -11,6 +10,7 @@
 	} from '$lib/utils/jellyfinLibraryCache';
 	import { launchJellyfinPlayback } from '$lib/player/launchJellyfinPlayback';
 	import type {
+	import { Tv, ArrowDown, CircleX , Play} from 'lucide-svelte';
 		JellyfinAlbumSummary,
 		JellyfinPaginatedResponse,
 		JellyfinLibraryStats,
@@ -240,19 +240,7 @@
 
 <div class="container mx-auto p-6">
 	<div class="flex items-center gap-3 mb-2">
-		<svg
-			xmlns="http://www.w3.org/2000/svg"
-			viewBox="0 0 24 24"
-			fill="none"
-			stroke="currentColor"
-			stroke-width="2"
-			stroke-linecap="round"
-			stroke-linejoin="round"
-			class="h-8 w-8 text-info"
-		>
-			<rect x="2" y="7" width="20" height="15" rx="2" ry="2"></rect>
-			<polyline points="17 2 12 7 7 2"></polyline>
-		</svg>
+		<Tv class="h-8 w-8 text-info" />
 		<h1 class="text-2xl font-bold">Jellyfin Library</h1>
 		{#if stats}
 			<span class="badge badge-neutral">{stats.total_albums} albums</span>
@@ -335,19 +323,7 @@
 				aria-label="Toggle sort order"
 				title={sortOrder === 'Ascending' ? 'Ascending' : 'Descending'}
 			>
-				<svg
-					xmlns="http://www.w3.org/2000/svg"
-					viewBox="0 0 24 24"
-					fill="none"
-					stroke="currentColor"
-					stroke-width="2"
-					stroke-linecap="round"
-					stroke-linejoin="round"
-					class="h-4 w-4 transition-transform {sortOrder === 'Descending' ? 'rotate-180' : ''}"
-				>
-					<path d="M12 5v14"></path>
-					<path d="M18 13l-6 6-6-6"></path>
-				</svg>
+				<ArrowDown class="h-4 w-4 transition-transform {sortOrder === 'Descending' ? 'rotate-180' : ''}" />
 			</button>
 			{#if genres.length > 0}
 				<select class="select select-sm" onchange={handleGenreChange}>
@@ -365,9 +341,7 @@
 
 	{#if fetchError}
 		<div role="alert" class="alert alert-error alert-soft mb-4">
-			<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
-			</svg>
+			<CircleX class="h-6 w-6 shrink-0" />
 			<span>{fetchError}</span>
 			<button class="btn btn-sm btn-ghost" onclick={() => fetchAlbums(true)}>Retry</button>
 		</div>
@@ -412,17 +386,7 @@
 							<div
 								class="badge badge-sm gap-1 badge-info"
 							>
-								<svg
-									xmlns="http://www.w3.org/2000/svg"
-									viewBox="0 0 24 24"
-									fill="none"
-									stroke="currentColor"
-									stroke-width="2"
-									class="h-3 w-3"
-								>
-									<rect x="2" y="7" width="20" height="15" rx="2" ry="2"></rect>
-									<polyline points="17 2 12 7 7 2"></polyline>
-								</svg>
+								<Tv class="h-3 w-3" />
 							</div>
 						</div>
 						{#if album.year}
@@ -439,7 +403,7 @@
 								{#if playingAlbumId === album.jellyfin_id}
 									<span class="loading loading-spinner loading-xs"></span>
 								{:else}
-									<PlayIcon class="h-4 w-4" />
+									<Play class="h-4 w-4 fill-current" />
 								{/if}
 							</button>
 						</div>
@@ -456,17 +420,7 @@
 		{#if albums.length === 0}
 			<div class="card bg-base-200 mt-4">
 				<div class="card-body items-center text-center">
-					<svg
-						xmlns="http://www.w3.org/2000/svg"
-						viewBox="0 0 24 24"
-						fill="none"
-						stroke="currentColor"
-						stroke-width="2"
-						class="h-12 w-12 opacity-20"
-					>
-						<rect x="2" y="7" width="20" height="15" rx="2" ry="2"></rect>
-						<polyline points="17 2 12 7 7 2"></polyline>
-					</svg>
+					<Tv class="h-12 w-12 opacity-20" />
 					<p class="text-lg opacity-60">No albums found</p>
 					<p class="text-sm opacity-40">
 						Make sure your Jellyfin server is configured and has music libraries.

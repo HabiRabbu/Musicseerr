@@ -8,6 +8,7 @@
 	import { colors } from '$lib/colors';
 	import { searchStore } from '$lib/stores/search';
 	import { fetchEnrichmentBatch, applyAlbumEnrichment } from '$lib/utils/enrichment';
+	import { Check } from 'lucide-svelte';
 
 	export let data: { query: string };
 
@@ -256,16 +257,7 @@
 {#if showToast}
 	<div class="toast toast-end toast-bottom">
 		<div class="alert alert-success">
-			<svg
-				xmlns="http://www.w3.org/2000/svg"
-				class="h-6 w-6"
-				fill="none"
-				viewBox="0 0 24 24"
-				stroke="currentColor"
-				stroke-width="2"
-			>
-				<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
-			</svg>
+			<Check class="h-6 w-6" />
 			<span>Added to Library</span>
 		</div>
 	</div>

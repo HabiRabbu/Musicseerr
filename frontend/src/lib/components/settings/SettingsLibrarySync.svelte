@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { Check, X } from 'lucide-svelte';
 	let settings: any = $state(null);
 	let loading = $state(false);
 	let saving = $state(false);
@@ -98,9 +99,9 @@
 						<div class="stat-value text-lg">{formatLastSync(settings.last_sync)}</div>
 						<div class="stat-desc">
 							{#if settings.last_sync_success === true}
-								<span class="text-success">✓ Successful</span>
-							{:else if settings.last_sync_success === false}
-								<span class="text-error">✗ Failed</span>
+							<span class="text-success inline-flex items-center gap-0.5"><Check class="h-3 w-3" /> Successful</span>
+						{:else if settings.last_sync_success === false}
+							<span class="text-error inline-flex items-center gap-0.5"><X class="h-3 w-3" /> Failed</span>
 							{/if}
 						</div>
 					</div>

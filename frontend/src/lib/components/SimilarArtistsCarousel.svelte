@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { Check } from 'lucide-svelte';
 	import type { SimilarArtist } from '$lib/types';
 	import HorizontalCarousel from './HorizontalCarousel.svelte';
 	import CarouselSkeleton from './CarouselSkeleton.svelte';
@@ -59,16 +60,7 @@
 								class="absolute bottom-1 right-1 rounded-full p-1"
 								style="background-color: {colors.accent};"
 							>
-								<svg
-									xmlns="http://www.w3.org/2000/svg"
-									class="w-3 h-3"
-									fill="none"
-									viewBox="0 0 24 24"
-									stroke={colors.secondary}
-									stroke-width="3"
-								>
-									<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
-								</svg>
+							<Check class="w-3 h-3" color={colors.secondary} strokeWidth={3} />
 							</div>
 						{/if}
 					</div>

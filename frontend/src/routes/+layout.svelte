@@ -17,6 +17,7 @@
 	import { cancelPendingImages } from '$lib/utils/lazyImage';
 	import { fetchActiveRequestCount, type RequestCountChangedDetail } from '$lib/utils/requestsApi';
 	import { fromStore } from 'svelte/store';
+	import { User, Settings, Search, House, Compass, Menu, Tv, Headphones, Download, PanelLeft, TriangleAlert, Info, X } from 'lucide-svelte';
 
 	let query = '';
 	let activeRequestCount = $state(0);
@@ -200,23 +201,7 @@
 				<div class="navbar-end w-auto">
 					<details class="dropdown dropdown-end" bind:this={userDropdown}>
 						<summary class="btn btn-ghost btn-circle btn-lg" aria-label="User Profile">
-							<svg
-								xmlns="http://www.w3.org/2000/svg"
-								viewBox="0 0 24 24"
-								fill="none"
-								stroke="currentColor"
-								stroke-width="2"
-								stroke-linecap="round"
-								stroke-linejoin="round"
-								class="h-6 w-6"
-							>
-								<path
-									stroke-linecap="round"
-									stroke-linejoin="round"
-									stroke-width="2"
-									d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-								/>
-							</svg>
+							<User class="h-6 w-6" />
 						</summary>
 						<ul class="dropdown-content menu bg-base-200 rounded-box z-[100] w-52 p-2 shadow">
 							<li>
@@ -227,20 +212,7 @@
 										handleSettingsClick();
 									}}
 								>
-									<svg
-										xmlns="http://www.w3.org/2000/svg"
-										viewBox="0 0 24 24"
-										fill="none"
-										stroke="currentColor"
-										stroke-width="2"
-										stroke-linecap="round"
-										stroke-linejoin="round"
-										class="h-5 w-5"
-									>
-										<circle cx="12" cy="12" r="3"></circle>
-										<path d="M12 1v6m0 6v6m-9-9h6m6 0h6M4.5 5.5l4 4m6 6l4 4m0-14l-4 4m-6 6l-4 4"
-										></path>
-									</svg>
+									<Settings class="h-5 w-5" />
 									Settings
 								</a>
 							</li>
@@ -268,23 +240,7 @@
 								class="is-drawer-close:tooltip is-drawer-close:tooltip-right"
 								data-tip="Search"
 							>
-								<svg
-									xmlns="http://www.w3.org/2000/svg"
-									viewBox="0 0 24 24"
-									fill="none"
-									stroke="currentColor"
-									stroke-width="2"
-									stroke-linecap="round"
-									stroke-linejoin="round"
-									class="h-6 w-6"
-								>
-									<path
-										stroke-linecap="round"
-										stroke-linejoin="round"
-										stroke-width="2"
-										d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-									/>
-								</svg>
+								<Search class="h-6 w-6" />
 								<span class="is-drawer-close:hidden">Search</span>
 							</button>
 						</li>
@@ -298,21 +254,7 @@
 							class="is-drawer-close:tooltip is-drawer-close:tooltip-right"
 							data-tip="Home"
 						>
-							<svg
-								xmlns="http://www.w3.org/2000/svg"
-								viewBox="0 0 24 24"
-								fill="none"
-								stroke="currentColor"
-								stroke-width="2"
-								stroke-linecap="round"
-								stroke-linejoin="round"
-								class="h-6 w-6"
-							>
-								<path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"></path>
-								<path
-									d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"
-								></path>
-							</svg>
+							<House class="h-6 w-6" />
 							<span class="is-drawer-close:hidden">Home</span>
 						</a>
 					</li>
@@ -323,19 +265,7 @@
 							class="is-drawer-close:tooltip is-drawer-close:tooltip-right"
 							data-tip="Discover"
 						>
-							<svg
-								xmlns="http://www.w3.org/2000/svg"
-								viewBox="0 0 24 24"
-								fill="none"
-								stroke="currentColor"
-								stroke-width="2"
-								stroke-linecap="round"
-								stroke-linejoin="round"
-								class="h-6 w-6"
-							>
-								<circle cx="12" cy="12" r="10"></circle>
-								<polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"></polygon>
-							</svg>
+							<Compass class="h-6 w-6" />
 							<span class="is-drawer-close:hidden">Discover</span>
 						</a>
 					</li>
@@ -347,21 +277,7 @@
 								class="is-drawer-close:tooltip is-drawer-close:tooltip-right"
 								data-tip="Library"
 							>
-								<svg
-									xmlns="http://www.w3.org/2000/svg"
-									viewBox="0 0 24 24"
-									fill="none"
-									stroke="currentColor"
-									stroke-width="2"
-									stroke-linecap="round"
-									stroke-linejoin="round"
-									class="h-6 w-6"
-								>
-									<rect x="3" y="3" width="18" height="18" rx="2"></rect>
-									<path d="M7 7h10"></path>
-									<path d="M7 12h10"></path>
-									<path d="M7 17h10"></path>
-								</svg>
+								<Menu class="h-6 w-6" />
 								<span class="is-drawer-close:hidden">Library</span>
 							</a>
 						</li>
@@ -391,19 +307,7 @@
 								class="is-drawer-close:tooltip is-drawer-close:tooltip-right"
 								data-tip="Jellyfin"
 							>
-								<svg
-									xmlns="http://www.w3.org/2000/svg"
-									viewBox="0 0 24 24"
-									fill="none"
-									stroke="currentColor"
-									stroke-width="2"
-									stroke-linecap="round"
-									stroke-linejoin="round"
-									class="h-6 w-6 text-info"
-								>
-									<rect x="2" y="7" width="20" height="15" rx="2" ry="2"></rect>
-									<polyline points="17 2 12 7 7 2"></polyline>
-								</svg>
+								<Tv class="h-6 w-6 text-info" />
 								<span class="is-drawer-close:hidden">Jellyfin</span>
 							</a>
 						</li>
@@ -416,20 +320,7 @@
 								class="is-drawer-close:tooltip is-drawer-close:tooltip-right"
 								data-tip="Local Files"
 							>
-								<svg
-									xmlns="http://www.w3.org/2000/svg"
-									viewBox="0 0 24 24"
-									fill="none"
-									stroke="currentColor"
-									stroke-width="2"
-									stroke-linecap="round"
-									stroke-linejoin="round"
-									class="h-6 w-6 text-accent"
-								>
-									<path d="M3 18v-6a9 9 0 0 1 18 0v6"></path>
-									<path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3z"></path>
-									<path d="M3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"></path>
-								</svg>
+								<Headphones class="h-6 w-6 text-accent" />
 								<span class="is-drawer-close:hidden">Local Files</span>
 							</a>
 						</li>
@@ -444,20 +335,7 @@
 								data-tip="Requests"
 							>
 								<div class="relative">
-									<svg
-										xmlns="http://www.w3.org/2000/svg"
-										viewBox="0 0 24 24"
-										fill="none"
-										stroke="currentColor"
-										stroke-width="2"
-										stroke-linecap="round"
-										stroke-linejoin="round"
-										class="h-6 w-6"
-									>
-										<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-										<polyline points="7 10 12 15 17 10"></polyline>
-										<line x1="12" y1="15" x2="12" y2="3"></line>
-									</svg>
+									<Download class="h-6 w-6" />
 									{#if activeRequestCount > 0}
 										<span
 											class="absolute -top-2 -right-2 badge badge-info badge-xs w-4 h-4 p-0 text-[10px] font-bold"
@@ -475,22 +353,7 @@
 						for="main-drawer"
 						class="btn btn-ghost btn-circle drawer-button is-drawer-open:rotate-y-180"
 					>
-						<svg
-							xmlns="http://www.w3.org/2000/svg"
-							viewBox="0 0 24 24"
-							fill="none"
-							stroke="currentColor"
-							stroke-width="2"
-							stroke-linecap="round"
-							stroke-linejoin="round"
-							class="h-5 w-5"
-						>
-							<path
-								d="M4 4m0 2a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2z"
-							></path>
-							<path d="M9 4v16"></path>
-							<path d="M14 10l2 2l-2 2"></path>
-						</svg>
+						<PanelLeft class="h-5 w-5" />
 					</label>
 				</div>
 			</div>
@@ -501,7 +364,7 @@
 		<div class="modal-box overflow-visible">
 			<form method="dialog">
 				<button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" aria-label="Close"
-					>✕</button
+					><X class="h-4 w-4" /></button
 				>
 			</form>
 			<h3 class="font-bold text-lg mb-4">Search</h3>
@@ -527,23 +390,12 @@
 					onclick={() => errorModal.hide()}
 					aria-label="Close"
 				>
-					✕
+					<X class="h-4 w-4" />
 				</button>
 
 				<div class="flex flex-col items-center text-center pt-2 pb-1">
 					<div class="bg-error/10 rounded-full p-3 mb-4">
-						<svg
-							xmlns="http://www.w3.org/2000/svg"
-							viewBox="0 0 24 24"
-							fill="none"
-							stroke="currentColor"
-							stroke-width="2"
-							stroke-linecap="round"
-							stroke-linejoin="round"
-							class="h-8 w-8 text-error"
-						>
-							<path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-						</svg>
+						<TriangleAlert class="h-8 w-8 text-error" />
 					</div>
 
 					<h3 class="text-lg font-bold text-base-content mb-2">
@@ -558,20 +410,7 @@
 				{#if $errorModal.details}
 					<div class="mt-4 rounded-box bg-base-300/60 border border-base-300 p-4">
 						<div class="flex gap-3 items-start">
-							<svg
-								xmlns="http://www.w3.org/2000/svg"
-								viewBox="0 0 24 24"
-								fill="none"
-								stroke="currentColor"
-								stroke-width="2"
-								stroke-linecap="round"
-								stroke-linejoin="round"
-								class="h-5 w-5 text-info flex-shrink-0 mt-0.5"
-							>
-								<circle cx="12" cy="12" r="10" />
-								<path d="M12 16v-4" />
-								<path d="M12 8h.01" />
-							</svg>
+							<Info class="h-5 w-5 text-info flex-shrink-0 mt-0.5" />
 							<p class="text-sm text-base-content/80 leading-relaxed text-left">
 								{$errorModal.details}
 							</p>
@@ -604,43 +443,11 @@
 						: 'alert-info'} shadow-lg px-4 py-2 min-w-64 max-w-md"
 			>
 				{#if playbackToast.type === 'error'}
-					<svg
-						xmlns="http://www.w3.org/2000/svg"
-						class="h-5 w-5 flex-shrink-0"
-						fill="none"
-						viewBox="0 0 24 24"
-						stroke="currentColor"
-						stroke-width="2"
-						><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg
-					>
+					<X class="h-5 w-5 flex-shrink-0" />
 				{:else if playbackToast.type === 'warning'}
-					<svg
-						xmlns="http://www.w3.org/2000/svg"
-						class="h-5 w-5 flex-shrink-0"
-						fill="none"
-						viewBox="0 0 24 24"
-						stroke="currentColor"
-						stroke-width="2"
-						><path
-							stroke-linecap="round"
-							stroke-linejoin="round"
-							d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-						/></svg
-					>
+					<TriangleAlert class="h-5 w-5 flex-shrink-0" />
 				{:else}
-					<svg
-						xmlns="http://www.w3.org/2000/svg"
-						class="h-5 w-5 flex-shrink-0"
-						fill="none"
-						viewBox="0 0 24 24"
-						stroke="currentColor"
-						stroke-width="2"
-						><path
-							stroke-linecap="round"
-							stroke-linejoin="round"
-							d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-						/></svg
-					>
+					<Info class="h-5 w-5 flex-shrink-0" />
 				{/if}
 				<span class="text-sm">{playbackToast.message}</span>
 				<button
@@ -648,15 +455,7 @@
 					onclick={() => playbackToast.dismiss()}
 					aria-label="Dismiss"
 				>
-					<svg
-						xmlns="http://www.w3.org/2000/svg"
-						class="h-3.5 w-3.5"
-						fill="none"
-						viewBox="0 0 24 24"
-						stroke="currentColor"
-						stroke-width="2"
-						><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg
-					>
+					<X class="h-3.5 w-3.5" />
 				</button>
 			</div>
 		</div>

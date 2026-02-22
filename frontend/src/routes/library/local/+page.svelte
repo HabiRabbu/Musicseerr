@@ -2,7 +2,6 @@
 	import { onMount, onDestroy } from 'svelte';
 	import { API } from '$lib/constants';
 	import AlbumImage from '$lib/components/AlbumImage.svelte';
-	import PlayIcon from '$lib/components/PlayIcon.svelte';
 	import SourceAlbumModal from '$lib/components/SourceAlbumModal.svelte';
 	import {
 		getLocalFilesSidebarCachedData,
@@ -11,6 +10,7 @@
 	} from '$lib/utils/localFilesCache';
 	import { launchLocalPlayback } from '$lib/player/launchLocalPlayback';
 	import type {
+	import { Headphones, ArrowDown, CircleX , Play} from 'lucide-svelte';
 		LocalAlbumSummary,
 		LocalPaginatedResponse,
 		LocalStorageStats,
@@ -210,20 +210,7 @@
 
 <div class="container mx-auto p-6">
 	<div class="flex items-center gap-3 mb-2">
-		<svg
-			xmlns="http://www.w3.org/2000/svg"
-			viewBox="0 0 24 24"
-			fill="none"
-			stroke="currentColor"
-			stroke-width="2"
-			stroke-linecap="round"
-			stroke-linejoin="round"
-			class="h-8 w-8 text-accent"
-		>
-			<path d="M3 18v-6a9 9 0 0 1 18 0v6"></path>
-			<path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3z"></path>
-			<path d="M3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"></path>
-		</svg>
+		<Headphones class="h-8 w-8 text-accent" />
 		<h1 class="text-2xl font-bold">Local Files</h1>
 		{#if stats}
 			<span class="badge badge-neutral">{stats.total_albums} albums</span>
@@ -315,19 +302,7 @@
 				aria-label="Toggle sort order"
 				title={sortOrder === 'asc' ? 'Ascending' : 'Descending'}
 			>
-				<svg
-					xmlns="http://www.w3.org/2000/svg"
-					viewBox="0 0 24 24"
-					fill="none"
-					stroke="currentColor"
-					stroke-width="2"
-					stroke-linecap="round"
-					stroke-linejoin="round"
-					class="h-4 w-4 transition-transform {sortOrder === 'desc' ? 'rotate-180' : ''}"
-				>
-					<path d="M12 5v14"></path>
-					<path d="M18 13l-6 6-6-6"></path>
-				</svg>
+				<ArrowDown class="h-4 w-4 transition-transform {sortOrder === 'desc' ? 'rotate-180' : ''}" />
 			</button>
 			{#if !loading}
 				<span class="text-sm opacity-50">{total} results</span>
@@ -337,9 +312,7 @@
 
 	{#if fetchError}
 		<div role="alert" class="alert alert-error alert-soft mb-4">
-			<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
-			</svg>
+			<CircleX class="h-6 w-6 shrink-0" />
 			<span>{fetchError}</span>
 			<button class="btn btn-sm btn-ghost" onclick={() => fetchAlbums(true)}>Retry</button>
 		</div>
@@ -384,18 +357,7 @@
 							<div
 								class="badge badge-sm gap-1 badge-accent"
 							>
-								<svg
-									xmlns="http://www.w3.org/2000/svg"
-									viewBox="0 0 24 24"
-									fill="none"
-									stroke="currentColor"
-									stroke-width="2"
-									class="h-3 w-3"
-								>
-									<path d="M3 18v-6a9 9 0 0 1 18 0v6"></path>
-									<path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3z"></path>
-									<path d="M3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"></path>
-								</svg>
+								<Headphones class="h-3 w-3" />
 							</div>
 						</div>
 						{#if album.primary_format}
@@ -417,7 +379,7 @@
 								{#if playingAlbumId === album.lidarr_album_id}
 									<span class="loading loading-spinner loading-xs"></span>
 								{:else}
-									<PlayIcon class="h-4 w-4" />
+									<Play class="h-4 w-4 fill-current" />
 								{/if}
 							</button>
 						</div>
@@ -441,18 +403,7 @@
 		{#if albums.length === 0}
 			<div class="card bg-base-200 mt-4">
 				<div class="card-body items-center text-center">
-					<svg
-						xmlns="http://www.w3.org/2000/svg"
-						viewBox="0 0 24 24"
-						fill="none"
-						stroke="currentColor"
-						stroke-width="2"
-						class="h-12 w-12 opacity-20"
-					>
-						<path d="M3 18v-6a9 9 0 0 1 18 0v6"></path>
-						<path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3z"></path>
-						<path d="M3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"></path>
-					</svg>
+					<Headphones class="h-12 w-12 opacity-20" />
 					<p class="text-lg opacity-60">No local files found</p>
 					<p class="text-sm opacity-40">
 						Make sure your music directory is mounted and configured in Settings.

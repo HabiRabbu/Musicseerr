@@ -11,6 +11,7 @@
 	import PageHeader from '$lib/components/PageHeader.svelte';
 	import { getDiscoverCachedData, setDiscoverCachedData, isDiscoverCacheStale } from '$lib/utils/discoverCache';
 	import { formatLastUpdated } from '$lib/utils/formatting';
+	import { Compass } from 'lucide-svelte';
 
 	let discoverData: DiscoverResponse | null = null;
 	let loading = true;
@@ -210,19 +211,7 @@
 		onRefresh={handleRefresh}
 	>
 		{#snippet title()}
-			<svg
-				xmlns="http://www.w3.org/2000/svg"
-				viewBox="0 0 24 24"
-				fill="none"
-				stroke="currentColor"
-				stroke-width="2"
-				stroke-linecap="round"
-				stroke-linejoin="round"
-				class="inline h-8 w-8 sm:h-10 sm:w-10 lg:h-12 lg:w-12 mr-2 align-text-bottom"
-			>
-				<circle cx="12" cy="12" r="10"></circle>
-				<polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"></polygon>
-			</svg>
+			<Compass class="inline h-8 w-8 sm:h-10 sm:w-10 lg:h-12 lg:w-12 mr-2 align-text-bottom" />
 			Discover
 		{/snippet}
 	</PageHeader>

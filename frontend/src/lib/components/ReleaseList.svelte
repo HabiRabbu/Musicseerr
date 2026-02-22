@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { ChevronDown, Download } from 'lucide-svelte';
 	import { colors } from '$lib/colors';
 	import AlbumImage from './AlbumImage.svelte';
 	import LibraryBadge from './LibraryBadge.svelte';
@@ -46,15 +47,7 @@
 			on:click={onToggleCollapse}
 		>
 			<span class="text-xl sm:text-2xl font-bold">{title} ({releases.length})</span>
-			<svg
-				xmlns="http://www.w3.org/2000/svg"
-				class="h-6 w-6 transition-transform duration-200 {collapsed ? '' : 'rotate-180'}"
-				fill="none"
-				viewBox="0 0 24 24"
-				stroke="currentColor"
-			>
-				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-			</svg>
+			<ChevronDown class="h-6 w-6 transition-transform duration-200 {collapsed ? '' : 'rotate-180'}" />
 		</button>
 	</div>
 	{#if !collapsed}
@@ -116,20 +109,7 @@
 											style="color: {colors.secondary};"
 										></span>
 									{:else}
-										<svg
-											xmlns="http://www.w3.org/2000/svg"
-											class="h-4 w-4 sm:h-5 sm:w-5"
-											fill="none"
-											viewBox="0 0 24 24"
-											stroke={colors.secondary}
-											stroke-width="2.5"
-										>
-											<path
-												stroke-linecap="round"
-												stroke-linejoin="round"
-												d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
-											/>
-										</svg>
+										<Download class="h-4 w-4 sm:h-5 sm:w-5" color={colors.secondary} strokeWidth={2.5} />
 									{/if}
 								</button>
 							{/if}

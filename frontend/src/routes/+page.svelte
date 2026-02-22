@@ -1,4 +1,5 @@
 <script lang="ts">
+import { Shield, ArrowRight, Compass, Music } from 'lucide-svelte';
 	import { onMount, onDestroy } from 'svelte';
 	import { beforeNavigate } from '$app/navigation';
 	import HomeSection from '$lib/components/HomeSection.svelte';
@@ -248,7 +249,7 @@
 					class="card bg-gradient-to-br from-accent/20 via-accent/10 to-base-200 border-2 border-accent/40 shadow-xl"
 				>
 					<div class="card-body items-center text-center py-12">
-						<div class="text-6xl mb-4">🎶</div>
+						<Music class="h-16 w-16 mb-4" />
 						<h2 class="card-title text-2xl sm:text-3xl mb-2">Welcome to Musicseerr!</h2>
 						<p class="text-base-content/70 max-w-lg mb-6">
 							To get started, connect your Lidarr server. This is required to manage your music
@@ -260,29 +261,9 @@
 							{/each}
 						</div>
 						<a href="/settings?tab=lidarr-connection" class="btn btn-accent btn-lg gap-2">
-							<svg
-								xmlns="http://www.w3.org/2000/svg"
-								viewBox="0 0 24 24"
-								fill="none"
-								stroke="currentColor"
-								stroke-width="2"
-								class="h-5 w-5"
-							>
-								<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
-							</svg>
+							<Shield class="h-5 w-5" />
 							Connect Lidarr
-							<svg
-								xmlns="http://www.w3.org/2000/svg"
-								viewBox="0 0 20 20"
-								fill="currentColor"
-								class="h-5 w-5"
-							>
-								<path
-									fill-rule="evenodd"
-									d="M3 10a.75.75 0 01.75-.75h10.638L10.23 5.29a.75.75 0 111.04-1.08l5.5 5.25a.75.75 0 010 1.08l-5.5 5.25a.75.75 0 11-1.04-1.08l4.158-3.96H3.75A.75.75 0 013 10z"
-									clip-rule="evenodd"
-								/>
-							</svg>
+							<ArrowRight class="h-5 w-5" />
 						</a>
 					</div>
 				</div>
@@ -368,33 +349,9 @@
 						/>
 						<div class="flex items-center justify-center pt-2 pb-2">
 							<a href="/discover" class="btn btn-primary gap-2">
-								<svg
-									xmlns="http://www.w3.org/2000/svg"
-									viewBox="0 0 24 24"
-									fill="none"
-									stroke="currentColor"
-									stroke-width="2"
-									stroke-linecap="round"
-									stroke-linejoin="round"
-									class="h-5 w-5"
-								>
-									<circle cx="12" cy="12" r="10"></circle>
-									<polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"
-									></polygon>
-								</svg>
+								<Compass class="h-5 w-5" />
 								Explore More on Discover
-								<svg
-									xmlns="http://www.w3.org/2000/svg"
-									viewBox="0 0 20 20"
-									fill="currentColor"
-									class="h-5 w-5"
-								>
-									<path
-										fill-rule="evenodd"
-										d="M3 10a.75.75 0 01.75-.75h10.638L10.23 5.29a.75.75 0 111.04-1.08l5.5 5.25a.75.75 0 010 1.08l-5.5 5.25a.75.75 0 11-1.04-1.08l4.158-3.96H3.75A.75.75 0 013 10z"
-										clip-rule="evenodd"
-									/>
-								</svg>
+								<ArrowRight class="h-5 w-5" />
 							</a>
 						</div>
 					</div>
@@ -413,7 +370,7 @@
 
 			{#if !loading && !hasContent && servicePrompts.length === 0}
 				<div class="flex flex-col items-center justify-center py-12 sm:py-16">
-					<div class="mb-4 text-5xl sm:mb-6 sm:text-6xl">🎵</div>
+					<Music class="h-12 w-12 sm:h-16 sm:w-16 mb-4 sm:mb-6" />
 					<h2 class="mb-2 text-center text-xl font-bold sm:text-2xl">Welcome to Musicseerr</h2>
 					<p class="mb-6 max-w-md px-4 text-center text-sm text-base-content/70 sm:text-base">
 						Your music library appears to be empty. Add some albums in Lidarr to get started, or

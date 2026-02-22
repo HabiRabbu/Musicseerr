@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { Check } from 'lucide-svelte';
 	import type { ArtistInfo } from '$lib/types';
 	import { extractDominantColor, DEFAULT_GRADIENT } from '$lib/utils/colors';
 	import ArtistLinks from './ArtistLinks.svelte';
@@ -117,16 +118,7 @@
 						</div>
 						{#if artist.in_library}
 							<div class="absolute -bottom-2 -right-2 badge badge-success badge-lg gap-1 shadow-lg">
-								<svg
-									xmlns="http://www.w3.org/2000/svg"
-									class="h-4 w-4"
-									fill="none"
-									viewBox="0 0 24 24"
-									stroke="currentColor"
-									stroke-width="2"
-								>
-									<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
-								</svg>
+							<Check class="h-4 w-4" />
 								In Library
 							</div>
 						{/if}

@@ -6,6 +6,7 @@
 		HomeTrack,
 		HomeGenre
 	} from '$lib/types';
+	import { ArrowRight, X, Check, Music2, Tv, Sparkles } from 'lucide-svelte';
 	import { goto } from '$app/navigation';
 	import { formatListenCount, formatListenedAt } from '$lib/utils/formatting';
 	import ArtistImage from './ArtistImage.svelte';
@@ -61,18 +62,7 @@
 				class="text-lg sm:text-xl font-bold hover:text-primary transition-colors flex items-center gap-2 group"
 			>
 				{section.title}
-				<svg
-					xmlns="http://www.w3.org/2000/svg"
-					viewBox="0 0 20 20"
-					fill="currentColor"
-					class="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity"
-				>
-					<path
-						fill-rule="evenodd"
-						d="M3 10a.75.75 0 01.75-.75h10.638L10.23 5.29a.75.75 0 111.04-1.08l5.5 5.25a.75.75 0 010 1.08l-5.5 5.25a.75.75 0 11-1.04-1.08l4.158-3.96H3.75A.75.75 0 013 10z"
-						clip-rule="evenodd"
-					/>
-				</svg>
+				<ArrowRight class="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity" />
 			</a>
 		{:else}
 			<h2 class="text-lg sm:text-xl font-bold">{section.title}</h2>
@@ -87,11 +77,11 @@
 			<div class="card-body items-center text-center py-6 sm:py-8">
 				<div class="text-3xl sm:text-4xl mb-2">
 					{#if section.connect_service === 'listenbrainz'}
-						🎵
+						<Music2 class="h-5 w-5" />
 					{:else if section.connect_service === 'jellyfin'}
-						📺
+						<Tv class="h-5 w-5" />
 					{:else}
-						✨
+						<Sparkles class="h-5 w-5" />
 					{/if}
 				</div>
 				<p class="text-base-content/70 text-sm">{section.fallback_message}</p>
@@ -138,32 +128,12 @@
 										class="absolute top-2 left-2 badge badge-ghost badge-sm"
 										title="Not linked to MusicBrainz"
 									>
-										<svg
-											xmlns="http://www.w3.org/2000/svg"
-											viewBox="0 0 20 20"
-											fill="currentColor"
-											class="w-3 h-3"
-										>
-											<path
-												d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z"
-											/>
-										</svg>
+										<X class="w-3 h-3" />
 									</div>
 								{/if}
 								{#if item.in_library}
 									<div class="absolute top-2 right-2 badge badge-success badge-sm">
-										<svg
-											xmlns="http://www.w3.org/2000/svg"
-											viewBox="0 0 20 20"
-											fill="currentColor"
-											class="w-3 h-3"
-										>
-											<path
-												fill-rule="evenodd"
-												d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z"
-												clip-rule="evenodd"
-											/>
-										</svg>
+										<Check class="w-3 h-3" />
 									</div>
 								{/if}
 							</figure>
@@ -195,18 +165,7 @@
 								/>
 								{#if item.in_library}
 									<div class="absolute top-2 right-2 badge badge-success badge-sm">
-										<svg
-											xmlns="http://www.w3.org/2000/svg"
-											viewBox="0 0 20 20"
-											fill="currentColor"
-											class="w-3 h-3"
-										>
-											<path
-												fill-rule="evenodd"
-												d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z"
-												clip-rule="evenodd"
-											/>
-										</svg>
+										<Check class="w-3 h-3" />
 									</div>
 								{/if}
 							</figure>
@@ -229,7 +188,7 @@
 						>
 							<figure class="w-16 h-16 flex-shrink-0">
 								<div class="w-full h-full flex items-center justify-center text-2xl bg-base-200">
-									🎵
+									<Music2 class="h-6 w-6 text-base-content/40" />
 								</div>
 							</figure>
 							<div class="card-body p-2 justify-center">
