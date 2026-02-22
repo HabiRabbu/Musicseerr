@@ -70,7 +70,10 @@
 
 		if (artist) {
 			fetchExtendedInfo(force, artist);
-			fetchDiscoveryData();
+			await fetchDiscoveryData();
+			if (hasMoreReleases) {
+				fetchMoreReleases();
+			}
 		}
 	}
 	
@@ -99,7 +102,7 @@
 						hasMoreReleases = true;
 						totalReleaseCount = releaseGroupCount || loadedReleaseCount;
 						currentOffset = BATCH_SIZE;
-						fetchMoreReleases();
+
 					} else {
 						hasMoreReleases = false;
 					}

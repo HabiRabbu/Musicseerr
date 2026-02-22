@@ -11,6 +11,7 @@
 	let heroImageLoaded = false;
 	let fanartLoaded = false;
 	let fanartError = false;
+	let coverBgLoaded = false;
 
 	function onHeroImageLoad() {
 		heroImageLoaded = true;
@@ -26,6 +27,9 @@
 			(gradient) => (heroGradient = gradient)
 		);
 	}
+
+	$: useCoverBg = heroImageLoaded && (!artist.fanart_url || fanartError);
+	$: coverBgUrl = `/api/covers/artist/${artist.musicbrainz_id}?size=500`;
 
 	$: validLinks = artist.external_links.filter((link) => link.url && link.url.trim() !== '');
 </script>
@@ -49,6 +53,21 @@
 	{:else}
 		<div class="absolute inset-0 bg-gradient-to-b {heroGradient} transition-all duration-1000"
 		></div>
+		{#if useCoverBg}
+			<div class="absolute inset-0 overflow-hidden">
+				<img
+					src={coverBgUrl}
+					alt=""
+					class="w-full h-full object-cover scale-[1.02] blur-xs transition-opacity duration-700 {coverBgLoaded
+						? 'opacity-30'
+						: 'opacity-0'}"
+					loading="eager"
+					on:load={() => (coverBgLoaded = true)}
+				/>
+				<div class="absolute inset-0 bg-gradient-to-b from-transparent via-base-100/60 to-base-100"
+				></div>
+			</div>
+		{/if}
 	{/if}
 
 	<div class="relative z-10 px-4 sm:px-8 lg:px-12 pt-6 pb-8 sm:pt-8 sm:pb-12">
