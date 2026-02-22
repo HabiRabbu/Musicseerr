@@ -306,7 +306,7 @@
 			</div>
 		{:else if currentItem}
 			{#key currentItem.release_group_mbid}
-				<div in:fly={{ x: 20, duration: 300 }} class="flex flex-col h-full w-full">
+				<div in:fly={{ x: 20, duration: 300 }} class="flex flex-col flex-1 min-h-0 w-full">
 					<!-- Header -->
 					<div class="dq-header">
 						<div class="dq-header-left">
@@ -527,7 +527,7 @@
 	.dq-modal {
 		width: 92vw;
 		max-width: 64rem;
-		max-height: 85vh;
+		height: 85vh;
 		display: flex;
 		flex-direction: column;
 		padding: 0 !important;
@@ -691,6 +691,7 @@
 
 	/* ── Body ── */
 	.dq-body {
+		flex: 1 1 0;
 		overflow-y: auto;
 		min-height: 0;
 		padding: 1rem 1.5rem;
@@ -886,7 +887,7 @@
 	@media (max-width: 640px) {
 		.dq-modal {
 			width: 100vw;
-			max-height: 100vh;
+			height: 100vh;
 			max-width: 100vw;
 			border-radius: 0;
 		}

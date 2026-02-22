@@ -58,8 +58,8 @@
 				<img
 					src={coverBgUrl}
 					alt=""
-					class="w-full h-full object-cover scale-[1.02] blur-xs transition-opacity duration-700 {coverBgLoaded
-						? 'opacity-30'
+					class="w-full h-full object-cover scale-110 blur-xl transition-opacity duration-700 {coverBgLoaded
+						? 'opacity-25'
 						: 'opacity-0'}"
 					loading="eager"
 					on:load={() => (coverBgLoaded = true)}
