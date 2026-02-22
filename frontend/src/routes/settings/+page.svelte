@@ -66,13 +66,13 @@ activeTab = tabParam;
 </div>
 <ul class="menu p-0">
 {#each getTabsByGroup(group) as tab}
+{@const Icon = tab.icon}
 <li>
 <button
 class="text-base justify-start"
 class:btn-active={activeTab === tab.id}
 onclick={() => activeTab = tab.id}
 >
-{@const Icon = tab.icon}
 <Icon class="w-5 h-5" />
 <span>{tab.label}</span>
 </button>
