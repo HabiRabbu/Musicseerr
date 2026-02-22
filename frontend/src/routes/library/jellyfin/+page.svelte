@@ -10,12 +10,12 @@
 	} from '$lib/utils/jellyfinLibraryCache';
 	import { launchJellyfinPlayback } from '$lib/player/launchJellyfinPlayback';
 	import type {
-	import { Tv, ArrowDown, CircleX , Play} from 'lucide-svelte';
 		JellyfinAlbumSummary,
 		JellyfinPaginatedResponse,
 		JellyfinLibraryStats,
 		JellyfinTrackInfo
 	} from '$lib/types';
+	import { Tv, ArrowDown, CircleX, Play } from 'lucide-svelte';
 
 	let albums = $state<JellyfinAlbumSummary[]>([]);
 	let recentAlbums = $state<JellyfinAlbumSummary[]>([]);

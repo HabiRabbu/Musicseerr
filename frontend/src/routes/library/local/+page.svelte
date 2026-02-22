@@ -10,12 +10,12 @@
 	} from '$lib/utils/localFilesCache';
 	import { launchLocalPlayback } from '$lib/player/launchLocalPlayback';
 	import type {
-	import { Headphones, ArrowDown, CircleX , Play} from 'lucide-svelte';
 		LocalAlbumSummary,
 		LocalPaginatedResponse,
 		LocalStorageStats,
 		LocalTrackInfo
 	} from '$lib/types';
+	import { Headphones, ArrowDown, CircleX, Play } from 'lucide-svelte';
 
 	let albums = $state<LocalAlbumSummary[]>([]);
 	let recentAlbums = $state<LocalAlbumSummary[]>([]);
