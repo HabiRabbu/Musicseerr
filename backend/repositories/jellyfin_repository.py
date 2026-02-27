@@ -441,6 +441,19 @@ class JellyfinRepository:
 
         return None
 
+    async def get_artist_by_mbid(self, musicbrainz_id: str) -> JellyfinItem | None:
+        try:
+            results = await self.search_items(musicbrainz_id, item_types="MusicArtist")
+            for item in results:
+                if not item.provider_ids:
+                    continue
+                if item.provider_ids.get("MusicBrainzArtist") == musicbrainz_id:
+                    return item
+        except Exception as e:
+            logger.debug(f"Artist MBID search fallback failed for {musicbrainz_id}: {e}")
+
+        return None
+
     async def get_artists(
         self, limit: int = 50, offset: int = 0
     ) -> list[JellyfinItem]:

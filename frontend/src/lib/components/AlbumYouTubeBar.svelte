@@ -130,7 +130,7 @@
 					albumId: albumLink.album_id,
 					albumName: albumLink.album_name,
 					artistName: albumLink.artist_name,
-					coverUrl: albumLink.cover_url || getCoverUrl(coverUrl, albumId),
+					coverUrl: getCoverUrl(albumLink.cover_url || coverUrl, albumId),
 					videoId: albumLink.video_id,
 					embedUrl: albumLink.embed_url ?? undefined,
 					artistId

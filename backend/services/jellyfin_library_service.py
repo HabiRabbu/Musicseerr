@@ -10,6 +10,7 @@ from api.v1.schemas.jellyfin import (
     JellyfinSearchResponse,
     JellyfinTrackInfo,
 )
+from infrastructure.cover_urls import prefer_artist_cover_url, prefer_release_group_cover_url
 from repositories.jellyfin_repository import JellyfinRepository
 from repositories.jellyfin_models import JellyfinItem
 from services.preferences_service import PreferencesService
@@ -59,13 +60,18 @@ class JellyfinLibraryService:
         pids = item.provider_ids or {}
         mbid = pids.get("MusicBrainzReleaseGroup") or pids.get("MusicBrainzAlbum")
         artist_mbid = pids.get("MusicBrainzAlbumArtist") or pids.get("MusicBrainzArtist")
+        image_url = prefer_release_group_cover_url(
+            mbid,
+            self._jellyfin.get_image_url(item.id, item.image_tag),
+            size=500,
+        )
         return JellyfinAlbumSummary(
             jellyfin_id=item.id,
             name=item.name,
             artist_name=item.artist_name or "",
             year=item.year,
             track_count=item.child_count or 0,
-            image_url=self._jellyfin.get_image_url(item.id, item.image_tag),
+            image_url=image_url,
             musicbrainz_id=mbid,
             artist_musicbrainz_id=artist_mbid,
         )
@@ -106,6 +112,11 @@ class JellyfinLibraryService:
         pids = item.provider_ids or {}
         mbid = pids.get("MusicBrainzReleaseGroup") or pids.get("MusicBrainzAlbum")
         artist_mbid = pids.get("MusicBrainzAlbumArtist") or pids.get("MusicBrainzArtist")
+        image_url = prefer_release_group_cover_url(
+            mbid,
+            self._jellyfin.get_image_url(item.id, item.image_tag),
+            size=500,
+        )
 
         return JellyfinAlbumDetail(
             jellyfin_id=item.id,
@@ -113,7 +124,7 @@ class JellyfinLibraryService:
             artist_name=item.artist_name or "",
             year=item.year,
             track_count=len(tracks),
-            image_url=self._jellyfin.get_image_url(item.id, item.image_tag),
+            image_url=image_url,
             musicbrainz_id=mbid,
             artist_musicbrainz_id=artist_mbid,
             tracks=tracks,
@@ -144,10 +155,15 @@ class JellyfinLibraryService:
         artists = []
         for item in items:
             mbid = item.provider_ids.get("MusicBrainzArtist") if item.provider_ids else None
+            image_url = prefer_artist_cover_url(
+                mbid,
+                self._jellyfin.get_image_url(item.id, item.image_tag),
+                size=500,
+            )
             artists.append(JellyfinArtistSummary(
                 jellyfin_id=item.id,
                 name=item.name,
-                image_url=self._jellyfin.get_image_url(item.id, item.image_tag),
+                image_url=image_url,
                 album_count=item.album_count or 0,
                 musicbrainz_id=mbid,
             ))
@@ -165,10 +181,15 @@ class JellyfinLibraryService:
                 albums.append(self._item_to_album_summary(item))
             elif item.type in ("MusicArtist", "Artist"):
                 mbid = item.provider_ids.get("MusicBrainzArtist") if item.provider_ids else None
+                image_url = prefer_artist_cover_url(
+                    mbid,
+                    self._jellyfin.get_image_url(item.id, item.image_tag),
+                    size=500,
+                )
                 artists.append(JellyfinArtistSummary(
                     jellyfin_id=item.id,
                     name=item.name,
-                    image_url=self._jellyfin.get_image_url(item.id, item.image_tag),
+                    image_url=image_url,
                     musicbrainz_id=mbid,
                 ))
             elif item.type == "Audio":

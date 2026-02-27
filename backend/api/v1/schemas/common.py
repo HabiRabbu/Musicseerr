@@ -1,5 +1,5 @@
 from typing import Literal, Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class SuccessResponse(BaseModel):
@@ -22,3 +22,8 @@ class ServiceStatus(BaseModel):
 class StatusReport(BaseModel):
     status: Literal["ok", "degraded", "error"]
     services: dict[str, ServiceStatus]
+
+
+class LastFmTagSchema(BaseModel):
+    name: str
+    url: Optional[str] = None

@@ -4,7 +4,7 @@
 	import { goto } from '$app/navigation';
 	import AlbumCard from '$lib/components/AlbumCard.svelte';
 	import AlbumCardSkeleton from '$lib/components/AlbumCardSkeleton.svelte';
-	import type { Album } from '$lib/types';
+	import type { Album, EnrichmentSource } from '$lib/types';
 	import { colors } from '$lib/colors';
 	import { searchStore } from '$lib/stores/search';
 	import { fetchEnrichmentBatch, applyAlbumEnrichment } from '$lib/utils/enrichment';
@@ -23,6 +23,7 @@
 	let enrichmentController: AbortController | null = null;
 	let observer: IntersectionObserver | null = null;
 	let initializedFromCache = false;
+	let enrichmentSource: EnrichmentSource = 'none';
 
 	function navigateBack() {
 		if (data.query) {
@@ -43,18 +44,25 @@
 		}, 3000);
 	}
 
-	async function fetchEnrichment(albumMbids: string[]) {
-		if (albumMbids.length === 0) return;
+	async function fetchEnrichment(albumsToEnrich: Album[]) {
+		if (albumsToEnrich.length === 0) return;
 
 		if (enrichmentController) {
 			enrichmentController.abort();
 		}
 		enrichmentController = new AbortController();
 
+		const requests = albumsToEnrich.map((a) => ({
+			musicbrainz_id: a.musicbrainz_id,
+			artist_name: a.artist || '',
+			album_name: a.title
+		}));
+
 		try {
-			const enrichment = await fetchEnrichmentBatch([], albumMbids, enrichmentController.signal);
+			const enrichment = await fetchEnrichmentBatch([], requests, enrichmentController.signal);
 			if (!enrichment) return;
 
+			enrichmentSource = enrichment.source;
 			albums = applyAlbumEnrichment(albums, enrichment);
 		} catch (error) {
 			if (error instanceof Error && error.name === 'AbortError') {
@@ -86,7 +94,7 @@
 					hasMore = false;
 				}
 
-				const newMbids: string[] = [];
+				const newMbids: Set<string> = new Set();
 				if (offset === 0 && albums.length > 0) {
 					const existingIds = new Set(albums.map((a) => a.musicbrainz_id));
 					const uniqueNewAlbums = newAlbums.filter(
@@ -94,16 +102,17 @@
 					);
 					albums = [...albums, ...uniqueNewAlbums];
 					offset = albums.length;
-					uniqueNewAlbums.forEach((a) => newMbids.push(a.musicbrainz_id));
+					uniqueNewAlbums.forEach((a) => newMbids.add(a.musicbrainz_id));
 				} else {
 					albums = [...albums, ...newAlbums];
 					offset += newAlbums.length;
-					newAlbums.forEach((a) => newMbids.push(a.musicbrainz_id));
+					newAlbums.forEach((a) => newMbids.add(a.musicbrainz_id));
 				}
 				searchStore.updateAlbums(albums);
 
-				if (newMbids.length > 0) {
-					fetchEnrichment(newMbids);
+				const toEnrich = albums.filter((a) => newMbids.has(a.musicbrainz_id));
+				if (toEnrich.length > 0) {
+					fetchEnrichment(toEnrich);
 				}
 			} else {
 				hasMore = false;
@@ -139,6 +148,7 @@
 			offset = 0;
 			hasMore = true;
 			initializedFromCache = true;
+			fetchEnrichment(albums);
 			loadMore();
 		} else {
 			albums = [];
@@ -239,7 +249,7 @@
 				class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4"
 			>
 				{#each albums as album (album.musicbrainz_id)}
-					<AlbumCard {album} onadded={handleAlbumAdded} />
+					<AlbumCard {album} {enrichmentSource} onadded={handleAlbumAdded} />
 				{/each}
 			</div>
 		</div>

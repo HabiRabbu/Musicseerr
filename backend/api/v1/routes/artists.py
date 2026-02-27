@@ -1,10 +1,13 @@
 import logging
+from typing import Literal, Optional
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from api.v1.schemas.artist import ArtistInfo, ArtistExtendedInfo, ArtistReleases
+from api.v1.schemas.artist import ArtistInfo, ArtistExtendedInfo, ArtistReleases, LastFmArtistEnrichment
 from api.v1.schemas.discovery import SimilarArtistsResponse, TopSongsResponse, TopAlbumsResponse
-from core.dependencies import get_artist_service, get_artist_discovery_service
+from core.dependencies import get_artist_service, get_artist_discovery_service, get_artist_enrichment_service
 from services.artist_service import ArtistService
 from services.artist_discovery_service import ArtistDiscoveryService
+from services.artist_enrichment_service import ArtistEnrichmentService
 from infrastructure.validators import is_unknown_mbid
 
 logger = logging.getLogger(__name__)
@@ -78,6 +81,7 @@ async def get_artist_releases(
 async def get_similar_artists(
     artist_id: str,
     count: int = Query(default=15, ge=1, le=50),
+    source: Literal["listenbrainz", "lastfm"] | None = Query(default=None, description="Data source: listenbrainz or lastfm"),
     discovery_service: ArtistDiscoveryService = Depends(get_artist_discovery_service)
 ):
     if is_unknown_mbid(artist_id):
@@ -85,13 +89,14 @@ async def get_similar_artists(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Invalid or unknown artist ID: {artist_id}"
         )
-    return await discovery_service.get_similar_artists(artist_id, count)
+    return await discovery_service.get_similar_artists(artist_id, count, source=source)
 
 
 @router.get("/{artist_id}/top-songs", response_model=TopSongsResponse)
 async def get_top_songs(
     artist_id: str,
     count: int = Query(default=10, ge=1, le=50),
+    source: Literal["listenbrainz", "lastfm"] | None = Query(default=None, description="Data source: listenbrainz or lastfm"),
     discovery_service: ArtistDiscoveryService = Depends(get_artist_discovery_service)
 ):
     if is_unknown_mbid(artist_id):
@@ -99,13 +104,14 @@ async def get_top_songs(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Invalid or unknown artist ID: {artist_id}"
         )
-    return await discovery_service.get_top_songs(artist_id, count)
+    return await discovery_service.get_top_songs(artist_id, count, source=source)
 
 
 @router.get("/{artist_id}/top-albums", response_model=TopAlbumsResponse)
 async def get_top_albums(
     artist_id: str,
     count: int = Query(default=10, ge=1, le=50),
+    source: Literal["listenbrainz", "lastfm"] | None = Query(default=None, description="Data source: listenbrainz or lastfm"),
     discovery_service: ArtistDiscoveryService = Depends(get_artist_discovery_service)
 ):
     if is_unknown_mbid(artist_id):
@@ -113,4 +119,21 @@ async def get_top_albums(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Invalid or unknown artist ID: {artist_id}"
         )
-    return await discovery_service.get_top_albums(artist_id, count)
+    return await discovery_service.get_top_albums(artist_id, count, source=source)
+
+
+@router.get("/{artist_id}/lastfm", response_model=LastFmArtistEnrichment)
+async def get_artist_lastfm_enrichment(
+    artist_id: str,
+    artist_name: str = Query(..., description="Artist name for Last.fm lookup"),
+    enrichment_service: ArtistEnrichmentService = Depends(get_artist_enrichment_service),
+):
+    if is_unknown_mbid(artist_id):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid or unknown artist ID: {artist_id}"
+        )
+    result = await enrichment_service.get_lastfm_enrichment(artist_id, artist_name)
+    if result is None:
+        return LastFmArtistEnrichment()
+    return result

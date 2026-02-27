@@ -1,17 +1,21 @@
 <script lang="ts">
-	import type { Album } from '$lib/types';
+	import type { Album, EnrichmentSource } from '$lib/types';
 	import { colors } from '$lib/colors';
 	import { goto } from '$app/navigation';
 	import { libraryStore } from '$lib/stores/library';
 	import { requestAlbum } from '$lib/utils/albumRequest';
 	import { formatListenCount } from '$lib/utils/formatting';
+	import { getListenTitle } from '$lib/utils/enrichment';
 	import { Download, Music2 } from 'lucide-svelte';
 	import AlbumImage from './AlbumImage.svelte';
 	import LibraryBadge from './LibraryBadge.svelte';
 
 	export let album: Album;
+	export let enrichmentSource: EnrichmentSource = 'none';
 	export let onadded: (() => void) | undefined = undefined;
 	export let onremoved: (() => void) | undefined = undefined;
+
+	$: listenTitle = getListenTitle(enrichmentSource, 'album');
 
 	let requesting = false;
 
@@ -115,9 +119,27 @@
 
 		{#if album.listen_count != null}
 			<div class="flex items-center gap-1 mt-1">
-			<span class="badge badge-sm badge-primary badge-outline" title="ListenBrainz plays">
-				<Music2 class="inline h-3 w-3" /> {formatListenCount(album.listen_count, true)}
-			</span>
+			{#if enrichmentSource === 'lastfm'}
+				<span
+					class="badge badge-sm border-0"
+					style="background-color: rgb(var(--brand-lastfm) / 0.15); color: rgb(var(--brand-lastfm));"
+					title={listenTitle}
+				>
+					Last.fm {formatListenCount(album.listen_count, true)}
+				</span>
+			{:else if enrichmentSource === 'listenbrainz'}
+				<span
+					class="badge badge-sm border-0"
+					style="background-color: rgb(var(--brand-listenbrainz) / 0.15); color: rgb(var(--brand-listenbrainz));"
+					title={listenTitle}
+				>
+					LB {formatListenCount(album.listen_count, true)}
+				</span>
+			{:else}
+				<span class="badge badge-sm badge-ghost" title={listenTitle}>
+					<Music2 class="inline h-3 w-3" /> {formatListenCount(album.listen_count, true)}
+				</span>
+			{/if}
 			</div>
 		{/if}
 	</div>

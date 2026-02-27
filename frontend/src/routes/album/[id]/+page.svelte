@@ -1,13 +1,14 @@
 <script lang="ts">
 	import { browser } from '$app/environment';
 	import { goto } from '$app/navigation';
-	import type { AlbumBasicInfo, AlbumTracksInfo, SimilarAlbumsResponse, MoreByArtistResponse, YouTubeTrackLink, YouTubeLink, YouTubeQuotaStatus, JellyfinAlbumMatch, LocalAlbumMatch } from '$lib/types';
+	import type { AlbumBasicInfo, AlbumTracksInfo, SimilarAlbumsResponse, MoreByArtistResponse, YouTubeTrackLink, YouTubeLink, YouTubeQuotaStatus, JellyfinAlbumMatch, LocalAlbumMatch, LastFmAlbumEnrichment } from '$lib/types';
 	import { colors } from '$lib/colors';
 	import { libraryStore } from '$lib/stores/library';
 	import { API } from '$lib/constants';
 	import AlbumImage from '$lib/components/AlbumImage.svelte';
 	import Toast from '$lib/components/Toast.svelte';
 	import DiscoveryAlbumCarousel from '$lib/components/DiscoveryAlbumCarousel.svelte';
+	import LastFmAlbumEnrichmentComponent from '$lib/components/LastFmAlbumEnrichment.svelte';
 	import { requestAlbum } from '$lib/utils/albumRequest';
 	import { formatDuration, formatTotalDuration } from '$lib/utils/formatting';
 	import { integrationStore } from '$lib/stores/integration';
@@ -55,6 +56,9 @@
 	let loadingJellyfin = false;
 	let loadingLocal = false;
 
+	let lastfmEnrichment: LastFmAlbumEnrichment | null = null;
+	let loadingLastfm = true;
+
 	$: trackLinkMap = new Map(trackLinks.map(tl => [tl.track_number, tl]));
 	$: jellyfinTrackMap = new Map(jellyfinMatch?.tracks.map(t => [t.track_number, t]) ?? []);
 	$: localTrackMap = new Map(localMatch?.tracks.map(t => [t.track_number, t]) ?? []);
@@ -88,6 +92,8 @@
 		localMatch = null;
 		loadingJellyfin = false;
 		loadingLocal = false;
+		lastfmEnrichment = null;
+		loadingLastfm = true;
 	}
 
 	async function loadAlbum() {
@@ -97,6 +103,7 @@
 			fetchDiscoveryData();
 			fetchYouTubeData();
 			await integrationStore.ensureLoaded();
+			fetchLastFmEnrichment();
 			fetchJellyfinAlbumData();
 			fetchLocalAlbumData();
 		}
@@ -186,6 +193,33 @@
 			console.error('Failed to fetch local album data:', e);
 		} finally {
 			loadingLocal = false;
+		}
+	}
+
+	async function fetchLastFmEnrichment() {
+		if (!album) {
+			loadingLastfm = false;
+			return;
+		}
+		await integrationStore.ensureLoaded();
+		if (!$integrationStore.lastfm) {
+			loadingLastfm = false;
+			return;
+		}
+		loadingLastfm = true;
+		try {
+			const params = new URLSearchParams({
+				artist_name: album.artist_name,
+				album_name: album.title
+			});
+			const res = await fetch(`/api/album/${data.albumId}/lastfm?${params.toString()}`);
+			if (res.ok) {
+				lastfmEnrichment = await res.json();
+			}
+		} catch (e) {
+			console.error('Failed to fetch Last.fm album data:', e);
+		} finally {
+			loadingLastfm = false;
 		}
 	}
 
@@ -601,6 +635,14 @@
 				<div class="text-xs opacity-60">
 					<span class="font-semibold">Release Date:</span> {album.release_date}
 				</div>
+			{/if}
+
+			{#if $integrationStore.lastfm}
+				<LastFmAlbumEnrichmentComponent
+					enrichment={lastfmEnrichment}
+					loading={loadingLastfm}
+					enabled={$integrationStore.lastfm}
+				/>
 			{/if}
 
 			<!-- More by Artist Section -->

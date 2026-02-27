@@ -6,6 +6,7 @@
 	import { launchJellyfinPlayback } from '$lib/player/launchJellyfinPlayback';
 	import { launchLocalPlayback } from '$lib/player/launchLocalPlayback';
 	import AlbumImage from '$lib/components/AlbumImage.svelte';
+	import { getCoverUrl } from '$lib/utils/errorHandling';
 	import type { JellyfinTrackInfo, LocalTrackInfo, JellyfinAlbumSummary, LocalAlbumSummary } from '$lib/types';
 
 	type SourceType = 'jellyfin' | 'local';
@@ -28,10 +29,10 @@
 	let albumName = $derived(album?.name ?? '');
 	let artistName = $derived(album?.artist_name ?? '');
 	let year = $derived(album?.year);
-	let coverUrl = $derived(getAlbumCoverUrl());
 	let albumId = $derived(getAlbumId());
 	let mbid = $derived(getMbid());
 	let artistMbid = $derived(getArtistMbid());
+	let coverUrl = $derived(getCoverUrl(getAlbumCoverUrl() || null, mbid ?? albumId));
 	let canNavigate = $derived(!!mbid);
 	let canNavigateArtist = $derived(!!artistMbid);
 	let trackCount = $derived(sourceType === 'jellyfin' ? jellyfinTracks.length : localTracks.length);

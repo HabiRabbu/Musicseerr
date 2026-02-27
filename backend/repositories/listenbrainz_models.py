@@ -15,8 +15,6 @@ class ListenBrainzReleaseGroup:
     listen_count: int
     release_group_mbid: str | None = None
     artist_mbids: list[str] | None = None
-    caa_id: int | None = None
-    caa_release_mbid: str | None = None
 
 
 @dataclass
@@ -38,6 +36,7 @@ class ListenBrainzListen:
     recording_mbid: str | None = None
     release_name: str | None = None
     release_mbid: str | None = None
+    artist_mbids: list[str] | None = None
 
 
 @dataclass
@@ -53,6 +52,17 @@ class ListenBrainzSimilarArtist:
     artist_name: str
     listen_count: int
     score: float | None = None
+
+
+@dataclass
+class ListenBrainzFeedbackRecording:
+    track_name: str
+    artist_name: str
+    release_name: str | None = None
+    recording_mbid: str | None = None
+    release_mbid: str | None = None
+    artist_mbids: list[str] | None = None
+    score: int = 0
 
 
 ALLOWED_STATS_RANGE = [
@@ -78,8 +88,6 @@ def parse_release_group(item: dict) -> ListenBrainzReleaseGroup:
         listen_count=item.get("listen_count", 0),
         release_group_mbid=item.get("release_group_mbid"),
         artist_mbids=item.get("artist_mbids"),
-        caa_id=item.get("caa_id"),
-        caa_release_mbid=item.get("caa_release_mbid"),
     )
 
 
@@ -106,6 +114,7 @@ def parse_listen(item: dict) -> ListenBrainzListen:
         recording_mbid=mbid_mapping.get("recording_mbid") or additional.get("recording_mbid"),
         release_name=track_meta.get("release_name"),
         release_mbid=mbid_mapping.get("release_mbid") or additional.get("release_mbid"),
+        artist_mbids=mbid_mapping.get("artist_mbids"),
     )
 
 
@@ -134,4 +143,42 @@ def parse_similar_artist(artist_mbid: str, recordings: list[dict]) -> ListenBrai
         artist_mbid=artist_mbid,
         artist_name=first.get("similar_artist_name", "Unknown"),
         listen_count=total_count,
+    )
+
+
+def parse_feedback_recording(item: dict) -> ListenBrainzFeedbackRecording:
+    metadata = item.get("recording_metadata") or item.get("track_metadata") or item.get("metadata") or {}
+    if not isinstance(metadata, dict):
+        metadata = {}
+
+    mbid_mapping = metadata.get("mbid_mapping", {})
+    if not isinstance(mbid_mapping, dict):
+        mbid_mapping = {}
+
+    artist_mbids = mbid_mapping.get("artist_mbids") or metadata.get("artist_mbids")
+    if artist_mbids is None and metadata.get("artist_mbid"):
+        artist_mbids = [metadata.get("artist_mbid")]
+
+    return ListenBrainzFeedbackRecording(
+        track_name=(
+            metadata.get("track_name")
+            or metadata.get("recording_name")
+            or item.get("track_name")
+            or "Unknown"
+        ),
+        artist_name=(
+            metadata.get("artist_name")
+            or metadata.get("artist")
+            or item.get("artist_name")
+            or "Unknown"
+        ),
+        release_name=(
+            metadata.get("release_name")
+            or metadata.get("album_name")
+            or item.get("release_name")
+        ),
+        recording_mbid=item.get("recording_mbid") or mbid_mapping.get("recording_mbid") or metadata.get("recording_mbid"),
+        release_mbid=mbid_mapping.get("release_mbid") or item.get("release_mbid") or metadata.get("release_mbid"),
+        artist_mbids=artist_mbids,
+        score=int(item.get("score", 0) or 0),
     )

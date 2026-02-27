@@ -44,3 +44,53 @@ def sanitize_optional_string(value: Optional[str]) -> Optional[str]:
     
     value = value.strip()
     return value if value else None
+
+
+def strip_html_tags(text: str | None) -> str:
+    """Strip HTML tags from text, converting <br> to newlines.
+
+    Uses stdlib html.parser — no external dependencies needed.
+    Returns plain text suitable for display.
+    """
+    if not text:
+        return ""
+
+    from html.parser import HTMLParser
+    from html import unescape
+
+    class _TextExtractor(HTMLParser):
+        def __init__(self) -> None:
+            super().__init__()
+            self._parts: list[str] = []
+
+        def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+            if tag in ("br", "br/"):
+                self._parts.append("\n")
+
+        def handle_endtag(self, tag: str) -> None:
+            if tag == "p":
+                self._parts.append("\n\n")
+
+        def handle_data(self, data: str) -> None:
+            self._parts.append(data)
+
+        def get_text(self) -> str:
+            return "".join(self._parts).strip()
+
+    extractor = _TextExtractor()
+    extractor.feed(unescape(text))
+    return extractor.get_text()
+
+
+_LASTFM_SUFFIX_RE = re.compile(
+    r"\s*Read more on Last\.fm\.?\s*$",
+    re.IGNORECASE,
+)
+
+
+def clean_lastfm_bio(text: str | None) -> str:
+    """Strip HTML tags and remove the trailing 'Read more on Last.fm' suffix."""
+    cleaned = strip_html_tags(text)
+    if not cleaned:
+        return ""
+    return _LASTFM_SUFFIX_RE.sub("", cleaned).rstrip()

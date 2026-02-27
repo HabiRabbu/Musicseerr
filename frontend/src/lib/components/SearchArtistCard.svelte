@@ -1,11 +1,15 @@
 <script lang="ts">
-	import type { Artist } from '$lib/types';
+	import type { Artist, EnrichmentSource } from '$lib/types';
 	import { goto } from '$app/navigation';
 	import { formatListenCount } from '$lib/utils/formatting';
+	import { getListenTitle } from '$lib/utils/enrichment';
 	import { Music2 } from 'lucide-svelte';
 	import ArtistImage from './ArtistImage.svelte';
 
 	export let artist: Artist;
+	export let enrichmentSource: EnrichmentSource = 'none';
+
+	$: listenTitle = getListenTitle(enrichmentSource, 'artist');
 
 	function handleClick() {
 		goto(`/artist/${artist.musicbrainz_id}`);
@@ -34,10 +38,28 @@
 					{artist.release_group_count} release{artist.release_group_count !== 1 ? 's' : ''}
 				</span>
 			{/if}
-			{#if artist.listen_count != null}
-				<span class="badge badge-sm badge-primary badge-outline" title="ListenBrainz plays">
-					<Music2 class="inline h-3 w-3" /> {formatListenCount(artist.listen_count, true)}
-				</span>
+				{#if artist.listen_count != null}
+				{#if enrichmentSource === 'lastfm'}
+					<span
+						class="badge badge-sm border-0"
+						style="background-color: rgb(var(--brand-lastfm) / 0.15); color: rgb(var(--brand-lastfm));"
+						title={listenTitle}
+					>
+						Last.fm {formatListenCount(artist.listen_count, true)}
+					</span>
+				{:else if enrichmentSource === 'listenbrainz'}
+					<span
+						class="badge badge-sm border-0"
+						style="background-color: rgb(var(--brand-listenbrainz) / 0.15); color: rgb(var(--brand-listenbrainz));"
+						title={listenTitle}
+					>
+						LB {formatListenCount(artist.listen_count, true)}
+					</span>
+				{:else}
+					<span class="badge badge-sm badge-ghost" title={listenTitle}>
+						<Music2 class="inline h-3 w-3" /> {formatListenCount(artist.listen_count, true)}
+					</span>
+				{/if}
 			{/if}
 		</div>
 	</div>

@@ -1,6 +1,7 @@
 import { playerStore } from '$lib/stores/player.svelte';
 import type { QueueItem } from '$lib/player/types';
 import type { YouTubeTrackLink } from '$lib/types';
+import { getCoverUrl } from '$lib/utils/errorHandling';
 
 export type TrackQueueOptions = {
 	albumId: string;
@@ -16,6 +17,8 @@ export function launchTrackPlayback(
 	shuffle: boolean = false,
 	options: TrackQueueOptions
 ): void {
+	const normalizedCoverUrl = getCoverUrl(options.coverUrl, options.albumId);
+
 	const items: QueueItem[] = trackLinks.map((tl) => ({
 		videoId: tl.video_id,
 		trackName: tl.track_name,
@@ -23,7 +26,7 @@ export function launchTrackPlayback(
 		trackNumber: tl.track_number,
 		albumId: options.albumId,
 		albumName: options.albumName,
-		coverUrl: options.coverUrl,
+		coverUrl: normalizedCoverUrl,
 		sourceType: 'youtube',
 		artistId: options.artistId
 	}));

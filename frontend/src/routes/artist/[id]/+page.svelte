@@ -2,7 +2,7 @@
 	import { onMount, onDestroy } from 'svelte';
 	import { browser } from '$app/environment';
 	import { goto } from '$app/navigation';
-	import type { ArtistInfo, ArtistReleases, SimilarArtistsResponse, TopSongsResponse, TopAlbumsResponse } from '$lib/types';
+	import type { ArtistInfo, ArtistReleases, SimilarArtistsResponse, TopSongsResponse, TopAlbumsResponse, LastFmArtistEnrichment } from '$lib/types';
 	import { colors } from '$lib/colors';
 	import ArtistHeaderSkeleton from '$lib/components/ArtistHeaderSkeleton.svelte';
 	import AlbumGridSkeleton from '$lib/components/AlbumGridSkeleton.svelte';
@@ -14,8 +14,13 @@
 	import TopSongsList from '$lib/components/TopSongsList.svelte';
 	import TopAlbumsList from '$lib/components/TopAlbumsList.svelte';
 	import ArtistRemovedModal from '$lib/components/ArtistRemovedModal.svelte';
+	import SourceSwitcher from '$lib/components/SourceSwitcher.svelte';
+	import LastFmEnrichment from '$lib/components/LastFmEnrichment.svelte';
+	import LibraryAlbumsCarousel from '$lib/components/LibraryAlbumsCarousel.svelte';
 	import { requestAlbum } from '$lib/utils/albumRequest';
 	import { getArtistDiscoveryCache, setArtistDiscoveryCache } from '$lib/stores/discoveryCache';
+	import { integrationStore } from '$lib/stores/integration';
+	import { musicSourceStore, type MusicSource } from '$lib/stores/musicSource';
 
 	export let data: { artistId: string };
 
@@ -43,7 +48,12 @@
 	let similarArtists: SimilarArtistsResponse | null = null;
 	let topSongs: TopSongsResponse | null = null;
 	let topAlbums: TopAlbumsResponse | null = null;
-	let loadingDiscovery = true;
+	let loadingSimilar = true;
+	let loadingTopSongs = true;
+	let loadingTopAlbums = true;
+
+	let lastfmEnrichment: LastFmArtistEnrichment | null = null;
+	let loadingLastfm = true;
 
 	function sortReleasesByYear(releases: any[]) {
 		return releases.sort((a, b) => {
@@ -58,19 +68,25 @@
 	async function fetchArtist(force = false) {
 		if (!artist) loadingBasic = true;
 		if (!artist) loadingExtended = true;
-		if (!similarArtists && !topSongs && !topAlbums) loadingDiscovery = true;
+		if (!similarArtists && !topSongs && !topAlbums) {
+			loadingSimilar = true;
+			loadingTopSongs = true;
+			loadingTopAlbums = true;
+		}
 		error = null;
 		
 		if (abortController) {
 			abortController.abort();
 		}
 		abortController = new AbortController();
-		
+
+		await musicSourceStore.load();
 		await fetchBasicInfo(force);
 
 		if (artist) {
 			fetchExtendedInfo(force, artist);
-			await fetchDiscoveryData();
+			fetchLastFmEnrichment();
+			await fetchDiscoveryData(musicSourceStore.getPageSource('artist'));
 			if (hasMoreReleases) {
 				fetchMoreReleases();
 			}
@@ -147,34 +163,84 @@
 		}
 	}
 
-	async function fetchDiscoveryData() {
-		const cached = getArtistDiscoveryCache(data.artistId);
+	async function fetchDiscoveryData(sourceOverride?: MusicSource) {
+		const activeSource = sourceOverride ?? musicSourceStore.getPageSource('artist');
+		const cacheKey = `${data.artistId}:${activeSource}`;
+		const cached = getArtistDiscoveryCache(cacheKey);
 		if (cached) {
 			similarArtists = cached.similarArtists;
 			topSongs = cached.topSongs;
 			topAlbums = cached.topAlbums;
-			loadingDiscovery = false;
-		} else if (!similarArtists && !topSongs && !topAlbums) {
-			loadingDiscovery = true;
+			loadingSimilar = false;
+			loadingTopSongs = false;
+			loadingTopAlbums = false;
+			return;
 		}
 
+		similarArtists = null;
+		topSongs = null;
+		topAlbums = null;
+		loadingSimilar = true;
+		loadingTopSongs = true;
+		loadingTopAlbums = true;
+
+		const signal = abortController?.signal;
+
+		const similarPromise = fetch(`/api/artist/${data.artistId}/similar?count=15&source=${activeSource}`, { signal })
+			.then(async (res) => { if (res.ok) similarArtists = await res.json(); })
+			.catch((e) => { if (!(e instanceof Error && e.name === 'AbortError')) { /* ignore */ } })
+			.finally(() => { loadingSimilar = false; });
+
+		const songsPromise = fetch(`/api/artist/${data.artistId}/top-songs?count=10&source=${activeSource}`, { signal })
+			.then(async (res) => { if (res.ok) topSongs = await res.json(); })
+			.catch((e) => { if (!(e instanceof Error && e.name === 'AbortError')) { /* ignore */ } })
+			.finally(() => { loadingTopSongs = false; });
+
+		const albumsPromise = fetch(`/api/artist/${data.artistId}/top-albums?count=10&source=${activeSource}`, { signal })
+			.then(async (res) => { if (res.ok) topAlbums = await res.json(); })
+			.catch((e) => { if (!(e instanceof Error && e.name === 'AbortError')) { /* ignore */ } })
+			.finally(() => { loadingTopAlbums = false; });
+
+		await Promise.all([similarPromise, songsPromise, albumsPromise]);
+
+		setArtistDiscoveryCache(cacheKey, { similarArtists, topSongs, topAlbums });
+	}
+
+	async function fetchLastFmEnrichment() {
+		if (!artist) {
+			loadingLastfm = false;
+			return;
+		}
+		await integrationStore.ensureLoaded();
+		if (!$integrationStore.lastfm) {
+			loadingLastfm = false;
+			return;
+		}
+		loadingLastfm = true;
 		try {
-			const [similarRes, songsRes, albumsRes] = await Promise.all([
-				fetch(`/api/artist/${data.artistId}/similar`, { signal: abortController?.signal }),
-				fetch(`/api/artist/${data.artistId}/top-songs`, { signal: abortController?.signal }),
-				fetch(`/api/artist/${data.artistId}/top-albums`, { signal: abortController?.signal })
-			]);
-
-			if (similarRes.ok) similarArtists = await similarRes.json();
-			if (songsRes.ok) topSongs = await songsRes.json();
-			if (albumsRes.ok) topAlbums = await albumsRes.json();
-
-			setArtistDiscoveryCache(data.artistId, { similarArtists, topSongs, topAlbums });
+			const params = new URLSearchParams({ artist_name: artist.name });
+			const res = await fetch(
+				`/api/artist/${data.artistId}/lastfm?${params.toString()}`,
+				{ signal: abortController?.signal }
+			);
+			if (res.ok) {
+				lastfmEnrichment = await res.json();
+			}
 		} catch (e) {
 			if (e instanceof Error && e.name === 'AbortError') return;
 		} finally {
-			loadingDiscovery = false;
+			loadingLastfm = false;
 		}
+	}
+
+	function handleSourceChange(source: MusicSource) {
+		similarArtists = null;
+		topSongs = null;
+		topAlbums = null;
+		loadingSimilar = true;
+		loadingTopSongs = true;
+		loadingTopAlbums = true;
+		fetchDiscoveryData(source);
 	}
 	
 	async function fetchMoreReleases() {
@@ -239,10 +305,14 @@
 		artist = null;
 		loadingBasic = true;
 		loadingExtended = true;
-		loadingDiscovery = true;
+		loadingSimilar = true;
+		loadingTopSongs = true;
+		loadingTopAlbums = true;
+		loadingLastfm = true;
 		similarArtists = null;
 		topSongs = null;
 		topAlbums = null;
+		lastfmEnrichment = null;
 		error = null;
 		currentOffset = 50;
 		hasMoreReleases = false;
@@ -308,8 +378,8 @@
 			artist.in_library = false;
 			removedArtistName = result.artist_name || artist.name;
 			showArtistRemovedModal = true;
-			artist = artist;
 		}
+		artist = artist;
 	}
 </script>
 
@@ -351,28 +421,57 @@
 			{#if artist.tags.length > 0}
 				<div class="flex flex-wrap gap-2 justify-center sm:justify-start -mt-2">
 					{#each artist.tags.slice(0, 10) as tag}
-						<span class="badge badge-lg" style="background-color: {colors.primary}; color: {colors.secondary};">{tag}</span>
+						<a
+							href="/genre?name={encodeURIComponent(tag)}"
+							class="badge badge-lg cursor-pointer hover:opacity-80 transition-opacity"
+							style="background-color: {colors.primary}; color: {colors.secondary};"
+						>{tag}</a>
 					{/each}
 				</div>
 			{/if}
 
-			<ArtistDescription description={artist.description} loading={loadingExtended} />
+			{#if !lastfmEnrichment?.bio}
+				<ArtistDescription description={artist.description} loading={loadingExtended} />
+			{/if}
 
-			<!-- Discovery Section: Top Albums & Top Songs side by side -->
-			<div class="flex flex-col md:flex-row gap-6 mt-8 md:items-stretch">
+			{#if $integrationStore.lastfm}
+				<LastFmEnrichment
+					enrichment={lastfmEnrichment}
+					loading={loadingLastfm}
+					enabled={$integrationStore.lastfm}
+				/>
+			{/if}
+
+			<LibraryAlbumsCarousel
+				releases={[...artist.albums, ...artist.eps, ...artist.singles]}
+				artistName={artist.name}
+				loading={loadingBasic}
+			/>
+
+			<!-- Source Switcher (only visible when multiple sources available) -->
+			<div class="flex items-center justify-end mt-8 mb-4">
+				<SourceSwitcher
+					pageKey="artist"
+					onSourceChange={handleSourceChange}
+				/>
+			</div>
+
+			<div class="flex flex-col md:flex-row gap-6 md:items-stretch">
 				<div class="flex-1 min-w-0">
 					<TopAlbumsList 
 						albums={topAlbums?.albums || []} 
-						loading={loadingDiscovery} 
+						loading={loadingTopAlbums} 
 						configured={topAlbums?.configured ?? true} 
+						source={topAlbums?.source || ''}
 					/>
 				</div>
 				<div class="shrink-0 bg-base-content/25 h-px w-full md:w-px md:h-auto md:self-stretch" aria-hidden="true"></div>
 				<div class="flex-1 min-w-0">
 					<TopSongsList 
 						songs={topSongs?.songs || []} 
-						loading={loadingDiscovery} 
+						loading={loadingTopSongs} 
 						configured={topSongs?.configured ?? true} 
+						source={topSongs?.source || ''}
 					/>
 				</div>
 			</div>
@@ -381,7 +480,7 @@
 			<div class="mt-8">
 				<SimilarArtistsCarousel 
 					artists={similarArtists?.similar_artists || []} 
-					loading={loadingDiscovery} 
+					loading={loadingSimilar} 
 					configured={similarArtists?.configured ?? true} 
 				/>
 			</div>

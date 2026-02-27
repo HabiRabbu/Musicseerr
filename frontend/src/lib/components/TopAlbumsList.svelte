@@ -8,14 +8,16 @@
 	import { requestAlbum } from '$lib/utils/albumRequest';
 	import AlbumImage from './AlbumImage.svelte';
 	import LibraryBadge from './LibraryBadge.svelte';
+	import LastFmPlaceholder from './LastFmPlaceholder.svelte';
 
 	interface Props {
 		albums: TopAlbum[];
 		loading?: boolean;
 		configured?: boolean;
+		source?: string;
 	}
 
-	let { albums, loading = false, configured = true }: Props = $props();
+	let { albums, loading = false, configured = true, source = '' }: Props = $props();
 	let requestingIds = $state(new Set<string>());
 	
 	let libraryMbids = $state(new Set<string>());
@@ -90,7 +92,7 @@
 	{:else if !configured}
 		<div class="bg-base-200 rounded-lg p-4 text-center flex-1 flex items-center justify-center">
 			<div>
-				<p class="text-base-content/70 text-sm">Connect ListenBrainz to see popular albums</p>
+				<p class="text-base-content/70 text-sm">Connect a music service to see popular albums</p>
 				<a href="/settings" class="btn btn-primary btn-xs mt-2">Configure</a>
 			</div>
 		</div>
@@ -101,6 +103,7 @@
 	{:else}
 		<div class="space-y-1">
 			{#each albums as album}
+				{#if album.release_group_mbid}
 				<div
 					class="flex items-center gap-3 p-2 rounded-lg hover:bg-base-200 cursor-pointer transition-colors group"
 					role="button"
@@ -108,7 +111,6 @@
 					onclick={() => handleClick(album.release_group_mbid)}
 					onkeydown={(e) => e.key === 'Enter' && handleClick(album.release_group_mbid)}
 				>
-					{#if album.release_group_mbid}
 						<div class="w-12 h-12 flex-shrink-0 relative">
 							<AlbumImage mbid={album.release_group_mbid} alt={album.title} size="full" className="w-12 h-12 rounded" />
 							{#if isInLibrary(album)}
@@ -131,11 +133,6 @@
 								/>
 							{/if}
 						</div>
-					{:else}
-						<div class="w-12 h-12 flex-shrink-0 bg-base-300 rounded flex items-center justify-center">
-						<Music2 class="w-6 h-6 opacity-50" />
-						</div>
-					{/if}
 
 					<div class="flex-1 min-w-0">
 						<p class="font-medium text-sm truncate">{album.title}</p>
@@ -148,7 +145,7 @@
 						</p>
 					</div>
 
-					{#if album.release_group_mbid && !isInLibrary(album) && !isRequested(album)}
+					{#if !isInLibrary(album) && !isRequested(album)}
 						<button
 							type="button"
 							class="btn btn-circle btn-sm opacity-0 group-hover:opacity-100 transition-all flex-shrink-0 hover:scale-110 hover:brightness-110"
@@ -169,6 +166,26 @@
 						</button>
 					{/if}
 				</div>
+				{:else}
+				<div class="flex items-center gap-3 p-2 rounded-lg transition-colors {source === 'lastfm' ? 'opacity-75' : ''}">
+					{#if source === 'lastfm'}
+						<LastFmPlaceholder />
+					{:else}
+						<div class="w-12 h-12 flex-shrink-0 bg-base-300 rounded flex items-center justify-center">
+							<Music2 class="w-6 h-6 opacity-50" />
+						</div>
+					{/if}
+
+					<div class="flex-1 min-w-0">
+						<p class="font-medium text-sm truncate">{album.title}</p>
+						<p class="text-xs text-base-content/50 truncate">
+							{#if album.listen_count}
+								{album.listen_count.toLocaleString()} plays
+							{/if}
+						</p>
+					</div>
+				</div>
+				{/if}
 			{/each}
 		</div>
 	{/if}

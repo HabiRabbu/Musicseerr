@@ -8,6 +8,7 @@ from services.album_utils import parse_year, find_primary_release, extract_artis
 from infrastructure.cache.persistent_cache import LibraryCache
 from infrastructure.cache.memory_cache import CacheInterface
 from infrastructure.cache.disk_cache import DiskMetadataCache
+from infrastructure.cover_urls import prefer_release_group_cover_url
 from infrastructure.validators import validate_mbid
 from core.exceptions import ResourceNotFoundError
 
@@ -365,7 +366,11 @@ class AlbumService:
             except (ValueError, IndexError):
                 pass
 
-        cover_url = lidarr_album.get("cover_url")
+        cover_url = prefer_release_group_cover_url(
+            release_group_id,
+            lidarr_album.get("cover_url"),
+            size=500,
+        )
 
         return AlbumInfo(
             title=lidarr_album.get("title", "Unknown Album"),

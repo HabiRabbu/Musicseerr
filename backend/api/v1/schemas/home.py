@@ -7,6 +7,7 @@ class HomeArtist(BaseModel):
     image_url: str | None = Field(default=None, description="Artist image URL")
     listen_count: int | None = Field(default=None, description="Total listen count")
     in_library: bool = Field(default=False, description="Whether artist is in Lidarr library")
+    source: str | None = Field(default=None, description="Data source (listenbrainz, lastfm, etc.)")
 
 
 class HomeAlbum(BaseModel):
@@ -19,6 +20,7 @@ class HomeAlbum(BaseModel):
     listen_count: int | None = Field(default=None, description="Total listen count")
     in_library: bool = Field(default=False, description="Whether album is in library")
     requested: bool = Field(default=False, description="Whether album is requested/in queue")
+    source: str | None = Field(default=None, description="Data source (listenbrainz, lastfm, etc.)")
 
 
 class HomeTrack(BaseModel):
@@ -29,6 +31,7 @@ class HomeTrack(BaseModel):
     album_name: str | None = Field(default=None, description="Album name")
     listen_count: int | None = Field(default=None, description="Listen count")
     listened_at: str | None = Field(default=None, description="When the track was listened to")
+    image_url: str | None = Field(default=None, description="Track or album image URL")
 
 
 class HomeGenre(BaseModel):
@@ -101,6 +104,9 @@ class HomeResponse(BaseModel):
     )
     favorite_artists: HomeSection | None = Field(
         default=None, description="User's favorite artists"
+    )
+    your_top_albums: HomeSection | None = Field(
+        default=None, description="User's personal top albums from listening history"
     )
     service_prompts: list[ServicePrompt] = Field(
         default_factory=list,

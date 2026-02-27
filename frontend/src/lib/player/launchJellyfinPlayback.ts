@@ -2,6 +2,7 @@ import { playerStore } from '$lib/stores/player.svelte';
 import { API } from '$lib/constants';
 import type { PlaybackMeta, QueueItem } from '$lib/player/types';
 import type { JellyfinTrackInfo } from '$lib/types';
+import { getCoverUrl } from '$lib/utils/errorHandling';
 
 const SUPPORTED_CODECS = new Set(['aac', 'mp3', 'opus', 'flac', 'wav', 'wma', 'vorbis', 'alac']);
 const CODEC_ALIASES: Record<string, string> = {
@@ -22,6 +23,8 @@ export function launchJellyfinPlayback(
 	shuffle: boolean = false,
 	meta: PlaybackMeta
 ): void {
+	const normalizedCoverUrl = getCoverUrl(meta.coverUrl, meta.albumId);
+
 	const items: QueueItem[] = tracks.map((t) => {
 		const format = normalizeCodec(t.codec);
 		return {
@@ -31,7 +34,7 @@ export function launchJellyfinPlayback(
 			trackNumber: t.track_number,
 			albumId: meta.albumId,
 			albumName: meta.albumName,
-			coverUrl: meta.coverUrl,
+			coverUrl: normalizedCoverUrl,
 			sourceType: 'jellyfin' as const,
 			artistId: meta.artistId,
 			streamUrl: API.stream.jellyfin(t.jellyfin_id, format),

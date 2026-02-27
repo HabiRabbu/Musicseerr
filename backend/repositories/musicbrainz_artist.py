@@ -12,6 +12,7 @@ from repositories.musicbrainz_base import (
     mb_deduplicator,
     dedupe_by_id,
     get_score,
+    build_musicbrainz_tag_query,
 )
 
 logger = logging.getLogger(__name__)
@@ -111,7 +112,7 @@ class MusicBrainzArtistMixin:
             result = await mb_api_get(
                 "/artist",
                 params={
-                    "query": f"tag:{tag.lower()}",
+                    "query": build_musicbrainz_tag_query(tag),
                     "limit": min(100, limit),
                     "offset": offset,
                 },

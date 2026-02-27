@@ -13,6 +13,7 @@ from api.v1.schemas.requests_page import (
     RetryRequestResponse,
     StatusMessage,
 )
+from infrastructure.cover_urls import prefer_release_group_cover_url
 from infrastructure.cache.request_history import RequestHistoryRecord, RequestHistoryStore
 from repositories.protocols import LidarrRepositoryProtocol
 from services.request_utils import extract_cover_url, parse_eta, resolve_display_status
@@ -296,7 +297,11 @@ class RequestsPageService:
         album_data = queue_item.get("album", {})
         artist_data = album_data.get("artist", {}) or queue_item.get("artist", {})
 
-        cover_url = record.cover_url or extract_cover_url(album_data)
+        cover_url = prefer_release_group_cover_url(
+            record.musicbrainz_id,
+            record.cover_url or extract_cover_url(album_data),
+            size=500,
+        )
         artist_mbid = record.artist_mbid or artist_data.get("foreignArtistId")
 
         size = queue_item.get("size")
@@ -348,7 +353,11 @@ class RequestsPageService:
             album_title=record.album_title,
             artist_mbid=record.artist_mbid,
             year=record.year,
-            cover_url=record.cover_url,
+            cover_url=prefer_release_group_cover_url(
+                record.musicbrainz_id,
+                record.cover_url,
+                size=500,
+            ),
             requested_at=datetime.fromisoformat(record.requested_at),
             status=record.status,
             progress=None,

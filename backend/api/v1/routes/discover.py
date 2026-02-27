@@ -1,4 +1,5 @@
 import logging
+from typing import Literal
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from api.v1.schemas.discover import (
     DiscoverResponse,
@@ -7,12 +8,16 @@ from api.v1.schemas.discover import (
     DiscoverQueueIgnoreRequest,
     DiscoverQueueValidateRequest,
     DiscoverQueueValidateResponse,
+    QueueStatusResponse,
+    QueueGenerateRequest,
+    QueueGenerateResponse,
     YouTubeSearchResponse,
     YouTubeQuotaResponse,
 )
-from core.dependencies import get_discover_service, get_youtube_repo
+from core.dependencies import get_discover_service, get_discover_queue_manager, get_youtube_repo
 from repositories.youtube import YouTubeRepository
 from services.discover_service import DiscoverService
+from services.discover_queue_manager import DiscoverQueueManager
 
 logger = logging.getLogger(__name__)
 
@@ -21,10 +26,11 @@ router = APIRouter(prefix="/api/discover", tags=["discover"])
 
 @router.get("", response_model=DiscoverResponse)
 async def get_discover_data(
+    source: Literal["listenbrainz", "lastfm"] | None = Query(default=None, description="Data source: listenbrainz or lastfm"),
     discover_service: DiscoverService = Depends(get_discover_service),
 ):
     try:
-        return await discover_service.get_discover_data()
+        return await discover_service.get_discover_data(source=source)
     except Exception as e:
         logger.error(f"Failed to get discover data: {e}")
         raise HTTPException(status_code=500, detail="Failed to load discover page")
@@ -44,14 +50,47 @@ async def refresh_discover_data(
 
 @router.get("/queue", response_model=DiscoverQueueResponse)
 async def get_discover_queue(
-    count: int = 10,
+    count: int | None = Query(default=None, description="Number of items (default from settings, max 20)"),
+    source: Literal["listenbrainz", "lastfm"] | None = Query(default=None, description="Data source: listenbrainz or lastfm"),
     discover_service: DiscoverService = Depends(get_discover_service),
+    queue_manager: DiscoverQueueManager = Depends(get_discover_queue_manager),
 ):
     try:
-        return await discover_service.build_queue(count=min(count, 20))
+        resolved = source or discover_service.resolve_source(None)
+        cached = await queue_manager.consume_queue(resolved)
+        if cached:
+            logger.info("Serving pre-built discover queue (source=%s, items=%d)", resolved, len(cached.items))
+            return cached
+        effective_count = min(count, 20) if count is not None else None
+        return await queue_manager.build_hydrated_queue(resolved, effective_count)
     except Exception as e:
         logger.error(f"Failed to build discover queue: {e}")
         raise HTTPException(status_code=500, detail="Failed to build discover queue")
+
+
+@router.get("/queue/status", response_model=QueueStatusResponse)
+async def get_queue_status(
+    source: Literal["listenbrainz", "lastfm"] | None = Query(default=None, description="Data source"),
+    discover_service: DiscoverService = Depends(get_discover_service),
+    queue_manager: DiscoverQueueManager = Depends(get_discover_queue_manager),
+):
+    resolved = source or discover_service.resolve_source(None)
+    return queue_manager.get_status(resolved)
+
+
+@router.post("/queue/generate", response_model=QueueGenerateResponse)
+async def generate_queue(
+    body: QueueGenerateRequest,
+    discover_service: DiscoverService = Depends(get_discover_service),
+    queue_manager: DiscoverQueueManager = Depends(get_discover_queue_manager),
+):
+    try:
+        resolved = body.source or discover_service.resolve_source(None)
+        result = await queue_manager.start_build(resolved, force=body.force)
+        return result
+    except Exception as e:
+        logger.error(f"Failed to trigger queue generation: {e}")
+        raise HTTPException(status_code=500, detail="Failed to trigger queue generation")
 
 
 @router.get("/queue/enrich/{release_group_mbid}", response_model=DiscoverQueueEnrichment)

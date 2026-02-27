@@ -1,6 +1,62 @@
 from pydantic import BaseModel, Field, field_validator
 from typing import Literal
 
+LASTFM_SECRET_MASK = "••••••••"
+
+
+def _mask_secret(value: str) -> str:
+    if not value:
+        return ""
+    if len(value) <= 4:
+        return LASTFM_SECRET_MASK
+    return LASTFM_SECRET_MASK + value[-4:]
+
+
+class LastFmConnectionSettings(BaseModel):
+    api_key: str = Field(default="", description="Last.fm API key")
+    shared_secret: str = Field(default="", description="Last.fm shared secret")
+    session_key: str = Field(default="", description="Last.fm session key (obtained via auth flow)")
+    username: str = Field(default="", description="Last.fm username (set after authorization)")
+    enabled: bool = Field(default=False, description="Whether Last.fm integration is enabled")
+
+
+class LastFmConnectionSettingsResponse(BaseModel):
+    api_key: str = Field(default="", description="Last.fm API key (returned in full)")
+    shared_secret: str = Field(default="", description="Last.fm shared secret (masked)")
+    session_key: str = Field(default="", description="Last.fm session key (masked)")
+    username: str = Field(default="", description="Last.fm username")
+    enabled: bool = Field(default=False, description="Whether Last.fm integration is enabled")
+
+    @classmethod
+    def from_settings(cls, settings: LastFmConnectionSettings) -> "LastFmConnectionSettingsResponse":
+        return cls(
+            api_key=settings.api_key,
+            shared_secret=_mask_secret(settings.shared_secret),
+            session_key=_mask_secret(settings.session_key),
+            username=settings.username,
+            enabled=settings.enabled,
+        )
+
+
+class LastFmVerifyResponse(BaseModel):
+    valid: bool = Field(description="Whether the connection is valid")
+    message: str = Field(description="Status message")
+
+
+class LastFmAuthTokenResponse(BaseModel):
+    token: str = Field(description="Last.fm request token")
+    auth_url: str = Field(description="URL to authorize the token on Last.fm")
+
+
+class LastFmAuthSessionRequest(BaseModel):
+    token: str = Field(description="Last.fm request token to exchange for a session")
+
+
+class LastFmAuthSessionResponse(BaseModel):
+    username: str = Field(default="", description="Last.fm username")
+    success: bool = Field(description="Whether session exchange succeeded")
+    message: str = Field(description="Status message")
+
 
 class UserPreferences(BaseModel):
     primary_types: list[str] = Field(
@@ -174,6 +230,22 @@ class LidarrVerifyResponse(BaseModel):
 class LidarrMetadataProfileSummary(BaseModel):
     id: int = Field(description="Lidarr metadata profile ID")
     name: str = Field(description="Lidarr metadata profile name")
+
+
+class ScrobbleSettings(BaseModel):
+    scrobble_to_lastfm: bool = Field(
+        default=False, description="Whether to send scrobbles to Last.fm"
+    )
+    scrobble_to_listenbrainz: bool = Field(
+        default=False, description="Whether to send scrobbles to ListenBrainz"
+    )
+
+
+class PrimaryMusicSourceSettings(BaseModel):
+    source: Literal["listenbrainz", "lastfm"] = Field(
+        default="listenbrainz",
+        description="Primary music data source for home/discover pages",
+    )
 
 
 class LidarrMetadataProfilePreferences(BaseModel):

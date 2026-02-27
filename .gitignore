@@ -1,5 +1,7 @@
 .github/
 
+.Trash-1000
+
 # Cache directory
 cache/
 
@@ -16,6 +18,7 @@ __pycache__/
 # Python virtual environments
 .venv/
 .pytest_cache
+.mypy_cache/
 backend/.venv/
 backend/.ruff*
 venv/

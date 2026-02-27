@@ -1,6 +1,8 @@
 from typing import Literal, Optional
 from pydantic import BaseModel, Field
 
+EnrichmentSource = Literal["listenbrainz", "lastfm", "none"]
+
 
 class SearchResult(BaseModel):
     type: str
@@ -33,10 +35,26 @@ class AlbumEnrichment(BaseModel):
     listen_count: Optional[int] = None
 
 
+class ArtistEnrichmentRequest(BaseModel):
+    musicbrainz_id: str
+    name: str = ""
+
+
+class AlbumEnrichmentRequest(BaseModel):
+    musicbrainz_id: str
+    artist_name: str = ""
+    album_name: str = ""
+
+
+class EnrichmentBatchRequest(BaseModel):
+    artists: list[ArtistEnrichmentRequest] = Field(default_factory=list)
+    albums: list[AlbumEnrichmentRequest] = Field(default_factory=list)
+
+
 class EnrichmentResponse(BaseModel):
     artists: list[ArtistEnrichment] = Field(default_factory=list)
     albums: list[AlbumEnrichment] = Field(default_factory=list)
-    listenbrainz_enabled: bool = False
+    source: EnrichmentSource = "none"
 
 
 class SuggestResult(BaseModel):

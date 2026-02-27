@@ -27,6 +27,18 @@ class AdvancedSettings(BaseModel):
         le=604800,
         description="TTL for non-library artist data in seconds"
     )
+    cache_ttl_artist_discovery_library: int = Field(
+        default=21600,
+        ge=3600,
+        le=604800,
+        description="TTL for library artist discovery data in seconds"
+    )
+    cache_ttl_artist_discovery_non_library: int = Field(
+        default=3600,
+        ge=3600,
+        le=604800,
+        description="TTL for non-library artist discovery data in seconds"
+    )
     cache_ttl_search: int = Field(
         default=3600,
         ge=60,
@@ -113,6 +125,24 @@ class AdvancedSettings(BaseModel):
         le=5.0,
         description="Delay between album batch operations in seconds"
     )
+    artist_discovery_warm_interval: int = Field(
+        default=14400,
+        ge=300,
+        le=604800,
+        description="Interval for periodic artist discovery cache warming in seconds"
+    )
+    artist_discovery_warm_delay: float = Field(
+        default=0.5,
+        ge=0.0,
+        le=5.0,
+        description="Delay between artists during periodic discovery warming in seconds"
+    )
+    artist_discovery_precache_delay: float = Field(
+        default=0.3,
+        ge=0.0,
+        le=5.0,
+        description="Delay between artists during library-sync discovery precache in seconds"
+    )
     
     memory_cache_max_entries: int = Field(
         default=10000,
@@ -125,6 +155,20 @@ class AdvancedSettings(BaseModel):
         ge=60,
         le=3600,
         description="Interval for expired entry cleanup in seconds"
+    )
+
+    cover_memory_cache_max_entries: int = Field(
+        default=128,
+        ge=16,
+        le=2048,
+        description="Maximum entries in cover in-memory LRU cache"
+    )
+
+    cover_memory_cache_max_size_mb: int = Field(
+        default=16,
+        ge=1,
+        le=1024,
+        description="Maximum total size for cover in-memory LRU cache in MB"
     )
     
     disk_cache_cleanup_interval: int = Field(
@@ -160,6 +204,69 @@ class AdvancedSettings(BaseModel):
         ge=2,
         le=5,
         description="Max concurrent MusicBrainz API requests for parallel search"
+    )
+
+    discover_queue_size: int = Field(
+        default=10,
+        ge=1,
+        le=20,
+        description="Number of albums in a generated discover queue"
+    )
+    discover_queue_ttl: int = Field(
+        default=86400,
+        ge=3600,
+        le=604800,
+        description="How long a pre-built queue stays fresh in seconds"
+    )
+    discover_queue_auto_generate: bool = Field(
+        default=True,
+        description="Automatically generate a queue when visiting the Discover page"
+    )
+    discover_queue_polling_interval: int = Field(
+        default=4000,
+        ge=1000,
+        le=30000,
+        description="Frontend polling interval for queue build status in milliseconds"
+    )
+    discover_queue_warm_cycle_build: bool = Field(
+        default=True,
+        description="Pre-build discover queue during periodic warm cycle"
+    )
+    discover_queue_seed_artists: int = Field(
+        default=3,
+        ge=1,
+        le=10,
+        description="Number of seed artists used for queue generation"
+    )
+    discover_queue_wildcard_slots: int = Field(
+        default=2,
+        ge=0,
+        le=10,
+        description="Number of wildcard album slots in the queue"
+    )
+    discover_queue_similar_artists_limit: int = Field(
+        default=15,
+        ge=5,
+        le=50,
+        description="Max similar artists fetched per seed"
+    )
+    discover_queue_albums_per_similar: int = Field(
+        default=5,
+        ge=1,
+        le=20,
+        description="Max top albums fetched per similar artist"
+    )
+    discover_queue_enrich_ttl: int = Field(
+        default=86400,
+        ge=3600,
+        le=604800,
+        description="TTL for queue item enrichment data in seconds"
+    )
+    discover_queue_lastfm_mbid_max_lookups: int = Field(
+        default=10,
+        ge=1,
+        le=50,
+        description="Max MusicBrainz lookups for Last.fm release-to-release-group MBID resolution"
     )
 
     frontend_ttl_home: int = Field(
@@ -221,6 +328,8 @@ class FrontendCacheTTLs(BaseModel):
     search: int = Field(default=300000, description="Search/Discovery cache TTL in ms")
     local_files_sidebar: int = Field(default=120000, description="Local Files sidebar cache TTL in ms")
     jellyfin_sidebar: int = Field(default=120000, description="Jellyfin sidebar cache TTL in ms")
+    discover_queue_polling_interval: int = Field(default=4000, description="Discover queue build status polling interval in ms")
+    discover_queue_auto_generate: bool = Field(default=True, description="Auto-generate queue on page visit")
 
 
 class AdvancedSettingsFrontend(BaseModel):
@@ -248,6 +357,18 @@ class AdvancedSettingsFrontend(BaseModel):
         ge=1,
         le=168,
         description="TTL for non-library artist data in hours"
+    )
+    cache_ttl_artist_discovery_library: int = Field(
+        default=6,
+        ge=1,
+        le=168,
+        description="TTL for library artist discovery data in hours"
+    )
+    cache_ttl_artist_discovery_non_library: int = Field(
+        default=1,
+        ge=1,
+        le=168,
+        description="TTL for non-library artist discovery data in hours"
     )
     cache_ttl_search: int = Field(
         default=60,
@@ -335,6 +456,24 @@ class AdvancedSettingsFrontend(BaseModel):
         le=5.0,
         description="Delay between album batch operations in seconds"
     )
+    artist_discovery_warm_interval: int = Field(
+        default=240,
+        ge=5,
+        le=10080,
+        description="Interval for periodic artist discovery cache warming in minutes"
+    )
+    artist_discovery_warm_delay: float = Field(
+        default=0.5,
+        ge=0.0,
+        le=5.0,
+        description="Delay between artists during periodic discovery warming in seconds"
+    )
+    artist_discovery_precache_delay: float = Field(
+        default=0.3,
+        ge=0.0,
+        le=5.0,
+        description="Delay between artists during library-sync discovery precache in seconds"
+    )
     
     memory_cache_max_entries: int = Field(
         default=10000,
@@ -347,6 +486,20 @@ class AdvancedSettingsFrontend(BaseModel):
         ge=60,
         le=3600,
         description="Interval for expired entry cleanup in seconds"
+    )
+
+    cover_memory_cache_max_entries: int = Field(
+        default=128,
+        ge=16,
+        le=2048,
+        description="Maximum entries in cover in-memory LRU cache"
+    )
+
+    cover_memory_cache_max_size_mb: int = Field(
+        default=16,
+        ge=1,
+        le=1024,
+        description="Maximum total size for cover in-memory LRU cache in MB"
     )
     
     disk_cache_cleanup_interval: int = Field(
@@ -382,6 +535,69 @@ class AdvancedSettingsFrontend(BaseModel):
         ge=2,
         le=5,
         description="Max concurrent MusicBrainz API requests for parallel search"
+    )
+
+    discover_queue_size: int = Field(
+        default=10,
+        ge=1,
+        le=20,
+        description="Number of albums in a generated discover queue"
+    )
+    discover_queue_ttl: int = Field(
+        default=24,
+        ge=1,
+        le=168,
+        description="How long a pre-built queue stays fresh in hours"
+    )
+    discover_queue_auto_generate: bool = Field(
+        default=True,
+        description="Automatically generate a queue when visiting the Discover page"
+    )
+    discover_queue_polling_interval: int = Field(
+        default=4,
+        ge=1,
+        le=30,
+        description="Frontend polling interval for queue build status in seconds"
+    )
+    discover_queue_warm_cycle_build: bool = Field(
+        default=True,
+        description="Pre-build discover queue during periodic warm cycle"
+    )
+    discover_queue_seed_artists: int = Field(
+        default=3,
+        ge=1,
+        le=10,
+        description="Number of seed artists used for queue generation"
+    )
+    discover_queue_wildcard_slots: int = Field(
+        default=2,
+        ge=0,
+        le=10,
+        description="Number of wildcard album slots in the queue"
+    )
+    discover_queue_similar_artists_limit: int = Field(
+        default=15,
+        ge=5,
+        le=50,
+        description="Max similar artists fetched per seed"
+    )
+    discover_queue_albums_per_similar: int = Field(
+        default=5,
+        ge=1,
+        le=20,
+        description="Max top albums fetched per similar artist"
+    )
+    discover_queue_enrich_ttl: int = Field(
+        default=24,
+        ge=1,
+        le=168,
+        description="TTL for queue item enrichment data in hours"
+    )
+    discover_queue_lastfm_mbid_max_lookups: int = Field(
+        default=10,
+        ge=1,
+        le=50,
+        description="Max MusicBrainz lookups for Last.fm MBID resolution"
     )
 
     frontend_ttl_home: int = Field(
@@ -438,6 +654,8 @@ class AdvancedSettingsFrontend(BaseModel):
         'cache_ttl_album_non_library', 
         'cache_ttl_artist_library',
         'cache_ttl_artist_non_library',
+        'cache_ttl_artist_discovery_library',
+        'cache_ttl_artist_discovery_non_library',
         'cache_ttl_search',
         'cache_ttl_local_files_recently_added',
         'cache_ttl_local_files_storage_stats',
@@ -466,6 +684,8 @@ class AdvancedSettingsFrontend(BaseModel):
             cache_ttl_album_non_library=settings.cache_ttl_album_non_library // 3600,
             cache_ttl_artist_library=settings.cache_ttl_artist_library // 3600,
             cache_ttl_artist_non_library=settings.cache_ttl_artist_non_library // 3600,
+            cache_ttl_artist_discovery_library=settings.cache_ttl_artist_discovery_library // 3600,
+            cache_ttl_artist_discovery_non_library=settings.cache_ttl_artist_discovery_non_library // 3600,
             cache_ttl_search=settings.cache_ttl_search // 60,
             cache_ttl_local_files_recently_added=settings.cache_ttl_local_files_recently_added // 60,
             cache_ttl_local_files_storage_stats=settings.cache_ttl_local_files_storage_stats // 60,
@@ -480,13 +700,29 @@ class AdvancedSettingsFrontend(BaseModel):
             batch_albums=settings.batch_albums,
             delay_artist=settings.delay_artist,
             delay_albums=settings.delay_albums,
+            artist_discovery_warm_interval=settings.artist_discovery_warm_interval // 60,
+            artist_discovery_warm_delay=settings.artist_discovery_warm_delay,
+            artist_discovery_precache_delay=settings.artist_discovery_precache_delay,
             memory_cache_max_entries=settings.memory_cache_max_entries,
             memory_cache_cleanup_interval=settings.memory_cache_cleanup_interval,
+            cover_memory_cache_max_entries=settings.cover_memory_cache_max_entries,
+            cover_memory_cache_max_size_mb=settings.cover_memory_cache_max_size_mb,
             disk_cache_cleanup_interval=settings.disk_cache_cleanup_interval // 60,
             recent_metadata_max_size_mb=settings.recent_metadata_max_size_mb,
             recent_covers_max_size_mb=settings.recent_covers_max_size_mb,
             persistent_metadata_ttl_hours=settings.persistent_metadata_ttl_hours,
             musicbrainz_concurrent_searches=settings.musicbrainz_concurrent_searches,
+            discover_queue_size=settings.discover_queue_size,
+            discover_queue_ttl=settings.discover_queue_ttl // 3600,
+            discover_queue_auto_generate=settings.discover_queue_auto_generate,
+            discover_queue_polling_interval=settings.discover_queue_polling_interval // 1000,
+            discover_queue_warm_cycle_build=settings.discover_queue_warm_cycle_build,
+            discover_queue_seed_artists=settings.discover_queue_seed_artists,
+            discover_queue_wildcard_slots=settings.discover_queue_wildcard_slots,
+            discover_queue_similar_artists_limit=settings.discover_queue_similar_artists_limit,
+            discover_queue_albums_per_similar=settings.discover_queue_albums_per_similar,
+            discover_queue_enrich_ttl=settings.discover_queue_enrich_ttl // 3600,
+            discover_queue_lastfm_mbid_max_lookups=settings.discover_queue_lastfm_mbid_max_lookups,
             frontend_ttl_home=settings.frontend_ttl_home // 60000,
             frontend_ttl_discover=settings.frontend_ttl_discover // 60000,
             frontend_ttl_library=settings.frontend_ttl_library // 60000,
@@ -503,6 +739,8 @@ class AdvancedSettingsFrontend(BaseModel):
             cache_ttl_album_non_library=self.cache_ttl_album_non_library * 3600,
             cache_ttl_artist_library=self.cache_ttl_artist_library * 3600,
             cache_ttl_artist_non_library=self.cache_ttl_artist_non_library * 3600,
+            cache_ttl_artist_discovery_library=self.cache_ttl_artist_discovery_library * 3600,
+            cache_ttl_artist_discovery_non_library=self.cache_ttl_artist_discovery_non_library * 3600,
             cache_ttl_search=self.cache_ttl_search * 60,
             cache_ttl_local_files_recently_added=self.cache_ttl_local_files_recently_added * 60,
             cache_ttl_local_files_storage_stats=self.cache_ttl_local_files_storage_stats * 60,
@@ -517,13 +755,29 @@ class AdvancedSettingsFrontend(BaseModel):
             batch_albums=self.batch_albums,
             delay_artist=self.delay_artist,
             delay_albums=self.delay_albums,
+            artist_discovery_warm_interval=self.artist_discovery_warm_interval * 60,
+            artist_discovery_warm_delay=self.artist_discovery_warm_delay,
+            artist_discovery_precache_delay=self.artist_discovery_precache_delay,
             memory_cache_max_entries=self.memory_cache_max_entries,
             memory_cache_cleanup_interval=self.memory_cache_cleanup_interval,
+            cover_memory_cache_max_entries=self.cover_memory_cache_max_entries,
+            cover_memory_cache_max_size_mb=self.cover_memory_cache_max_size_mb,
             disk_cache_cleanup_interval=self.disk_cache_cleanup_interval * 60,
             recent_metadata_max_size_mb=self.recent_metadata_max_size_mb,
             recent_covers_max_size_mb=self.recent_covers_max_size_mb,
             persistent_metadata_ttl_hours=self.persistent_metadata_ttl_hours,
             musicbrainz_concurrent_searches=self.musicbrainz_concurrent_searches,
+            discover_queue_size=self.discover_queue_size,
+            discover_queue_ttl=self.discover_queue_ttl * 3600,
+            discover_queue_auto_generate=self.discover_queue_auto_generate,
+            discover_queue_polling_interval=self.discover_queue_polling_interval * 1000,
+            discover_queue_warm_cycle_build=self.discover_queue_warm_cycle_build,
+            discover_queue_seed_artists=self.discover_queue_seed_artists,
+            discover_queue_wildcard_slots=self.discover_queue_wildcard_slots,
+            discover_queue_similar_artists_limit=self.discover_queue_similar_artists_limit,
+            discover_queue_albums_per_similar=self.discover_queue_albums_per_similar,
+            discover_queue_enrich_ttl=self.discover_queue_enrich_ttl * 3600,
+            discover_queue_lastfm_mbid_max_lookups=self.discover_queue_lastfm_mbid_max_lookups,
             frontend_ttl_home=self.frontend_ttl_home * 60000,
             frontend_ttl_discover=self.frontend_ttl_discover * 60000,
             frontend_ttl_library=self.frontend_ttl_library * 60000,

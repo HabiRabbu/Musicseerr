@@ -3,7 +3,7 @@
 	import { toastStore } from '$lib/stores/toast';
 	import YouTubeIcon from '$lib/components/YouTubeIcon.svelte';
 	import AlbumImage from '$lib/components/AlbumImage.svelte';
-	import { throwOnApiError } from '$lib/utils/errorHandling';
+	import { throwOnApiError, getCoverUrl } from '$lib/utils/errorHandling';
 	import type { YouTubeLink, Album } from '$lib/types';
 	import { X } from 'lucide-svelte';
 
@@ -37,7 +37,7 @@
 			albumName = editLink.album_name;
 			artistName = editLink.artist_name;
 			youtubeUrl = editLink.video_id ? `https://www.youtube.com/watch?v=${editLink.video_id}` : '';
-			coverUrl = editLink.cover_url || '';
+			coverUrl = getCoverUrl(editLink.cover_url, editLink.album_id);
 			selectedAlbumId = editLink.album_id;
 			mode = 'manual';
 		} else if (open && !editLink) {
@@ -79,7 +79,7 @@
 	function selectAlbum(album: Album): void {
 		albumName = album.title;
 		artistName = album.artist || '';
-		coverUrl = album.cover_url || `/api/covers/release-group/${album.musicbrainz_id}?size=250`;
+		coverUrl = getCoverUrl(album.cover_url, album.musicbrainz_id);
 		selectedAlbumId = album.musicbrainz_id;
 		searchResults = [];
 		searchQuery = '';
@@ -89,6 +89,10 @@
 	async function handleSave(): Promise<void> {
 		if (!isValid) return;
 		saving = true;
+		const trimmedCoverUrl = coverUrl.trim() || null;
+		const normalizedCoverUrl = selectedAlbumId
+			? getCoverUrl(trimmedCoverUrl, selectedAlbumId)
+			: trimmedCoverUrl;
 
 		try {
 			if (isEditing && selectedAlbumId) {
@@ -99,7 +103,7 @@
 						youtube_url: youtubeUrl.trim(),
 						album_name: albumName.trim(),
 						artist_name: artistName.trim(),
-						cover_url: coverUrl.trim() || null
+						cover_url: normalizedCoverUrl
 					})
 				});
 				await throwOnApiError(res, 'Failed to update');
@@ -114,7 +118,7 @@
 						album_name: albumName.trim(),
 						artist_name: artistName.trim(),
 						youtube_url: youtubeUrl.trim(),
-						cover_url: coverUrl.trim() || null,
+						cover_url: normalizedCoverUrl,
 						album_id: selectedAlbumId
 					})
 				});

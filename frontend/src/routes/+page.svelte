@@ -1,12 +1,14 @@
 <script lang="ts">
-import { Shield, ArrowRight, Compass, Music } from 'lucide-svelte';
+	import { Shield, Music, ArrowRight } from 'lucide-svelte';
 	import { onMount, onDestroy } from 'svelte';
 	import { beforeNavigate } from '$app/navigation';
 	import HomeSection from '$lib/components/HomeSection.svelte';
 	import ServicePromptCard from '$lib/components/ServicePromptCard.svelte';
 	import GenreGrid from '$lib/components/GenreGrid.svelte';
+	import SourceSwitcher from '$lib/components/SourceSwitcher.svelte';
 	import type { HomeResponse, HomeSection as HomeSectionType } from '$lib/types';
 	import { integrationStore } from '$lib/stores/integration';
+	import { musicSourceStore, type MusicSource } from '$lib/stores/musicSource';
 	import CarouselSkeleton from '$lib/components/CarouselSkeleton.svelte';
 	import PageHeader from '$lib/components/PageHeader.svelte';
 	import {
@@ -15,7 +17,7 @@ import { Shield, ArrowRight, Compass, Music } from 'lucide-svelte';
 		isHomeCacheStale,
 		getGreeting
 	} from '$lib/utils/homeCache';
-	import { formatLastUpdated } from '$lib/utils/formatting';
+	import { removeQueueCachedData } from '$lib/utils/discoverQueueCache';
 
 	let homeData: HomeResponse | null = null;
 	let loading = true;
@@ -24,15 +26,21 @@ import { Shield, ArrowRight, Compass, Music } from 'lucide-svelte';
 	let error = '';
 	let lastUpdated: Date | null = null;
 	let abortController: AbortController | null = null;
+	let activeSource: MusicSource = 'listenbrainz';
 
-	async function loadHomeData(forceRefresh = false) {
-		const cached = getHomeCachedData();
+	function resolveHomeSource(source?: MusicSource): MusicSource {
+		return source ?? activeSource;
+	}
+
+	async function loadHomeData(forceRefresh = false, sourceOverride?: MusicSource) {
+		const source = resolveHomeSource(sourceOverride);
+		const cached = getHomeCachedData(source);
 		if (cached && !forceRefresh) {
 			homeData = cached.data;
 			lastUpdated = new Date(cached.timestamp);
 			loading = false;
 			if (isHomeCacheStale(cached.timestamp)) {
-				refreshInBackground();
+				refreshInBackground(source);
 			}
 			return;
 		}
@@ -49,12 +57,14 @@ import { Shield, ArrowRight, Compass, Music } from 'lucide-svelte';
 		error = '';
 
 		try {
-			const response = await fetch('/api/home', { signal: abortController.signal });
+			const response = await fetch(`/api/home?source=${encodeURIComponent(source)}`, {
+				signal: abortController.signal
+			});
 			if (response.ok) {
 				const data = await response.json();
 				homeData = data;
 				lastUpdated = new Date();
-				setHomeCachedData(data);
+				setHomeCachedData(data, source);
 				if (data.integration_status) {
 					integrationStore.setStatus(data.integration_status);
 				}
@@ -75,7 +85,7 @@ import { Shield, ArrowRight, Compass, Music } from 'lucide-svelte';
 		}
 	}
 
-	async function refreshInBackground() {
+	async function refreshInBackground(sourceOverride?: MusicSource) {
 		if (refreshing) return;
 
 		if (abortController) {
@@ -84,14 +94,17 @@ import { Shield, ArrowRight, Compass, Music } from 'lucide-svelte';
 		abortController = new AbortController();
 		refreshing = true;
 		isUpdating = true;
+		const source = resolveHomeSource(sourceOverride);
 
 		try {
-			const response = await fetch('/api/home', { signal: abortController.signal });
+			const response = await fetch(`/api/home?source=${encodeURIComponent(source)}`, {
+				signal: abortController.signal
+			});
 			if (response.ok) {
 				const data = await response.json();
 				homeData = data;
 				lastUpdated = new Date();
-				setHomeCachedData(data);
+				setHomeCachedData(data, source);
 				if (data.integration_status) {
 					integrationStore.setStatus(data.integration_status);
 				}
@@ -111,7 +124,7 @@ import { Shield, ArrowRight, Compass, Music } from 'lucide-svelte';
 		isUpdating = true;
 		const minDelay = new Promise((r) => setTimeout(r, 500));
 		try {
-			await loadHomeData(true);
+			await loadHomeData(true, activeSource);
 		} finally {
 			await minDelay;
 			refreshing = false;
@@ -127,18 +140,24 @@ import { Shield, ArrowRight, Compass, Music } from 'lucide-svelte';
 		}
 	}
 
-	onMount(() => {
-		loadHomeData();
+	onMount(async () => {
+		await musicSourceStore.load();
+		activeSource = musicSourceStore.getPageSource('home');
+		loadHomeData(false, activeSource);
 	});
 
 	onDestroy(cleanup);
 	beforeNavigate(cleanup);
 
-	function getSections(): { key: string; section: HomeSectionType; link?: string }[] {
+	function handleSourceChange(source: MusicSource) {
+		activeSource = source;
+		removeQueueCachedData();
+		loadHomeData(true, source);
+	}
+
+	function getPreGenreSections(): { key: string; section: HomeSectionType; link?: string }[] {
 		if (!homeData) return [];
-
 		const sections: { key: string; section: HomeSectionType; link?: string }[] = [];
-
 		if (homeData.popular_albums && homeData.popular_albums.items.length > 0) {
 			sections.push({ key: 'popular_albums', section: homeData.popular_albums, link: '/popular' });
 		}
@@ -149,6 +168,19 @@ import { Shield, ArrowRight, Compass, Music } from 'lucide-svelte';
 				link: '/trending'
 			});
 		}
+		if (homeData.your_top_albums && homeData.your_top_albums.items.length > 0) {
+			sections.push({
+				key: 'your_top_albums',
+				section: homeData.your_top_albums,
+				link: '/your-top'
+			});
+		}
+		if (homeData.recently_played && homeData.recently_played.items.length > 0) {
+			sections.push({
+				key: 'recently_played',
+				section: homeData.recently_played
+			});
+		}
 		if (homeData.recently_added && homeData.recently_added.items.length > 0) {
 			sections.push({
 				key: 'recently_added',
@@ -156,13 +188,18 @@ import { Shield, ArrowRight, Compass, Music } from 'lucide-svelte';
 				link: '/library/albums'
 			});
 		}
-
 		return sections;
 	}
 
-	function getLibrarySections(): { key: string; section: HomeSectionType; link?: string }[] {
+	function getPostGenreSections(): { key: string; section: HomeSectionType; link?: string }[] {
 		if (!homeData) return [];
 		const sections: { key: string; section: HomeSectionType; link?: string }[] = [];
+		if (homeData.favorite_artists && homeData.favorite_artists.items.length > 0) {
+			sections.push({
+				key: 'favorite_artists',
+				section: homeData.favorite_artists
+			});
+		}
 		if (homeData.library_artists && homeData.library_artists.items.length > 0) {
 			sections.push({
 				key: 'library_artists',
@@ -179,43 +216,16 @@ import { Shield, ArrowRight, Compass, Music } from 'lucide-svelte';
 		}
 		return sections;
 	}
-
-	function getListenBrainzSections(): { key: string; section: HomeSectionType; link?: string }[] {
-		if (!homeData) return [];
-		const sections: { key: string; section: HomeSectionType; link?: string }[] = [];
-		if (homeData.fresh_releases && homeData.fresh_releases.items.length > 0) {
-			sections.push({ key: 'fresh_releases', section: homeData.fresh_releases });
-		}
-		return sections;
-	}
-
-	function getJellyfinSections(): { key: string; section: HomeSectionType; link?: string }[] {
-		if (!homeData) return [];
-		const sections: { key: string; section: HomeSectionType; link?: string }[] = [];
-		if (homeData.recently_played && homeData.recently_played.items.length > 0) {
-			sections.push({ key: 'recently_played', section: homeData.recently_played });
-		}
-		if (homeData.favorite_artists && homeData.favorite_artists.items.length > 0) {
-			sections.push({ key: 'favorite_artists', section: homeData.favorite_artists });
-		}
-		return sections;
-	}
-
-	$: sections = homeData ? getSections() : [];
-	$: librarySections = homeData ? getLibrarySections() : [];
-	$: listenbrainzSections = homeData ? getListenBrainzSections() : [];
-	$: jellyfinSections = homeData ? getJellyfinSections() : [];
+	$: preGenreSections = homeData ? getPreGenreSections() : [];
+	$: postGenreSections = homeData ? getPostGenreSections() : [];
 	$: hasContent =
-		sections.length > 0 ||
-		librarySections.length > 0 ||
-		listenbrainzSections.length > 0 ||
-		jellyfinSections.length > 0 ||
+		preGenreSections.length > 0 ||
+		postGenreSections.length > 0 ||
 		(homeData?.genre_list?.items?.length ?? 0) > 0;
 	$: servicePrompts = homeData?.service_prompts || [];
 	$: lidarrConfigured = homeData?.integration_status?.lidarr ?? true;
 	$: lidarrPrompt = servicePrompts.find((p) => p.service === 'lidarr-connection');
 	$: otherPrompts = servicePrompts.filter((p) => p.service !== 'lidarr-connection');
-	$: discoverPreview = homeData?.discover_preview ?? null;
 </script>
 
 <svelte:head>
@@ -235,6 +245,10 @@ import { Shield, ArrowRight, Compass, Music } from 'lucide-svelte';
 			{getGreeting()} 👋
 		{/snippet}
 	</PageHeader>
+
+	<div class="flex justify-end px-4 -mt-4 mb-4 sm:px-6 lg:px-8">
+		<SourceSwitcher pageKey="home" onSourceChange={handleSourceChange} />
+	</div>
 
 	{#if error && !homeData}
 		<div class="mt-16 flex flex-col items-center justify-center px-4">
@@ -283,7 +297,7 @@ import { Shield, ArrowRight, Compass, Music } from 'lucide-svelte';
 					<CarouselSkeleton />
 				</section>
 			{:else}
-				{#each sections as { key, section, link } (key)}
+				{#each preGenreSections as { key, section, link } (key)}
 					<HomeSection {section} headerLink={link} />
 				{/each}
 			{/if}
@@ -306,66 +320,16 @@ import { Shield, ArrowRight, Compass, Music } from 'lucide-svelte';
 			{/if}
 
 			{#if loading && !homeData}
-				{#each Array(3) as _}
+				{#each Array(4) as _}
 					<section>
 						<div class="skeleton mb-4 h-6 w-32"></div>
 						<CarouselSkeleton showSubtitle={false} />
 					</section>
 				{/each}
 			{:else}
-				{#if librarySections.length > 0}
-					<div
-						class="section-group section-group-library -mx-4 px-4 py-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8"
-					>
-						{#each librarySections as { key, section, link } (key)}
-							<HomeSection {section} headerLink={link} />
-						{/each}
-					</div>
-				{/if}
-
-				{#if listenbrainzSections.length > 0}
-					<div
-						class="section-group section-group-listenbrainz -mx-4 px-4 py-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8"
-					>
-						{#each listenbrainzSections as { key, section, link } (key)}
-							<HomeSection {section} headerLink={link} />
-						{/each}
-					</div>
-				{/if}
-
-				{#if discoverPreview && discoverPreview.items.length > 0}
-					<div
-						class="section-group section-group-discover -mx-4 px-4 py-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8"
-					>
-						<HomeSection
-							section={{
-								title: `Because You Listen to ${discoverPreview.seed_artist}`,
-								type: 'artists',
-								items: discoverPreview.items,
-								source: null,
-								fallback_message: null,
-								connect_service: null
-							}}
-						/>
-						<div class="flex items-center justify-center pt-2 pb-2">
-							<a href="/discover" class="btn btn-primary gap-2">
-								<Compass class="h-5 w-5" />
-								Explore More on Discover
-								<ArrowRight class="h-5 w-5" />
-							</a>
-						</div>
-					</div>
-				{/if}
-
-				{#if jellyfinSections.length > 0}
-					<div
-						class="section-group section-group-jellyfin -mx-4 px-4 py-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8"
-					>
-						{#each jellyfinSections as { key, section, link } (key)}
-							<HomeSection {section} headerLink={link} />
-						{/each}
-					</div>
-				{/if}
+				{#each postGenreSections as { key, section, link } (key)}
+					<HomeSection {section} headerLink={link} />
+				{/each}
 			{/if}
 
 			{#if !loading && !hasContent && servicePrompts.length === 0}
@@ -382,48 +346,3 @@ import { Shield, ArrowRight, Compass, Music } from 'lucide-svelte';
 		</div>
 	{/if}
 </div>
-
-<style>
-	.section-group {
-		border-radius: 1rem;
-		display: flex;
-		flex-direction: column;
-		gap: 1.5rem;
-	}
-
-	.section-group-library {
-		background: linear-gradient(
-			135deg,
-			rgb(var(--brand-library) / 0.06) 0%,
-			rgb(var(--brand-library) / 0.02) 100%
-		);
-		border: 1px solid rgb(var(--brand-library) / 0.12);
-	}
-
-	.section-group-listenbrainz {
-		background: linear-gradient(
-			135deg,
-			rgb(var(--brand-listenbrainz) / 0.06) 0%,
-			rgb(var(--brand-listenbrainz) / 0.02) 100%
-		);
-		border: 1px solid rgb(var(--brand-listenbrainz) / 0.12);
-	}
-
-	.section-group-jellyfin {
-		background: linear-gradient(
-			135deg,
-			rgb(var(--brand-jellyfin) / 0.06) 0%,
-			rgb(var(--brand-jellyfin) / 0.02) 100%
-		);
-		border: 1px solid rgb(var(--brand-jellyfin) / 0.12);
-	}
-
-	.section-group-discover {
-		background: linear-gradient(
-			135deg,
-			rgb(var(--brand-discover) / 0.06) 0%,
-			rgb(var(--brand-discover) / 0.02) 100%
-		);
-		border: 1px solid rgb(var(--brand-discover) / 0.12);
-	}
-</style>

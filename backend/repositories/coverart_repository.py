@@ -1,28 +1,40 @@
 import asyncio
+import hashlib
 import logging
+from collections import OrderedDict
+from dataclasses import dataclass
+from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
 from pathlib import Path
 from typing import Optional, TYPE_CHECKING
+from urllib.parse import urlparse
 
 import aiofiles
 import httpx
 
+from core.exceptions import ExternalServiceError, RateLimitedError
 from infrastructure.cache.memory_cache import CacheInterface
 from infrastructure.resilience.retry import with_retry, CircuitBreaker
+from infrastructure.resilience.rate_limiter import TokenBucketRateLimiter
 from infrastructure.validators import validate_mbid
 from infrastructure.queue.priority_queue import RequestPriority, get_priority_queue
 from infrastructure.http.deduplication import RequestDeduplicator
 from repositories.coverart_artist import ArtistImageFetcher
 from repositories.coverart_album import AlbumCoverFetcher
-from repositories.coverart_disk_cache import CoverDiskCache, get_cache_filename
+from repositories.coverart_disk_cache import CoverDiskCache
 
 if TYPE_CHECKING:
     from repositories.musicbrainz_repository import MusicBrainzRepository
     from repositories.lidarr import LidarrRepository
+    from repositories.jellyfin_repository import JellyfinRepository
 
 logger = logging.getLogger(__name__)
 
 COVER_ART_ARCHIVE_BASE = "https://coverartarchive.org"
 DEFAULT_CACHE_DIR = Path("/app/cache/covers")
+COVER_NEGATIVE_TTL_SECONDS = 4 * 3600
+COVER_MEMORY_MAX_ENTRIES = 128
+COVER_MEMORY_MAX_BYTES = 16 * 1024 * 1024
 
 _coverart_circuit_breaker = CircuitBreaker(
     failure_threshold=5,
@@ -31,7 +43,108 @@ _coverart_circuit_breaker = CircuitBreaker(
     name="coverart"
 )
 
+_lidarr_cover_circuit_breaker = CircuitBreaker(
+    failure_threshold=5,
+    success_threshold=2,
+    timeout=60.0,
+    name="coverart_lidarr",
+)
+
+_jellyfin_cover_circuit_breaker = CircuitBreaker(
+    failure_threshold=5,
+    success_threshold=2,
+    timeout=60.0,
+    name="coverart_jellyfin",
+)
+
+_wikidata_cover_circuit_breaker = CircuitBreaker(
+    failure_threshold=5,
+    success_threshold=2,
+    timeout=60.0,
+    name="coverart_wikidata",
+)
+
+_wikimedia_cover_circuit_breaker = CircuitBreaker(
+    failure_threshold=5,
+    success_threshold=2,
+    timeout=60.0,
+    name="coverart_wikimedia",
+)
+
+_generic_cover_circuit_breaker = CircuitBreaker(
+    failure_threshold=5,
+    success_threshold=2,
+    timeout=60.0,
+    name="coverart_generic",
+)
+
+_coverart_rate_limiter = TokenBucketRateLimiter(rate=1.0, capacity=1)
+
 _deduplicator = RequestDeduplicator()
+
+
+@dataclass(slots=True)
+class _CoverMemoryEntry:
+    content: bytes
+    content_type: str
+    source: str
+    content_sha1: str
+    size_bytes: int
+
+
+class _CoverMemoryLRU:
+    def __init__(self, max_entries: int, max_bytes: int):
+        self._max_entries = max(1, max_entries)
+        self._max_bytes = max(1, max_bytes)
+        self._entries: OrderedDict[str, _CoverMemoryEntry] = OrderedDict()
+        self._total_bytes = 0
+        self._lock = asyncio.Lock()
+
+    async def get(self, key: str) -> Optional[_CoverMemoryEntry]:
+        async with self._lock:
+            entry = self._entries.get(key)
+            if entry is None:
+                return None
+            self._entries.move_to_end(key)
+            return entry
+
+    async def get_hash(self, key: str) -> Optional[str]:
+        entry = await self.get(key)
+        if entry is None:
+            return None
+        return entry.content_sha1
+
+    async def set(self, key: str, content: bytes, content_type: str, source: str) -> None:
+        content_size = len(content)
+        if content_size <= 0:
+            return
+
+        async with self._lock:
+            existing = self._entries.pop(key, None)
+            if existing is not None:
+                self._total_bytes -= existing.size_bytes
+
+            entry = _CoverMemoryEntry(
+                content=content,
+                content_type=content_type,
+                source=source,
+                content_sha1=hashlib.sha1(content).hexdigest(),
+                size_bytes=content_size,
+            )
+            self._entries[key] = entry
+            self._entries.move_to_end(key)
+            self._total_bytes += content_size
+
+            while self._entries and (
+                len(self._entries) > self._max_entries or self._total_bytes > self._max_bytes
+            ):
+                _, evicted = self._entries.popitem(last=False)
+                self._total_bytes -= evicted.size_bytes
+
+
+def _log_task_error(task: asyncio.Task) -> None:
+    if not task.cancelled() and task.exception():
+        logger.error(f"Background task failed: {task.exception()}")
 
 
 
@@ -42,34 +155,285 @@ class CoverArtRepository:
         cache: CacheInterface,
         mb_repo: Optional['MusicBrainzRepository'] = None,
         lidarr_repo: Optional['LidarrRepository'] = None,
-        cache_dir: Path = DEFAULT_CACHE_DIR
+        jellyfin_repo: Optional['JellyfinRepository'] = None,
+        cache_dir: Path = DEFAULT_CACHE_DIR,
+        cover_cache_max_size_mb: Optional[int] = None,
+        cover_memory_cache_max_entries: int = COVER_MEMORY_MAX_ENTRIES,
+        cover_memory_cache_max_bytes: int = COVER_MEMORY_MAX_BYTES,
     ):
         self._client = http_client
         self._cache = cache
         self._mb_repo = mb_repo
         self._lidarr_repo = lidarr_repo
+        self._jellyfin_repo = jellyfin_repo
         self.cache_dir = cache_dir
         self.cache_dir.mkdir(parents=True, exist_ok=True)
-        self._disk_cache = CoverDiskCache(cache_dir)
+        self._disk_cache = CoverDiskCache(cache_dir, max_size_mb=cover_cache_max_size_mb)
+        self._cover_memory_cache = _CoverMemoryLRU(
+            max_entries=cover_memory_cache_max_entries,
+            max_bytes=cover_memory_cache_max_bytes,
+        )
         self._artist_fetcher = ArtistImageFetcher(
             http_get_fn=self._http_get,
             write_cache_fn=self._disk_cache.write,
             cache=cache,
             mb_repo=mb_repo,
-            lidarr_repo=lidarr_repo
+            lidarr_repo=lidarr_repo,
+            jellyfin_repo=jellyfin_repo,
         )
         self._album_fetcher = AlbumCoverFetcher(
             http_get_fn=self._http_get,
             write_cache_fn=self._disk_cache.write,
-            lidarr_repo=lidarr_repo
+            lidarr_repo=lidarr_repo,
+            mb_repo=mb_repo,
+            jellyfin_repo=jellyfin_repo,
+        )
+
+        try:
+            task = asyncio.create_task(self._disk_cache.enforce_size_limit(force=True))
+            task.add_done_callback(_log_task_error)
+        except RuntimeError:
+            logger.debug("No running event loop to enforce cover cache size at initialization")
+
+    @staticmethod
+    def _memory_cache_key(identifier: str, suffix: str) -> str:
+        return f"{identifier}:{suffix}"
+
+    @staticmethod
+    def _is_successful_image_payload(content: bytes, content_type: str) -> bool:
+        return bool(content) and content_type.lower().startswith("image/")
+
+    async def _memory_get(
+        self,
+        identifier: str,
+        suffix: str,
+    ) -> Optional[tuple[bytes, str, str]]:
+        entry = await self._cover_memory_cache.get(self._memory_cache_key(identifier, suffix))
+        if entry is None:
+            return None
+        return entry.content, entry.content_type, entry.source
+
+    async def _memory_get_hash(self, identifier: str, suffix: str) -> Optional[str]:
+        return await self._cover_memory_cache.get_hash(self._memory_cache_key(identifier, suffix))
+
+    async def _memory_set_from_result(
+        self,
+        identifier: str,
+        suffix: str,
+        result: Optional[tuple[bytes, str, str]],
+    ) -> None:
+        if result is None:
+            return
+
+        content, content_type, source = result
+        if not self._is_successful_image_payload(content, content_type):
+            return
+
+        await self._cover_memory_cache.set(
+            self._memory_cache_key(identifier, suffix),
+            content,
+            content_type,
+            source,
         )
     
-    @with_retry(max_attempts=3, circuit_breaker=_coverart_circuit_breaker)
-    async def _http_get(self, url: str, priority: RequestPriority, **kwargs) -> httpx.Response:
+    @staticmethod
+    def _parse_retry_after_seconds(retry_after: Optional[str]) -> Optional[float]:
+        if not retry_after:
+            return None
+
+        try:
+            seconds = float(retry_after)
+            return seconds if seconds > 0 else None
+        except ValueError:
+            pass
+
+        try:
+            parsed_dt = parsedate_to_datetime(retry_after)
+            if parsed_dt.tzinfo is None:
+                parsed_dt = parsed_dt.replace(tzinfo=timezone.utc)
+            seconds = (parsed_dt - datetime.now(timezone.utc)).total_seconds()
+            return seconds if seconds > 0 else None
+        except (TypeError, ValueError):
+            return None
+
+    @staticmethod
+    def _infer_source_from_url(url: str) -> str:
+        netloc = urlparse(url).netloc.lower()
+        if "coverartarchive.org" in netloc:
+            return "coverart"
+        if "wikidata.org" in netloc:
+            return "wikidata"
+        if "wikimedia.org" in netloc:
+            return "wikimedia"
+        return "generic"
+
+    @staticmethod
+    def _raise_retryable_status(response: httpx.Response, source: str, url: str) -> None:
+        status_code = response.status_code
+
+        if status_code == 429:
+            retry_after = CoverArtRepository._parse_retry_after_seconds(
+                response.headers.get("Retry-After")
+            )
+            raise RateLimitedError(
+                f"{source} rate limited (429): {url}",
+                retry_after_seconds=retry_after,
+            )
+
+        if 500 <= status_code <= 599:
+            raise ExternalServiceError(f"{source} transient error ({status_code})", url)
+
+    async def _perform_http_get(
+        self,
+        url: str,
+        priority: RequestPriority,
+        source: str,
+        **kwargs,
+    ) -> httpx.Response:
         priority_mgr = get_priority_queue()
         semaphore = await priority_mgr.acquire_slot(priority)
         async with semaphore:
-            return await self._client.get(url, **kwargs)
+            response = await self._client.get(url, **kwargs)
+            self._raise_retryable_status(response, source, url)
+            return response
+
+    @with_retry(
+        max_attempts=3,
+        circuit_breaker=_coverart_circuit_breaker,
+        retriable_exceptions=(httpx.HTTPError, ExternalServiceError, RateLimitedError),
+    )
+    async def _http_get_coverart(self, url: str, priority: RequestPriority, **kwargs) -> httpx.Response:
+        await _coverart_rate_limiter.acquire()
+        return await self._perform_http_get(url, priority, "coverart", **kwargs)
+
+    @with_retry(
+        max_attempts=3,
+        circuit_breaker=_lidarr_cover_circuit_breaker,
+        retriable_exceptions=(httpx.HTTPError, ExternalServiceError),
+    )
+    async def _http_get_lidarr(self, url: str, priority: RequestPriority, **kwargs) -> httpx.Response:
+        return await self._perform_http_get(url, priority, "lidarr", **kwargs)
+
+    @with_retry(
+        max_attempts=3,
+        circuit_breaker=_jellyfin_cover_circuit_breaker,
+        retriable_exceptions=(httpx.HTTPError, ExternalServiceError),
+    )
+    async def _http_get_jellyfin(self, url: str, priority: RequestPriority, **kwargs) -> httpx.Response:
+        return await self._perform_http_get(url, priority, "jellyfin", **kwargs)
+
+    @with_retry(
+        max_attempts=3,
+        circuit_breaker=_wikidata_cover_circuit_breaker,
+        retriable_exceptions=(httpx.HTTPError, ExternalServiceError),
+    )
+    async def _http_get_wikidata(self, url: str, priority: RequestPriority, **kwargs) -> httpx.Response:
+        return await self._perform_http_get(url, priority, "wikidata", **kwargs)
+
+    @with_retry(
+        max_attempts=3,
+        circuit_breaker=_wikimedia_cover_circuit_breaker,
+        retriable_exceptions=(httpx.HTTPError, ExternalServiceError),
+    )
+    async def _http_get_wikimedia(self, url: str, priority: RequestPriority, **kwargs) -> httpx.Response:
+        return await self._perform_http_get(url, priority, "wikimedia", **kwargs)
+
+    @with_retry(
+        max_attempts=3,
+        circuit_breaker=_generic_cover_circuit_breaker,
+        retriable_exceptions=(httpx.HTTPError, ExternalServiceError),
+    )
+    async def _http_get_generic(self, url: str, priority: RequestPriority, **kwargs) -> httpx.Response:
+        return await self._perform_http_get(url, priority, "generic", **kwargs)
+
+    async def _http_get(
+        self,
+        url: str,
+        priority: RequestPriority,
+        source: Optional[str] = None,
+        **kwargs,
+    ) -> httpx.Response:
+        request_source = source or self._infer_source_from_url(url)
+        if request_source == "coverart":
+            return await self._http_get_coverart(url, priority, **kwargs)
+        if request_source == "lidarr":
+            return await self._http_get_lidarr(url, priority, **kwargs)
+        if request_source == "jellyfin":
+            return await self._http_get_jellyfin(url, priority, **kwargs)
+        if request_source == "wikidata":
+            return await self._http_get_wikidata(url, priority, **kwargs)
+        if request_source == "wikimedia":
+            return await self._http_get_wikimedia(url, priority, **kwargs)
+        return await self._http_get_generic(url, priority, **kwargs)
+
+    async def get_release_group_cover_etag(
+        self,
+        release_group_id: str,
+        size: Optional[str] = "500",
+    ) -> Optional[str]:
+        try:
+            release_group_id = validate_mbid(release_group_id, "release-group")
+        except ValueError:
+            return None
+
+        identifier = f"rg_{release_group_id}"
+        suffix = size or "orig"
+
+        if content_hash := await self._memory_get_hash(identifier, suffix):
+            return content_hash
+
+        file_path = self._disk_cache.get_file_path(identifier, suffix)
+        return await self._disk_cache.get_content_hash(file_path)
+
+    async def get_release_cover_etag(
+        self,
+        release_id: str,
+        size: Optional[str] = "500",
+    ) -> Optional[str]:
+        try:
+            release_id = validate_mbid(release_id, "release")
+        except ValueError:
+            return None
+
+        identifier = f"rel_{release_id}"
+        suffix = size or "orig"
+
+        if content_hash := await self._memory_get_hash(identifier, suffix):
+            return content_hash
+
+        file_path = self._disk_cache.get_file_path(identifier, suffix)
+        return await self._disk_cache.get_content_hash(file_path)
+
+    async def get_artist_image_etag(
+        self,
+        artist_id: str,
+        size: Optional[int] = None,
+    ) -> Optional[str]:
+        try:
+            artist_id = validate_mbid(artist_id, "artist")
+        except ValueError:
+            return None
+
+        size_suffix = f"_{size}" if size else ""
+        identifier = f"artist_{artist_id}{size_suffix}"
+
+        if content_hash := await self._memory_get_hash(identifier, "img"):
+            return content_hash
+
+        file_path = self._disk_cache.get_file_path(identifier, "img")
+
+        content_hash = await self._disk_cache.get_content_hash(file_path)
+        if content_hash:
+            return content_hash
+
+        if size and size != 250:
+            fallback_identifier = f"artist_{artist_id}_250"
+            if content_hash := await self._memory_get_hash(fallback_identifier, "img"):
+                return content_hash
+            fallback_path = self._disk_cache.get_file_path(fallback_identifier, "img")
+            return await self._disk_cache.get_content_hash(fallback_path)
+
+        return None
     
     async def get_artist_image(self, artist_id: str, size: Optional[int] = None) -> Optional[tuple[bytes, str, str]]:
         try:
@@ -79,78 +443,147 @@ class CoverArtRepository:
             return None
 
         size_suffix = f"_{size}" if size else ""
-        file_path = self._disk_cache.get_file_path(f"artist_{artist_id}{size_suffix}", "img")
+        identifier = f"artist_{artist_id}{size_suffix}"
+        file_path = self._disk_cache.get_file_path(identifier, "img")
 
-        if cached := await self._disk_cache.read(file_path, ["wikidata_id"]):
+        if cached_memory := await self._memory_get(identifier, "img"):
+            logger.debug(f"Cache HIT (memory): Artist image {artist_id[:8]}...")
+            return cached_memory
+
+        if cached := await self._disk_cache.read(file_path, ["source", "wikidata_id"]):
             logger.debug(f"Cache HIT (disk): Artist image {artist_id[:8]}...")
-            return cached
+            source = "wikidata"
+            if cached[2] and isinstance(cached[2], dict):
+                source = cached[2].get("source") or source
+            result = (cached[0], cached[1], source)
+            await self._memory_set_from_result(identifier, "img", result)
+            return result
 
         if size and size != 250:
-            fallback_path = self._disk_cache.get_file_path(f"artist_{artist_id}_250", "img")
-            if cached := await self._disk_cache.read(fallback_path, ["wikidata_id"]):
+            fallback_identifier = f"artist_{artist_id}_250"
+            if cached_memory := await self._memory_get(fallback_identifier, "img"):
+                logger.debug(f"Cache HIT (memory - fallback 250px): Artist image {artist_id[:8]}...")
+                return cached_memory
+
+            fallback_path = self._disk_cache.get_file_path(fallback_identifier, "img")
+            if cached := await self._disk_cache.read(fallback_path, ["source", "wikidata_id"]):
                 logger.debug(f"Cache HIT (disk - fallback 250px): Artist image {artist_id[:8]}...")
-                return cached
+                source = "wikidata"
+                if cached[2] and isinstance(cached[2], dict):
+                    source = cached[2].get("source") or source
+                result = (cached[0], cached[1], source)
+                await self._memory_set_from_result(fallback_identifier, "img", result)
+                return result
+
+        if await self._disk_cache.is_negative(file_path):
+            logger.debug(f"Cache HIT (disk-negative): Artist image {artist_id[:8]}...")
+            return None
 
         logger.debug(f"Cache MISS (disk): Artist image {artist_id[:8]}... - fetching from Wikidata")
 
         dedupe_key = f"artist:img:{artist_id}:{size}"
-        return await _deduplicator.dedupe(
+        result = await _deduplicator.dedupe(
             dedupe_key,
             lambda: self._artist_fetcher.fetch_artist_image(artist_id, size, file_path)
         )
+        if result is None:
+            await self._disk_cache.write_negative(file_path, ttl_seconds=COVER_NEGATIVE_TTL_SECONDS)
+        else:
+            await self._memory_set_from_result(identifier, "img", result)
+        return result
 
     async def get_release_group_cover(
         self,
         release_group_id: str,
         size: Optional[str] = "500"
-    ) -> Optional[tuple[bytes, str]]:
+    ) -> Optional[tuple[bytes, str, str]]:
         try:
             release_group_id = validate_mbid(release_group_id, "release-group")
         except ValueError as e:
             logger.warning(f"Invalid release-group MBID: {e}")
             return None
 
-        file_path = self._disk_cache.get_file_path(f"rg_{release_group_id}", size or 'orig')
+        identifier = f"rg_{release_group_id}"
+        suffix = size or 'orig'
+        file_path = self._disk_cache.get_file_path(identifier, suffix)
 
-        if cached := await self._disk_cache.read(file_path):
+        if cached_memory := await self._memory_get(identifier, suffix):
+            logger.debug(f"Cache HIT (memory): Album cover {release_group_id[:8]}...")
+            return cached_memory
+
+        if cached := await self._disk_cache.read(file_path, ["source"]):
             logger.debug(f"Cache HIT (disk): Album cover {release_group_id[:8]}...")
-            return (cached[0], cached[1])
+            source = "cover-art-archive"
+            if cached[2] and isinstance(cached[2], dict):
+                source = cached[2].get("source") or source
+            result = (cached[0], cached[1], source)
+            await self._memory_set_from_result(identifier, suffix, result)
+            return result
+
+        if await self._disk_cache.is_negative(file_path):
+            logger.debug(f"Cache HIT (disk-negative): Album cover {release_group_id[:8]}...")
+            return None
 
         logger.debug(f"Cache MISS (disk): Album cover {release_group_id[:8]}... - fetching from CoverArtArchive")
 
         dedupe_key = f"cover:rg:{release_group_id}:{size}"
-        return await _deduplicator.dedupe(
+        result = await _deduplicator.dedupe(
             dedupe_key,
             lambda: self._album_fetcher.fetch_release_group_cover(release_group_id, size, file_path)
         )
+        if result is None:
+            await self._disk_cache.write_negative(file_path, ttl_seconds=COVER_NEGATIVE_TTL_SECONDS)
+        else:
+            await self._memory_set_from_result(identifier, suffix, result)
+        return result
 
     async def get_release_cover(
         self,
         release_id: str,
         size: Optional[str] = "500"
-    ) -> Optional[tuple[bytes, str]]:
+    ) -> Optional[tuple[bytes, str, str]]:
         try:
             release_id = validate_mbid(release_id, "release")
         except ValueError as e:
             logger.warning(f"Invalid release MBID: {e}")
             return None
 
-        file_path = self._disk_cache.get_file_path(f"rel_{release_id}", size or 'orig')
+        identifier = f"rel_{release_id}"
+        suffix = size or 'orig'
+        file_path = self._disk_cache.get_file_path(identifier, suffix)
 
-        if cached := await self._disk_cache.read(file_path):
-            return (cached[0], cached[1])
+        if cached_memory := await self._memory_get(identifier, suffix):
+            logger.debug(f"Cache HIT (memory): Release cover {release_id[:8]}...")
+            return cached_memory
+
+        if cached := await self._disk_cache.read(file_path, ["source"]):
+            source = "cover-art-archive"
+            if cached[2] and isinstance(cached[2], dict):
+                source = cached[2].get("source") or source
+            result = (cached[0], cached[1], source)
+            await self._memory_set_from_result(identifier, suffix, result)
+            return result
+
+        if await self._disk_cache.is_negative(file_path):
+            logger.debug(f"Cache HIT (disk-negative): Release cover {release_id[:8]}...")
+            return None
 
         dedupe_key = f"cover:rel:{release_id}:{size}"
-        return await _deduplicator.dedupe(
+        result = await _deduplicator.dedupe(
             dedupe_key,
             lambda: self._album_fetcher.fetch_release_cover(release_id, size, file_path)
         )
+        if result is None:
+            await self._disk_cache.write_negative(file_path, ttl_seconds=COVER_NEGATIVE_TTL_SECONDS)
+        else:
+            await self._memory_set_from_result(identifier, suffix, result)
+        return result
     
     async def batch_prefetch_covers(
         self,
         album_ids: list[str],
         size: str = "250",
-        max_concurrent: int = 10
+        max_concurrent: int = 5
     ) -> None:
         if not album_ids:
             return

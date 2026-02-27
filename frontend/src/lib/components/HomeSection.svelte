@@ -6,7 +6,7 @@
 		HomeTrack,
 		HomeGenre
 	} from '$lib/types';
-	import { ArrowRight, X, Check, Music2, Tv, Sparkles } from 'lucide-svelte';
+	import { ArrowRight, X, Check, Music2, Tv, Sparkles, Search } from 'lucide-svelte';
 	import { goto } from '$app/navigation';
 	import { formatListenCount, formatListenedAt } from '$lib/utils/formatting';
 	import ArtistImage from './ArtistImage.svelte';
@@ -35,6 +35,20 @@
 
 	function handleGenreClick(genre: HomeGenre) {
 		goto(`/genre?name=${encodeURIComponent(genre.name)}`);
+	}
+
+	function handleAlbumSearch(album: HomeAlbum) {
+		const query = [album.artist_name, album.name].filter(Boolean).join(' ').trim();
+		if (query) {
+			goto(`/search/albums?q=${encodeURIComponent(query)}`);
+		}
+	}
+
+	function handleTrackAlbumSearch(track: HomeTrack) {
+		const query = [track.artist_name, track.album_name || track.name].filter(Boolean).join(' ').trim();
+		if (query) {
+			goto(`/search/albums?q=${encodeURIComponent(query)}`);
+		}
 	}
 
 	function isArtist(item: HomeArtist | HomeAlbum | HomeTrack | HomeGenre): item is HomeArtist {
@@ -67,7 +81,21 @@
 		{:else}
 			<h2 class="text-lg sm:text-xl font-bold">{section.title}</h2>
 		{/if}
-		{#if section.source}
+		{#if section.source === 'lastfm'}
+			<span
+				class="badge badge-xs sm:badge-sm border-0"
+				style="background-color: rgb(var(--brand-lastfm) / 0.15); color: rgb(var(--brand-lastfm));"
+			>
+				via Last.fm
+			</span>
+		{:else if section.source === 'listenbrainz'}
+			<span
+				class="badge badge-xs sm:badge-sm border-0"
+				style="background-color: rgb(var(--brand-listenbrainz) / 0.15); color: rgb(var(--brand-listenbrainz));"
+			>
+				via ListenBrainz
+			</span>
+		{:else if section.source}
 			<span class="badge badge-ghost badge-xs sm:badge-sm capitalize">{section.source}</span>
 		{/if}
 	</div>
@@ -80,6 +108,8 @@
 						<Music2 class="h-5 w-5" />
 					{:else if section.connect_service === 'jellyfin'}
 						<Tv class="h-5 w-5" />
+					{:else if section.connect_service === 'lastfm'}
+						<Music2 class="h-5 w-5" />
 					{:else}
 						<Sparkles class="h-5 w-5" />
 					{/if}
@@ -87,7 +117,13 @@
 				<p class="text-base-content/70 text-sm">{section.fallback_message}</p>
 				{#if section.connect_service}
 					<a href="/settings" class="btn btn-primary btn-sm mt-2">
-						Connect {section.connect_service === 'listenbrainz' ? 'ListenBrainz' : 'Jellyfin'}
+						Connect {section.connect_service === 'listenbrainz'
+							? 'ListenBrainz'
+							: section.connect_service === 'lastfm'
+								? 'Last.fm'
+								: section.connect_service === 'jellyfin'
+									? 'Jellyfin'
+									: section.connect_service}
 					</a>
 				{/if}
 			</div>
@@ -118,8 +154,8 @@
 								: 'cursor-default opacity-80'}"
 							onclick={() => handleArtistClick(item)}
 							onkeydown={(e) => e.key === 'Enter' && handleArtistClick(item)}
-							role={item.mbid ? 'button' : 'presentation'}
-							tabindex={item.mbid ? 0 : -1}
+							role="button"
+							tabindex="0"
 						>
 							<figure class="flex justify-center pt-4 relative">
 								<ArtistImage mbid={item.mbid ?? ''} alt={item.name} size="md" lazy={true} />
@@ -148,11 +184,13 @@
 				{:else if isAlbum(item)}
 					<div class="w-32 sm:w-36 md:w-44 flex-shrink-0">
 						<div
-							class="card bg-base-100 w-full shadow-sm cursor-pointer transition-transform hover:scale-105 active:scale-95 hover:shadow-lg"
+							class="card bg-base-100 w-full shadow-sm transition-transform {item.mbid
+								? 'cursor-pointer hover:scale-105 active:scale-95 hover:shadow-lg'
+								: 'cursor-default opacity-90'}"
 							onclick={() => handleAlbumClick(item)}
 							onkeydown={(e) => e.key === 'Enter' && handleAlbumClick(item)}
 							role="button"
-							tabindex={0}
+							tabindex="0"
 						>
 							<figure class="aspect-square overflow-hidden relative">
 								<AlbumImage
@@ -168,6 +206,19 @@
 										<Check class="w-3 h-3" />
 									</div>
 								{/if}
+								{#if !item.mbid}
+									<button
+										type="button"
+										class="btn btn-ghost btn-xs btn-circle absolute bottom-2 right-2"
+										title="Search album"
+										onclick={(e) => {
+											e.stopPropagation();
+											handleAlbumSearch(item);
+										}}
+									>
+										<Search class="w-3 h-3" />
+									</button>
+								{/if}
 							</figure>
 							<div class="card-body p-2">
 								<h3 class="card-title text-xs line-clamp-1">{item.name}</h3>
@@ -180,16 +231,22 @@
 				{:else if isTrack(item)}
 					<div class="w-56 sm:w-64 md:w-72 flex-shrink-0">
 						<div
-							class="card card-side bg-base-100 w-full shadow-sm cursor-pointer hover:shadow-lg active:scale-95 transition-all"
+							class="card card-side bg-base-100 w-full shadow-sm transition-all {item.artist_mbid
+								? 'cursor-pointer hover:shadow-lg active:scale-95'
+								: 'cursor-default opacity-90'}"
 							onclick={() => handleTrackClick(item)}
 							onkeydown={(e) => e.key === 'Enter' && handleTrackClick(item)}
 							role="button"
-							tabindex={0}
+							tabindex="0"
 						>
 							<figure class="w-16 h-16 flex-shrink-0">
-								<div class="w-full h-full flex items-center justify-center text-2xl bg-base-200">
-									<Music2 class="h-6 w-6 text-base-content/40" />
-								</div>
+								{#if item.image_url}
+									<img src={item.image_url} alt={item.album_name || item.name} class="w-full h-full object-cover" />
+								{:else}
+									<div class="w-full h-full flex items-center justify-center text-2xl bg-base-200">
+										<Music2 class="h-6 w-6 text-base-content/40" />
+									</div>
+								{/if}
 							</figure>
 							<div class="card-body p-2 justify-center">
 								<h3 class="card-title text-xs line-clamp-1">{item.name}</h3>
@@ -198,6 +255,21 @@
 								{/if}
 								{#if item.listened_at}
 									<p class="text-xs text-base-content/40">{formatListenedAt(item.listened_at)}</p>
+								{/if}
+								{#if !item.artist_mbid}
+									<div class="flex justify-end pt-1">
+										<button
+											type="button"
+											class="btn btn-ghost btn-xs btn-circle"
+											title="Search album"
+											onclick={(e) => {
+												e.stopPropagation();
+												handleTrackAlbumSearch(item);
+											}}
+										>
+											<Search class="w-3 h-3" />
+										</button>
+									</div>
 								{/if}
 							</div>
 						</div>

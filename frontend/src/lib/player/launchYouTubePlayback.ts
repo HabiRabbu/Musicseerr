@@ -1,6 +1,7 @@
 import { tick } from 'svelte';
 import { playerStore } from '$lib/stores/player.svelte';
 import { createPlaybackSource } from '$lib/player/createSource';
+import { getCoverUrl } from '$lib/utils/errorHandling';
 
 export type YouTubePlaybackPayload = {
 	albumId: string;
@@ -22,13 +23,14 @@ export async function launchYouTubePlayback(
 	options: LaunchYouTubePlaybackOptions = {}
 ): Promise<void> {
 	const { stopOnError = true, onLoadError } = options;
+	const normalizedCoverUrl = getCoverUrl(payload.coverUrl ?? null, payload.albumId);
 
 	const source = createPlaybackSource('youtube');
 	playerStore.playAlbum(source, {
 		albumId: payload.albumId,
 		albumName: payload.albumName,
 		artistName: payload.artistName,
-		coverUrl: payload.coverUrl ?? null,
+		coverUrl: normalizedCoverUrl,
 		sourceType: 'youtube',
 		videoId: payload.videoId,
 		embedUrl: payload.embedUrl ?? `https://www.youtube.com/embed/${payload.videoId}`,

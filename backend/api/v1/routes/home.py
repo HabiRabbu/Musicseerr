@@ -1,4 +1,5 @@
 import logging
+from typing import Literal
 from fastapi import APIRouter, Depends, Query, HTTPException
 from api.v1.schemas.home import (
     HomeResponse,
@@ -19,10 +20,11 @@ router = APIRouter(prefix="/api/home", tags=["home"])
 
 @router.get("", response_model=HomeResponse)
 async def get_home_data(
-    home_service: HomeService = Depends(get_home_service)
+    source: Literal["listenbrainz", "lastfm"] | None = Query(default=None, description="Data source: listenbrainz or lastfm"),
+    home_service: HomeService = Depends(get_home_service),
 ):
     try:
-        return await home_service.get_home_data()
+        return await home_service.get_home_data(source=source)
     except Exception as e:
         logger.error(f"Failed to get home data: {e}")
         raise HTTPException(status_code=500, detail="Failed to load home page")
@@ -62,10 +64,11 @@ async def get_genre_detail(
 @router.get("/trending/artists", response_model=TrendingArtistsResponse)
 async def get_trending_artists(
     limit: int = Query(default=10, ge=1, le=25),
+    source: Literal["listenbrainz", "lastfm"] | None = Query(default=None),
     charts_service: HomeChartsService = Depends(get_home_charts_service)
 ):
     try:
-        return await charts_service.get_trending_artists(limit=limit)
+        return await charts_service.get_trending_artists(limit=limit, source=source)
     except Exception as e:
         logger.error(f"Failed to get trending artists: {e}")
         raise HTTPException(status_code=500, detail="Failed to load trending artists")
@@ -76,11 +79,12 @@ async def get_trending_artists_by_range(
     range_key: str,
     limit: int = Query(default=25, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
+    source: Literal["listenbrainz", "lastfm"] | None = Query(default=None),
     charts_service: HomeChartsService = Depends(get_home_charts_service)
 ):
     try:
         return await charts_service.get_trending_artists_by_range(
-            range_key=range_key, limit=limit, offset=offset
+            range_key=range_key, limit=limit, offset=offset, source=source
         )
     except Exception as e:
         logger.error(f"Failed to get trending artists for range {range_key}: {e}")
@@ -90,10 +94,11 @@ async def get_trending_artists_by_range(
 @router.get("/popular/albums", response_model=PopularAlbumsResponse)
 async def get_popular_albums(
     limit: int = Query(default=10, ge=1, le=25),
+    source: Literal["listenbrainz", "lastfm"] | None = Query(default=None),
     charts_service: HomeChartsService = Depends(get_home_charts_service)
 ):
     try:
-        return await charts_service.get_popular_albums(limit=limit)
+        return await charts_service.get_popular_albums(limit=limit, source=source)
     except Exception as e:
         logger.error(f"Failed to get popular albums: {e}")
         raise HTTPException(status_code=500, detail="Failed to load popular albums")
@@ -104,15 +109,46 @@ async def get_popular_albums_by_range(
     range_key: str,
     limit: int = Query(default=25, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
+    source: Literal["listenbrainz", "lastfm"] | None = Query(default=None),
     charts_service: HomeChartsService = Depends(get_home_charts_service)
 ):
     try:
         return await charts_service.get_popular_albums_by_range(
-            range_key=range_key, limit=limit, offset=offset
+            range_key=range_key, limit=limit, offset=offset, source=source
         )
     except Exception as e:
         logger.error(f"Failed to get popular albums for range {range_key}: {e}")
         raise HTTPException(status_code=500, detail="Failed to load popular albums")
+
+
+@router.get("/your-top/albums", response_model=PopularAlbumsResponse)
+async def get_your_top_albums(
+    limit: int = Query(default=10, ge=1, le=25),
+    source: Literal["listenbrainz", "lastfm"] | None = Query(default=None),
+    charts_service: HomeChartsService = Depends(get_home_charts_service)
+):
+    try:
+        return await charts_service.get_your_top_albums(limit=limit, source=source)
+    except Exception as e:
+        logger.error(f"Failed to get your top albums: {e}")
+        raise HTTPException(status_code=500, detail="Failed to load your top albums")
+
+
+@router.get("/your-top/albums/{range_key}", response_model=PopularAlbumsRangeResponse)
+async def get_your_top_albums_by_range(
+    range_key: str,
+    limit: int = Query(default=25, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    source: Literal["listenbrainz", "lastfm"] | None = Query(default=None),
+    charts_service: HomeChartsService = Depends(get_home_charts_service)
+):
+    try:
+        return await charts_service.get_your_top_albums_by_range(
+            range_key=range_key, limit=limit, offset=offset, source=source
+        )
+    except Exception as e:
+        logger.error(f"Failed to get your top albums for range {range_key}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to load your top albums")
 
 
 @router.get("/genre-artist/{genre_name}")

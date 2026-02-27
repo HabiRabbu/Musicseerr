@@ -1,17 +1,34 @@
-import type { Artist, Album, EnrichmentResponse } from '$lib/types';
+import type {
+	Artist,
+	Album,
+	EnrichmentResponse,
+	EnrichmentSource,
+	ArtistEnrichmentRequest,
+	AlbumEnrichmentRequest
+} from '$lib/types';
+
+export function getListenTitle(
+	source: EnrichmentSource,
+	kind: 'artist' | 'album' = 'artist'
+): string {
+	if (source === 'lastfm') return kind === 'album' ? 'Last.fm plays' : 'Last.fm listeners';
+	if (source === 'listenbrainz') return 'ListenBrainz plays';
+	return 'Plays';
+}
 
 export async function fetchEnrichmentBatch(
-	artistMbids: string[],
-	albumMbids: string[],
+	artists: ArtistEnrichmentRequest[],
+	albums: AlbumEnrichmentRequest[],
 	signal?: AbortSignal
 ): Promise<EnrichmentResponse | null> {
-	if (artistMbids.length === 0 && albumMbids.length === 0) return null;
+	if (artists.length === 0 && albums.length === 0) return null;
 
-	const params = new URLSearchParams();
-	if (artistMbids.length > 0) params.set('artist_mbids', artistMbids.join(','));
-	if (albumMbids.length > 0) params.set('album_mbids', albumMbids.join(','));
-
-	const res = await fetch(`/api/search/enrich/batch?${params.toString()}`, { signal });
+	const res = await fetch('/api/search/enrich/batch', {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ artists, albums }),
+		signal
+	});
 	if (!res.ok) return null;
 
 	return res.json();

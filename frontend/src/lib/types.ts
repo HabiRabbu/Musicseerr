@@ -52,6 +52,8 @@ export type SuggestResult = {
 	score: number;
 };
 
+export type EnrichmentSource = 'listenbrainz' | 'lastfm' | 'none';
+
 export type ArtistEnrichment = {
 	musicbrainz_id: string;
 	release_group_count?: number | null;
@@ -64,10 +66,26 @@ export type AlbumEnrichment = {
 	listen_count?: number | null;
 };
 
+export type ArtistEnrichmentRequest = {
+	musicbrainz_id: string;
+	name: string;
+};
+
+export type AlbumEnrichmentRequest = {
+	musicbrainz_id: string;
+	artist_name: string;
+	album_name: string;
+};
+
+export type EnrichmentBatchRequest = {
+	artists: ArtistEnrichmentRequest[];
+	albums: AlbumEnrichmentRequest[];
+};
+
 export type EnrichmentResponse = {
 	artists: ArtistEnrichment[];
 	albums: AlbumEnrichment[];
-	listenbrainz_enabled: boolean;
+	source: EnrichmentSource;
 };
 
 export type ReleaseGroup = {
@@ -236,6 +254,7 @@ export type HomeTrack = {
 	album_name: string | null;
 	listen_count: number | null;
 	listened_at: string | null;
+	image_url?: string | null;
 };
 
 export type HomeGenre = {
@@ -275,6 +294,7 @@ export type HomeResponse = {
 	genre_list: HomeSection | null;
 	fresh_releases: HomeSection | null;
 	favorite_artists: HomeSection | null;
+	your_top_albums: HomeSection | null;
 	service_prompts: ServicePrompt[];
 	integration_status: Record<string, boolean>;
 	genre_artists: Record<string, string | null>;
@@ -304,8 +324,12 @@ export type DiscoverResponse = {
 	popular_in_your_genres: HomeSection | null;
 	genre_list: HomeSection | null;
 	globally_trending: HomeSection | null;
+	lastfm_weekly_artist_chart: HomeSection | null;
+	lastfm_weekly_album_chart: HomeSection | null;
+	lastfm_recent_scrobbles: HomeSection | null;
 	integration_status: Record<string, boolean>;
 	service_prompts: ServicePrompt[];
+	refreshing: boolean;
 };
 
 export type QualityProfile = {
@@ -484,6 +508,7 @@ export type DiscoverQueueItemLight = {
 };
 
 export type DiscoverQueueEnrichment = {
+	artist_mbid: string | null;
 	release_date: string | null;
 	country: string | null;
 	tags: string[];
@@ -507,13 +532,34 @@ export type YouTubeQuotaStatus = {
 	date: string;
 };
 
+export type DiscoverQueueItemFull = DiscoverQueueItemLight & {
+	enrichment?: DiscoverQueueEnrichment;
+};
+
 export type DiscoverQueueResponse = {
-	items: DiscoverQueueItemLight[];
+	items: DiscoverQueueItemFull[];
 	queue_id: string;
 };
 
-export type DiscoverQueueItemFull = DiscoverQueueItemLight & {
-	enrichment?: DiscoverQueueEnrichment;
+export type QueueStatusResponse = {
+	status: 'idle' | 'building' | 'ready' | 'error';
+	source: string;
+	queue_id?: string;
+	item_count?: number;
+	built_at?: number;
+	stale?: boolean;
+	error?: string;
+};
+
+export type QueueGenerateResponse = {
+	action: 'started' | 'already_building' | 'already_ready';
+	status: string;
+	source: string;
+	queue_id?: string;
+	item_count?: number;
+	built_at?: number;
+	stale?: boolean;
+	error?: string;
 };
 
 export type MoreByArtistResponse = {
@@ -742,4 +788,98 @@ export type LocalFilesConnectionSettings = {
 	enabled: boolean;
 	music_path: string;
 	lidarr_root_path: string;
+};
+
+export type LastFmConnectionSettings = {
+	api_key: string;
+	shared_secret: string;
+	session_key: string;
+	username: string;
+	enabled: boolean;
+};
+
+export type LastFmConnectionSettingsResponse = {
+	api_key: string;
+	shared_secret: string;
+	session_key: string;
+	username: string;
+	enabled: boolean;
+};
+
+export type LastFmVerifyResponse = {
+	valid: boolean;
+	message: string;
+};
+
+export type LastFmAuthTokenResponse = {
+	token: string;
+	auth_url: string;
+};
+
+export type LastFmAuthSessionResponse = {
+	username: string;
+	success: boolean;
+	message: string;
+};
+
+export type ScrobbleSettings = {
+	scrobble_to_lastfm: boolean;
+	scrobble_to_listenbrainz: boolean;
+};
+
+export type NowPlayingSubmission = {
+	track_name: string;
+	artist_name: string;
+	album_name: string;
+	duration_ms: number;
+	mbid?: string;
+};
+
+export type ScrobbleSubmission = {
+	track_name: string;
+	artist_name: string;
+	album_name: string;
+	timestamp: number;
+	duration_ms: number;
+	mbid?: string;
+};
+
+export type ServiceResult = {
+	success: boolean;
+	error?: string;
+};
+
+export type ScrobbleResponse = {
+	accepted: boolean;
+	services: Record<string, ServiceResult>;
+};
+
+export type LastFmTag = {
+	name: string;
+	url?: string | null;
+};
+
+export type LastFmSimilarArtistDetail = {
+	name: string;
+	mbid?: string | null;
+	match: number;
+	url?: string | null;
+};
+
+export type LastFmArtistEnrichment = {
+	bio?: string | null;
+	summary?: string | null;
+	tags: LastFmTag[];
+	listeners: number;
+	playcount: number;
+	similar_artists: LastFmSimilarArtistDetail[];
+	url?: string | null;
+};
+
+export type LastFmAlbumEnrichment = {
+	summary?: string | null;
+	tags: LastFmTag[];
+	listeners: number;
+	playcount: number;
+	url?: string | null;
 };

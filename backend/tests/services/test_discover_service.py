@@ -1,0 +1,584 @@
+import pytest
+from unittest.mock import AsyncMock, MagicMock
+
+from api.v1.schemas.settings import (
+    ListenBrainzConnectionSettings,
+    LastFmConnectionSettings,
+    PrimaryMusicSourceSettings,
+)
+from api.v1.schemas.search import SearchResult
+from repositories.listenbrainz_models import (
+    ListenBrainzArtist,
+    ListenBrainzReleaseGroup,
+    ListenBrainzGenreActivity,
+    ListenBrainzFeedbackRecording,
+)
+from services.discover_service import DiscoverService
+
+
+def _make_lb_settings(enabled: bool = True, username: str = "lbuser") -> ListenBrainzConnectionSettings:
+    return ListenBrainzConnectionSettings(
+        user_token="tok",
+        username=username,
+        enabled=enabled,
+    )
+
+
+def _make_lfm_settings(
+    enabled: bool = True, username: str = "lfmuser"
+) -> LastFmConnectionSettings:
+    return LastFmConnectionSettings(
+        api_key="key",
+        shared_secret="secret",
+        session_key="sk",
+        username=username,
+        enabled=enabled,
+    )
+
+
+def _make_prefs(
+    lb_enabled: bool = True,
+    lfm_enabled: bool = True,
+    primary_source: str = "listenbrainz",
+) -> MagicMock:
+    prefs = MagicMock()
+    prefs.get_listenbrainz_connection.return_value = _make_lb_settings(enabled=lb_enabled)
+    prefs.get_lastfm_connection.return_value = _make_lfm_settings(enabled=lfm_enabled)
+    prefs.is_lastfm_enabled.return_value = lfm_enabled
+    prefs.get_primary_music_source.return_value = PrimaryMusicSourceSettings(source=primary_source)
+
+    jf_settings = MagicMock()
+    jf_settings.enabled = False
+    jf_settings.jellyfin_url = ""
+    jf_settings.api_key = ""
+    prefs.get_jellyfin_connection.return_value = jf_settings
+
+    lidarr = MagicMock()
+    lidarr.lidarr_url = ""
+    lidarr.lidarr_api_key = ""
+    prefs.get_lidarr_connection.return_value = lidarr
+
+    yt = MagicMock()
+    yt.enabled = False
+    yt.api_key = ""
+    prefs.get_youtube_connection.return_value = yt
+
+    lf = MagicMock()
+    lf.enabled = False
+    lf.music_path = ""
+    prefs.get_local_files_connection.return_value = lf
+
+    adv = MagicMock()
+    adv.discover_queue_size = 10
+    adv.discover_queue_ttl = 3600
+    adv.discover_queue_seed_artists = 3
+    adv.discover_queue_wildcard_slots = 2
+    adv.discover_queue_similar_artists_limit = 15
+    adv.discover_queue_albums_per_similar = 3
+    adv.discover_queue_enrich_ttl = 3600
+    adv.discover_queue_lastfm_mbid_max_lookups = 10
+    prefs.get_advanced_settings.return_value = adv
+
+    return prefs
+
+
+def _make_service(
+    lb_enabled: bool = True,
+    lfm_enabled: bool = True,
+    primary_source: str = "listenbrainz",
+) -> tuple[DiscoverService, AsyncMock, AsyncMock, MagicMock]:
+    lb_repo = AsyncMock()
+    lb_repo.get_sitewide_top_artists = AsyncMock(return_value=[])
+    lb_repo.get_user_fresh_releases = AsyncMock(return_value=None)
+    lb_repo.get_user_genre_activity = AsyncMock(return_value=None)
+    lb_repo.configure = MagicMock()
+
+    lfm_repo = AsyncMock()
+    lfm_repo.get_global_top_artists = AsyncMock(return_value=[])
+    lfm_repo.get_user_weekly_artist_chart = AsyncMock(return_value=[])
+    lfm_repo.get_user_top_albums = AsyncMock(return_value=[])
+    lfm_repo.get_user_recent_tracks = AsyncMock(return_value=[])
+
+    jf_repo = AsyncMock()
+    lidarr_repo = AsyncMock()
+    mb_repo = AsyncMock()
+    prefs = _make_prefs(
+        lb_enabled=lb_enabled,
+        lfm_enabled=lfm_enabled,
+        primary_source=primary_source,
+    )
+
+    service = DiscoverService(
+        listenbrainz_repo=lb_repo,
+        jellyfin_repo=jf_repo,
+        lidarr_repo=lidarr_repo,
+        musicbrainz_repo=mb_repo,
+        preferences_service=prefs,
+        lastfm_repo=lfm_repo,
+    )
+    return service, lb_repo, lfm_repo, prefs
+
+
+class TestResolveSource:
+    def test_explicit_listenbrainz(self):
+        service, _, _, _ = _make_service(primary_source="lastfm")
+        assert service.resolve_source("listenbrainz") == "listenbrainz"
+
+    def test_explicit_lastfm(self):
+        service, _, _, _ = _make_service(primary_source="listenbrainz")
+        assert service.resolve_source("lastfm") == "lastfm"
+
+    def test_none_uses_global_setting(self):
+        service, _, _, _ = _make_service(primary_source="lastfm")
+        assert service.resolve_source(None) == "lastfm"
+
+    def test_invalid_uses_global_setting(self):
+        service, _, _, _ = _make_service(primary_source="listenbrainz")
+        assert service.resolve_source("invalid") == "listenbrainz"
+
+
+class TestLastFmSectionsAlwaysFetched:
+    @pytest.mark.asyncio
+    async def test_lastfm_tasks_fetched_when_source_is_listenbrainz(self):
+        """Last.fm weekly/recent tasks should be fetched even when primary source is listenbrainz."""
+        service, lb_repo, lfm_repo, _ = _make_service(
+            lb_enabled=True, lfm_enabled=True, primary_source="listenbrainz"
+        )
+        await service.build_discover_data(source="listenbrainz")
+        lfm_repo.get_user_weekly_artist_chart.assert_awaited_once()
+        lfm_repo.get_user_weekly_album_chart.assert_awaited_once()
+        lfm_repo.get_user_recent_tracks.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_lastfm_tasks_fetched_when_source_is_lastfm(self):
+        """Last.fm weekly/recent tasks should also be fetched when primary source is lastfm."""
+        service, _, lfm_repo, _ = _make_service(
+            lb_enabled=True, lfm_enabled=True, primary_source="lastfm"
+        )
+        await service.build_discover_data(source="lastfm")
+        lfm_repo.get_user_weekly_artist_chart.assert_awaited_once()
+        lfm_repo.get_user_weekly_album_chart.assert_awaited_once()
+        lfm_repo.get_user_recent_tracks.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_lastfm_tasks_not_fetched_when_lfm_disabled(self):
+        """Last.fm tasks should NOT be fetched when Last.fm is disabled."""
+        service, _, lfm_repo, _ = _make_service(
+            lb_enabled=True, lfm_enabled=False, primary_source="listenbrainz"
+        )
+        await service.build_discover_data(source="listenbrainz")
+        lfm_repo.get_user_weekly_artist_chart.assert_not_awaited()
+        lfm_repo.get_user_weekly_album_chart.assert_not_awaited()
+        lfm_repo.get_user_recent_tracks.assert_not_awaited()
+
+
+class TestGloballyTrendingSourceSelection:
+    @pytest.mark.asyncio
+    async def test_listenbrainz_trending_when_source_is_lb(self):
+        """When source is listenbrainz, LB sitewide_top_artists should be called for trending."""
+        service, lb_repo, lfm_repo, _ = _make_service(
+            lb_enabled=True, lfm_enabled=True, primary_source="listenbrainz"
+        )
+        await service.build_discover_data(source="listenbrainz")
+        lb_repo.get_sitewide_top_artists.assert_awaited_once()
+        lfm_repo.get_global_top_artists.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_lastfm_trending_when_source_is_lastfm(self):
+        """When source is lastfm, LFM global_top_artists should be called for trending."""
+        service, lb_repo, lfm_repo, _ = _make_service(
+            lb_enabled=True, lfm_enabled=True, primary_source="lastfm"
+        )
+        await service.build_discover_data(source="lastfm")
+        lfm_repo.get_global_top_artists.assert_awaited_once()
+        lb_repo.get_sitewide_top_artists.assert_not_awaited()
+
+
+class TestCacheKeySourceAware:
+    def test_different_sources_produce_different_keys(self):
+        service, _, _, _ = _make_service()
+        key_lb = service._get_discover_cache_key("listenbrainz")
+        key_lfm = service._get_discover_cache_key("lastfm")
+        assert key_lb != key_lfm
+        assert "listenbrainz" in key_lb
+        assert "lastfm" in key_lfm
+
+    def test_none_source_uses_global_default(self):
+        service, _, _, _ = _make_service(primary_source="lastfm")
+        key = service._get_discover_cache_key(None)
+        assert "lastfm" in key
+
+
+class TestBuildServicePrompts:
+    def _make_all_enabled(self) -> DiscoverService:
+        prefs = _make_prefs(lb_enabled=True, lfm_enabled=True)
+        jf = MagicMock()
+        jf.enabled = True
+        jf.jellyfin_url = "http://jf"
+        jf.api_key = "jf-key"
+        prefs.get_jellyfin_connection.return_value = jf
+        lidarr = MagicMock()
+        lidarr.lidarr_url = "http://lidarr"
+        lidarr.lidarr_api_key = "lidarr-key"
+        prefs.get_lidarr_connection.return_value = lidarr
+        service = DiscoverService(
+            listenbrainz_repo=AsyncMock(),
+            jellyfin_repo=AsyncMock(),
+            lidarr_repo=AsyncMock(),
+            musicbrainz_repo=AsyncMock(),
+            preferences_service=prefs,
+            lastfm_repo=AsyncMock(),
+        )
+        return service
+
+    def test_lastfm_prompt_shown_when_disabled(self):
+        service = self._make_all_enabled()
+        service._preferences.is_lastfm_enabled.return_value = False
+        prompts = service._build_service_prompts()
+        services = [p.service for p in prompts]
+        assert "lastfm" in services
+
+    def test_lastfm_prompt_hidden_when_enabled(self):
+        service = self._make_all_enabled()
+        prompts = service._build_service_prompts()
+        services = [p.service for p in prompts]
+        assert "lastfm" not in services
+
+    def test_no_prompts_when_all_enabled(self):
+        service = self._make_all_enabled()
+        prompts = service._build_service_prompts()
+        assert prompts == []
+
+    def test_all_prompts_when_nothing_enabled(self):
+        service, _, _, _ = _make_service(lb_enabled=False, lfm_enabled=False)
+        prompts = service._build_service_prompts()
+        services = {p.service for p in prompts}
+        assert services == {"lidarr-connection", "listenbrainz", "jellyfin", "lastfm"}
+
+    def test_lb_prompt_mentions_lastfm(self):
+        service = self._make_all_enabled()
+        lb_settings = _make_lb_settings(enabled=False)
+        service._preferences.get_listenbrainz_connection.return_value = lb_settings
+        prompts = service._build_service_prompts()
+        lb_prompt = next(p for p in prompts if p.service == "listenbrainz")
+        assert "last.fm" in lb_prompt.description.lower()
+
+
+class TestBuildArtistsYouMightLikeLastFm:
+    def test_handles_lastfm_similar_artist_shape(self):
+        """_build_artists_you_might_like must work with LastFmSimilarArtist (mbid/name, not artist_mbid/artist_name)."""
+        from repositories.lastfm_models import LastFmSimilarArtist
+
+        service, _, _, _ = _make_service(primary_source="lastfm")
+        seed = MagicMock(artist_name="Radiohead", artist_mbids=["seed-mbid"])
+        similar = [
+            LastFmSimilarArtist(name="Muse", mbid="muse-mbid", match=0.9),
+            LastFmSimilarArtist(name="Coldplay", mbid="coldplay-mbid", match=0.7),
+        ]
+        results = {"similar_0": similar}
+        seen: set[str] = set()
+        section = service._build_artists_you_might_like(
+            [seed], results, set(), seen, resolved_source="lastfm"
+        )
+        assert section is not None
+        assert len(section.items) == 2
+        assert section.items[0].name == "Muse"
+        assert section.items[0].mbid == "muse-mbid"
+        assert section.items[1].name == "Coldplay"
+        assert section.source == "lastfm"
+
+    def test_handles_listenbrainz_similar_artist_shape(self):
+        """_build_artists_you_might_like must also still work with LB similar artist objects."""
+        service, _, _, _ = _make_service(primary_source="listenbrainz")
+        seed = MagicMock(artist_name="Radiohead", artist_mbids=["seed-mbid"])
+        lb_similar = MagicMock(
+            artist_mbid="muse-mbid",
+            artist_name="Muse",
+            listen_count=500,
+        )
+        lb_similar.mbid = None
+        lb_similar.name = None
+        lb_similar.playcount = None
+        results = {"similar_0": [lb_similar]}
+        seen: set[str] = set()
+        section = service._build_artists_you_might_like(
+            [seed], results, set(), seen, resolved_source="listenbrainz"
+        )
+        assert section is not None
+        assert section.items[0].name == "Muse"
+        assert section.items[0].mbid == "muse-mbid"
+        assert section.source == "listenbrainz"
+
+    def test_skips_artists_without_mbid(self):
+        """Artists with no mbid should be skipped."""
+        from repositories.lastfm_models import LastFmSimilarArtist
+
+        service, _, _, _ = _make_service()
+        seed = MagicMock(artist_name="Seed", artist_mbids=["seed-mbid"])
+        similar = [
+            LastFmSimilarArtist(name="NoMBID", mbid=None, match=0.5),
+        ]
+        results = {"similar_0": similar}
+        seen: set[str] = set()
+        section = service._build_artists_you_might_like(
+            [seed], results, set(), seen, resolved_source="lastfm"
+        )
+        assert section is None
+
+
+class TestDiscoverQueuePersonalization:
+    @pytest.mark.asyncio
+    async def test_queue_uses_non_wildcard_strategies_when_seed_similar_empty(self):
+        service, lb_repo, _, _ = _make_service(lb_enabled=True, lfm_enabled=False)
+        mb_repo = service._mb_repo
+
+        lb_repo.get_user_top_artists = AsyncMock(
+            return_value=[
+                ListenBrainzArtist("Seed A", 100, ["seed-a"]),
+                ListenBrainzArtist("Seed B", 90, ["seed-b"]),
+                ListenBrainzArtist("Seed C", 80, ["seed-c"]),
+            ]
+        )
+        lb_repo.get_similar_artists = AsyncMock(return_value=[])
+        lb_repo.get_user_genre_activity = AsyncMock(
+            return_value=[ListenBrainzGenreActivity("post-rock", 150)]
+        )
+        mb_repo.search_release_groups_by_tag = AsyncMock(
+            return_value=[
+                SearchResult(
+                    type="album",
+                    title="Genre Album 1",
+                    artist="Genre Artist",
+                    musicbrainz_id="genre-rg-1",
+                ),
+                SearchResult(
+                    type="album",
+                    title="Genre Album 2",
+                    artist="Genre Artist",
+                    musicbrainz_id="genre-rg-2",
+                ),
+            ]
+        )
+        lb_repo.get_user_fresh_releases = AsyncMock(
+            return_value=[
+                {
+                    "release_group_mbid": "fresh-rg-1",
+                    "title": "Fresh Album",
+                    "artist_credit_name": "Fresh Artist",
+                    "artist_mbids": ["fresh-artist-1"],
+                }
+            ]
+        )
+        lb_repo.get_user_loved_recordings = AsyncMock(
+            return_value=[
+                ListenBrainzFeedbackRecording(
+                    track_name="Loved Track",
+                    artist_name="Loved Artist",
+                    artist_mbids=["loved-artist-1"],
+                )
+            ]
+        )
+
+        async def top_release_groups_side_effect(
+            username: str | None = None,
+            range_: str = "this_month",
+            count: int = 25,
+            offset: int = 0,
+        ) -> list[ListenBrainzReleaseGroup]:
+            if range_ == "all_time":
+                return []
+            return [
+                ListenBrainzReleaseGroup(
+                    release_group_name="Current Top",
+                    artist_name="Top Artist",
+                    listen_count=10,
+                    release_group_mbid="top-current-rg",
+                    artist_mbids=["top-artist-1"],
+                )
+            ]
+
+        lb_repo.get_user_top_release_groups = AsyncMock(side_effect=top_release_groups_side_effect)
+
+        async def artist_release_groups_side_effect(
+            artist_mbid: str,
+            count: int = 10,
+        ) -> list[ListenBrainzReleaseGroup]:
+            if artist_mbid == "loved-artist-1":
+                return [
+                    ListenBrainzReleaseGroup(
+                        release_group_name="Loved Artist Album",
+                        artist_name="Loved Artist",
+                        listen_count=50,
+                        release_group_mbid="loved-rg-1",
+                    )
+                ]
+            if artist_mbid == "top-artist-1":
+                return [
+                    ListenBrainzReleaseGroup(
+                        release_group_name="Deep Cut Album",
+                        artist_name="Top Artist",
+                        listen_count=20,
+                        release_group_mbid="deep-cut-rg-1",
+                    )
+                ]
+            return []
+
+        lb_repo.get_artist_top_release_groups = AsyncMock(side_effect=artist_release_groups_side_effect)
+
+        lb_repo.get_sitewide_top_release_groups = AsyncMock(
+            return_value=[
+                ListenBrainzReleaseGroup(
+                    release_group_name=f"Wildcard {i}",
+                    artist_name=f"Wildcard Artist {i}",
+                    listen_count=100 - i,
+                    release_group_mbid=f"wild-rg-{i}",
+                    artist_mbids=[f"wild-artist-{i}"],
+                )
+                for i in range(20)
+            ]
+        )
+
+        queue = await service.build_queue(count=10, source="listenbrainz")
+
+        assert len(queue.items) == 10
+        assert any(not item.is_wildcard for item in queue.items)
+        assert any(
+            "Because you listen to" in item.recommendation_reason
+            or item.recommendation_reason == "New release for you"
+            or item.recommendation_reason == "From an artist you love"
+            for item in queue.items
+        )
+
+    @pytest.mark.asyncio
+    async def test_queue_all_wildcards_when_all_personalized_strategies_empty(self):
+        service, lb_repo, _, _ = _make_service(lb_enabled=True, lfm_enabled=False)
+        mb_repo = service._mb_repo
+
+        lb_repo.get_user_top_artists = AsyncMock(
+            return_value=[
+                ListenBrainzArtist("Seed A", 100, ["seed-a"]),
+                ListenBrainzArtist("Seed B", 90, ["seed-b"]),
+                ListenBrainzArtist("Seed C", 80, ["seed-c"]),
+            ]
+        )
+        lb_repo.get_similar_artists = AsyncMock(return_value=[])
+        lb_repo.get_user_genre_activity = AsyncMock(return_value=[])
+        mb_repo.search_release_groups_by_tag = AsyncMock(return_value=[])
+        lb_repo.get_user_fresh_releases = AsyncMock(return_value=[])
+        lb_repo.get_user_loved_recordings = AsyncMock(return_value=[])
+
+        async def no_top_release_groups(
+            username: str | None = None,
+            range_: str = "this_month",
+            count: int = 25,
+            offset: int = 0,
+        ) -> list[ListenBrainzReleaseGroup]:
+            return []
+
+        lb_repo.get_user_top_release_groups = AsyncMock(side_effect=no_top_release_groups)
+        lb_repo.get_artist_top_release_groups = AsyncMock(return_value=[])
+        lb_repo.get_sitewide_top_release_groups = AsyncMock(
+            return_value=[
+                ListenBrainzReleaseGroup(
+                    release_group_name=f"Wildcard {i}",
+                    artist_name=f"Wildcard Artist {i}",
+                    listen_count=100 - i,
+                    release_group_mbid=f"wild-rg-{i}",
+                    artist_mbids=[f"wild-artist-{i}"],
+                )
+                for i in range(20)
+            ]
+        )
+
+        queue = await service.build_queue(count=10, source="listenbrainz")
+
+        assert len(queue.items) == 10
+        assert all(item.is_wildcard for item in queue.items)
+
+    @pytest.mark.asyncio
+    async def test_deep_cuts_excludes_listened_release_groups(self):
+        """Deep cuts strategy should exclude listened release groups, other strategies should not."""
+        service, lb_repo, _, _ = _make_service(lb_enabled=True, lfm_enabled=False)
+        mb_repo = service._mb_repo
+
+        lb_repo.get_user_top_artists = AsyncMock(
+            return_value=[
+                ListenBrainzArtist("Seed A", 100, ["seed-a"]),
+            ]
+        )
+        lb_repo.get_similar_artists = AsyncMock(return_value=[])
+        lb_repo.get_user_genre_activity = AsyncMock(return_value=[])
+        mb_repo.search_release_groups_by_tag = AsyncMock(return_value=[])
+        lb_repo.get_user_loved_recordings = AsyncMock(return_value=[])
+        lb_repo.get_user_fresh_releases = AsyncMock(return_value=[])
+
+        async def top_release_groups_side_effect(
+            username: str | None = None,
+            range_: str = "this_month",
+            count: int = 25,
+            offset: int = 0,
+        ) -> list[ListenBrainzReleaseGroup]:
+            if range_ == "all_time":
+                return [
+                    ListenBrainzReleaseGroup(
+                        release_group_name="Already Heard",
+                        artist_name="Deep Artist",
+                        listen_count=120,
+                        release_group_mbid="listened-rg-1",
+                        artist_mbids=["deep-artist-1"],
+                    )
+                ]
+            if range_ == "this_month":
+                return [
+                    ListenBrainzReleaseGroup(
+                        release_group_name="Current Fav",
+                        artist_name="Deep Artist",
+                        listen_count=50,
+                        release_group_mbid="current-rg-1",
+                        artist_mbids=["deep-artist-1"],
+                    )
+                ]
+            return []
+
+        lb_repo.get_user_top_release_groups = AsyncMock(side_effect=top_release_groups_side_effect)
+
+        async def artist_release_groups_side_effect(
+            artist_mbid: str,
+            count: int = 10,
+        ) -> list[ListenBrainzReleaseGroup]:
+            if artist_mbid == "deep-artist-1":
+                return [
+                    ListenBrainzReleaseGroup(
+                        release_group_name="Already Heard",
+                        artist_name="Deep Artist",
+                        listen_count=120,
+                        release_group_mbid="listened-rg-1",
+                    ),
+                    ListenBrainzReleaseGroup(
+                        release_group_name="Unheard Deep Cut",
+                        artist_name="Deep Artist",
+                        listen_count=5,
+                        release_group_mbid="deep-cut-new",
+                    ),
+                ]
+            return []
+
+        lb_repo.get_artist_top_release_groups = AsyncMock(side_effect=artist_release_groups_side_effect)
+        lb_repo.get_sitewide_top_release_groups = AsyncMock(
+            return_value=[
+                ListenBrainzReleaseGroup(
+                    release_group_name=f"Wildcard {i}",
+                    artist_name=f"Wildcard Artist {i}",
+                    listen_count=100 - i,
+                    release_group_mbid=f"wild-rg-{i}",
+                    artist_mbids=[f"wild-artist-{i}"],
+                )
+                for i in range(20)
+            ]
+        )
+
+        queue = await service.build_queue(count=10, source="listenbrainz")
+        mbids = {item.release_group_mbid.lower() for item in queue.items}
+
+        assert "listened-rg-1" not in mbids, "Deep cuts should exclude listened release groups"
+        assert "deep-cut-new" in mbids, "Unheard deep cuts should be included"

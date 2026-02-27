@@ -9,6 +9,7 @@
 		setJellyfinSidebarCachedData
 	} from '$lib/utils/jellyfinLibraryCache';
 	import { launchJellyfinPlayback } from '$lib/player/launchJellyfinPlayback';
+	import { getCoverUrl } from '$lib/utils/errorHandling';
 	import type {
 		JellyfinAlbumSummary,
 		JellyfinPaginatedResponse,
@@ -217,7 +218,7 @@
 				albumId: album.musicbrainz_id || album.jellyfin_id,
 				albumName: album.name,
 				artistName: album.artist_name,
-				coverUrl: album.image_url ?? ''
+				coverUrl: getCoverUrl(album.image_url, album.musicbrainz_id || album.jellyfin_id)
 			});
 		} catch {} finally {
 			playingAlbumId = null;

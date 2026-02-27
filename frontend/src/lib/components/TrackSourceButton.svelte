@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { Play } from 'lucide-svelte';
 	import type { Snippet } from 'svelte';
 
 	interface Props {

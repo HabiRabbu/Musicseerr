@@ -40,7 +40,7 @@
 		<CarouselSkeleton count={6} cardWidth="w-36" />
 	{:else if !configured}
 		<div class="bg-base-200 rounded-lg p-6 text-center">
-			<p class="text-base-content/70">Connect ListenBrainz in Settings to see recommendations</p>
+			<p class="text-base-content/70">Connect a music service in Settings to see recommendations</p>
 			<a href="/settings" class="btn btn-primary btn-sm mt-3">Configure</a>
 		</div>
 	{:else if albums.length === 0}

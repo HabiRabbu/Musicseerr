@@ -21,6 +21,7 @@ class DiscoverQueueItemLight(BaseModel):
 
 
 class DiscoverQueueEnrichment(BaseModel):
+    artist_mbid: str | None = None
     release_date: str | None = None
     country: str | None = None
     tags: list[str] = Field(default_factory=list)
@@ -29,6 +30,10 @@ class DiscoverQueueEnrichment(BaseModel):
     youtube_search_available: bool = False
     artist_description: str | None = None
     listen_count: int | None = None
+
+
+class DiscoverQueueItemFull(DiscoverQueueItemLight):
+    enrichment: DiscoverQueueEnrichment | None = None
 
 
 class YouTubeSearchResponse(BaseModel):
@@ -45,7 +50,7 @@ class YouTubeQuotaResponse(BaseModel):
 
 
 class DiscoverQueueResponse(BaseModel):
-    items: list[DiscoverQueueItemLight] = Field(default_factory=list)
+    items: list[DiscoverQueueItemLight | DiscoverQueueItemFull] = Field(default_factory=list)
     queue_id: str = ""
 
 
@@ -62,6 +67,32 @@ class DiscoverQueueValidateRequest(BaseModel):
 
 class DiscoverQueueValidateResponse(BaseModel):
     in_library: list[str] = Field(default_factory=list)
+
+
+class QueueStatusResponse(BaseModel):
+    status: str = Field(description="Queue build status: idle, building, ready, error")
+    source: str = Field(description="Source the queue was built for")
+    queue_id: str | None = Field(default=None, description="Queue ID if ready")
+    item_count: int | None = Field(default=None, description="Number of items if ready")
+    built_at: float | None = Field(default=None, description="Unix timestamp when queue was built")
+    stale: bool | None = Field(default=None, description="Whether the queue has expired")
+    error: str | None = Field(default=None, description="Error message if build failed")
+
+
+class QueueGenerateRequest(BaseModel):
+    source: str | None = Field(default=None, description="Data source override")
+    force: bool = Field(default=False, description="Force rebuild even if a ready queue exists")
+
+
+class QueueGenerateResponse(BaseModel):
+    action: str = Field(description="What happened: started, already_building, already_ready")
+    status: str = Field(description="Current queue build status")
+    source: str = Field(description="Source the queue is being built for")
+    queue_id: str | None = Field(default=None)
+    item_count: int | None = Field(default=None)
+    built_at: float | None = Field(default=None)
+    stale: bool | None = Field(default=None)
+    error: str | None = Field(default=None)
 
 
 class DiscoverResponse(BaseModel):
@@ -101,6 +132,15 @@ class DiscoverResponse(BaseModel):
     )
     genre_artists: dict[str, str | None] = Field(
         default_factory=dict, description="Map of genre name to representative artist MBID"
+    )
+    lastfm_weekly_artist_chart: HomeSection | None = Field(
+        default=None, description="User's Last.fm weekly top artists"
+    )
+    lastfm_weekly_album_chart: HomeSection | None = Field(
+        default=None, description="User's Last.fm weekly top albums"
+    )
+    lastfm_recent_scrobbles: HomeSection | None = Field(
+        default=None, description="User's recently scrobbled albums from Last.fm"
     )
     refreshing: bool = Field(
         default=False, description="Whether a background refresh is in progress"

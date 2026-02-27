@@ -57,16 +57,23 @@
 		full: API_SIZES.FULL
 	};
 
+	$: canonicalAlbumCoverUrl =
+		imageType === 'album' && isValidMbid(mbid)
+			? `/api/covers/release-group/${mbid}?size=${apiSizes[size]}`
+			: null;
 	$: validMbid = imageType === 'artist' ? isValidMbid(mbid) : true;
-	$: hasSource = imageType === 'album' ? (mbid || customUrl) : validMbid;
+	$: hasSource = imageType === 'album' ? (canonicalAlbumCoverUrl || customUrl || mbid) : validMbid;
 	$: apiEndpoint = imageType === 'album' ? 'release-group' : 'artist';
-	$: coverUrl = customUrl ?? `/api/covers/${apiEndpoint}/${mbid}?size=${apiSizes[size]}`;
+	$: fallbackCoverUrl = `/api/covers/${apiEndpoint}/${mbid}?size=${apiSizes[size]}`;
+	$: coverUrl = imageType === 'album'
+		? (canonicalAlbumCoverUrl ?? customUrl ?? fallbackCoverUrl)
+		: fallbackCoverUrl;
 	$: sizeClasses = imageType === 'album' ? albumSizeClasses : artistSizeClasses;
 	$: sizeClass = sizeClasses[size];
 	$: roundedClass = roundedClasses[rounded];
 
 	$: {
-		const source = customUrl ?? mbid;
+		const source = imageType === 'album' ? (canonicalAlbumCoverUrl ?? customUrl ?? mbid) : mbid;
 		if (source && imgElement && source !== currentSource) {
 			currentSource = source;
 			imgError = false;

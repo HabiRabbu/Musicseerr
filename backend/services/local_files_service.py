@@ -19,6 +19,7 @@ from api.v1.schemas.local_files import (
 from api.v1.schemas.settings import LocalFilesVerifyResponse
 from core.exceptions import ExternalServiceError, ResourceNotFoundError
 from infrastructure.cache.memory_cache import CacheInterface
+from infrastructure.cover_urls import prefer_release_group_cover_url
 from infrastructure.constants import STREAM_CHUNK_SIZE
 from repositories.lidarr.repository import LidarrRepository
 from services.preferences_service import PreferencesService
@@ -311,6 +312,7 @@ class LocalFilesService:
             except ValueError:
                 pass
 
+        mbid = item.get("foreignAlbumId", "")
         cover_url = None
         images = item.get("images", [])
         for img in images:
@@ -319,12 +321,13 @@ class LocalFilesService:
                 break
         if not cover_url and images:
             cover_url = images[0].get("remoteUrl") or images[0].get("url")
+        cover_url = prefer_release_group_cover_url(mbid, cover_url, size=500)
 
         total_size = item.get("statistics", {}).get("sizeOnDisk", 0)
 
         return LocalAlbumSummary(
             lidarr_album_id=album_id,
-            musicbrainz_id=item.get("foreignAlbumId", ""),
+            musicbrainz_id=mbid,
             name=item.get("title", "Unknown"),
             artist_name=artist_data.get("artistName", "Unknown"),
             artist_mbid=artist_data.get("foreignArtistId"),

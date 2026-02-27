@@ -120,3 +120,45 @@ def dedupe_by_id(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
     result = list(seen.values())
     result.sort(key=get_score, reverse=True)
     return result
+
+
+def _normalize_tag_phrase(tag: str) -> str:
+    return " ".join(tag.strip().lower().split())
+
+
+def _escape_lucene_phrase(value: str) -> str:
+    return value.replace("\\", "\\\\").replace('"', '\\"')
+
+
+def build_musicbrainz_tag_query(tag: str) -> str:
+    base = _normalize_tag_phrase(tag)
+    if not base:
+        return 'tag:""^3'
+
+    variants: list[str] = [base]
+    seen = {base}
+
+    def add_variant(value: str) -> None:
+        normalized = _normalize_tag_phrase(value)
+        if normalized and normalized not in seen:
+            seen.add(normalized)
+            variants.append(normalized)
+
+    add_variant(base.replace("-", " "))
+    add_variant(base.replace(" ", "-"))
+
+    if "&" in base:
+        add_variant(base.replace("&", " and "))
+        add_variant(base.replace("&", " "))
+
+    if " and " in base:
+        add_variant(base.replace(" and ", " & "))
+        add_variant(base.replace(" and ", " "))
+
+    clauses = []
+    for index, variant in enumerate(variants):
+        escaped = _escape_lucene_phrase(variant)
+        boost = "^3" if index == 0 else "^2"
+        clauses.append(f'tag:"{escaped}"{boost}')
+
+    return " OR ".join(clauses)

@@ -13,11 +13,18 @@ from api.v1.schemas.settings import (
     LocalFilesVerifyResponse,
     LidarrMetadataProfilePreferences,
     LidarrMetadataProfileSummary,
+    LastFmConnectionSettings,
+    LastFmConnectionSettingsResponse,
+    LastFmVerifyResponse,
+    ScrobbleSettings,
+    PrimaryMusicSourceSettings,
+    LASTFM_SECRET_MASK,
 )
 from api.v1.schemas.advanced_settings import AdvancedSettingsFrontend, FrontendCacheTTLs
 from core.dependencies import (
     get_preferences_service,
     get_settings_service,
+    get_coverart_repository,
     get_youtube_repo,
     get_local_files_service,
     get_jellyfin_repository,
@@ -27,11 +34,15 @@ from core.dependencies import (
     get_home_service,
     get_home_charts_service,
     get_library_cache,
+    get_lastfm_repository,
+    get_lastfm_auth_service,
+    clear_lastfm_dependent_caches,
 )
 from core.exceptions import ConfigurationError, ExternalServiceError
 from repositories.jellyfin_repository import JellyfinRepository
 from repositories.listenbrainz_repository import ListenBrainzRepository
 from repositories.youtube import YouTubeRepository
+from repositories.lastfm_repository import LastFmRepository
 from services.local_files_service import LocalFilesService
 from services.preferences_service import PreferencesService
 from services.settings_service import SettingsService
@@ -109,6 +120,8 @@ async def get_frontend_cache_ttls():
             search=backend_settings.frontend_ttl_search,
             local_files_sidebar=backend_settings.frontend_ttl_local_files_sidebar,
             jellyfin_sidebar=backend_settings.frontend_ttl_jellyfin_sidebar,
+            discover_queue_polling_interval=backend_settings.discover_queue_polling_interval,
+            discover_queue_auto_generate=backend_settings.discover_queue_auto_generate,
         )
     except Exception as e:
         logger.exception(f"Failed to get frontend cache TTLs: {e}")
@@ -132,6 +145,7 @@ async def update_advanced_settings(settings: AdvancedSettingsFrontend):
         preferences_service = get_preferences_service()
         backend_settings = settings.to_backend()
         preferences_service.save_advanced_settings(backend_settings)
+        get_coverart_repository.cache_clear()
         logger.info("Updated advanced settings")
         return settings
     except ConfigurationError as e:
@@ -438,3 +452,134 @@ async def verify_local_files_connection(
     local_service: LocalFilesService = Depends(get_local_files_service),
 ) -> LocalFilesVerifyResponse:
     return await local_service.verify_path(settings.music_path)
+
+
+@router.get("/lastfm", response_model=LastFmConnectionSettingsResponse)
+async def get_lastfm_settings():
+    try:
+        preferences_service = get_preferences_service()
+        settings = preferences_service.get_lastfm_connection()
+        return LastFmConnectionSettingsResponse.from_settings(settings)
+    except Exception as e:
+        logger.exception("Failed to get Last.fm settings: %s", e)
+        raise HTTPException(status_code=500, detail="Failed to retrieve Last.fm settings")
+
+
+@router.put("/lastfm", response_model=LastFmConnectionSettingsResponse)
+async def update_lastfm_settings(settings: LastFmConnectionSettings):
+    try:
+        preferences_service = get_preferences_service()
+        preferences_service.save_lastfm_connection(settings)
+        LastFmRepository.reset_circuit_breaker()
+        get_lastfm_repository.cache_clear()
+        get_lastfm_auth_service.cache_clear()
+        clear_lastfm_dependent_caches()
+        settings_service = get_settings_service()
+        await settings_service.clear_home_cache()
+        logger.info("Updated Last.fm connection settings")
+        saved = preferences_service.get_lastfm_connection()
+        return LastFmConnectionSettingsResponse.from_settings(saved)
+    except ConfigurationError as e:
+        logger.warning("Configuration error updating Last.fm settings: %s", e)
+        raise HTTPException(status_code=400, detail="Invalid Last.fm configuration")
+    except Exception as e:
+        logger.exception("Failed to save Last.fm settings: %s", e)
+        raise HTTPException(status_code=500, detail="Failed to save Last.fm settings")
+
+
+@router.post("/lastfm/verify", response_model=LastFmVerifyResponse)
+async def verify_lastfm_connection(settings: LastFmConnectionSettings):
+    from infrastructure.http.client import get_http_client
+    from core.config import get_settings as get_app_settings
+    from infrastructure.cache.memory_cache import InMemoryCache
+
+    try:
+        app_settings = get_app_settings()
+        http_client = get_http_client(app_settings)
+
+        preferences_service = get_preferences_service()
+        current = preferences_service.get_lastfm_connection()
+        shared_secret = settings.shared_secret
+        if shared_secret.startswith(LASTFM_SECRET_MASK):
+            shared_secret = current.shared_secret
+
+        session_key = settings.session_key
+        if session_key.startswith(LASTFM_SECRET_MASK):
+            session_key = current.session_key
+
+        temp_repo = LastFmRepository(
+            http_client=http_client,
+            cache=InMemoryCache(),
+            api_key=settings.api_key,
+            shared_secret=shared_secret,
+            session_key=session_key,
+        )
+        valid, message = await temp_repo.validate_api_key()
+        if not valid:
+            return LastFmVerifyResponse(valid=False, message=message)
+
+        if session_key:
+            session_valid, session_message = await temp_repo.validate_session()
+            if not session_valid:
+                return LastFmVerifyResponse(
+                    valid=False,
+                    message=f"API key valid, but session invalid: {session_message}",
+                )
+            return LastFmVerifyResponse(valid=True, message=session_message)
+
+        return LastFmVerifyResponse(valid=valid, message=message)
+    except Exception as e:
+        logger.exception("Failed to verify Last.fm connection: %s", e)
+        return LastFmVerifyResponse(valid=False, message="Verification error")
+
+
+@router.get("/scrobble", response_model=ScrobbleSettings)
+async def get_scrobble_settings():
+    try:
+        preferences_service = get_preferences_service()
+        return preferences_service.get_scrobble_settings()
+    except Exception as e:
+        logger.exception("Failed to get scrobble settings: %s", e)
+        raise HTTPException(status_code=500, detail="Failed to retrieve scrobble settings")
+
+
+@router.put("/scrobble", response_model=ScrobbleSettings)
+async def update_scrobble_settings(settings: ScrobbleSettings):
+    try:
+        preferences_service = get_preferences_service()
+        preferences_service.save_scrobble_settings(settings)
+        logger.info("Updated scrobble settings")
+        return preferences_service.get_scrobble_settings()
+    except ConfigurationError as e:
+        logger.warning("Configuration error updating scrobble settings: %s", e)
+        raise HTTPException(status_code=400, detail="Invalid scrobble configuration")
+    except Exception as e:
+        logger.exception("Failed to save scrobble settings: %s", e)
+        raise HTTPException(status_code=500, detail="Failed to save scrobble settings")
+
+
+@router.get("/primary-source", response_model=PrimaryMusicSourceSettings)
+async def get_primary_music_source():
+    try:
+        preferences_service = get_preferences_service()
+        return preferences_service.get_primary_music_source()
+    except Exception as e:
+        logger.exception("Failed to get primary music source: %s", e)
+        raise HTTPException(status_code=500, detail="Failed to retrieve primary music source")
+
+
+@router.put("/primary-source", response_model=PrimaryMusicSourceSettings)
+async def update_primary_music_source(settings: PrimaryMusicSourceSettings):
+    try:
+        preferences_service = get_preferences_service()
+        preferences_service.save_primary_music_source(settings)
+        settings_service = get_settings_service()
+        await settings_service.clear_home_cache()
+        logger.info("Updated primary music source to %s", settings.source)
+        return preferences_service.get_primary_music_source()
+    except ConfigurationError as e:
+        logger.warning("Configuration error updating primary music source: %s", e)
+        raise HTTPException(status_code=400, detail="Invalid primary music source")
+    except Exception as e:
+        logger.exception("Failed to save primary music source: %s", e)
+        raise HTTPException(status_code=500, detail="Failed to save primary music source")

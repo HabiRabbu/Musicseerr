@@ -1,0 +1,112 @@
+import pytest
+from unittest.mock import AsyncMock, MagicMock
+
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
+
+from api.v1.routes.covers import router
+from core.dependencies import get_coverart_repository
+
+
+@pytest.fixture
+def mock_cover_repo():
+    mock = MagicMock()
+    mock.get_release_group_cover = AsyncMock(return_value=(b'rg-image', 'image/jpeg', 'lidarr'))
+    mock.get_release_cover = AsyncMock(return_value=(b'rel-image', 'image/jpeg', 'jellyfin'))
+    mock.get_artist_image = AsyncMock(return_value=(b'artist-image', 'image/png', 'wikidata'))
+    mock.get_release_group_cover_etag = AsyncMock(return_value='etag-rg')
+    mock.get_release_cover_etag = AsyncMock(return_value='etag-rel')
+    mock.get_artist_image_etag = AsyncMock(return_value='etag-artist')
+    return mock
+
+
+@pytest.fixture
+def client(mock_cover_repo):
+    app = FastAPI()
+    app.include_router(router)
+    app.dependency_overrides[get_coverart_repository] = lambda: mock_cover_repo
+    return TestClient(app)
+
+
+def test_release_group_uses_dynamic_source_header(client):
+    response = client.get('/api/covers/release-group/11111111-1111-1111-1111-111111111111?size=500')
+
+    assert response.status_code == 200
+    assert response.headers['x-cover-source'] == 'lidarr'
+
+
+def test_release_uses_dynamic_source_header(client):
+    response = client.get('/api/covers/release/22222222-2222-2222-2222-222222222222?size=500')
+
+    assert response.status_code == 200
+    assert response.headers['x-cover-source'] == 'jellyfin'
+
+
+def test_artist_uses_dynamic_source_header(client, mock_cover_repo):
+    mock_cover_repo.get_artist_image = AsyncMock(return_value=(b'artist-image', 'image/png', 'lidarr'))
+
+    response = client.get('/api/covers/artist/33333333-3333-3333-3333-333333333333?size=250')
+
+    assert response.status_code == 200
+    assert response.headers['x-cover-source'] == 'lidarr'
+
+
+def test_release_group_uses_placeholder_header_when_missing(client, mock_cover_repo):
+    mock_cover_repo.get_release_group_cover = AsyncMock(return_value=None)
+
+    response = client.get('/api/covers/release-group/44444444-4444-4444-4444-444444444444?size=500')
+
+    assert response.status_code == 200
+    assert response.headers['x-cover-source'] == 'placeholder'
+
+
+def test_artist_uses_placeholder_header_when_missing(client, mock_cover_repo):
+    mock_cover_repo.get_artist_image = AsyncMock(return_value=None)
+
+    response = client.get('/api/covers/artist/55555555-5555-5555-5555-555555555555')
+
+    assert response.status_code == 200
+    assert response.headers['x-cover-source'] == 'placeholder'
+
+
+def test_release_group_original_size_maps_to_none(client, mock_cover_repo):
+    response = client.get('/api/covers/release-group/66666666-6666-6666-6666-666666666666?size=original')
+
+    assert response.status_code == 200
+    mock_cover_repo.get_release_group_cover.assert_awaited_once_with(
+        '66666666-6666-6666-6666-666666666666',
+        None,
+    )
+
+
+def test_release_rejects_invalid_size(client):
+    response = client.get('/api/covers/release/77777777-7777-7777-7777-777777777777?size=999')
+
+    assert response.status_code == 400
+
+
+def test_release_group_sets_etag_header(client):
+    response = client.get('/api/covers/release-group/11111111-1111-1111-1111-111111111111?size=500')
+
+    assert response.status_code == 200
+    assert response.headers['etag'] == '"etag-rg"'
+
+
+def test_release_group_returns_304_when_etag_matches(client, mock_cover_repo):
+    response = client.get(
+        '/api/covers/release-group/11111111-1111-1111-1111-111111111111?size=500',
+        headers={'If-None-Match': '"etag-rg"'},
+    )
+
+    assert response.status_code == 304
+    mock_cover_repo.get_release_group_cover.assert_not_awaited()
+
+
+def test_artist_returns_304_when_etag_matches(client, mock_cover_repo):
+    response = client.get(
+        '/api/covers/artist/33333333-3333-3333-3333-333333333333?size=250',
+        headers={'If-None-Match': '"etag-artist"'},
+    )
+
+    assert response.status_code == 304
+    mock_cover_repo.get_artist_image.assert_not_awaited()

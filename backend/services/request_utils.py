@@ -1,6 +1,8 @@
 from datetime import datetime
 from typing import Optional
 
+from infrastructure.cover_urls import release_group_cover_url
+
 
 _FAILED_STATES = {"downloadFailed", "downloadFailedPending", "importFailed"}
 _IMPORT_BLOCKED_STATES = {"importBlocked", "importPending"}
@@ -29,6 +31,10 @@ def parse_eta(eta_str: Optional[str]) -> Optional[datetime]:
 
 
 def extract_cover_url(album_data: dict) -> Optional[str]:
+    canonical_cover_url = release_group_cover_url(album_data.get("foreignAlbumId"), size=500)
+    if canonical_cover_url:
+        return canonical_cover_url
+
     images = album_data.get("images", [])
     for img in images:
         if img.get("coverType", "").lower() == "cover":

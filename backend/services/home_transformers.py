@@ -1,5 +1,15 @@
-from api.v1.schemas.home import HomeArtist, HomeAlbum, HomeGenre
+from datetime import UTC, datetime
+
+from api.v1.schemas.home import HomeArtist, HomeAlbum, HomeGenre, HomeTrack
 from api.v1.schemas.library import LibraryAlbum
+from repositories.lastfm_models import (
+    LastFmAlbum,
+    LastFmArtist,
+    LastFmLovedTrack,
+    LastFmRecentTrack,
+    LastFmSimilarArtist,
+)
+from repositories.listenbrainz_models import ListenBrainzFeedbackRecording, ListenBrainzListen
 from repositories.protocols import (
     ListenBrainzArtist,
     ListenBrainzReleaseGroup,
@@ -11,6 +21,12 @@ from repositories.protocols import (
 class HomeDataTransformers:
     def __init__(self, jellyfin_repo: JellyfinRepositoryProtocol | None = None):
         self._jf_repo = jellyfin_repo
+
+    @staticmethod
+    def _cover_url(release_mbid: str | None) -> str | None:
+        if release_mbid:
+            return f"/api/covers/release/{release_mbid}?size=250"
+        return None
 
     def lidarr_album_to_home(self, album: LibraryAlbum) -> HomeAlbum:
         return HomeAlbum(
@@ -94,6 +110,122 @@ class HomeDataTransformers:
             image_url=image_url,
             listen_count=item.play_count,
             in_library=mbid.lower() in library_mbids if mbid else False,
+        )
+
+    def lastfm_artist_to_home(
+        self,
+        artist: LastFmArtist,
+        library_mbids: set[str],
+    ) -> HomeArtist | None:
+        return HomeArtist(
+            mbid=artist.mbid,
+            name=artist.name,
+            image_url=None,
+            listen_count=artist.playcount,
+            in_library=artist.mbid.lower() in library_mbids if artist.mbid else False,
+            source="lastfm",
+        )
+
+    def lastfm_album_to_home(
+        self,
+        album: LastFmAlbum,
+        library_mbids: set[str],
+    ) -> HomeAlbum | None:
+        return HomeAlbum(
+            mbid=None,
+            name=album.name,
+            artist_name=album.artist_name,
+            artist_mbid=None,
+            image_url=album.image_url or None,
+            listen_count=album.playcount,
+            in_library=album.mbid.lower() in library_mbids if album.mbid else False,
+            source="lastfm",
+        )
+
+    def lastfm_similar_to_home(
+        self,
+        similar: LastFmSimilarArtist,
+        library_mbids: set[str],
+    ) -> HomeArtist | None:
+        return HomeArtist(
+            mbid=similar.mbid,
+            name=similar.name,
+            image_url=None,
+            in_library=similar.mbid.lower() in library_mbids if similar.mbid else False,
+            source="lastfm",
+        )
+
+    def lastfm_recent_to_home(
+        self,
+        track: LastFmRecentTrack,
+        library_mbids: set[str],
+    ) -> HomeAlbum | None:
+        return HomeAlbum(
+            mbid=track.album_mbid,
+            name=track.album_name or track.track_name,
+            artist_name=track.artist_name,
+            artist_mbid=track.artist_mbid,
+            image_url=track.image_url or None,
+            in_library=track.album_mbid.lower() in library_mbids if track.album_mbid else False,
+            source="lastfm",
+        )
+
+    def lb_listen_to_home_track(self, listen: ListenBrainzListen) -> HomeTrack:
+        listened_at = None
+        if listen.listened_at:
+            listened_at = datetime.fromtimestamp(listen.listened_at, tz=UTC).isoformat()
+        artist_mbid = listen.artist_mbids[0] if listen.artist_mbids else None
+        image_url = self._cover_url(listen.release_mbid)
+        return HomeTrack(
+            mbid=listen.recording_mbid,
+            name=listen.track_name,
+            artist_name=listen.artist_name,
+            artist_mbid=artist_mbid,
+            album_name=listen.release_name,
+            listen_count=None,
+            listened_at=listened_at,
+            image_url=image_url,
+        )
+
+    def lastfm_recent_to_home_track(self, track: LastFmRecentTrack) -> HomeTrack:
+        listened_at = None
+        if track.timestamp:
+            listened_at = datetime.fromtimestamp(track.timestamp, tz=UTC).isoformat()
+        return HomeTrack(
+            mbid=None,
+            name=track.track_name,
+            artist_name=track.artist_name,
+            artist_mbid=None,
+            album_name=track.album_name or None,
+            listen_count=None,
+            listened_at=listened_at,
+            image_url=track.image_url or None,
+        )
+
+    def lastfm_loved_to_home_track(self, track: LastFmLovedTrack) -> HomeTrack:
+        return HomeTrack(
+            mbid=None,
+            name=track.track_name,
+            artist_name=track.artist_name,
+            artist_mbid=None,
+            album_name=track.album_name or None,
+            listen_count=None,
+            listened_at=None,
+            image_url=track.image_url or None,
+        )
+
+    def lb_feedback_to_home_track(self, feedback: ListenBrainzFeedbackRecording) -> HomeTrack:
+        artist_mbid = feedback.artist_mbids[0] if feedback.artist_mbids else None
+        image_url = self._cover_url(feedback.release_mbid)
+        return HomeTrack(
+            mbid=feedback.recording_mbid,
+            name=feedback.track_name,
+            artist_name=feedback.artist_name,
+            artist_mbid=artist_mbid,
+            album_name=feedback.release_name,
+            listen_count=None,
+            listened_at=None,
+            image_url=image_url,
         )
 
     def extract_genres_from_library(

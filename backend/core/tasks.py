@@ -12,6 +12,8 @@ if TYPE_CHECKING:
     from services.album_service import AlbumService
     from services.home_service import HomeService
     from services.discover_service import DiscoverService
+    from services.discover_queue_manager import DiscoverQueueManager
+    from services.artist_discovery_service import ArtistDiscoveryService
     from infrastructure.cache.persistent_cache import LibraryCache
 
 logger = logging.getLogger(__name__)
@@ -159,18 +161,20 @@ async def warm_home_cache_periodically(
     interval: int = 240
 ) -> None:
     await asyncio.sleep(10)
-    
+
     while True:
         try:
-            logger.debug("Warming home page cache...")
-            await home_service.get_home_data()
-            logger.debug("Home cache warming complete")
+            for src in ("listenbrainz", "lastfm"):
+                try:
+                    logger.debug("Warming home page cache (source=%s)...", src)
+                    await home_service.get_home_data(source=src)
+                    logger.debug("Home cache warming complete (source=%s)", src)
+                except Exception as e:
+                    logger.warning("Home cache warming failed (source=%s): %s", src, e)
         except asyncio.CancelledError:
             logger.info("Home cache warming task cancelled")
             break
-        except Exception as e:
-            logger.warning(f"Home cache warming failed: {e}")
-        
+
         await asyncio.sleep(interval)
 
 
@@ -181,27 +185,50 @@ def start_home_cache_warming_task(home_service: 'HomeService') -> asyncio.Task:
 async def warm_discover_cache_periodically(
     discover_service: 'DiscoverService',
     interval: int = 43200,
+    queue_manager: 'DiscoverQueueManager | None' = None,
+    preferences_service: 'PreferencesService | None' = None,
 ) -> None:
-    from services.discover_service import DiscoverService as _DS
-
     await asyncio.sleep(30)
 
     while True:
         try:
-            logger.info("Warming discover cache...")
-            await discover_service.warm_cache()
-            logger.info("Discover cache warming complete")
+            for src in ("listenbrainz", "lastfm"):
+                try:
+                    logger.info("Warming discover cache (source=%s)...", src)
+                    await discover_service.warm_cache(source=src)
+                    logger.info("Discover cache warming complete (source=%s)", src)
+                except Exception as e:
+                    logger.warning("Discover cache warming failed (source=%s): %s", src, e)
+
+            if queue_manager and preferences_service:
+                try:
+                    adv = preferences_service.get_advanced_settings()
+                    if adv.discover_queue_auto_generate and adv.discover_queue_warm_cycle_build:
+                        resolved = discover_service.resolve_source(None)
+                        logger.info("Pre-building discover queue (source=%s)...", resolved)
+                        await queue_manager.start_build(resolved)
+                except Exception as e:
+                    logger.warning("Discover queue pre-build failed: %s", e)
+
         except asyncio.CancelledError:
             logger.info("Discover cache warming task cancelled")
             break
-        except Exception as e:
-            logger.warning(f"Discover cache warming failed: {e}")
 
         await asyncio.sleep(interval)
 
 
-def start_discover_cache_warming_task(discover_service: 'DiscoverService') -> asyncio.Task:
-    return asyncio.create_task(warm_discover_cache_periodically(discover_service))
+def start_discover_cache_warming_task(
+    discover_service: 'DiscoverService',
+    queue_manager: 'DiscoverQueueManager | None' = None,
+    preferences_service: 'PreferencesService | None' = None,
+) -> asyncio.Task:
+    return asyncio.create_task(
+        warm_discover_cache_periodically(
+            discover_service,
+            queue_manager=queue_manager,
+            preferences_service=preferences_service,
+        )
+    )
 
 
 async def warm_jellyfin_mbid_index(jellyfin_repo: 'JellyfinRepository') -> None:
@@ -213,4 +240,63 @@ async def warm_jellyfin_mbid_index(jellyfin_repo: 'JellyfinRepository') -> None:
         logger.info("Jellyfin MBID index warmed with %d entries", len(index))
     except Exception as e:
         logger.warning("Jellyfin MBID index warming failed: %s", e)
+
+
+async def warm_artist_discovery_cache_periodically(
+    artist_discovery_service: 'ArtistDiscoveryService',
+    library_cache: 'LibraryCache',
+    interval: int = 14400,
+    delay: float = 0.5,
+) -> None:
+    await asyncio.sleep(60)
+
+    while True:
+        try:
+            artists = await library_cache.get_artists()
+            if not artists:
+                logger.debug("No library artists for discovery cache warming")
+                await asyncio.sleep(interval)
+                continue
+
+            mbids = [
+                a['mbid'] for a in artists
+                if a.get('mbid') and not is_unknown_mbid(a['mbid'])
+            ]
+            if not mbids:
+                await asyncio.sleep(interval)
+                continue
+
+            logger.info(
+                "Warming artist discovery cache for %d library artists...", len(mbids)
+            )
+            cached = await artist_discovery_service.precache_artist_discovery(
+                mbids, delay=delay
+            )
+            logger.info(
+                "Artist discovery cache warming complete: %d/%d artists refreshed",
+                cached, len(mbids),
+            )
+        except asyncio.CancelledError:
+            logger.info("Artist discovery cache warming task cancelled")
+            break
+        except Exception as e:
+            logger.warning("Artist discovery cache warming failed: %s", e)
+
+        await asyncio.sleep(interval)
+
+
+def start_artist_discovery_cache_warming_task(
+    artist_discovery_service: 'ArtistDiscoveryService',
+    library_cache: 'LibraryCache',
+    interval: int = 14400,
+    delay: float = 0.5,
+) -> asyncio.Task:
+    return asyncio.create_task(
+        warm_artist_discovery_cache_periodically(
+            artist_discovery_service,
+            library_cache,
+            interval=interval,
+            delay=delay,
+        )
+    )
 

@@ -1,8 +1,10 @@
 <script lang="ts">
 	import { playerStore } from '$lib/stores/player.svelte';
+	import { scrobbleManager } from '$lib/stores/scrobble.svelte';
 	import YouTubePlayer from '$lib/components/YouTubePlayer.svelte';
 	import JellyfinIcon from '$lib/components/JellyfinIcon.svelte';
-	import { X, Music, Shuffle, SkipBack, AlertCircle, Pause, Play, SkipForward, Volume2, ExternalLink } from 'lucide-svelte';
+	import { getCoverUrl } from '$lib/utils/errorHandling';
+	import { X, Music, Shuffle, SkipBack, AlertCircle, Pause, Play, SkipForward, Volume2, ExternalLink, Check, CircleX } from 'lucide-svelte';
 
 	function formatTime(seconds: number): string {
 		if (!seconds || isNaN(seconds)) return '0:00';
@@ -33,6 +35,10 @@
 			window.open(`https://www.youtube.com/watch?v=${videoId}`, '_blank');
 		}
 	}
+
+	$: nowPlayingCoverUrl = playerStore.nowPlaying
+		? getCoverUrl(playerStore.nowPlaying.coverUrl, playerStore.nowPlaying.albumId)
+		: null;
 </script>
 
 {#if playerStore.isPlayerVisible && playerStore.nowPlaying}
@@ -52,9 +58,9 @@
 		<div class="flex items-center h-full px-4 gap-4 max-w-screen-2xl mx-auto">
 			<!-- Left: Cover Art + Info -->
 			<div class="flex items-center gap-3 min-w-0 w-1/4">
-				{#if playerStore.nowPlaying.coverUrl}
+				{#if nowPlayingCoverUrl}
 					<img
-						src={playerStore.nowPlaying.coverUrl}
+						src={nowPlayingCoverUrl}
 						alt={playerStore.nowPlaying.albumName}
 						class="w-[60px] h-[60px] rounded-lg shadow-lg ring-1 ring-base-content/10 object-cover flex-shrink-0"
 					/>
@@ -179,7 +185,7 @@
 			</div>
 
 			<!-- Right: Volume + YouTube + Open Link -->
-			<div class="flex items-center gap-3 w-1/4 justify-end">
+			<div class="flex items-center gap-3 lg:gap-7 w-1/4 justify-end">
 				<!-- Volume -->
 				<div class="hidden sm:flex items-center gap-1.5">
 					<Volume2 class="h-4 w-4 opacity-60 flex-shrink-0" />
@@ -192,6 +198,22 @@
 						oninput={handleVolume}
 					/>
 				</div>
+
+				<!-- Scrobble status -->
+				{#if scrobbleManager.enabled && scrobbleManager.status !== 'idle'}
+					<div class="tooltip tooltip-left" data-tip={scrobbleManager.tooltip}>
+						{#if scrobbleManager.status === 'scrobbled'}
+							<Check class="h-4 w-4 text-success" />
+						{:else if scrobbleManager.status === 'error'}
+							<CircleX class="h-4 w-4 text-error" />
+						{:else}
+							<span class="badge badge-info badge-sm gap-1 font-semibold">
+								<span class="status status-md status-info"></span>
+								Tracking
+							</span>
+						{/if}
+					</div>
+				{/if}
 
 				<!-- YouTube mini player -->
 				{#if playerStore.nowPlaying.sourceType === 'youtube'}

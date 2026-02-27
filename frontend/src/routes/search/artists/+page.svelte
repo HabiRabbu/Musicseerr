@@ -4,7 +4,7 @@
 	import { goto } from '$app/navigation';
 	import SearchArtistCard from '$lib/components/SearchArtistCard.svelte';
 	import ArtistCardSkeleton from '$lib/components/ArtistCardSkeleton.svelte';
-	import type { Artist } from '$lib/types';
+	import type { Artist, EnrichmentSource } from '$lib/types';
 	import { colors } from '$lib/colors';
 	import { searchStore } from '$lib/stores/search';
 	import { fetchEnrichmentBatch, applyArtistEnrichment } from '$lib/utils/enrichment';
@@ -21,6 +21,7 @@
 	let enrichmentController: AbortController | null = null;
 	let observer: IntersectionObserver | null = null;
 	let initializedFromCache = false;
+	let enrichmentSource: EnrichmentSource = 'none';
 
 	function navigateBack() {
 		if (data.query) {
@@ -34,18 +35,24 @@
 		}
 	}
 
-	async function fetchEnrichment(artistMbids: string[]) {
-		if (artistMbids.length === 0) return;
+	async function fetchEnrichment(artistsToEnrich: Artist[]) {
+		if (artistsToEnrich.length === 0) return;
 
 		if (enrichmentController) {
 			enrichmentController.abort();
 		}
 		enrichmentController = new AbortController();
 
+		const requests = artistsToEnrich.map((a) => ({
+			musicbrainz_id: a.musicbrainz_id,
+			name: a.title
+		}));
+
 		try {
-			const enrichment = await fetchEnrichmentBatch(artistMbids, [], enrichmentController.signal);
+			const enrichment = await fetchEnrichmentBatch(requests, [], enrichmentController.signal);
 			if (!enrichment) return;
 
+			enrichmentSource = enrichment.source;
 			artists = applyArtistEnrichment(artists, enrichment);
 		} catch (error) {
 			if (error instanceof Error && error.name === 'AbortError') {
@@ -90,9 +97,7 @@
 				}
 				searchStore.updateArtists(artists);
 
-				const needsEnrichment = artists
-					.filter((a) => a.release_group_count == null)
-					.map((a) => a.musicbrainz_id);
+				const needsEnrichment = artists.filter((a) => a.release_group_count == null);
 				if (needsEnrichment.length > 0) {
 					fetchEnrichment(needsEnrichment);
 				}
@@ -130,6 +135,7 @@
 			offset = 0;
 			hasMore = true;
 			initializedFromCache = true;
+			fetchEnrichment(artists);
 			loadMore();
 		} else {
 			artists = [];
@@ -230,7 +236,7 @@
 				class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4"
 			>
 				{#each artists as artist (artist.musicbrainz_id)}
-					<SearchArtistCard {artist} />
+					<SearchArtistCard {artist} {enrichmentSource} />
 				{/each}
 			</div>
 		</div>

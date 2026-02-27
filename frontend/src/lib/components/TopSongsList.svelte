@@ -6,9 +6,10 @@
 		songs: TopSong[];
 		loading?: boolean;
 		configured?: boolean;
+		source?: string;
 	}
 
-	let { songs, loading = false, configured = true }: Props = $props();
+	let { songs, loading = false, configured = true, source = '' }: Props = $props();
 </script>
 
 <div class="flex flex-col min-w-0">
@@ -30,7 +31,7 @@
 	{:else if !configured}
 		<div class="bg-base-200 rounded-lg p-4 text-center flex-1 flex items-center justify-center">
 			<div>
-				<p class="text-base-content/70 text-sm">Connect ListenBrainz to see popular songs</p>
+				<p class="text-base-content/70 text-sm">Connect a music service to see popular songs</p>
 				<a href="/settings" class="btn btn-primary btn-xs mt-2">Configure</a>
 			</div>
 		</div>
@@ -41,7 +42,7 @@
 	{:else}
 		<div class="space-y-1">
 			{#each songs as song, i}
-				<TrackRow {song} position={i + 1} />
+				<TrackRow {song} position={i + 1} {source} />
 			{/each}
 		</div>
 	{/if}

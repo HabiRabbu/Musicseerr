@@ -1,4 +1,5 @@
 import { MESSAGES } from '$lib/constants';
+import { isValidMbid } from '$lib/utils/formatting';
 
 export function handleFetchError(error: unknown, fallback: string): string | null {
 	if (error instanceof Error && error.name === 'AbortError') return null;
@@ -23,5 +24,8 @@ export async function throwOnApiError(res: Response, fallbackMessage: string): P
 }
 
 export function getCoverUrl(coverUrl: string | null | undefined, albumId: string): string {
+	if (isValidMbid(albumId)) {
+		return `/api/covers/release-group/${albumId}?size=250`;
+	}
 	return coverUrl || `/api/covers/release-group/${albumId}?size=250`;
 }

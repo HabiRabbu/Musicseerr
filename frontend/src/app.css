@@ -20,8 +20,19 @@
 	--brand-jellyfin: 168 85 247;
 	--brand-localfiles: 20 184 166;
 	--brand-discover: 56 189 248;
+	--brand-lastfm: 213 16 7;
 	--color-youtube: #ff0000;
 	--color-youtube-hover: #cc0000;
+}
+
+@utility btn-lastfm {
+	background-color: rgb(var(--brand-lastfm));
+	color: white;
+	border-color: rgb(var(--brand-lastfm));
+	&:hover {
+		background-color: rgb(var(--brand-lastfm) / 0.85);
+		border-color: rgb(var(--brand-lastfm) / 0.85);
+	}
 }
 
 @utility scrollbar-hide {

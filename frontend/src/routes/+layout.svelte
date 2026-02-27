@@ -9,6 +9,7 @@
 	import { playerStore } from '$lib/stores/player.svelte';
 	import { launchYouTubePlayback } from '$lib/player/launchYouTubePlayback';
 	import { playbackToast } from '$lib/stores/playbackToast.svelte';
+	import { scrobbleManager } from '$lib/stores/scrobble.svelte';
 	import Player from '$lib/components/Player.svelte';
 	import YouTubeIcon from '$lib/components/YouTubeIcon.svelte';
 	import SearchSuggestions from '$lib/components/SearchSuggestions.svelte';
@@ -78,6 +79,7 @@
 		window.addEventListener('request-count-changed', handleRequestCountChanged);
 		window.addEventListener('requests-page-active', handleRequestsPageActive);
 		void restorePlayerSession();
+		void scrobbleManager.init();
 		void pollRequestCount();
 		requestCountInterval = setInterval(pollRequestCount, 10_000);
 	});

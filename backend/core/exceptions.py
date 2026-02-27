@@ -17,6 +17,17 @@ class ExternalServiceError(MusicseerrException):
     pass
 
 
+class RateLimitedError(ExternalServiceError):
+    def __init__(
+        self,
+        message: str,
+        details: Any = None,
+        retry_after_seconds: float | None = None,
+    ):
+        super().__init__(message, details)
+        self.retry_after_seconds = retry_after_seconds
+
+
 class ResourceNotFoundError(MusicseerrException):
     pass
 
@@ -34,4 +45,8 @@ class CacheError(MusicseerrException):
 
 
 class PlaybackNotAllowedError(ExternalServiceError):
+    pass
+
+
+class TokenNotAuthorizedError(ExternalServiceError):
     pass

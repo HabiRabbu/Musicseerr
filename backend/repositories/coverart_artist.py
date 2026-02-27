@@ -13,8 +13,10 @@ from infrastructure.queue.priority_queue import RequestPriority
 if TYPE_CHECKING:
     from repositories.musicbrainz_repository import MusicBrainzRepository
     from repositories.lidarr import LidarrRepository
+    from repositories.jellyfin_repository import JellyfinRepository
 
 logger = logging.getLogger(__name__)
+LOCAL_SOURCE_TIMEOUT_SECONDS = 1.0
 
 
 def _log_task_error(task: asyncio.Task) -> None:
@@ -39,13 +41,15 @@ class ArtistImageFetcher:
         write_cache_fn,
         cache: CacheInterface,
         mb_repo: Optional['MusicBrainzRepository'] = None,
-        lidarr_repo: Optional['LidarrRepository'] = None
+        lidarr_repo: Optional['LidarrRepository'] = None,
+        jellyfin_repo: Optional['JellyfinRepository'] = None,
     ):
         self._http_get = http_get_fn
         self._write_disk_cache = write_cache_fn
         self._cache = cache
         self._mb_repo = mb_repo
         self._lidarr_repo = lidarr_repo
+        self._jellyfin_repo = jellyfin_repo
 
     async def fetch_artist_image(
         self,
@@ -54,17 +58,35 @@ class ArtistImageFetcher:
         file_path: Path
     ) -> Optional[tuple[bytes, str, str]]:
         logger.info(f"[IMG] Fetching artist image for {artist_id[:8]}... (size={size})")
-        result = await self._fetch_from_lidarr(artist_id, size, file_path)
+        result = None
+        try:
+            result = await asyncio.wait_for(
+                self._fetch_local_sources(artist_id, size, file_path),
+                timeout=LOCAL_SOURCE_TIMEOUT_SECONDS,
+            )
+        except TimeoutError:
+            logger.debug(f"[IMG] Timed out local source lookup for {artist_id[:8]}...")
         if result:
-            logger.info(f"[IMG] SUCCESS from Lidarr for {artist_id[:8]}...")
+            logger.info(f"[IMG] SUCCESS from local source for {artist_id[:8]}...")
             return result
-        logger.info(f"[IMG] Lidarr failed for {artist_id[:8]}..., trying Wikidata")
+        logger.info(f"[IMG] Local sources failed for {artist_id[:8]}..., trying Wikidata")
         result = await self._fetch_from_wikidata(artist_id, size, file_path)
         if result:
             logger.info(f"[IMG] SUCCESS from Wikidata for {artist_id[:8]}...")
             return result
         logger.info(f"[IMG] FAILED: No image found for {artist_id[:8]}... from any source")
         return None
+
+    async def _fetch_local_sources(
+        self,
+        artist_id: str,
+        size: Optional[int],
+        file_path: Path,
+    ) -> Optional[tuple[bytes, str, str]]:
+        result = await self._fetch_from_lidarr(artist_id, size, file_path)
+        if result:
+            return result
+        return await self._fetch_from_jellyfin(artist_id, file_path)
 
     async def _fetch_from_lidarr(
         self,
@@ -81,7 +103,11 @@ class ArtistImageFetcher:
                 logger.info(f"[IMG:Lidarr] No image URL returned for {artist_id[:8]}")
                 return None
             logger.info(f"[IMG:Lidarr] Fetching from URL for {artist_id[:8]}...")
-            response = await self._http_get(image_url, RequestPriority.IMAGE_FETCH)
+            response = await self._http_get(
+                image_url,
+                RequestPriority.IMAGE_FETCH,
+                source="lidarr",
+            )
             if response.status_code != 200:
                 logger.warning(f"[IMG:Lidarr] HTTP {response.status_code} for {artist_id[:8]}")
                 return None
@@ -95,6 +121,42 @@ class ArtistImageFetcher:
             return (content, content_type, "lidarr")
         except Exception as e:
             logger.warning(f"[IMG:Lidarr] Exception for {artist_id[:8]}: {e}")
+            return None
+
+    async def _fetch_from_jellyfin(
+        self,
+        artist_id: str,
+        file_path: Path,
+    ) -> Optional[tuple[bytes, str, str]]:
+        if not self._jellyfin_repo or not self._jellyfin_repo.is_configured():
+            return None
+        try:
+            artist = await self._jellyfin_repo.get_artist_by_mbid(artist_id)
+            if not artist:
+                return None
+            image_url = self._jellyfin_repo.get_image_url(artist.id, artist.image_tag)
+            if not image_url:
+                return None
+            response = await self._http_get(
+                image_url,
+                RequestPriority.IMAGE_FETCH,
+                source="jellyfin",
+                headers=self._jellyfin_repo.get_auth_headers(),
+            )
+            if response.status_code != 200:
+                return None
+            content_type = response.headers.get("content-type", "")
+            if not _is_valid_image_content_type(content_type):
+                logger.warning(f"[IMG:Jellyfin] Non-image content-type ({content_type}) for {artist_id[:8]}")
+                return None
+            content = response.content
+            task = asyncio.create_task(
+                self._write_disk_cache(file_path, content, content_type, {"source": "jellyfin"})
+            )
+            task.add_done_callback(_log_task_error)
+            return (content, content_type, "jellyfin")
+        except Exception as e:
+            logger.warning(f"[IMG:Jellyfin] Exception for {artist_id[:8]}: {e}")
             return None
 
     async def _fetch_from_wikidata(
@@ -118,7 +180,11 @@ class ArtistImageFetcher:
                 logger.debug(f"Could not parse Wikidata Q-id from URL: {wikidata_url}")
                 return None
             api_url = f"https://www.wikidata.org/wiki/Special:EntityData/{wikidata_id}.json"
-            response = await self._http_get(api_url, RequestPriority.IMAGE_FETCH)
+            response = await self._http_get(
+                api_url,
+                RequestPriority.IMAGE_FETCH,
+                source="wikidata",
+            )
             if response.status_code != 200:
                 return None
             data = response.json()
@@ -137,7 +203,11 @@ class ArtistImageFetcher:
             )
             if size:
                 commons_api += f"&iiurlwidth={size}"
-            commons_response = await self._http_get(commons_api, RequestPriority.IMAGE_FETCH)
+            commons_response = await self._http_get(
+                commons_api,
+                RequestPriority.IMAGE_FETCH,
+                source="wikimedia",
+            )
             if commons_response.status_code != 200:
                 return None
             commons_data = commons_response.json()
@@ -153,16 +223,27 @@ class ArtistImageFetcher:
                     break
             if not image_url:
                 return None
-            response = await self._http_get(image_url, RequestPriority.IMAGE_FETCH)
+            response = await self._http_get(
+                image_url,
+                RequestPriority.IMAGE_FETCH,
+                source="wikimedia",
+            )
             if response.status_code == 200:
                 content_type = response.headers.get("content-type", "")
                 if not _is_valid_image_content_type(content_type):
                     logger.warning(f"[IMG:Wikidata] Non-image content-type ({content_type})")
                     return None
                 content = response.content
-                task = asyncio.create_task(self._write_disk_cache(file_path, content, content_type, {"wikidata_id": wikidata_id}))
+                task = asyncio.create_task(
+                    self._write_disk_cache(
+                        file_path,
+                        content,
+                        content_type,
+                        {"wikidata_id": wikidata_id, "source": "wikidata"},
+                    )
+                )
                 task.add_done_callback(_log_task_error)
-                return (content, content_type, wikidata_id)
+                return (content, content_type, "wikidata")
         except Exception as e:
             logger.error(f"Error fetching artist image for {artist_id}: {e}")
         return None

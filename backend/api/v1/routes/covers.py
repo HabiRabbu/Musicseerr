@@ -1,6 +1,7 @@
 import logging
+import hashlib
 from typing import Optional
-from fastapi import APIRouter, HTTPException, Path, Query, Depends
+from fastapi import APIRouter, HTTPException, Path, Query, Depends, Request
 from fastapi.responses import Response
 from core.dependencies import get_coverart_repository
 from repositories.coverart_repository import CoverArtRepository
@@ -10,6 +11,25 @@ log = logging.getLogger(__name__)
 
 _ALLOWED_SIZES = {"250", "500", "1200"}
 _SIZE_ALIAS_NONE = {"", "original", "full", "max", "largest"}
+
+
+def _quote_etag(content_hash: str) -> str:
+    return f'"{content_hash}"'
+
+
+def _etag_matches(if_none_match: Optional[str], etag_header: str) -> bool:
+    if not if_none_match:
+        return False
+
+    candidates = [token.strip() for token in if_none_match.split(",")]
+    if "*" in candidates:
+        return True
+
+    if etag_header in candidates:
+        return True
+
+    weak_etag = f"W/{etag_header}"
+    return weak_etag in candidates
 
 
 def _normalize_size(size: Optional[str]) -> Optional[str]:
@@ -28,6 +48,7 @@ def _normalize_size(size: Optional[str]) -> Optional[str]:
 
 @router.get("/release-group/{release_group_id}")
 async def cover_from_release_group(
+    request: Request,
     release_group_id: str = Path(..., min_length=1, description="MusicBrainz release group ID"),
     size: Optional[str] = Query(
         "500",
@@ -36,16 +57,31 @@ async def cover_from_release_group(
     coverart_repo: CoverArtRepository = Depends(get_coverart_repository)
 ):
     desired_size = _normalize_size(size)
+
+    etag_hash = await coverart_repo.get_release_group_cover_etag(release_group_id, desired_size)
+    etag_header = _quote_etag(etag_hash) if etag_hash else None
+    if etag_header and _etag_matches(request.headers.get("if-none-match"), etag_header):
+        return Response(
+            status_code=304,
+            headers={
+                "Cache-Control": "public, max-age=31536000, immutable",
+                "ETag": etag_header,
+            },
+        )
+
     result = await coverart_repo.get_release_group_cover(release_group_id, desired_size)
     
     if result:
-        image_data, content_type = result
+        image_data, content_type, source = result
+        if not etag_header:
+            etag_header = _quote_etag(hashlib.sha1(image_data).hexdigest())
         return Response(
             content=image_data,
             media_type=content_type,
             headers={
                 "Cache-Control": "public, max-age=31536000, immutable",
-                "X-Cover-Source": "cover-art-archive",
+                "X-Cover-Source": source,
+                "ETag": etag_header,
             }
         )
     
@@ -69,6 +105,7 @@ async def cover_from_release_group(
 
 @router.get("/release/{release_id}")
 async def cover_from_release(
+    request: Request,
     release_id: str = Path(..., min_length=1, description="MusicBrainz release ID"),
     size: Optional[str] = Query(
         "500",
@@ -77,16 +114,31 @@ async def cover_from_release(
     coverart_repo: CoverArtRepository = Depends(get_coverart_repository)
 ):
     desired_size = _normalize_size(size)
+
+    etag_hash = await coverart_repo.get_release_cover_etag(release_id, desired_size)
+    etag_header = _quote_etag(etag_hash) if etag_hash else None
+    if etag_header and _etag_matches(request.headers.get("if-none-match"), etag_header):
+        return Response(
+            status_code=304,
+            headers={
+                "Cache-Control": "public, max-age=31536000, immutable",
+                "ETag": etag_header,
+            },
+        )
+
     result = await coverart_repo.get_release_cover(release_id, desired_size)
     
     if result:
-        image_data, content_type = result
+        image_data, content_type, source = result
+        if not etag_header:
+            etag_header = _quote_etag(hashlib.sha1(image_data).hexdigest())
         return Response(
             content=image_data,
             media_type=content_type,
             headers={
                 "Cache-Control": "public, max-age=31536000, immutable",
-                "X-Cover-Source": "cover-art-archive",
+                "X-Cover-Source": source,
+                "ETag": etag_header,
             }
         )
     
@@ -110,10 +162,22 @@ async def cover_from_release(
 
 @router.get("/artist/{artist_id}")
 async def get_artist_cover(
+    request: Request,
     artist_id: str,
     size: Optional[int] = Query(None, description="Preferred size in pixels for width"),
     coverart_repo: CoverArtRepository = Depends(get_coverart_repository)
 ):
+    etag_hash = await coverart_repo.get_artist_image_etag(artist_id, size)
+    etag_header = _quote_etag(etag_hash) if etag_hash else None
+    if etag_header and _etag_matches(request.headers.get("if-none-match"), etag_header):
+        return Response(
+            status_code=304,
+            headers={
+                "Cache-Control": "public, max-age=31536000, immutable",
+                "ETag": etag_header,
+            },
+        )
+
     result = await coverart_repo.get_artist_image(artist_id, size)
     
     if not result:
@@ -131,13 +195,16 @@ async def get_artist_cover(
             }
         )
     
-    image_data, content_type, wikidata_id = result
+    image_data, content_type, source = result
+    if not etag_header:
+        etag_header = _quote_etag(hashlib.sha1(image_data).hexdigest())
     return Response(
         content=image_data,
         media_type=content_type,
         headers={
             "Cache-Control": "public, max-age=31536000, immutable",
-            "X-Cover-Source": "wikidata",
+            "X-Cover-Source": source,
+            "ETag": etag_header,
         }
     )
 

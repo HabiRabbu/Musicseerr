@@ -5,13 +5,17 @@ interface CachedEntry<T> {
 	timestamp: number;
 }
 
-export function createLocalStorageCache<T>(key: string, initialTtl: number) {
+export function createLocalStorageCache<T>(baseKey: string, initialTtl: number) {
 	let ttl = initialTtl;
 
-	function get(): CachedEntry<T> | null {
+	function resolveKey(suffix?: string): string {
+		return suffix ? `${baseKey}_${suffix}` : baseKey;
+	}
+
+	function get(suffix?: string): CachedEntry<T> | null {
 		if (!browser) return null;
 		try {
-			const raw = localStorage.getItem(key);
+			const raw = localStorage.getItem(resolveKey(suffix));
 			if (!raw) return null;
 			return JSON.parse(raw) as CachedEntry<T>;
 		} catch {
@@ -19,13 +23,13 @@ export function createLocalStorageCache<T>(key: string, initialTtl: number) {
 		}
 	}
 
-	function set(data: T): void {
+	function set(data: T, suffix?: string): void {
 		if (!browser) return;
 		try {
 			const entry: CachedEntry<T> = { data, timestamp: Date.now() };
-			localStorage.setItem(key, JSON.stringify(entry));
+			localStorage.setItem(resolveKey(suffix), JSON.stringify(entry));
 		} catch (e) {
-			console.warn(`[localStorageCache] Failed to write key "${key}":`, e);
+			console.warn(`[localStorageCache] Failed to write key "${resolveKey(suffix)}":`, e);
 		}
 	}
 
@@ -33,9 +37,9 @@ export function createLocalStorageCache<T>(key: string, initialTtl: number) {
 		return Date.now() - timestamp > ttl;
 	}
 
-	function remove(): void {
+	function remove(suffix?: string): void {
 		if (!browser) return;
-		localStorage.removeItem(key);
+		localStorage.removeItem(resolveKey(suffix));
 	}
 
 	function updateTTL(newTtl: number): void {

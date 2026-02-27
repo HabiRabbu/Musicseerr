@@ -189,8 +189,10 @@ class SettingsService:
         cleared_home = await self._cache.clear_prefix("home_response:")
         cleared_jf = await self._cache.clear_prefix("jellyfin_")
         cleared_lb = await self._cache.clear_prefix("listenbrainz_")
-        total = cleared_home + cleared_jf + cleared_lb
-        logger.info(f"Cleared {total} home/integration cache entries")
+        cleared_discover = await self._cache.clear_prefix("discover_response:")
+        cleared_lfm = await self._cache.clear_prefix("lastfm_")
+        total = cleared_home + cleared_jf + cleared_lb + cleared_discover + cleared_lfm
+        logger.info(f"Cleared {total} home/discover/integration cache entries")
         return total
 
     async def clear_local_files_cache(self) -> int:

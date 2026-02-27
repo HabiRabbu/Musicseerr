@@ -11,7 +11,7 @@ from core.dependencies import (
     init_app_state, 
     cleanup_app_state
 )
-from core.tasks import start_cache_cleanup_task, start_library_sync_task, start_disk_cache_cleanup_task, start_home_cache_warming_task, start_discover_cache_warming_task
+from core.tasks import start_cache_cleanup_task, start_library_sync_task, start_disk_cache_cleanup_task, start_home_cache_warming_task, start_discover_cache_warming_task, start_artist_discovery_cache_warming_task
 from core.exceptions import ResourceNotFoundError, ExternalServiceError, ValidationError
 from core.exception_handlers import (
     resource_not_found_handler,
@@ -33,6 +33,8 @@ from api.v1.routes import requests_page as requests_page_routes
 from api.v1.routes import stream as stream_routes
 from api.v1.routes import jellyfin_library as jellyfin_library_routes
 from api.v1.routes import local_library as local_library_routes
+from api.v1.routes import lastfm as lastfm_routes
+from api.v1.routes import scrobble as scrobble_routes
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -113,8 +115,20 @@ async def lifespan(app: FastAPI):
     from core.dependencies import get_home_service
     start_home_cache_warming_task(get_home_service())
 
-    from core.dependencies import get_discover_service
-    start_discover_cache_warming_task(get_discover_service())
+    from core.dependencies import get_discover_service, get_discover_queue_manager
+    start_discover_cache_warming_task(
+        get_discover_service(),
+        queue_manager=get_discover_queue_manager(),
+        preferences_service=get_preferences_service(),
+    )
+
+    from core.dependencies import get_artist_discovery_service
+    start_artist_discovery_cache_warming_task(
+        get_artist_discovery_service(),
+        get_library_cache(),
+        interval=advanced_settings.artist_discovery_warm_interval,
+        delay=advanced_settings.artist_discovery_warm_delay,
+    )
 
     from core.tasks import warm_jellyfin_mbid_index
     from core.dependencies import get_jellyfin_repository
@@ -215,5 +229,7 @@ app.include_router(requests_page_routes.router)
 app.include_router(stream_routes.router)
 app.include_router(jellyfin_library_routes.router)
 app.include_router(local_library_routes.router)
+app.include_router(lastfm_routes.router)
+app.include_router(scrobble_routes.router)
 
 mount_frontend(app)

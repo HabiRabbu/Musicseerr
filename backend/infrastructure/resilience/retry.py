@@ -107,6 +107,19 @@ class CircuitOpenError(Exception):
     pass
 
 
+def _get_retry_after_seconds(exception: Exception) -> Optional[float]:
+    retry_after = getattr(exception, "retry_after_seconds", None)
+    if retry_after is None:
+        return None
+    try:
+        retry_after_value = float(retry_after)
+    except (TypeError, ValueError):
+        return None
+    if retry_after_value <= 0:
+        return None
+    return retry_after_value
+
+
 def with_retry(
     max_attempts: int = 3,
     base_delay: float = 1.0,
@@ -193,11 +206,14 @@ def with_retry(
                             }
                         )
                         break
-                    
-                    delay = min(base_delay * (exponential_base ** (attempt - 1)), max_delay)
-                    
-                    if jitter:
-                        delay *= (0.5 + random.random())
+
+                    retry_after_override = _get_retry_after_seconds(e)
+                    if retry_after_override is not None:
+                        delay = min(retry_after_override, max_delay)
+                    else:
+                        delay = min(base_delay * (exponential_base ** (attempt - 1)), max_delay)
+                        if jitter:
+                            delay *= (0.5 + random.random())
                     
                     logger.warning(
                         "%s attempt %d/%d failed: %s. Retrying in %.2fs...",

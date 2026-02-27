@@ -1,3 +1,4 @@
+import asyncio
 import httpx
 import logging
 from typing import Any
@@ -8,15 +9,16 @@ from infrastructure.resilience.rate_limiter import TokenBucketRateLimiter
 from repositories.listenbrainz_models import (
     ListenBrainzArtist, ListenBrainzReleaseGroup, ListenBrainzRecording,
     ListenBrainzListen, ListenBrainzGenreActivity, ListenBrainzSimilarArtist,
+    ListenBrainzFeedbackRecording,
     ALLOWED_STATS_RANGE,
     parse_artist, parse_release_group, parse_recording, parse_listen,
-    parse_artist_recording, parse_similar_artist,
+    parse_artist_recording, parse_feedback_recording, parse_similar_artist,
 )
 
 logger = logging.getLogger(__name__)
 
 _listenbrainz_circuit_breaker = CircuitBreaker(
-    failure_threshold=5,
+    failure_threshold=10,
     success_threshold=2,
     timeout=60.0,
     name="listenbrainz"
@@ -40,6 +42,7 @@ class ListenBrainzRepository:
         self._username = username
         self._user_token = user_token
         self._base_url = LISTENBRAINZ_API_URL
+        self._request_semaphore = asyncio.Semaphore(2)
     
     def configure(self, username: str, user_token: str = "") -> None:
         self._username = username
@@ -79,36 +82,37 @@ class ListenBrainzRepository:
             raise ExternalServiceError("ListenBrainz user token required for this request")
         
         await _listenbrainz_rate_limiter.acquire()
-        
-        try:
-            response = await self._client.request(
-                method,
-                url,
-                headers=self._get_headers(),
-                params=params,
-                json=json_data,
-                timeout=15.0,
-            )
-            
-            if response.status_code == 204:
-                return None
-            
-            if response.status_code == 404:
-                return None
-            
-            if response.status_code != 200:
-                raise ExternalServiceError(
-                    f"ListenBrainz {method} failed ({response.status_code})",
-                    response.text
-                )
-            
+
+        async with self._request_semaphore:
             try:
-                return response.json()
-            except ValueError:
-                return None
-        
-        except httpx.HTTPError as e:
-            raise ExternalServiceError(f"ListenBrainz request failed: {str(e)}")
+                response = await self._client.request(
+                    method,
+                    url,
+                    headers=self._get_headers(),
+                    params=params,
+                    json=json_data,
+                    timeout=15.0,
+                )
+
+                if response.status_code == 204:
+                    return None
+
+                if response.status_code == 404:
+                    return None
+
+                if response.status_code != 200:
+                    raise ExternalServiceError(
+                        f"ListenBrainz {method} failed ({response.status_code})",
+                        response.text
+                    )
+
+                try:
+                    return response.json()
+                except ValueError:
+                    return None
+
+            except httpx.HTTPError as e:
+                raise ExternalServiceError(f"ListenBrainz request failed: {str(e)}")
     
     async def _get(
         self,
@@ -208,6 +212,49 @@ class ListenBrainzRepository:
         if not result:
             return []
         return [parse_listen(item) for item in result.get("payload", {}).get("listens", [])]
+
+    async def get_user_loved_recordings(
+        self,
+        username: str | None = None,
+        count: int = 25,
+        offset: int = 0,
+    ) -> list[ListenBrainzFeedbackRecording]:
+        user = username or self._username
+        if not user:
+            return []
+
+        cache_key = f"lb_user_loved_recordings:{user}:{count}:{offset}"
+        cached = await self._cache.get(cache_key)
+        if cached:
+            return cached
+
+        params: dict[str, Any] = {
+            "score": 1,
+            "count": min(count, 100),
+            "offset": offset,
+            "metadata": "true",
+        }
+        result = await self._get(f"/1/feedback/user/{user}/get-feedback", params=params)
+        if not result:
+            return []
+
+        payload = result.get("payload", result)
+        feedback_items: list[dict[str, Any]]
+        if isinstance(payload, dict):
+            feedback_raw = payload.get("feedback") or payload.get("recordings") or []
+            if isinstance(feedback_raw, list):
+                feedback_items = [item for item in feedback_raw if isinstance(item, dict)]
+            else:
+                feedback_items = []
+        elif isinstance(payload, list):
+            feedback_items = [item for item in payload if isinstance(item, dict)]
+        else:
+            feedback_items = []
+
+        loved_recordings = [parse_feedback_recording(item) for item in feedback_items]
+        if loved_recordings:
+            await self._cache.set(cache_key, loved_recordings, ttl_seconds=300)
+        return loved_recordings
     
     async def get_user_top_artists(
         self,
@@ -493,6 +540,11 @@ class ListenBrainzRepository:
 
         result = await self._get(f"/1/popularity/top-release-groups-for-artist/{artist_mbid}")
         if not result or not isinstance(result, list):
+            logger.info(
+                "LB top-release-groups returned empty/non-list for %s (type=%s)",
+                artist_mbid[:8],
+                type(result).__name__,
+            )
             return []
 
         release_groups = []
@@ -539,3 +591,67 @@ class ListenBrainzRepository:
 
     def is_configured(self) -> bool:
         return bool(self._username)
+
+    async def submit_now_playing(
+        self,
+        artist_name: str,
+        track_name: str,
+        release_name: str = "",
+        duration_ms: int = 0,
+    ) -> bool:
+        track_metadata: dict[str, Any] = {
+            "artist_name": artist_name,
+            "track_name": track_name,
+        }
+        if release_name:
+            track_metadata["release_name"] = release_name
+        if duration_ms > 0:
+            track_metadata["additional_info"] = {"duration_ms": duration_ms}
+
+        payload = {
+            "listen_type": "playing_now",
+            "payload": [{"track_metadata": track_metadata}],
+        }
+        await self._post("/1/submit-listens", payload, require_auth=True)
+        logger.info(
+            "Now playing reported to ListenBrainz",
+            extra={"artist": artist_name, "track": track_name},
+        )
+        return True
+
+    async def submit_single_listen(
+        self,
+        artist_name: str,
+        track_name: str,
+        listened_at: int,
+        release_name: str = "",
+        duration_ms: int = 0,
+    ) -> bool:
+        track_metadata: dict[str, Any] = {
+            "artist_name": artist_name,
+            "track_name": track_name,
+        }
+        if release_name:
+            track_metadata["release_name"] = release_name
+        if duration_ms > 0:
+            track_metadata["additional_info"] = {"duration_ms": duration_ms}
+
+        payload = {
+            "listen_type": "single",
+            "payload": [
+                {
+                    "listened_at": listened_at,
+                    "track_metadata": track_metadata,
+                }
+            ],
+        }
+        await self._post("/1/submit-listens", payload, require_auth=True)
+        logger.info(
+            "Scrobble submitted to ListenBrainz",
+            extra={
+                "artist": artist_name,
+                "track": track_name,
+                "listened_at": listened_at,
+            },
+        )
+        return True

@@ -14,9 +14,39 @@ from repositories.musicbrainz_base import (
     should_include_release,
     extract_artist_name,
     parse_year,
+    build_musicbrainz_tag_query,
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _rg_priority(rg: dict) -> int:
+    rg_type = rg.get("primary-type", "")
+    priority = 0
+    if rg_type == "Album":
+        priority = 3
+    elif rg_type == "EP":
+        priority = 2
+    elif rg_type == "Single":
+        priority = 1
+    secondary = rg.get("secondary-types", [])
+    if secondary:
+        priority = max(0, priority - 1)
+    return priority
+
+
+def _pick_best_release_group(releases: list[dict]) -> tuple[str, str] | None:
+    candidates: list[tuple[str, str, int]] = []
+    for release in releases:
+        rg = release.get("release-group", {})
+        rg_id = rg.get("id")
+        rg_title = rg.get("title", "")
+        if rg_id:
+            candidates.append((rg_id, rg_title, _rg_priority(rg)))
+    if not candidates:
+        return None
+    candidates.sort(key=lambda c: c[2], reverse=True)
+    return (candidates[0][0], candidates[0][1])
 
 
 class MusicBrainzAlbumMixin:
@@ -112,7 +142,7 @@ class MusicBrainzAlbumMixin:
             result = await mb_api_get(
                 "/release-group",
                 params={
-                    "query": f"tag:{tag.lower()}",
+                    "query": build_musicbrainz_tag_query(tag),
                     "limit": internal_limit,
                     "offset": offset,
                 },
@@ -224,6 +254,17 @@ class MusicBrainzAlbumMixin:
             logger.info(f"[MB] Cache hit for release {release_id[:8]}: '{cached[:8] if cached else 'empty'}'")
             return cached if cached != "" else None
 
+        dedupe_key = f"mb:release_to_rg:{release_id}"
+        return await mb_deduplicator.dedupe(
+            dedupe_key,
+            lambda: self._fetch_release_group_id_from_release(release_id, cache_key),
+        )
+
+    async def _fetch_release_group_id_from_release(
+        self,
+        release_id: str,
+        cache_key: str,
+    ) -> Optional[str]:
         try:
             logger.info(f"[MB] Fetching release group for release {release_id[:8]}")
             result = await mb_api_get(

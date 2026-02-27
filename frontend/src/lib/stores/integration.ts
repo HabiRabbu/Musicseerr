@@ -7,6 +7,7 @@ interface IntegrationStatus {
 	listenbrainz: boolean;
 	youtube: boolean;
 	localfiles: boolean;
+	lastfm: boolean;
 	loaded: boolean;
 }
 
@@ -17,6 +18,7 @@ function createIntegrationStore() {
 		listenbrainz: false,
 		youtube: false,
 		localfiles: false,
+		lastfm: false,
 		loaded: false
 	});
 	let loadPromise: Promise<void> | null = null;
@@ -30,7 +32,7 @@ function createIntegrationStore() {
 			update(current => ({ ...current, lidarr: configured }));
 		},
 		reset: () => {
-			set({ lidarr: false, jellyfin: false, listenbrainz: false, youtube: false, localfiles: false, loaded: false });
+			set({ lidarr: false, jellyfin: false, listenbrainz: false, youtube: false, localfiles: false, lastfm: false, loaded: false });
 		},
 		ensureLoaded: async () => {
 			const current = get({ subscribe });

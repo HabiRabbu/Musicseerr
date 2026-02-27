@@ -2,6 +2,7 @@ import asyncio
 import logging
 from typing import Any, Optional
 from core.exceptions import ExternalServiceError
+from infrastructure.cover_urls import prefer_release_group_cover_url
 from .base import LidarrBase
 
 logger = logging.getLogger(__name__)
@@ -146,6 +147,7 @@ class LidarrArtistRepository(LidarrBase):
             albums = []
             for album in album_data:
                 album_id = album.get("id")
+                album_mbid = album.get("foreignAlbumId")
                 images = album.get("images", [])
                 cover_url = None
                 for img in images:
@@ -156,6 +158,8 @@ class LidarrArtistRepository(LidarrBase):
                         else:
                             cover_url = self._build_api_media_cover_url_album(album_id, url_path, 250)
                         break
+
+                cover_url = prefer_release_group_cover_url(album_mbid, cover_url, size=500)
 
                 year = None
                 if release_date := album.get("releaseDate"):
@@ -170,7 +174,7 @@ class LidarrArtistRepository(LidarrBase):
                 album_info = {
                     "id": album_id,
                     "title": album.get("title", "Unknown"),
-                    "mbid": album.get("foreignAlbumId"),
+                    "mbid": album_mbid,
                     "album_type": album.get("albumType"),
                     "secondary_types": album.get("secondaryTypes", []),
                     "release_date": album.get("releaseDate"),

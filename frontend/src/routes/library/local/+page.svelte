@@ -9,6 +9,7 @@
 		setLocalFilesSidebarCachedData
 	} from '$lib/utils/localFilesCache';
 	import { launchLocalPlayback } from '$lib/player/launchLocalPlayback';
+	import { getCoverUrl } from '$lib/utils/errorHandling';
 	import type {
 		LocalAlbumSummary,
 		LocalPaginatedResponse,
@@ -187,7 +188,10 @@
 				albumId: album.musicbrainz_id || String(album.lidarr_album_id),
 				albumName: album.name,
 				artistName: album.artist_name,
-				coverUrl: album.cover_url ?? ''
+				coverUrl: getCoverUrl(
+					album.cover_url,
+					album.musicbrainz_id || String(album.lidarr_album_id)
+				)
 			});
 		} catch {} finally {
 			playingAlbumId = null;

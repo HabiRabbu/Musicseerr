@@ -12,6 +12,10 @@ from api.v1.schemas.settings import (
     YouTubeConnectionSettings,
     HomeSettings,
     LocalFilesConnectionSettings,
+    LastFmConnectionSettings,
+    ScrobbleSettings,
+    PrimaryMusicSourceSettings,
+    LASTFM_SECRET_MASK,
 )
 from api.v1.schemas.advanced_settings import AdvancedSettings
 from core.config import Settings
@@ -231,3 +235,69 @@ class PreferencesService:
         except Exception as e:
             logger.error("Failed to save local files settings: %s", e)
             raise ConfigurationError(f"Failed to save local files settings: {e}")
+
+    def get_lastfm_connection(self) -> LastFmConnectionSettings:
+        return self._get_section("lastfm_settings", LastFmConnectionSettings)
+
+    def save_lastfm_connection(self, settings: LastFmConnectionSettings) -> None:
+        try:
+            current = self.get_lastfm_connection()
+
+            api_key = settings.api_key.strip()
+            shared_secret = settings.shared_secret
+            if shared_secret.startswith(LASTFM_SECRET_MASK):
+                shared_secret = current.shared_secret
+            else:
+                shared_secret = shared_secret.strip()
+
+            session_key = settings.session_key
+            if session_key.startswith(LASTFM_SECRET_MASK):
+                session_key = current.session_key
+            else:
+                session_key = session_key.strip()
+
+            username = settings.username.strip()
+            enabled = settings.enabled
+            if not api_key or not shared_secret:
+                enabled = False
+                session_key = ""
+                username = ""
+
+            resolved = LastFmConnectionSettings(
+                api_key=api_key,
+                shared_secret=shared_secret,
+                session_key=session_key,
+                username=username,
+                enabled=enabled,
+            )
+            self._save_section("lastfm_settings", resolved)
+            logger.info("Saved Last.fm connection settings to %s", self._config_path)
+        except Exception as e:
+            logger.error("Failed to save Last.fm connection settings: %s", e)
+            raise ConfigurationError(f"Failed to save Last.fm connection settings: {e}")
+
+    def is_lastfm_enabled(self) -> bool:
+        settings = self.get_lastfm_connection()
+        return settings.enabled and bool(settings.api_key) and bool(settings.shared_secret)
+
+    def get_scrobble_settings(self) -> ScrobbleSettings:
+        return self._get_section("scrobble_settings", ScrobbleSettings)
+
+    def save_scrobble_settings(self, settings: ScrobbleSettings) -> None:
+        try:
+            self._save_section("scrobble_settings", settings)
+            logger.info("Saved scrobble settings to %s", self._config_path)
+        except Exception as e:
+            logger.error("Failed to save scrobble settings: %s", e)
+            raise ConfigurationError(f"Failed to save scrobble settings: {e}")
+
+    def get_primary_music_source(self) -> PrimaryMusicSourceSettings:
+        return self._get_section("primary_music_source", PrimaryMusicSourceSettings)
+
+    def save_primary_music_source(self, settings: PrimaryMusicSourceSettings) -> None:
+        try:
+            self._save_section("primary_music_source", settings)
+            logger.info("Saved primary music source to %s", self._config_path)
+        except Exception as e:
+            logger.error("Failed to save primary music source: %s", e)
+            raise ConfigurationError(f"Failed to save primary music source: {e}")

@@ -19,6 +19,8 @@ export interface CacheTTLs {
 	search: number;
 	localFilesSidebar: number;
 	jellyfinSidebar: number;
+	discoverQueuePollingInterval: number;
+	discoverQueueAutoGenerate: boolean;
 }
 
 const DEFAULTS: CacheTTLs = {
@@ -29,7 +31,9 @@ const DEFAULTS: CacheTTLs = {
 	discoverQueue: CACHE_TTL.DISCOVER_QUEUE,
 	search: CACHE_TTL.SEARCH,
 	localFilesSidebar: CACHE_TTL.LOCAL_FILES_SIDEBAR,
-	jellyfinSidebar: CACHE_TTL.JELLYFIN_SIDEBAR
+	jellyfinSidebar: CACHE_TTL.JELLYFIN_SIDEBAR,
+	discoverQueuePollingInterval: 4000,
+	discoverQueueAutoGenerate: true
 };
 
 let resolved: CacheTTLs = { ...DEFAULTS };
@@ -63,7 +67,11 @@ export async function initCacheTTLs(): Promise<void> {
 				discoverQueue: data.discover_queue ?? DEFAULTS.discoverQueue,
 				search: data.search ?? DEFAULTS.search,
 				localFilesSidebar: data.local_files_sidebar ?? DEFAULTS.localFilesSidebar,
-				jellyfinSidebar: data.jellyfin_sidebar ?? DEFAULTS.jellyfinSidebar
+				jellyfinSidebar: data.jellyfin_sidebar ?? DEFAULTS.jellyfinSidebar,
+				discoverQueuePollingInterval:
+					data.discover_queue_polling_interval ?? DEFAULTS.discoverQueuePollingInterval,
+				discoverQueueAutoGenerate:
+					data.discover_queue_auto_generate ?? DEFAULTS.discoverQueueAutoGenerate
 			};
 			applyTTLs(resolved);
 		}
@@ -76,6 +84,6 @@ export function getCacheTTLs(): CacheTTLs {
 	return resolved;
 }
 
-export function getCacheTTL(key: keyof CacheTTLs): number {
+export function getCacheTTL<K extends keyof CacheTTLs>(key: K): CacheTTLs[K] {
 	return resolved[key];
 }

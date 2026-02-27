@@ -3,6 +3,7 @@ import logging
 from datetime import datetime
 from typing import Any
 from api.v1.schemas.library import LibraryAlbum
+from infrastructure.cover_urls import prefer_release_group_cover_url
 from .base import LidarrBase
 
 logger = logging.getLogger(__name__)
@@ -142,7 +143,11 @@ class LidarrHistoryRepository(LidarrBase):
                     pass
 
             album_id = album_data.get("id")
-            cover_url = self._get_album_cover_url(album_data.get("images", []), album_id)
+            cover_url = prefer_release_group_cover_url(
+                album_mbid,
+                self._get_album_cover_url(album_data.get("images", []), album_id),
+                size=500,
+            )
 
             out.append(
                 LibraryAlbum(

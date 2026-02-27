@@ -1,5 +1,6 @@
 from typing import Optional
 from pydantic import BaseModel, Field
+from api.v1.schemas.common import LastFmTagSchema
 
 
 class Track(BaseModel):
@@ -52,3 +53,11 @@ class AlbumTracksInfo(BaseModel):
     label: Optional[str] = None
     barcode: Optional[str] = None
     country: Optional[str] = None
+
+
+class LastFmAlbumEnrichment(BaseModel):
+    summary: Optional[str] = None
+    tags: list[LastFmTagSchema] = Field(default_factory=list)
+    listeners: int = 0
+    playcount: int = 0
+    url: Optional[str] = None

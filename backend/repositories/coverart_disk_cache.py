@@ -36,27 +36,38 @@ def get_cache_filename(identifier: str, suffix: str = "") -> str:
 
 
 class CoverDiskCache:
-    def __init__(self, cache_dir: Path):
+    def __init__(
+        self,
+        cache_dir: Path,
+        max_size_mb: Optional[int] = None,
+        eviction_check_interval_seconds: int = 60,
+    ):
         self.cache_dir = cache_dir
         self.cache_dir.mkdir(parents=True, exist_ok=True)
+        self.max_size_bytes = max_size_mb * 1024 * 1024 if max_size_mb and max_size_mb > 0 else None
+        self._eviction_check_interval_seconds = max(eviction_check_interval_seconds, 1)
+        self._last_eviction_check = 0.0
+        self._eviction_lock = asyncio.Lock()
 
     async def write(
         self,
         file_path: Path,
         content: bytes,
         content_type: str,
-        extra_meta: Optional[dict[str, str]] = None,
+        extra_meta: Optional[dict[str, object]] = None,
         is_monitored: bool = False,
     ) -> None:
         try:
             now = datetime.now().timestamp()
             ttl = None if is_monitored else 24 * 3600
+            content_sha1 = hashlib.sha1(content).hexdigest()
             meta = {
                 'content_type': content_type,
                 'created_at': now,
                 'last_accessed': now,
                 'size_bytes': len(content),
-                'is_monitored': is_monitored
+                'is_monitored': is_monitored,
+                'content_sha1': content_sha1,
             }
             if ttl:
                 meta['expires_at'] = now + ttl
@@ -76,11 +87,59 @@ class CoverDiskCache:
                 if extra_meta and 'wikidata_url' in extra_meta:
                     wikidata_path = file_path.with_suffix('.wikidata')
                     async with aiofiles.open(wikidata_path, 'w') as f:
-                        await f.write(extra_meta['wikidata_url'])
+                        await f.write(str(extra_meta['wikidata_url']))
 
             await asyncio.gather(write_content(), write_meta(), write_wikidata())
+            await self.enforce_size_limit()
         except Exception as e:
             logger.warning(f"Failed to write disk cache: {e}")
+
+    async def write_negative(
+        self,
+        file_path: Path,
+        ttl_seconds: int = 4 * 3600,
+    ) -> None:
+        try:
+            now = datetime.now().timestamp()
+            meta = {
+                "created_at": now,
+                "last_accessed": now,
+                "expires_at": now + ttl_seconds,
+                "negative": True,
+                "is_monitored": False,
+            }
+            meta_path = file_path.with_suffix(".meta.json")
+            async with aiofiles.open(meta_path, "w") as f:
+                await f.write(json.dumps(meta))
+        except Exception as e:
+            logger.warning(f"Failed to write negative disk cache: {e}")
+
+    async def is_negative(self, file_path: Path) -> bool:
+        meta_path = file_path.with_suffix(".meta.json")
+        if not meta_path.exists():
+            return False
+        try:
+            async with aiofiles.open(meta_path, "r") as f:
+                meta = json.loads(await f.read())
+
+            if not meta.get("negative", False):
+                return False
+
+            expires_at = meta.get("expires_at")
+            if expires_at is None:
+                return False
+
+            now = datetime.now().timestamp()
+            if now > expires_at:
+                meta_path.unlink(missing_ok=True)
+                return False
+
+            task = asyncio.create_task(self._update_meta_access(meta_path, meta))
+            task.add_done_callback(_log_task_error)
+            return True
+        except Exception as e:
+            logger.warning(f"Failed to read negative disk cache: {e}")
+            return False
 
     async def read(
         self,
@@ -116,6 +175,8 @@ class CoverDiskCache:
                         return None
                 if extra_keys:
                     async def read_extra_key(key: str):
+                        if key in meta:
+                            return key, meta.get(key)
                         ext_path = file_path.with_suffix(f'.{key}')
                         if ext_path.exists():
                             async with aiofiles.open(ext_path, 'r') as f:
@@ -141,6 +202,113 @@ class CoverDiskCache:
                 await f.write(json.dumps(meta))
         except Exception:
             pass
+
+    async def get_content_hash(self, file_path: Path) -> Optional[str]:
+        meta_path = file_path.with_suffix('.meta.json')
+        if not meta_path.exists():
+            return None
+
+        try:
+            async with aiofiles.open(meta_path, 'r') as f:
+                meta = json.loads(await f.read())
+
+            if 'expires_at' in meta and not meta.get('is_monitored', False):
+                now = datetime.now().timestamp()
+                if now > meta['expires_at']:
+                    file_path.unlink(missing_ok=True)
+                    meta_path.unlink(missing_ok=True)
+                    file_path.with_suffix('.wikidata').unlink(missing_ok=True)
+                    return None
+
+            content_hash = meta.get('content_sha1')
+            if content_hash:
+                task = asyncio.create_task(self._update_meta_access(meta_path, meta))
+                task.add_done_callback(_log_task_error)
+                return str(content_hash)
+
+            if not file_path.exists():
+                return None
+
+            async with aiofiles.open(file_path, 'rb') as f:
+                content = await f.read()
+
+            if not content:
+                return None
+
+            content_hash = hashlib.sha1(content).hexdigest()
+            meta['content_sha1'] = content_hash
+            await self._update_meta_access(meta_path, meta)
+            return content_hash
+        except Exception as e:
+            logger.warning(f"Failed to get disk cache content hash: {e}")
+            return None
+
+    async def enforce_size_limit(self, force: bool = False) -> int:
+        if self.max_size_bytes is None:
+            return 0
+
+        now = datetime.now().timestamp()
+        if not force and (now - self._last_eviction_check) < self._eviction_check_interval_seconds:
+            return 0
+
+        async with self._eviction_lock:
+            now = datetime.now().timestamp()
+            if not force and (now - self._last_eviction_check) < self._eviction_check_interval_seconds:
+                return 0
+
+            self._last_eviction_check = now
+
+            total_bytes = 0
+            candidates: list[tuple[float, Path, int]] = []
+
+            for file_path in self.cache_dir.glob('*.bin'):
+                try:
+                    size_bytes = file_path.stat().st_size
+                except FileNotFoundError:
+                    continue
+
+                total_bytes += size_bytes
+
+                meta_path = file_path.with_suffix('.meta.json')
+                meta: dict = {}
+                if meta_path.exists():
+                    try:
+                        async with aiofiles.open(meta_path, 'r') as f:
+                            meta = json.loads(await f.read())
+                    except Exception:
+                        meta = {}
+
+                if meta.get('is_monitored', False):
+                    continue
+
+                last_accessed = float(meta.get('last_accessed', meta.get('created_at', 0.0)) or 0.0)
+                candidates.append((last_accessed, file_path, size_bytes))
+
+            if total_bytes <= self.max_size_bytes:
+                return 0
+
+            bytes_to_free = total_bytes - self.max_size_bytes
+            bytes_freed = 0
+
+            candidates.sort(key=lambda item: item[0])
+
+            for _, file_path, size_bytes in candidates:
+                file_path.unlink(missing_ok=True)
+                file_path.with_suffix('.meta.json').unlink(missing_ok=True)
+                file_path.with_suffix('.wikidata').unlink(missing_ok=True)
+                bytes_freed += size_bytes
+
+                if bytes_freed >= bytes_to_free:
+                    break
+
+            if bytes_freed > 0:
+                logger.info(
+                    "Evicted %d bytes from cover cache (target max=%d bytes)",
+                    bytes_freed,
+                    self.max_size_bytes,
+                )
+
+            return bytes_freed
 
     def get_file_path(self, identifier: str, suffix: str) -> Path:
         cache_filename = get_cache_filename(identifier, suffix)

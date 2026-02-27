@@ -6,11 +6,15 @@
 	import DiscoverQueueCard from '$lib/components/DiscoverQueueCard.svelte';
 	import DiscoverQueueModal from '$lib/components/DiscoverQueueModal.svelte';
 	import ServicePromptCard from '$lib/components/ServicePromptCard.svelte';
+	import SourceSwitcher from '$lib/components/SourceSwitcher.svelte';
 	import type { DiscoverResponse } from '$lib/types';
 	import CarouselSkeleton from '$lib/components/CarouselSkeleton.svelte';
 	import PageHeader from '$lib/components/PageHeader.svelte';
 	import { getDiscoverCachedData, setDiscoverCachedData, isDiscoverCacheStale } from '$lib/utils/discoverCache';
+	import { removeAllQueueCachedData } from '$lib/utils/discoverQueueCache';
 	import { formatLastUpdated } from '$lib/utils/formatting';
+	import { musicSourceStore, type MusicSource } from '$lib/stores/musicSource';
+	import { discoverQueueStatusStore } from '$lib/stores/discoverQueueStatus';
 	import { Compass } from 'lucide-svelte';
 
 	let discoverData: DiscoverResponse | null = null;
@@ -21,9 +25,20 @@
 	let lastUpdated: Date | null = null;
 	let abortController: AbortController | null = null;
 	let queueModalOpen = false;
+	let activeSource: MusicSource = 'listenbrainz';
+	let pollRunId = 0;
 
-	async function loadDiscoverData(forceRefresh = false) {
-		const cached = getDiscoverCachedData();
+	function resolveDiscoverSource(source?: MusicSource): MusicSource {
+		return source ?? activeSource;
+	}
+
+	function cancelDiscoverPolling(): void {
+		pollRunId += 1;
+	}
+
+	async function loadDiscoverData(forceRefresh = false, sourceOverride?: MusicSource) {
+		const source = resolveDiscoverSource(sourceOverride);
+		const cached = getDiscoverCachedData(source);
 		if (cached && !forceRefresh) {
 			// Guard: when the backend is still computing async recommendations,
 			// all personalized sections are null/empty. Don't use a cached response
@@ -38,7 +53,7 @@
 				lastUpdated = new Date(cached.timestamp);
 				loading = false;
 				if (isDiscoverCacheStale(cached.timestamp)) {
-					refreshInBackground();
+					refreshInBackground(source);
 				}
 				return;
 			}
@@ -46,6 +61,7 @@
 
 		if (abortController) abortController.abort();
 		abortController = new AbortController();
+		cancelDiscoverPolling();
 
 		if (!discoverData) {
 			loading = true;
@@ -55,7 +71,9 @@
 		error = '';
 
 		try {
-			const response = await fetch('/api/discover', { signal: abortController.signal });
+			const response = await fetch(`/api/discover?source=${encodeURIComponent(source)}`, {
+				signal: abortController.signal
+			});
 			if (response.ok) {
 				const data: DiscoverResponse = await response.json();
 				discoverData = data;
@@ -68,10 +86,10 @@
 					data.missing_essentials != null ||
 					data.globally_trending != null;
 				if (dataHasContent) {
-					setDiscoverCachedData(data);
+					setDiscoverCachedData(data, source);
 				}
 				if (!dataHasContent && data.refreshing) {
-					pollForReady();
+					pollForReady(source);
 				}
 			} else if (!discoverData) {
 				error = 'Failed to load discover data';
@@ -85,19 +103,20 @@
 		}
 	}
 
-	async function refreshInBackground() {
+	async function refreshInBackground(sourceOverride?: MusicSource) {
 		if (refreshing) return;
 		if (abortController) abortController.abort();
 		abortController = new AbortController();
 		refreshing = true;
 		isUpdating = true;
+		const source = resolveDiscoverSource(sourceOverride);
 
 		try {
-			const response = await fetch('/api/discover', { signal: abortController.signal });
+			const response = await fetch(`/api/discover?source=${encodeURIComponent(source)}`, {
+				signal: abortController.signal
+			});
 			if (response.ok) {
 				const data: DiscoverResponse = await response.json();
-				// Only update cached data if the response has content — empty means
-				// the backend is still computing and we should keep showing stale data
 				const hasContent =
 					(data.because_you_listen_to?.length ?? 0) > 0 ||
 					data.fresh_releases != null ||
@@ -106,7 +125,7 @@
 				if (hasContent) {
 					discoverData = data;
 					lastUpdated = new Date();
-					setDiscoverCachedData(data);
+					setDiscoverCachedData(data, source);
 				}
 			}
 		} catch (e) {
@@ -117,12 +136,15 @@
 		}
 	}
 
-	async function pollForReady() {
+	async function pollForReady(source: MusicSource) {
+		const runId = ++pollRunId;
 		isUpdating = true;
 		for (let i = 0; i < 15; i++) {
+			if (runId !== pollRunId) return;
 			await new Promise((r) => setTimeout(r, 3000));
+			if (runId !== pollRunId) return;
 			try {
-				const res = await fetch('/api/discover');
+				const res = await fetch(`/api/discover?source=${encodeURIComponent(source)}`);
 				if (res.ok) {
 					const data: DiscoverResponse = await res.json();
 					const ready =
@@ -133,7 +155,7 @@
 					if (ready || !data.refreshing) {
 						discoverData = data;
 						lastUpdated = new Date();
-						if (ready) setDiscoverCachedData(data);
+						if (ready) setDiscoverCachedData(data, source);
 						break;
 					}
 				}
@@ -141,10 +163,14 @@
 				break;
 			}
 		}
-		isUpdating = false;
+		if (runId === pollRunId) {
+			isUpdating = false;
+		}
 	}
 
-	async function handleRefresh() {
+	async function handleRefresh(sourceOverride?: MusicSource) {
+		const source = resolveDiscoverSource(sourceOverride);
+		const runId = ++pollRunId;
 		refreshing = true;
 		isUpdating = true;
 		try {
@@ -153,15 +179,17 @@
 
 		const maxPolls = 30;
 		for (let i = 0; i < maxPolls; i++) {
+			if (runId !== pollRunId) return;
 			await new Promise((r) => setTimeout(r, 2000));
+			if (runId !== pollRunId) return;
 			try {
-				const res = await fetch('/api/discover');
+				const res = await fetch(`/api/discover?source=${encodeURIComponent(source)}`);
 				if (res.ok) {
 					const data: DiscoverResponse = await res.json();
 					if (!data.refreshing) {
 						discoverData = data;
 						lastUpdated = new Date();
-						setDiscoverCachedData(data);
+						setDiscoverCachedData(data, source);
 						break;
 					}
 				}
@@ -169,20 +197,39 @@
 				break;
 			}
 		}
-		refreshing = false;
-		isUpdating = false;
+		if (runId === pollRunId) {
+			refreshing = false;
+			isUpdating = false;
+		}
 	}
 
 	function cleanup() {
+		cancelDiscoverPolling();
 		if (abortController) {
 			abortController.abort();
 			abortController = null;
 		}
 	}
 
-	onMount(() => loadDiscoverData());
-	onDestroy(cleanup);
+	onMount(async () => {
+		await musicSourceStore.load();
+		activeSource = musicSourceStore.getPageSource('discover');
+		loadDiscoverData(false, activeSource);
+		discoverQueueStatusStore.init(activeSource);
+	});
+	onDestroy(() => {
+		cleanup();
+		discoverQueueStatusStore.stopPolling();
+	});
 	beforeNavigate(cleanup);
+
+	function handleSourceChange(source: MusicSource) {
+		activeSource = source;
+		removeAllQueueCachedData();
+		loadDiscoverData(true, source);
+		discoverQueueStatusStore.reset();
+		discoverQueueStatusStore.init(source);
+	}
 
 	$: hasContent =
 		(discoverData?.because_you_listen_to?.length ?? 0) > 0 ||
@@ -191,7 +238,10 @@
 		discoverData?.rediscover != null ||
 		discoverData?.artists_you_might_like != null ||
 		discoverData?.popular_in_your_genres != null ||
-		discoverData?.globally_trending != null;
+		discoverData?.globally_trending != null ||
+		discoverData?.lastfm_weekly_artist_chart != null ||
+		discoverData?.lastfm_weekly_album_chart != null ||
+		discoverData?.lastfm_recent_scrobbles != null;
 	$: servicePrompts = discoverData?.service_prompts ?? [];
 </script>
 
@@ -216,11 +266,15 @@
 		{/snippet}
 	</PageHeader>
 
+	<div class="flex justify-end px-4 -mt-4 mb-4 sm:px-6 lg:px-8">
+		<SourceSwitcher pageKey="discover" onSourceChange={handleSourceChange} />
+	</div>
+
 	{#if error && !discoverData}
 		<div class="mt-16 flex flex-col items-center justify-center px-4">
 			<div class="mb-4 text-4xl">😕</div>
 			<p class="text-base-content/70">{error}</p>
-			<button class="btn btn-primary mt-4" on:click={() => loadDiscoverData(true)}>Try Again</button
+			<button class="btn btn-primary mt-4" on:click={() => loadDiscoverData(true, activeSource)}>Try Again</button
 			>
 		</div>
 	{:else}
@@ -261,7 +315,7 @@
 					</div>
 				{/if}
 
-				<DiscoverQueueCard onLaunch={() => (queueModalOpen = true)} />
+				<DiscoverQueueCard source={activeSource} onLaunch={() => (queueModalOpen = true)} />
 
 				{#if discoverData.fresh_releases && discoverData.fresh_releases.items.length > 0}
 					<HomeSection section={discoverData.fresh_releases} />
@@ -291,6 +345,18 @@
 					<HomeSection section={discoverData.globally_trending} />
 				{/if}
 
+				{#if discoverData.lastfm_weekly_artist_chart && discoverData.lastfm_weekly_artist_chart.items.length > 0}
+					<HomeSection section={discoverData.lastfm_weekly_artist_chart} />
+				{/if}
+
+				{#if discoverData.lastfm_weekly_album_chart && discoverData.lastfm_weekly_album_chart.items.length > 0}
+					<HomeSection section={discoverData.lastfm_weekly_album_chart} />
+				{/if}
+
+				{#if discoverData.lastfm_recent_scrobbles && discoverData.lastfm_recent_scrobbles.items.length > 0}
+					<HomeSection section={discoverData.lastfm_recent_scrobbles} />
+				{/if}
+
 				{#if !hasContent && servicePrompts.length === 0}
 					{#if discoverData.refreshing || isUpdating}
 						<div class="flex flex-col items-center justify-center py-12 sm:py-16">
@@ -312,7 +378,11 @@
 							<p class="mb-6 max-w-md px-4 text-center text-sm text-base-content/70 sm:text-base">
 								Your personalized recommendations are being prepared. Try refreshing in a moment.
 							</p>
-							<button class="btn btn-primary" on:click={handleRefresh} disabled={refreshing}>
+							<button
+								class="btn btn-primary"
+								on:click={() => void handleRefresh()}
+								disabled={refreshing}
+							>
 								{#if refreshing}
 									<span class="loading loading-spinner loading-sm"></span>
 								{/if}
@@ -336,7 +406,7 @@
 	{/if}
 </div>
 
-<DiscoverQueueModal bind:open={queueModalOpen} />
+<DiscoverQueueModal bind:open={queueModalOpen} source={activeSource} />
 
 <style>
 	.section-group-discover {

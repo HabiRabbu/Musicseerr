@@ -1,7 +1,7 @@
 <script lang="ts">
 	export let title: string;
 	export let genres: { name: string }[];
-	export let genreArtists: Record<string, string> | undefined = undefined;
+	export let genreArtists: Record<string, string | null> | undefined = undefined;
 
 	const genreColors = [
 		'from-rose-500 to-pink-600',

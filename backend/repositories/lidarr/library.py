@@ -2,6 +2,7 @@ import logging
 from datetime import datetime
 from typing import Any
 from api.v1.schemas.library import LibraryAlbum
+from infrastructure.cover_urls import prefer_release_group_cover_url
 from infrastructure.cache.cache_keys import lidarr_library_mbids_key, lidarr_artist_mbids_key
 from .base import LidarrBase
 
@@ -33,7 +34,12 @@ class LidarrLibraryRepository(LidarrBase):
                     pass
 
             album_id = item.get("id")
-            cover = self._get_album_cover_url(item.get("images", []), album_id)
+            album_mbid = item.get("foreignAlbumId")
+            cover = prefer_release_group_cover_url(
+                album_mbid,
+                self._get_album_cover_url(item.get("images", []), album_id),
+                size=500,
+            )
 
             date_added = None
             if added_str := item.get("added"):
@@ -51,7 +57,7 @@ class LidarrLibraryRepository(LidarrBase):
                     monitored=item.get("monitored", False),
                     quality=None,
                     cover_url=cover,
-                    musicbrainz_id=item.get("foreignAlbumId"),
+                    musicbrainz_id=album_mbid,
                     artist_mbid=artist_mbid,
                     date_added=date_added,
                 )
@@ -122,7 +128,12 @@ class LidarrLibraryRepository(LidarrBase):
                     pass
 
             album_id = item.get("id")
-            cover = self._get_album_cover_url(item.get("images", []), album_id)
+            album_mbid = item.get("foreignAlbumId")
+            cover = prefer_release_group_cover_url(
+                album_mbid,
+                self._get_album_cover_url(item.get("images", []), album_id),
+                size=500,
+            )
 
             grouped.setdefault(artist, []).append(
                 {

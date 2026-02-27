@@ -17,12 +17,14 @@ class LibraryPrecacheService:
         lidarr_repo: LidarrRepositoryProtocol,
         cover_repo: CoverArtRepositoryProtocol,
         preferences_service: Any,
-        library_cache: Any
+        library_cache: Any,
+        artist_discovery_service: Any = None,
     ):
         self._lidarr_repo = lidarr_repo
         self._cover_repo = cover_repo
         self._preferences_service = preferences_service
         self._library_cache = library_cache
+        self._artist_discovery_service = artist_discovery_service
 
     async def precache_library_resources(self, artists: list[dict], albums: list[Any], resume: bool = False) -> None:
         status_service = CacheStatusService(self._library_cache)
@@ -87,6 +89,26 @@ class LibraryPrecacheService:
                 await self._precache_artist_images(remaining_artists, status_service, library_artist_mbids, library_album_mbids, len(processed_artists))
             if status_service.is_cancelled():
                 logger.info("Pre-cache cancelled after Phase 1")
+                return
+
+            if self._artist_discovery_service and not skip_artists:
+                artist_mbids = [
+                    a.get('mbid') for a in artists
+                    if a.get('mbid') and not a.get('mbid', '').startswith('unknown_')
+                ]
+                if artist_mbids:
+                    logger.info(f"Phase 1.5: Pre-caching discovery data (popular albums/songs/similar) for {len(artist_mbids)} library artists")
+                    try:
+                        advanced_settings = self._preferences_service.get_advanced_settings()
+                        precache_delay = advanced_settings.artist_discovery_precache_delay
+                        await self._artist_discovery_service.precache_artist_discovery(
+                            artist_mbids, delay=precache_delay
+                        )
+                    except Exception as e:
+                        logger.warning(f"Discovery precache failed (non-fatal): {e}")
+
+            if status_service.is_cancelled():
+                logger.info("Pre-cache cancelled after Phase 1.5")
                 return
             from infrastructure.validators import is_unknown_mbid
             monitored_mbids: set[str] = set()

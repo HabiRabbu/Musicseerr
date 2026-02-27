@@ -1,7 +1,12 @@
 import logging
 import time
 from fastapi import APIRouter, Query, Path, BackgroundTasks, Depends
-from api.v1.schemas.search import SearchResponse, EnrichmentResponse, SuggestResponse
+from api.v1.schemas.search import (
+    SearchResponse,
+    EnrichmentResponse,
+    EnrichmentBatchRequest,
+    SuggestResponse,
+)
 from core.dependencies import get_search_service, get_coverart_repository, get_search_enrichment_service
 from services.search_service import SearchService
 from services.search_enrichment_service import SearchEnrichmentService
@@ -97,4 +102,12 @@ async def enrich_search_results(
         artist_mbids=artist_list,
         album_mbids=album_list,
     )
+
+
+@router.post("/enrich/batch", response_model=EnrichmentResponse)
+async def enrich_search_results_post(
+    body: EnrichmentBatchRequest,
+    enrichment_service: SearchEnrichmentService = Depends(get_search_enrichment_service),
+):
+    return await enrichment_service.enrich_batch(body)
 

@@ -6,13 +6,17 @@
 	import {
 		getQueueCachedData,
 		setQueueCachedData,
+		removeQueueCachedData,
 		type QueueCacheData
 	} from '$lib/utils/discoverQueueCache';
+	import type { MusicSource } from '$lib/stores/musicSource';
+	import { discoverQueueStatusStore } from '$lib/stores/discoverQueueStatus';
+	import { getCacheTTLs } from '$lib/stores/cacheTtl';
+	import { resolveQueueCloseAction } from '$lib/utils/discoverQueueActions';
 	import AlbumImage from './AlbumImage.svelte';
 	import DQVideoSection from './DQVideoSection.svelte';
 	import DQInfoGrid from './DQInfoGrid.svelte';
 	import type {
-		DiscoverQueueItemLight,
 		DiscoverQueueEnrichment,
 		DiscoverQueueItemFull,
 		DiscoverQueueResponse,
@@ -20,7 +24,21 @@
 		YouTubeQuotaStatus
 	} from '$lib/types';
 
-	let { open = $bindable(false) }: { open: boolean } = $props();
+	let { open = $bindable(false), source }: { open: boolean; source: MusicSource } = $props();
+
+	function emptyEnrichment(): DiscoverQueueEnrichment {
+		return {
+			artist_mbid: null,
+			release_date: null,
+			country: null,
+			tags: [],
+			youtube_url: null,
+			youtube_search_url: '',
+			youtube_search_available: false,
+			artist_description: null,
+			listen_count: null
+		};
+	}
 
 	let dialogEl: HTMLDialogElement | undefined = $state();
 	let queue: DiscoverQueueItemFull[] = $state([]);
@@ -35,10 +53,15 @@
 	let ytQuota: YouTubeQuotaStatus | null = $state(null);
 
 	let enrichmentCache = new Map<string, DiscoverQueueEnrichment>();
+	let inFlightEnrich = new Map<string, Promise<DiscoverQueueEnrichment | null>>();
 	let ytSearchCache = new Map<string, YouTubeSearchResponse>();
+	let abortController: AbortController | null = null;
 
 	let currentItem: DiscoverQueueItemFull | undefined = $derived(queue[currentIndex]);
 	let enrichment: DiscoverQueueEnrichment | undefined = $derived(currentItem?.enrichment);
+	let artistNavigationMbid: string = $derived(
+		currentItem?.artist_mbid || enrichment?.artist_mbid || ''
+	);
 	let enriching: boolean = $derived(currentItem != null && !currentItem.enrichment);
 	let isLastItem: boolean = $derived(currentIndex >= queue.length - 1);
 	let progressText: string = $derived(
@@ -48,28 +71,48 @@
 
 	let queueLoaded: boolean = $state(false);
 
+	function cleanup() {
+		if (abortController) {
+			abortController.abort();
+			abortController = null;
+		}
+		inFlightEnrich.clear();
+		enrichmentCache.clear();
+		ytSearchCache.clear();
+		queueLoaded = false;
+	}
+
 	$effect(() => {
 		if (!dialogEl) return;
 		if (open) {
+			abortController = new AbortController();
 			dialogEl.showModal();
 			fetchQuota();
 			if (!queueLoaded) {
 				queueLoaded = true;
 				loadQueue();
 			}
-		} else if (dialogEl.open) {
-			dialogEl.close();
-			queueLoaded = false;
+		} else {
+			if (dialogEl.open) dialogEl.close();
+			cleanup();
 		}
 	});
 
 	function handleClose() {
-		open = false;
+		if (!open) return;
+		if (queue.length === 0 || isLastItem) {
+			handleEndQueue();
+			return;
+		}
 		saveQueueToStorage();
+		open = false;
 	}
 
 	function navigateTo(path: string) {
-		saveQueueToStorage();
+		const action = resolveQueueCloseAction({ queueLength: queue.length, isLastItem });
+		if (action === 'save') {
+			saveQueueToStorage();
+		}
 		open = false;
 		goto(path);
 	}
@@ -93,16 +136,22 @@
 		if (loading) return;
 		loading = true;
 		try {
-			const res = await fetch(API.discoverQueue());
+			const res = await fetch(API.discoverQueue(source), { signal: abortController?.signal });
 			if (!res.ok) throw new Error('Failed to fetch queue');
 			const data: DiscoverQueueResponse = await res.json();
 			queue = data.items.map((item) => ({ ...item }));
 			queueId = data.queue_id;
 			currentIndex = 0;
 			enrichmentCache.clear();
+			inFlightEnrich.clear();
 			saveQueueToStorage();
 			enrichCurrentAndNext();
+			discoverQueueStatusStore.markConsumed();
+			if (getCacheTTLs().discoverQueueAutoGenerate) {
+				discoverQueueStatusStore.triggerGenerate(false, source);
+			}
 		} catch (e) {
+			if (e instanceof DOMException && e.name === 'AbortError') return;
 			console.error('Failed to fetch discover queue:', e);
 		} finally {
 			loading = false;
@@ -116,7 +165,8 @@
 			const res = await fetch(API.discoverQueueValidate(), {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ release_group_mbids: mbids })
+				body: JSON.stringify({ release_group_mbids: mbids }),
+				signal: abortController?.signal
 			});
 			if (res.ok) {
 				const data = await res.json();
@@ -157,23 +207,45 @@
 			return;
 		}
 
-		try {
-			const res = await fetch(API.discoverQueueEnrich(mbid));
-			if (res.ok) {
-				const data: DiscoverQueueEnrichment = await res.json();
-				enrichmentCache.set(mbid, data);
-				if (queue[index]?.release_group_mbid === mbid) {
-					queue[index] = { ...queue[index], enrichment: data };
-				}
-			} else if (queue[index]?.release_group_mbid === mbid && !queue[index]?.enrichment) {
-				queue[index] = { ...queue[index], enrichment: {} as DiscoverQueueEnrichment };
+		const existing = inFlightEnrich.get(mbid);
+		if (existing) {
+			const result = await existing;
+			if (result && queue[index]?.release_group_mbid === mbid && !queue[index]?.enrichment) {
+				queue[index] = { ...queue[index], enrichment: result };
 			}
-		} catch (e) {
-			console.error('Failed to enrich item:', e);
-			if (queue[index]?.release_group_mbid === mbid && !queue[index]?.enrichment) {
-				queue[index] = { ...queue[index], enrichment: {} as DiscoverQueueEnrichment };
-			}
+			return;
 		}
+
+		const signal = abortController?.signal;
+		const promise = (async (): Promise<DiscoverQueueEnrichment | null> => {
+			try {
+				const res = await fetch(API.discoverQueueEnrich(mbid), { signal });
+				if (res.ok) {
+					const data: DiscoverQueueEnrichment = await res.json();
+					enrichmentCache.set(mbid, data);
+					if (queue[index]?.release_group_mbid === mbid) {
+						queue[index] = { ...queue[index], enrichment: data };
+					}
+					return data;
+				}
+				if (queue[index]?.release_group_mbid === mbid && !queue[index]?.enrichment) {
+					queue[index] = { ...queue[index], enrichment: emptyEnrichment() };
+				}
+				return null;
+			} catch (e) {
+				if (e instanceof DOMException && e.name === 'AbortError') return null;
+				console.error('Failed to enrich item:', e);
+				if (queue[index]?.release_group_mbid === mbid && !queue[index]?.enrichment) {
+					queue[index] = { ...queue[index], enrichment: emptyEnrichment() };
+				}
+				return null;
+			} finally {
+				inFlightEnrich.delete(mbid);
+			}
+		})();
+
+		inFlightEnrich.set(mbid, promise);
+		await promise;
 	}
 
 	// ── Actions ──
@@ -206,7 +278,8 @@
 					artist_mbid: item.artist_mbid,
 					release_name: item.album_name,
 					artist_name: item.artist_name
-				})
+				}),
+				signal: abortController?.signal
 			});
 		} catch {
 			/* continue regardless */
@@ -220,22 +293,35 @@
 		saveQueueToStorage();
 	}
 
-	function handleGenerateNew() {
-		fetchNewQueue();
+	function handleEndQueue() {
+		queue = [];
+		currentIndex = 0;
+		queueId = '';
+		enrichmentCache.clear();
+		inFlightEnrich.clear();
+		ytSearchCache.clear();
+		removeQueueCachedData(source);
+		if (getCacheTTLs().discoverQueueAutoGenerate) {
+			discoverQueueStatusStore.triggerGenerate(false, source);
+		}
+		open = false;
 	}
 
 	// ── localStorage ──
 
 	function saveQueueToStorage() {
-		setQueueCachedData({
-			items: queue.map(({ enrichment, ...rest }) => rest),
-			currentIndex,
-			queueId
-		});
+		setQueueCachedData(
+			{
+				items: queue.map((item) => ({ ...item })),
+				currentIndex,
+				queueId
+			},
+			source
+		);
 	}
 
 	function loadQueueFromStorage(): QueueCacheData | null {
-		const cached = getQueueCachedData();
+		const cached = getQueueCachedData(source);
 		if (!cached) return null;
 		return cached.data;
 	}
@@ -252,7 +338,9 @@
 
 	async function fetchQuota() {
 		try {
-			const res = await fetch(API.discoverQueueYoutubeQuota());
+			const res = await fetch(API.discoverQueueYoutubeQuota(), {
+				signal: abortController?.signal
+			});
 			if (res.ok) {
 				ytQuota = await res.json();
 			}
@@ -274,7 +362,8 @@
 		ytSearchResult = null;
 		try {
 			const res = await fetch(
-				API.discoverQueueYoutubeSearch(currentItem.artist_name, currentItem.album_name)
+				API.discoverQueueYoutubeSearch(currentItem.artist_name, currentItem.album_name),
+				{ signal: abortController?.signal }
 			);
 			if (res.ok) {
 				const data: YouTubeSearchResponse = await res.json();
@@ -293,30 +382,33 @@
 </script>
 
 <dialog bind:this={dialogEl} class="modal" onclose={handleClose}>
-	<div class="modal-box dq-modal">
+	<div class="modal-box w-[92vw] max-w-4xl max-h-[80vh] sm:max-w-4xl max-sm:w-screen max-sm:max-w-full max-sm:max-h-screen max-sm:rounded-none flex flex-col p-0! overflow-hidden rounded-2xl bg-base-100 shadow-2xl relative">
+		<!-- Top accent bar -->
+		<div class="absolute top-0 inset-x-0 h-0.5 bg-gradient-to-r from-primary via-secondary to-primary z-10 rounded-t-2xl"></div>
+
 		<!-- Loading state -->
 		{#if loading}
-			<div class="dq-loading">
+			<div class="flex flex-col items-center justify-center py-16 px-8">
 				<span class="loading loading-spinner loading-lg text-primary"></span>
 				<p class="mt-4 text-base-content/60">Building your discovery queue…</p>
 			</div>
 		{:else if queue.length === 0}
-			<div class="dq-loading">
+			<div class="flex flex-col items-center justify-center py-16 px-8">
 				<p class="text-base-content/60">No albums to discover right now.</p>
-				<button class="btn btn-primary mt-4" onclick={handleGenerateNew}>Try Again</button>
+				<button class="btn btn-primary mt-4" onclick={handleEndQueue}>Try Again</button>
 			</div>
 		{:else if currentItem}
 			{#key currentItem.release_group_mbid}
-				<div in:fly={{ x: 20, duration: 300 }} class="flex flex-col flex-1 min-h-0 w-full">
+				<div in:fly={{ x: 20, duration: 300 }} class="flex flex-col flex-auto min-h-0 w-full">
 					<!-- Header -->
-					<div class="dq-header">
-						<div class="dq-header-left">
+					<div class="flex justify-between items-start pt-5 px-6 max-sm:pt-4 max-sm:px-4 shrink-0">
+						<div class="flex flex-col gap-0.5 min-w-0">
 							{#if currentItem.recommendation_reason}
-								<span class="dq-reason-eyebrow">{currentItem.recommendation_reason}</span>
+								<span class="text-[0.65rem] font-semibold uppercase tracking-widest text-primary/70 font-mono mb-1">{currentItem.recommendation_reason}</span>
 							{/if}
-							<div class="dq-title-row">
+							<div class="flex items-center gap-2">
 								<button
-									class="dq-album-title"
+									class="text-2xl font-extrabold text-base-content text-left bg-transparent border-none p-0 cursor-pointer leading-tight whitespace-nowrap overflow-hidden text-ellipsis max-w-full tracking-tight transition-colors duration-200 hover:text-primary"
 									onclick={() => navigateTo(`/album/${currentItem.release_group_mbid}`)}
 								>
 									{currentItem.album_name}
@@ -325,33 +417,33 @@
 									<span class="badge badge-sm badge-warning">✨</span>
 								{/if}
 							</div>
-							{#if currentItem.artist_mbid}
+							{#if artistNavigationMbid}
 								<button
-									class="dq-artist-name"
-									onclick={() => navigateTo(`/artist/${currentItem.artist_mbid}`)}
+									class="text-sm text-base-content/60 text-left bg-transparent border-none p-0 cursor-pointer uppercase tracking-wide font-semibold transition-colors duration-200 hover:text-primary"
+									onclick={() => navigateTo(`/artist/${artistNavigationMbid}`)}
 								>
 									{currentItem.artist_name}
 								</button>
 							{:else}
-								<span class="dq-artist-name-static">{currentItem.artist_name}</span>
+								<span class="text-sm text-base-content/60 uppercase tracking-wide font-semibold">{currentItem.artist_name}</span>
 							{/if}
 						</div>
-						<div class="dq-header-right">
-							<div class="dq-progress-bar-wrap">
-								<div class="dq-progress-bar-fill" style="width: {progressFraction * 100}%"></div>
+						<div class="flex items-center gap-2 shrink-0">
+							<div class="w-18 h-1 rounded-full bg-base-content/20 overflow-hidden">
+								<div class="h-full rounded-full bg-gradient-to-r from-primary to-secondary transition-all duration-400" style="width: {progressFraction * 100}%"></div>
 							</div>
-							<span class="dq-progress">{progressText}</span>
+							<span class="text-xs text-base-content/45 whitespace-nowrap font-mono px-2 py-0.5 rounded-full bg-base-content/5 border border-base-content/5">{progressText}</span>
 							<button class="btn btn-sm btn-circle btn-ghost" onclick={handleClose}><X class="h-4 w-4" /></button>
 						</div>
 					</div>
 
 					<!-- Desktop: 2-column layout -->
-					<div class="dq-body dq-desktop">
-						<div class="dq-grid">
+					<div class="flex-1 overflow-y-auto min-h-0 p-4 px-6 max-sm:py-3 max-sm:px-4 hidden lg:block">
+						<div class="grid grid-cols-[260px_1fr] gap-6 items-start">
 							<!-- Left: Album cover + info card -->
-							<div class="dq-col-left">
+							<div class="flex flex-col">
 								<button
-									class="dq-cover-wrap"
+									class="bg-transparent border-none p-0 cursor-pointer rounded-xl overflow-hidden shadow-xl transition-transform duration-300 hover:scale-[1.03] hover:-translate-y-1"
 									onclick={() => navigateTo(`/album/${currentItem.release_group_mbid}`)}
 								>
 									<AlbumImage
@@ -360,12 +452,12 @@
 										size="full"
 										lazy={false}
 										rounded="none"
-										className="dq-cover"
+										className="w-[260px] h-[260px] object-cover block"
 									/>
 								</button>
 
 								<!-- Info card below cover -->
-								<div class="dq-info-card">
+								<div class="mt-3 p-3 bg-base-100/30 backdrop-blur-md rounded-xl border border-base-content/5 shadow-sm">
 									{#if enriching}
 										<div class="flex flex-col gap-2">
 											<div class="skeleton h-4 w-3/4 rounded"></div>
@@ -379,12 +471,14 @@
 							</div>
 
 							<!-- Right: YouTube embed -->
-							<div class="dq-col-right">
+							<div class="flex flex-col">
 								<DQVideoSection
 									{enriching}
 									{enrichment}
 									{ytSearching}
-									{ytSearchResult}								quota={ytQuota}									onYtSearch={handleYtSearch}
+									{ytSearchResult}
+									quota={ytQuota}
+									onYtSearch={handleYtSearch}
 									onNavigate={navigateTo}
 								/>
 							</div>
@@ -394,8 +488,8 @@
 						{#if enriching}
 							<div class="skeleton h-12 w-full rounded-lg mt-4"></div>
 						{:else if enrichment?.artist_description}
-							<div class="dq-bio">
-								<p>
+							<div class="mt-3">
+								<p class="text-xs leading-relaxed text-base-content/55">
 									{#if bioExpanded}
 										{enrichment.artist_description}
 									{:else}
@@ -403,7 +497,7 @@
 									{/if}
 								</p>
 								{#if enrichment.artist_description.length > 300}
-									<button class="dq-bio-toggle" onclick={() => (bioExpanded = !bioExpanded)}>
+									<button class="text-xs text-primary bg-transparent border-none p-0 mt-1 cursor-pointer hover:underline" onclick={() => (bioExpanded = !bioExpanded)}>
 										{bioExpanded ? 'Show less' : 'Read more'}
 									</button>
 								{/if}
@@ -412,9 +506,9 @@
 					</div>
 
 					<!-- Mobile: Tabbed layout -->
-					<div class="dq-body dq-mobile">
+					<div class="flex-1 overflow-y-auto min-h-0 p-4 px-6 max-sm:py-3 max-sm:px-4 flex flex-col gap-3 items-center lg:hidden">
 						<button
-							class="dq-cover-wrap-mobile"
+							class="bg-transparent border-none p-0 cursor-pointer rounded-xl overflow-hidden shadow-xl"
 							onclick={() => navigateTo(`/album/${currentItem.release_group_mbid}`)}
 						>
 							<AlbumImage
@@ -423,7 +517,7 @@
 								size="full"
 								lazy={false}
 								rounded="none"
-								className="dq-cover-mobile"
+								className="w-full max-w-[220px] aspect-square object-cover block"
 							/>
 						</button>
 
@@ -454,7 +548,7 @@
 							</button>
 						</div>
 
-						<div class="dq-tab-content">
+						<div class="min-h-[120px] w-full">
 							{#if enriching}
 								<div class="skeleton h-40 w-full rounded-lg"></div>
 							{:else if mobileTab === 'video'}
@@ -462,7 +556,9 @@
 									{enriching}
 									{enrichment}
 									{ytSearching}
-									{ytSearchResult}								quota={ytQuota}									compact={true}
+									{ytSearchResult}
+									quota={ytQuota}
+									compact={true}
 									onYtSearch={handleYtSearch}
 									onNavigate={navigateTo}
 								/>
@@ -479,22 +575,22 @@
 					</div>
 
 					<!-- Footer -->
-					<div class="dq-footer">
-						<button class="btn btn-sm dq-ignore-btn" onclick={handleIgnore}>
+					<div class="flex justify-between items-center shrink-0 py-3 px-6 max-sm:py-3 max-sm:px-4 max-sm:flex-col max-sm:gap-2 border-t border-base-content/5 bg-base-content/[0.02]">
+						<button class="btn btn-sm btn-soft btn-error" onclick={handleIgnore}>
 							<X class="h-4 w-4" />
 							Not for me
 						</button>
-						<div class="dq-footer-actions">
+						<div class="flex items-center gap-2 max-sm:w-full max-sm:justify-center">
 							<button
-								class="btn btn-sm dq-view-album-btn"
+								class="btn btn-sm btn-ghost"
 								onclick={() => navigateTo(`/album/${currentItem.release_group_mbid}`)}
 							>
 								View Album
 							</button>
 							{#if isLastItem}
-								<button class="btn btn-primary" onclick={handleGenerateNew}> New Queue </button>
+							<button class="btn btn-primary" onclick={handleEndQueue}> End Queue </button>
 							{:else}
-								<button class="btn btn-primary dq-next-btn" onclick={handleNext}>Next <ArrowRight class="h-4 w-4" /></button>
+								<button class="btn btn-primary" onclick={handleNext}>Next <ArrowRight class="h-4 w-4" /></button>
 							{/if}
 						</div>
 					</div>
@@ -506,401 +602,3 @@
 		<button>close</button>
 	</form>
 </dialog>
-
-<style>
-	:global(dialog.modal::backdrop) {
-		background: rgba(0, 0, 0, 0.85) !important;
-	}
-
-	:global(.modal-backdrop) {
-		background: rgba(0, 0, 0, 0.85) !important;
-	}
-
-	.dq-modal {
-		width: 92vw;
-		max-width: 64rem;
-		height: 85vh;
-		display: flex;
-		flex-direction: column;
-		padding: 0 !important;
-		overflow: hidden;
-		border-radius: 1.25rem;
-		background-color: var(--color-base-100);
-		box-shadow:
-			0 25px 50px -12px rgba(0, 0, 0, 0.4),
-			0 0 0 1px color-mix(in srgb, var(--color-base-content) 6%, transparent),
-			inset 0 1px 0 0 color-mix(in srgb, var(--color-base-content) 6%, transparent);
-		position: relative;
-	}
-
-	.dq-modal::before {
-		content: '';
-		position: absolute;
-		top: 0;
-		left: 0;
-		right: 0;
-		height: 2px;
-		background: linear-gradient(
-			90deg,
-			var(--color-primary),
-			var(--color-secondary),
-			var(--color-primary)
-		);
-		z-index: 10;
-		border-radius: 1.25rem 1.25rem 0 0;
-	}
-
-	.dq-loading {
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		justify-content: center;
-		padding: 4rem 2rem;
-	}
-
-	/* ── Header ── */
-	.dq-header {
-		display: flex;
-		justify-content: space-between;
-		align-items: flex-start;
-		padding: 1.25rem 1.5rem 0;
-		flex-shrink: 0;
-	}
-
-	.dq-header-left {
-		display: flex;
-		flex-direction: column;
-		gap: 0.125rem;
-		min-width: 0;
-	}
-
-	.dq-header-right {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-		flex-shrink: 0;
-	}
-
-	.dq-title-row {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-	}
-
-	.dq-album-title {
-		font-size: 1.5rem;
-		font-weight: 800;
-		color: var(--color-base-content);
-		text-align: left;
-		background: none;
-		border: none;
-		padding: 0;
-		cursor: pointer;
-		line-height: 1.1;
-		white-space: nowrap;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		max-width: 100%;
-		letter-spacing: -0.02em;
-		text-shadow: 0 2px 8px color-mix(in srgb, var(--color-base-content) 15%, transparent);
-		transition:
-			color 0.2s ease,
-			transform 0.2s ease;
-		transform-origin: left center;
-	}
-
-	.dq-album-title:hover {
-		color: var(--color-primary);
-		transform: scale(1.02);
-	}
-
-	.dq-artist-name {
-		font-size: 0.85rem;
-		color: color-mix(in srgb, var(--color-base-content) 60%, transparent);
-		text-align: left;
-		background: none;
-		border: none;
-		padding: 0;
-		cursor: pointer;
-		text-transform: uppercase;
-		letter-spacing: 0.05em;
-		font-weight: 600;
-		transition:
-			color 0.2s ease,
-			transform 0.2s ease;
-		transform-origin: left center;
-	}
-
-	.dq-artist-name:hover {
-		color: var(--color-primary);
-		transform: scale(1.02);
-	}
-
-	.dq-artist-name-static {
-		font-size: 0.85rem;
-		color: color-mix(in srgb, var(--color-base-content) 60%, transparent);
-		text-transform: uppercase;
-		letter-spacing: 0.05em;
-		font-weight: 600;
-	}
-
-	.dq-reason-eyebrow {
-		font-size: 0.65rem;
-		font-weight: 600;
-		text-transform: uppercase;
-		letter-spacing: 0.08em;
-		color: color-mix(in srgb, var(--color-primary) 70%, transparent);
-		font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-		margin-bottom: 0.25rem;
-	}
-
-	.dq-progress {
-		font-size: 0.7rem;
-		color: color-mix(in srgb, var(--color-base-content) 45%, transparent);
-		white-space: nowrap;
-		font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-		padding: 0.15rem 0.5rem;
-		border-radius: 999px;
-		background: color-mix(in srgb, var(--color-base-content) 4%, transparent);
-		border: 1px solid color-mix(in srgb, var(--color-base-content) 6%, transparent);
-	}
-
-	.dq-progress-bar-wrap {
-		width: 4.5rem;
-		height: 5px;
-		border-radius: 999px;
-		background: color-mix(in srgb, var(--color-base-content) 20%, transparent);
-		overflow: hidden;
-		border: 1px solid color-mix(in srgb, var(--color-base-content) 8%, transparent);
-	}
-
-	.dq-progress-bar-fill {
-		height: 100%;
-		border-radius: 999px;
-		background: linear-gradient(90deg, var(--color-primary), var(--color-secondary));
-		transition: width 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
-	}
-
-	/* ── Body ── */
-	.dq-body {
-		flex: 1 1 0;
-		overflow-y: auto;
-		min-height: 0;
-		padding: 1rem 1.5rem;
-	}
-
-	.dq-desktop {
-		display: none;
-	}
-
-	.dq-mobile {
-		display: flex;
-		flex-direction: column;
-		gap: 0.75rem;
-		align-items: center;
-	}
-
-	@media (min-width: 1024px) {
-		.dq-desktop {
-			display: block;
-		}
-
-		.dq-grid {
-			display: grid;
-			grid-template-columns: 260px 1fr;
-			gap: 1.5rem;
-			align-items: start;
-		}
-
-		.dq-mobile {
-			display: none;
-		}
-	}
-
-	/* ── Left column ── */
-	.dq-col-left {
-		display: flex;
-		flex-direction: column;
-		gap: 0;
-	}
-
-	.dq-cover-wrap,
-	.dq-cover-wrap-mobile {
-		background: none;
-		border: none;
-		padding: 0;
-		cursor: pointer;
-		border-radius: 0.75rem;
-		overflow: hidden;
-		box-shadow:
-			0 20px 40px -10px rgba(0, 0, 0, 0.5),
-			0 0 60px 10px color-mix(in srgb, var(--color-primary) 15%, transparent);
-		transition:
-			transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1),
-			box-shadow 0.3s ease;
-	}
-
-	.dq-cover-wrap:hover {
-		transform: scale(1.03) translateY(-4px);
-		box-shadow:
-			0 25px 50px -12px rgba(0, 0, 0, 0.5),
-			0 0 60px 10px color-mix(in srgb, var(--color-primary) 25%, transparent);
-	}
-
-	:global(.dq-cover) {
-		width: 260px;
-		height: 260px;
-		object-fit: cover;
-		display: block;
-	}
-
-	:global(.dq-cover-skeleton) {
-		width: 260px;
-		height: 260px;
-		border-radius: 0;
-	}
-
-	:global(.dq-cover-mobile) {
-		width: 100%;
-		max-width: 220px;
-		aspect-ratio: 1;
-		object-fit: cover;
-		display: block;
-	}
-
-	/* ── Info card ── */
-	.dq-info-card {
-		margin-top: 0.75rem;
-		padding: 0.75rem;
-		background: color-mix(in srgb, var(--color-base-100) 30%, transparent);
-		backdrop-filter: blur(12px);
-		border-radius: 0.75rem;
-		border: 1px solid color-mix(in srgb, var(--color-base-content) 5%, transparent);
-		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-	}
-
-	/* ── Bio ── */
-	.dq-bio {
-		margin-top: 0.75rem;
-	}
-
-	.dq-bio p {
-		font-size: 0.8rem;
-		line-height: 1.5;
-		color: color-mix(in srgb, var(--color-base-content) 55%, transparent);
-	}
-
-	.dq-bio-toggle {
-		font-size: 0.75rem;
-		color: var(--color-primary);
-		background: none;
-		border: none;
-		padding: 0;
-		margin-top: 0.25rem;
-		cursor: pointer;
-	}
-
-	.dq-bio-toggle:hover {
-		text-decoration: underline;
-	}
-
-	/* ── Right column ── */
-	.dq-col-right {
-		display: flex;
-		flex-direction: column;
-	}
-
-	/* ── Mobile tabs ── */
-	.dq-tab-content {
-		min-height: 120px;
-		width: 100%;
-	}
-
-	/* ── Footer ── */
-	.dq-footer {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		flex-shrink: 0;
-		padding: 0.75rem 1.5rem;
-		border-top: 1px solid color-mix(in srgb, var(--color-base-content) 6%, transparent);
-		background: color-mix(in srgb, var(--color-base-content) 2%, transparent);
-	}
-
-	.dq-ignore-btn {
-		background: color-mix(in srgb, var(--color-error) 15%, transparent) !important;
-		border: 1px solid color-mix(in srgb, var(--color-error) 25%, transparent) !important;
-		color: var(--color-error) !important;
-		font-size: 0.8rem;
-		font-weight: 500;
-		transition: all 0.2s ease;
-	}
-
-	.dq-ignore-btn:hover {
-		background: color-mix(in srgb, var(--color-error) 25%, transparent) !important;
-		border-color: color-mix(in srgb, var(--color-error) 40%, transparent) !important;
-		color: var(--color-error) !important;
-	}
-
-	.dq-view-album-btn {
-		background: rgba(255, 255, 255, 0.03) !important;
-		backdrop-filter: blur(10px);
-		border: 1px solid color-mix(in srgb, var(--color-base-content) 15%, transparent) !important;
-		color: color-mix(in srgb, var(--color-base-content) 80%, transparent) !important;
-		font-weight: 500;
-	}
-
-	.dq-view-album-btn:hover {
-		background: color-mix(in srgb, var(--color-base-content) 10%, transparent) !important;
-		color: var(--color-base-content) !important;
-		border-color: color-mix(in srgb, var(--color-base-content) 30%, transparent) !important;
-	}
-
-	.dq-next-btn {
-		background: var(--color-primary) !important;
-		border: none !important;
-		box-shadow: 0 0 20px -5px color-mix(in srgb, var(--color-primary) 50%, transparent);
-		color: var(--color-primary-content) !important;
-		transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
-	}
-
-	.dq-next-btn:hover {
-		background: color-mix(in srgb, var(--color-primary) 85%, transparent) !important;
-		box-shadow: 0 0 30px -5px color-mix(in srgb, var(--color-primary) 70%, transparent);
-		transform: scale(1.05);
-	}
-
-	.dq-footer-actions {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-	}
-
-	@media (max-width: 640px) {
-		.dq-modal {
-			width: 100vw;
-			height: 100vh;
-			max-width: 100vw;
-			border-radius: 0;
-		}
-
-		.dq-header {
-			padding: 1rem 1rem 0;
-		}
-
-		.dq-body {
-			padding: 0.75rem 1rem;
-		}
-
-		.dq-footer {
-			padding: 0.75rem 1rem;
-			flex-direction: column;
-			gap: 0.5rem;
-		}
-
-		.dq-footer-actions {
-			width: 100%;
-			justify-content: center;
-		}
-	}
-</style>

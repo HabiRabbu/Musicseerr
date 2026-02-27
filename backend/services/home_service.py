@@ -14,6 +14,7 @@ from repositories.protocols import (
     JellyfinRepositoryProtocol,
     LidarrRepositoryProtocol,
     MusicBrainzRepositoryProtocol,
+    LastFmRepositoryProtocol,
 )
 from api.v1.schemas.library import LibraryAlbum
 from services.preferences_service import PreferencesService
@@ -33,6 +34,7 @@ class HomeService:
         musicbrainz_repo: MusicBrainzRepositoryProtocol,
         preferences_service: PreferencesService,
         memory_cache: CacheInterface | None = None,
+        lastfm_repo: LastFmRepositoryProtocol | None = None,
     ):
         self._lb_repo = listenbrainz_repo
         self._jf_repo = jellyfin_repo
@@ -40,6 +42,7 @@ class HomeService:
         self._mb_repo = musicbrainz_repo
         self._preferences = preferences_service
         self._memory_cache = memory_cache
+        self._lfm_repo = lastfm_repo
         self._transformers = HomeDataTransformers(jellyfin_repo)
     
     def _is_listenbrainz_enabled(self) -> bool:
@@ -61,10 +64,30 @@ class HomeService:
     def _is_local_files_enabled(self) -> bool:
         lf_settings = self._preferences.get_local_files_connection()
         return lf_settings.enabled and bool(lf_settings.music_path)
+
+    def _is_lastfm_enabled(self) -> bool:
+        return self._preferences.is_lastfm_enabled()
     
     def _get_listenbrainz_username(self) -> str | None:
         lb_settings = self._preferences.get_listenbrainz_connection()
         return lb_settings.username if lb_settings.enabled else None
+
+    def _get_lastfm_username(self) -> str | None:
+        lf_settings = self._preferences.get_lastfm_connection()
+        return lf_settings.username if lf_settings.enabled else None
+
+    def _resolve_source(self, source: str | None) -> str:
+        if source in ("listenbrainz", "lastfm"):
+            resolved = source
+        else:
+            resolved = self._preferences.get_primary_music_source().source
+        lb_enabled = self._is_listenbrainz_enabled()
+        lfm_enabled = self._is_lastfm_enabled()
+        if resolved == "listenbrainz" and not lb_enabled and lfm_enabled:
+            return "lastfm"
+        if resolved == "lastfm" and not lfm_enabled and lb_enabled:
+            return "listenbrainz"
+        return resolved
 
     def get_integration_status(self) -> dict[str, bool]:
         return {
@@ -73,6 +96,7 @@ class HomeService:
             "lidarr": self._is_lidarr_configured(),
             "youtube": self._is_youtube_enabled(),
             "localfiles": self._is_local_files_enabled(),
+            "lastfm": self._is_lastfm_enabled(),
         }
 
     async def get_genre_artist(self, genre_name: str) -> str | None:
@@ -109,11 +133,13 @@ class HomeService:
         results = await self._execute_tasks(tasks)
         return {genre: mbid for genre, mbid in results.items()}
     
-    def _get_home_cache_key(self) -> str:
+    def _get_home_cache_key(self, source: str | None = None) -> str:
+        resolved = self._resolve_source(source)
         lb_enabled = self._is_listenbrainz_enabled()
-        jf_enabled = self._is_jellyfin_enabled()
-        username = self._get_listenbrainz_username() or ""
-        return f"home_response:{lb_enabled}:{jf_enabled}:{username}"
+        lfm_enabled = self._is_lastfm_enabled()
+        lb_username = self._get_listenbrainz_username() or ""
+        lfm_username = self._get_lastfm_username() or ""
+        return f"home_response:{resolved}:{lb_enabled}:{lfm_enabled}:{lb_username}:{lfm_username}"
     
     async def get_cached_home_data(self) -> HomeResponse | None:
         if not self._memory_cache:
@@ -121,70 +147,105 @@ class HomeService:
         cache_key = self._get_home_cache_key()
         return await self._memory_cache.get(cache_key)
 
-    @deduplicate(lambda self: self._get_home_cache_key())
-    async def get_home_data(self) -> HomeResponse:
+    @deduplicate(lambda self, source=None: self._get_home_cache_key(source))
+    async def get_home_data(self, source: str | None = None) -> HomeResponse:
         HOME_CACHE_TTL = 300
+        resolved_source = self._resolve_source(source)
         
         if self._memory_cache:
-            cache_key = self._get_home_cache_key()
+            cache_key = self._get_home_cache_key(source)
             cached = await self._memory_cache.get(cache_key)
             if cached is not None:
                 return cached
         
         integration_status = self.get_integration_status()
         lb_enabled = integration_status["listenbrainz"]
-        jf_enabled = integration_status["jellyfin"]
         lidarr_configured = integration_status["lidarr"]
+        lfm_enabled = integration_status.get("lastfm", False)
         username = self._get_listenbrainz_username()
+        lfm_username = self._get_lastfm_username()
         
-        tasks: dict[str, Any] = {
-            "lb_trending_artists": self._lb_repo.get_sitewide_top_artists(count=20),
-            "lb_trending_albums": self._lb_repo.get_sitewide_top_release_groups(count=20),
-        }
+        tasks: dict[str, Any] = {}
+
+        if resolved_source == "listenbrainz":
+            tasks["lb_trending_artists"] = self._lb_repo.get_sitewide_top_artists(count=20)
+            tasks["lb_trending_albums"] = self._lb_repo.get_sitewide_top_release_groups(count=20)
+        elif resolved_source == "lastfm" and self._lfm_repo and lfm_enabled:
+            tasks["lfm_global_top_artists"] = self._lfm_repo.get_global_top_artists(limit=20)
+            if lfm_username:
+                tasks["lfm_top_albums"] = self._lfm_repo.get_user_top_albums(
+                    lfm_username, period="1month", limit=20
+                )
+            else:
+                logger.warning(
+                    "Last.fm enabled as home source but username is missing; skipping top album fetch"
+                )
         
         if lidarr_configured:
             tasks["library_albums"] = self._lidarr_repo.get_library()
             tasks["library_artists"] = self._lidarr_repo.get_artists_from_library()
             tasks["recently_imported"] = self._lidarr_repo.get_recently_imported(limit=15)
         
-        if lb_enabled and username:
+        if resolved_source == "listenbrainz" and lb_enabled and username:
             lb_settings = self._preferences.get_listenbrainz_connection()
             self._lb_repo.configure(username=username, user_token=lb_settings.user_token)
-            tasks["lb_top_artists"] = self._lb_repo.get_user_top_artists(count=20)
             tasks["lb_listens"] = self._lb_repo.get_user_listens(count=20)
-            tasks["lb_fresh"] = self._lb_repo.get_user_fresh_releases()
+            tasks["lb_loved"] = self._lb_repo.get_user_loved_recordings(count=20)
             tasks["lb_genres"] = self._lb_repo.get_user_genre_activity(username)
-        
-        if jf_enabled:
-            jf_settings = self._preferences.get_jellyfin_connection()
-            self._jf_repo.configure(
-                base_url=jf_settings.jellyfin_url,
-                api_key=jf_settings.api_key,
-                user_id=jf_settings.user_id
+            tasks["lb_user_top_rgs"] = self._lb_repo.get_user_top_release_groups(
+                username=username, range_="this_month", count=20
             )
-            tasks["jf_recent"] = self._jf_repo.get_recently_played(limit=20)
-            tasks["jf_favorites"] = self._jf_repo.get_favorite_artists(limit=20)
+        elif resolved_source == "lastfm" and self._lfm_repo and lfm_enabled and lfm_username:
+            tasks["lfm_recent"] = self._lfm_repo.get_user_recent_tracks(
+                lfm_username, limit=20
+            )
+            tasks["lfm_loved"] = self._lfm_repo.get_user_loved_tracks(
+                lfm_username, limit=20
+            )
         
         results = await self._execute_tasks(tasks)
         
         library_albums: list[LibraryAlbum] = results.get("library_albums") or []
         library_artists: list[dict] = results.get("library_artists") or []
         recently_imported: list[LibraryAlbum] = results.get("recently_imported") or []
-        library_mbids = {a.get("mbid", "").lower() for a in library_artists if a.get("mbid")}
+        library_artist_mbids = {
+            a.get("mbid", "").lower() for a in library_artists if a.get("mbid")
+        }
+        library_album_mbids = {
+            (a.musicbrainz_id or "").lower() for a in library_albums if a.musicbrainz_id
+        }
         
         response = HomeResponse(integration_status=integration_status)
         
         response.recently_added = self._build_recently_added_section(recently_imported)
         response.library_artists = self._build_library_artists_section(library_artists)
         response.library_albums = self._build_library_albums_section(library_albums)
-        response.trending_artists = self._build_trending_artists_section(
-            results, library_mbids
-        )
-        response.popular_albums = self._build_popular_albums_section(
-            results, library_mbids
-        )
+
+        if resolved_source == "listenbrainz":
+            response.trending_artists = self._build_trending_artists_section(
+                results, library_artist_mbids
+            )
+            response.popular_albums = self._build_popular_albums_section(
+                results, library_album_mbids
+            )
+            response.your_top_albums = self._build_lb_user_top_albums_section(
+                results, library_album_mbids
+            )
+            response.recently_played = self._build_listenbrainz_recent_section(results)
+            response.favorite_artists = self._build_listenbrainz_favorites_section(results)
+        elif resolved_source == "lastfm":
+            response.trending_artists = self._build_lastfm_trending_section(
+                results, library_artist_mbids
+            )
+            response.your_top_albums = self._build_lastfm_top_albums_section(
+                results, library_album_mbids
+            )
+            response.recently_played = self._build_lastfm_recent_section(results)
+            response.favorite_artists = self._build_lastfm_favorites_section(results)
+
         response.genre_list = self._build_genre_list_section(
-            library_albums, results.get("lb_genres")
+            library_albums,
+            results.get("lb_genres") if resolved_source == "listenbrainz" else None,
         )
         
         if response.genre_list and response.genre_list.items:
@@ -194,27 +255,16 @@ class HomeService:
             ]
             response.genre_artists = await self.get_genre_artists_batch(genre_names)
         
-        if lb_enabled:
-            response.fresh_releases = self._build_fresh_releases_section(
-                results, library_mbids
-            )
-            response.recommended_artists = self._build_recommended_section(
-                results, library_mbids
-            )
-        
-        if jf_enabled:
-            response.recently_played = self._build_recently_played_section(
-                results, library_mbids
-            )
-            response.favorite_artists = self._build_favorites_section(
-                results, library_mbids
-            )
-        
-        response.service_prompts = self._build_service_prompts(lb_enabled, jf_enabled, lidarr_configured)
+        response.service_prompts = self._build_service_prompts(
+            lb_enabled,
+            lidarr_configured,
+            lfm_enabled,
+        )
 
         response.discover_preview = await self._build_discover_preview()
         
         if self._memory_cache:
+            cache_key = self._get_home_cache_key(source)
             await self._memory_cache.set(cache_key, response, HOME_CACHE_TTL)
         
         return response
@@ -296,6 +346,23 @@ class HomeService:
             source="listenbrainz" if albums else None,
         )
 
+    def _build_lb_user_top_albums_section(
+        self, results: dict[str, Any], library_mbids: set[str]
+    ) -> HomeSection | None:
+        release_groups = results.get("lb_user_top_rgs") or []
+        if not release_groups:
+            return None
+        items = [
+            self._transformers.lb_release_to_home(rg, library_mbids)
+            for rg in release_groups[:15]
+        ]
+        return HomeSection(
+            title="Your Top Albums",
+            type="albums",
+            items=items,
+            source="listenbrainz",
+        )
+
     def _build_genre_list_section(
         self, library_albums: list[LibraryAlbum], lb_genres: list | None = None
     ) -> HomeSection:
@@ -330,45 +397,147 @@ class HomeService:
             title="Based on Your Listening", type="artists", items=items, source="listenbrainz"
         )
 
-    def _build_recently_played_section(
-        self, results: dict[str, Any], library_mbids: set[str]
-    ) -> HomeSection | None:
-        items = results.get("jf_recent")
-        if not items:
-            return None
-        seen_artists: set[str] = set()
-        artist_items = []
-        for item in items:
-            artist = self._transformers.jf_item_to_artist(item, library_mbids)
-            if artist and artist.name.lower() not in seen_artists:
-                seen_artists.add(artist.name.lower())
-                artist_items.append(artist)
-                if len(artist_items) >= 15:
-                    break
-        if not artist_items:
-            return None
-        return HomeSection(title="Recently Played", type="artists", items=artist_items, source="jellyfin")
-
-    def _build_favorites_section(
-        self, results: dict[str, Any], library_mbids: set[str]
-    ) -> HomeSection | None:
-        favorites = results.get("jf_favorites")
-        if not favorites:
+    def _build_listenbrainz_recent_section(self, results: dict[str, Any]) -> HomeSection | None:
+        listens = results.get("lb_listens") or []
+        if not listens:
             return None
         items = [
-            a for a in (self._transformers.jf_item_to_artist(f, library_mbids) for f in favorites[:15])
+            self._transformers.lb_listen_to_home_track(listen)
+            for listen in listens[:15]
+        ]
+        return HomeSection(
+            title="Recently Scrobbled",
+            type="tracks",
+            items=items,
+            source="listenbrainz",
+        )
+
+    def _build_listenbrainz_favorites_section(self, results: dict[str, Any]) -> HomeSection | None:
+        loved = results.get("lb_loved") or []
+        if not loved:
+            return None
+        items = [
+            self._transformers.lb_feedback_to_home_track(recording)
+            for recording in loved[:15]
+        ]
+        return HomeSection(
+            title="Your Favorites",
+            type="tracks",
+            items=items,
+            source="listenbrainz",
+        )
+
+    def _build_lastfm_trending_section(
+        self, results: dict[str, Any], library_mbids: set[str]
+    ) -> HomeSection:
+        artists = results.get("lfm_global_top_artists") or []
+        items = [
+            a for a in (
+                self._transformers.lastfm_artist_to_home(artist, library_mbids)
+                for artist in artists[:15]
+            )
+            if a is not None
+        ]
+        return HomeSection(
+            title="Trending Artists",
+            type="artists",
+            items=items,
+            source="lastfm" if artists else None,
+        )
+
+    def _build_lastfm_top_albums_section(
+        self, results: dict[str, Any], library_mbids: set[str]
+    ) -> HomeSection:
+        albums = results.get("lfm_top_albums") or []
+        items = [
+            a for a in (
+                self._transformers.lastfm_album_to_home(album, library_mbids)
+                for album in albums[:15]
+            )
+            if a is not None
+        ]
+
+        return HomeSection(
+            title="Your Top Albums",
+            type="albums",
+            items=items,
+            source="lastfm" if albums else None,
+        )
+
+    def _build_lastfm_recommended_section(
+        self, results: dict[str, Any], library_mbids: set[str]
+    ) -> HomeSection | None:
+        artists = results.get("lfm_top_artists") or []
+        if not artists:
+            return None
+        items = [
+            a for a in (
+                self._transformers.lastfm_artist_to_home(artist, library_mbids)
+                for artist in artists[:15]
+            )
             if a is not None
         ]
         if not items:
             return None
-        return HomeSection(title="Your Favorites", type="artists", items=items, source="jellyfin")
+        return HomeSection(
+            title="Based on Your Listening",
+            type="artists",
+            items=items,
+            source="lastfm",
+        )
+
+    def _build_lastfm_recent_section(self, results: dict[str, Any]) -> HomeSection | None:
+        tracks = results.get("lfm_recent") or []
+        if not tracks:
+            return None
+
+        items = [
+            self._transformers.lastfm_recent_to_home_track(track)
+            for track in tracks[:15]
+        ]
+        if not items:
+            return None
+        return HomeSection(
+            title="Recently Scrobbled",
+            type="tracks",
+            items=items,
+            source="lastfm",
+        )
+
+    def _build_lastfm_favorites_section(self, results: dict[str, Any]) -> HomeSection | None:
+        tracks = results.get("lfm_loved") or []
+        if not tracks:
+            return None
+        items = [
+            self._transformers.lastfm_loved_to_home_track(track)
+            for track in tracks[:15]
+        ]
+        return HomeSection(
+            title="Your Favorites",
+            type="tracks",
+            items=items,
+            source="lastfm",
+        )
+
+    async def _resolve_release_mbids(self, release_ids: list[str]) -> dict[str, str]:
+        if not release_ids:
+            return {}
+        tasks = [self._mb_repo.get_release_group_id_from_release(rid) for rid in release_ids]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        rg_map: dict[str, str] = {}
+        for rid, rg_id in zip(release_ids, results):
+            if isinstance(rg_id, str) and rg_id:
+                rg_map[rid] = rg_id
+        return rg_map
     
     async def _build_discover_preview(self) -> DiscoverPreview | None:
         if not self._memory_cache:
             return None
         try:
             from api.v1.schemas.discover import DiscoverResponse as DR
-            cached = await self._memory_cache.get("discover_response")
+            resolved = self._resolve_source(None)
+            cache_key = f"discover_response:{resolved}"
+            cached = await self._memory_cache.get(cache_key)
             if not cached or not isinstance(cached, DR):
                 return None
             if not cached.because_you_listen_to:
@@ -390,8 +559,8 @@ class HomeService:
     def _build_service_prompts(
         self,
         lb_enabled: bool,
-        jf_enabled: bool,
-        lidarr_configured: bool = True
+        lidarr_configured: bool = True,
+        lfm_enabled: bool = False,
     ) -> list[ServicePrompt]:
         prompts = []
         
@@ -405,25 +574,24 @@ class HomeService:
                 features=["Music library management", "Album requests", "Collection tracking", "Automatic imports"],
             ))
         
-        if not lb_enabled:
+        if not lb_enabled and not lfm_enabled:
             prompts.append(ServicePrompt(
                 service="listenbrainz",
                 title="Connect ListenBrainz",
-                description="Get personalized recommendations based on your listening history, discover new releases from artists you love, and see your top genres.",
+                description="Get personalized recommendations based on your listening history, discover new releases from artists you love, and see your top genres. You can also connect Last.fm for global listener stats.",
                 icon="🎵",
                 color="primary",
                 features=["Personalized recommendations", "New release alerts", "Listening stats", "Top genres"],
             ))
-        
-        if not jf_enabled:
+
+        if not lfm_enabled and not lb_enabled:
             prompts.append(ServicePrompt(
-                service="jellyfin",
-                title="Connect Jellyfin",
-                description="See your recently played tracks, favorite artists, and get recommendations based on your media server's play history.",
-                icon="📺",
-                color="secondary",
-                features=["Recently played", "Play statistics", "Favorite artists", "Listening history"],
+                service="lastfm",
+                title="Connect Last.fm",
+                description="Scrobble your plays, see global listener stats, and get recommendations powered by Last.fm's music data.",
+                icon="🎸",
+                color="primary",
+                features=["Scrobbling", "Global listener stats", "Artist recommendations", "Play history"],
             ))
-        
         
         return prompts

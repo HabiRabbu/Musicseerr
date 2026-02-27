@@ -8,7 +8,7 @@
 	import ViewMoreArtistCard from '$lib/components/ViewMoreArtistCard.svelte';
 	import ArtistCardSkeleton from '$lib/components/ArtistCardSkeleton.svelte';
 	import AlbumCardSkeleton from '$lib/components/AlbumCardSkeleton.svelte';
-	import type { Artist, Album } from '$lib/types';
+	import type { Artist, Album, EnrichmentSource } from '$lib/types';
 	import { colors } from '$lib/colors';
 	import { searchStore } from '$lib/stores/search';
 	import {
@@ -28,6 +28,7 @@
 	let showToast = false;
 	let abortController: AbortController | null = null;
 	let enrichmentController: AbortController | null = null;
+	let enrichmentSource: EnrichmentSource = 'none';
 
 	$: isSearching = loadingArtists || loadingAlbums;
 	$: hasResults = artists.length > 0 || albums.length > 0;
@@ -45,22 +46,33 @@
 		}, 3000);
 	}
 
-	async function fetchEnrichment(artistMbids: string[], albumMbids: string[]) {
-		if (artistMbids.length === 0 && albumMbids.length === 0) return;
+	async function fetchEnrichment() {
+		if (artists.length === 0 && albums.length === 0) return;
 
 		if (enrichmentController) {
 			enrichmentController.abort();
 		}
 		enrichmentController = new AbortController();
 
+		const artistRequests = artists.map((a) => ({
+			musicbrainz_id: a.musicbrainz_id,
+			name: a.title
+		}));
+		const albumRequests = albums.map((a) => ({
+			musicbrainz_id: a.musicbrainz_id,
+			artist_name: a.artist || '',
+			album_name: a.title
+		}));
+
 		try {
 			const enrichment = await fetchEnrichmentBatch(
-				artistMbids,
-				albumMbids,
+				artistRequests,
+				albumRequests,
 				enrichmentController.signal
 			);
 			if (!enrichment) return;
 
+			enrichmentSource = enrichment.source;
 			artists = applyArtistEnrichment(artists, enrichment);
 			albums = applyAlbumEnrichment(albums, enrichment);
 		} catch (error) {
@@ -143,9 +155,7 @@
 
 		searchStore.setResults(q, artists, albums);
 
-		const artistMbids = artists.map((a) => a.musicbrainz_id);
-		const albumMbids = albums.map((a) => a.musicbrainz_id);
-		fetchEnrichment(artistMbids, albumMbids);
+		fetchEnrichment();
 	}
 
 	let lastQuery = '';
@@ -266,7 +276,7 @@
 					>
 						<ViewMoreArtistCard />
 						{#each artists.slice(0, 5) as artist (artist.musicbrainz_id)}
-							<SearchArtistCard {artist} />
+							<SearchArtistCard {artist} {enrichmentSource} />
 						{/each}
 					</div>
 				</div>
@@ -304,7 +314,7 @@
 					>
 						<ViewMoreAlbumCard />
 						{#each albums as album (album.musicbrainz_id)}
-							<AlbumCard {album} onadded={handleAlbumAdded} />
+							<AlbumCard {album} {enrichmentSource} onadded={handleAlbumAdded} />
 						{/each}
 					</div>
 				</div>

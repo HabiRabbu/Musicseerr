@@ -3,6 +3,7 @@ import logging
 import time
 from typing import Any, Optional
 from core.exceptions import ExternalServiceError
+from infrastructure.cover_urls import prefer_release_group_cover_url
 from .base import LidarrBase
 from .history import LidarrHistoryRepository
 
@@ -86,7 +87,11 @@ class LidarrAlbumRepository(LidarrHistoryRepository):
             album = data[0]
             album_id = album.get("id")
 
-            cover_url = self._get_album_cover_url(album.get("images", []), album_id)
+            cover_url = prefer_release_group_cover_url(
+                album.get("foreignAlbumId"),
+                self._get_album_cover_url(album.get("images", []), album_id),
+                size=500,
+            )
 
             links = []
             for link in album.get("links", []):

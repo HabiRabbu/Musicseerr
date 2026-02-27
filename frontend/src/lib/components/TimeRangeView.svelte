@@ -4,8 +4,9 @@
 	import AlbumImage from './AlbumImage.svelte';
 	import ArtistImage from './ArtistImage.svelte';
 	import { formatListenCount } from '$lib/utils/formatting';
+	import { getTimeRangeFallbackPath } from '$lib/utils/timeRangeFallback';
 	import type { HomeAlbum, HomeArtist } from '$lib/types';
-	import { ChevronLeft, ChevronDown, Check } from 'lucide-svelte';
+	import { ChevronLeft, ChevronDown, Check, Search } from 'lucide-svelte';
 
 	type TimeRangeKey = 'this_week' | 'this_month' | 'this_year' | 'all_time';
 	type ItemType = 'album' | 'artist';
@@ -34,6 +35,7 @@
 	export let title: string;
 	export let subtitle: string;
 	export let errorEmoji = '💿';
+	export let source: 'listenbrainz' | 'lastfm' | null = null;
 
 	const timeRanges: { key: TimeRangeKey; label: string }[] = [
 		{ key: 'this_week', label: 'This Week' },
@@ -47,15 +49,32 @@
 	let expandedData: RangeResponse | null = null;
 	let loading = true;
 	let loadingMore = false;
+	let mounted = false;
+	let lastSourceKey = '';
 
 	onMount(async () => {
+		mounted = true;
+		lastSourceKey = source ?? '';
 		await loadOverview();
 	});
+
+	$: if (mounted && (source ?? '') !== lastSourceKey) {
+		lastSourceKey = source ?? '';
+		expandedRange = null;
+		expandedData = null;
+		loadOverview();
+	}
+
+	function withSource(url: string): string {
+		if (!source) return url;
+		const separator = url.includes('?') ? '&' : '?';
+		return `${url}${separator}source=${encodeURIComponent(source)}`;
+	}
 
 	async function loadOverview() {
 		loading = true;
 		try {
-			const res = await fetch(`${endpoint}?limit=10`);
+			const res = await fetch(withSource(`${endpoint}?limit=10`));
 			if (res.ok) {
 				overviewData = await res.json();
 			}
@@ -75,7 +94,7 @@
 		expandedRange = rangeKey;
 		loadingMore = true;
 		try {
-			const res = await fetch(`${endpoint}/${rangeKey}?limit=25&offset=0`);
+			const res = await fetch(withSource(`${endpoint}/${rangeKey}?limit=25&offset=0`));
 			if (res.ok) {
 				expandedData = await res.json();
 			}
@@ -91,7 +110,7 @@
 		loadingMore = true;
 		try {
 			const newOffset = expandedData.offset + expandedData.limit;
-			const res = await fetch(`${endpoint}/${expandedRange}?limit=25&offset=${newOffset}`);
+			const res = await fetch(withSource(`${endpoint}/${expandedRange}?limit=25&offset=${newOffset}`));
 			if (res.ok) {
 				const moreData: RangeResponse = await res.json();
 				expandedData = {
@@ -108,7 +127,16 @@
 	function handleItemClick(item: HomeAlbum | HomeArtist) {
 		if (item.mbid) {
 			goto(`/${itemType}/${item.mbid}`);
+			return;
 		}
+		const fallbackPath = getFallbackSearchPath(item);
+		if (fallbackPath) {
+			goto(fallbackPath);
+		}
+	}
+
+	function getFallbackSearchPath(item: HomeAlbum | HomeArtist): string | null {
+		return getTimeRangeFallbackPath(itemType, item);
 	}
 
 	function getItemsForRange(rangeKey: TimeRangeKey): (HomeAlbum | HomeArtist)[] {
@@ -216,10 +244,23 @@
 											{#if isAlbum(featured) && featured.artist_name}
 												<p class="line-clamp-1 text-sm text-white/80">{featured.artist_name}</p>
 											{/if}
-											{#if featured.listen_count}
+											{#if featured.listen_count !== null && featured.listen_count !== undefined}
 												<p class="mt-1 text-sm text-white/60">🎧 {formatListenCount(featured.listen_count)}</p>
 											{/if}
 										</div>
+										{#if !featured.mbid}
+											<button
+												type="button"
+												class="btn btn-ghost btn-xs btn-circle absolute bottom-3 right-3 text-white"
+												title={itemType === 'album' ? 'Search album' : 'Search artist'}
+												on:click={(e) => {
+													e.stopPropagation();
+													handleItemClick(featured);
+												}}
+											>
+												<Search class="h-3 w-3" />
+											</button>
+										{/if}
 									</figure>
 								</div>
 							{/if}
@@ -250,6 +291,19 @@
 													</div>
 												{/if}
 												<div class="badge badge-neutral badge-sm absolute bottom-1 left-1 font-bold">#{rank}</div>
+													{#if !item.mbid}
+														<button
+															type="button"
+															class="btn btn-ghost btn-xs btn-circle absolute bottom-1 right-1"
+															title="Search artist"
+															on:click={(e) => {
+																e.stopPropagation();
+																handleItemClick(item);
+															}}
+														>
+															<Search class="h-3 w-3" />
+														</button>
+													{/if}
 											</figure>
 										{:else}
 											<figure class="relative flex justify-center pt-4">
@@ -260,6 +314,19 @@
 													</div>
 												{/if}
 												<div class="badge badge-neutral badge-sm absolute bottom-1 left-1 font-bold">#{rank}</div>
+												{#if !item.mbid}
+													<button
+														type="button"
+														class="btn btn-ghost btn-xs btn-circle absolute bottom-1 right-1"
+														title="Search artist"
+														on:click={(e) => {
+															e.stopPropagation();
+															handleItemClick(item);
+														}}
+													>
+														<Search class="h-3 w-3" />
+													</button>
+												{/if}
 											</figure>
 										{/if}
 										<div class="card-body p-2">
@@ -267,7 +334,7 @@
 											{#if isAlbum(item) && item.artist_name}
 												<p class="line-clamp-1 text-xs text-base-content/50">{item.artist_name}</p>
 											{/if}
-											{#if item.listen_count}
+											{#if item.listen_count !== null && item.listen_count !== undefined}
 												<p class="text-xs text-base-content/40">{formatListenCount(item.listen_count)}</p>
 											{/if}
 										</div>
@@ -307,6 +374,19 @@
 													</div>
 												{/if}
 												<div class="badge badge-sm absolute bottom-1 left-1 font-bold {rank <= 3 ? 'badge-primary' : 'badge-neutral'}">#{rank}</div>
+													{#if !item.mbid}
+														<button
+															type="button"
+															class="btn btn-ghost btn-xs btn-circle absolute bottom-1 right-1"
+															title="Search album"
+															on:click={(e) => {
+																e.stopPropagation();
+																handleItemClick(item);
+															}}
+														>
+															<Search class="h-3 w-3" />
+														</button>
+													{/if}
 											</figure>
 										{:else}
 											<figure class="relative aspect-square overflow-hidden">
@@ -323,6 +403,19 @@
 													</div>
 												{/if}
 												<div class="badge badge-sm absolute bottom-1 left-1 font-bold {rank <= 3 ? 'badge-primary' : 'badge-neutral'}">#{rank}</div>
+												{#if !item.mbid}
+													<button
+														type="button"
+														class="btn btn-ghost btn-xs btn-circle absolute bottom-1 right-1"
+														title="Search artist"
+														on:click={(e) => {
+															e.stopPropagation();
+															handleItemClick(item);
+														}}
+													>
+														<Search class="h-3 w-3" />
+													</button>
+												{/if}
 											</figure>
 										{/if}
 										<div class="card-body p-2 sm:p-3">
@@ -330,7 +423,7 @@
 											{#if isAlbum(item) && item.artist_name}
 												<p class="line-clamp-1 text-xs text-base-content/50">{item.artist_name}</p>
 											{/if}
-											{#if item.listen_count}
+											{#if item.listen_count !== null && item.listen_count !== undefined}
 												<p class="text-xs text-base-content/40">{formatListenCount(item.listen_count)}</p>
 											{/if}
 										</div>

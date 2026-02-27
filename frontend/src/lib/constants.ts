@@ -8,6 +8,15 @@ export const CACHE_KEYS = {
 	DISCOVER_QUEUE: 'musicseerr_discover_queue'
 } as const;
 
+export const PAGE_SOURCE_KEYS = {
+	home: 'musicseerr_source_home',
+	discover: 'musicseerr_source_discover',
+	artist: 'musicseerr_source_artist',
+	trending: 'musicseerr_source_trending',
+	popular: 'musicseerr_source_popular',
+	yourTop: 'musicseerr_source_your_top'
+} as const;
+
 export const CACHE_TTL = {
 	DEFAULT: 5 * 60 * 1000,
 	LIBRARY: 5 * 60 * 1000,
@@ -88,7 +97,11 @@ export const API = {
 	homeIntegrationStatus: () => '/api/home/integration-status',
 	discover: () => '/api/discover',
 	discoverRefresh: () => '/api/discover/refresh',
-	discoverQueue: () => '/api/discover/queue',
+	discoverQueue: (source?: string) =>
+		`/api/discover/queue${source ? `?source=${source}` : ''}`,
+	discoverQueueStatus: (source?: string) =>
+		`/api/discover/queue/status${source ? `?source=${source}` : ''}`,
+	discoverQueueGenerate: () => '/api/discover/queue/generate',
 	discoverQueueEnrich: (mbid: string) => `/api/discover/queue/enrich/${mbid}`,
 	discoverQueueIgnore: () => '/api/discover/queue/ignore',
 	discoverQueueIgnored: () => '/api/discover/queue/ignored',

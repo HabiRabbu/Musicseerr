@@ -9,7 +9,7 @@ from core.config import Settings, get_settings
 from infrastructure.cache.memory_cache import InMemoryCache, CacheInterface
 from infrastructure.cache.persistent_cache import LibraryCache
 from infrastructure.cache.disk_cache import DiskMetadataCache
-from infrastructure.http.client import get_http_client, close_http_clients
+from infrastructure.http.client import get_http_client, get_listenbrainz_http_client, close_http_clients
 from infrastructure.queue.request_queue import RequestQueue
 from repositories.lidarr import LidarrRepository
 from repositories.musicbrainz_repository import MusicBrainzRepository
@@ -18,6 +18,7 @@ from repositories.coverart_repository import CoverArtRepository
 from repositories.listenbrainz_repository import ListenBrainzRepository
 from repositories.jellyfin_repository import JellyfinRepository
 from repositories.youtube import YouTubeRepository
+from repositories.lastfm_repository import LastFmRepository
 from services.preferences_service import PreferencesService
 from services.search_service import SearchService
 from services.search_enrichment_service import SearchEnrichmentService
@@ -33,12 +34,17 @@ from services.settings_service import SettingsService
 from services.artist_discovery_service import ArtistDiscoveryService
 from services.album_discovery_service import AlbumDiscoveryService
 from services.discover_service import DiscoverService
+from services.discover_queue_manager import DiscoverQueueManager
 from services.youtube_service import YouTubeService
 from services.requests_page_service import RequestsPageService
 from services.stream_service import StreamService
 from services.jellyfin_playback_service import JellyfinPlaybackService
 from services.local_files_service import LocalFilesService
 from services.jellyfin_library_service import JellyfinLibraryService
+from services.lastfm_auth_service import LastFmAuthService
+from services.scrobble_service import ScrobbleService
+from services.artist_enrichment_service import ArtistEnrichmentService
+from services.album_enrichment_service import AlbumEnrichmentService
 from infrastructure.cache.request_history import RequestHistoryStore
 
 logger = logging.getLogger(__name__)
@@ -120,7 +126,11 @@ def get_wikidata_repository() -> WikidataRepository:
 @lru_cache(maxsize=1)
 def get_listenbrainz_repository() -> ListenBrainzRepository:
     cache = get_cache()
-    http_client = _get_configured_http_client()
+    http_client = get_listenbrainz_http_client(
+        settings=get_settings(),
+        timeout=float(get_preferences_service().get_advanced_settings().http_timeout),
+        connect_timeout=float(get_preferences_service().get_advanced_settings().http_connect_timeout),
+    )
     preferences = get_preferences_service()
     lb_settings = preferences.get_listenbrainz_connection()
     return ListenBrainzRepository(
@@ -151,12 +161,24 @@ def get_jellyfin_repository() -> JellyfinRepository:
 @lru_cache(maxsize=1)
 def get_coverart_repository() -> CoverArtRepository:
     settings = get_settings()
+    advanced = get_preferences_service().get_advanced_settings()
     cache = get_cache()
     mb_repo = get_musicbrainz_repository()
     lidarr_repo = get_lidarr_repository()
+    jellyfin_repo = get_jellyfin_repository()
     http_client = _get_configured_http_client()
     cache_dir = settings.cache_dir / "covers"
-    return CoverArtRepository(http_client, cache, mb_repo, lidarr_repo, cache_dir=cache_dir)
+    return CoverArtRepository(
+        http_client,
+        cache,
+        mb_repo,
+        lidarr_repo,
+        jellyfin_repo,
+        cache_dir=cache_dir,
+        cover_cache_max_size_mb=settings.cover_cache_max_size_mb,
+        cover_memory_cache_max_entries=advanced.cover_memory_cache_max_entries,
+        cover_memory_cache_max_bytes=advanced.cover_memory_cache_max_size_mb * 1024 * 1024,
+    )
 
 
 @lru_cache(maxsize=1)
@@ -261,7 +283,12 @@ def get_library_service() -> LibraryService:
     preferences_service = get_preferences_service()
     memory_cache = get_cache()
     disk_cache = get_disk_cache()
-    return LibraryService(lidarr_repo, library_cache, cover_repo, preferences_service, memory_cache, disk_cache)
+    artist_discovery_service = get_artist_discovery_service()
+    return LibraryService(
+        lidarr_repo, library_cache, cover_repo, preferences_service,
+        memory_cache, disk_cache,
+        artist_discovery_service=artist_discovery_service,
+    )
 
 
 @lru_cache(maxsize=1)
@@ -286,6 +313,7 @@ def get_home_service() -> HomeService:
     musicbrainz_repo = get_musicbrainz_repository()
     preferences_service = get_preferences_service()
     memory_cache = get_cache()
+    lastfm_repo = get_lastfm_repository()
     return HomeService(
         listenbrainz_repo=listenbrainz_repo,
         jellyfin_repo=jellyfin_repo,
@@ -293,6 +321,7 @@ def get_home_service() -> HomeService:
         musicbrainz_repo=musicbrainz_repo,
         preferences_service=preferences_service,
         memory_cache=memory_cache,
+        lastfm_repo=lastfm_repo,
     )
 
 
@@ -302,11 +331,15 @@ def get_home_charts_service() -> HomeChartsService:
     lidarr_repo = get_lidarr_repository()
     musicbrainz_repo = get_musicbrainz_repository()
     library_cache = get_library_cache()
+    lastfm_repo = get_lastfm_repository()
+    preferences_service = get_preferences_service()
     return HomeChartsService(
         listenbrainz_repo=listenbrainz_repo,
         lidarr_repo=lidarr_repo,
         musicbrainz_repo=musicbrainz_repo,
         library_cache=library_cache,
+        lastfm_repo=lastfm_repo,
+        preferences_service=preferences_service,
     )
 
 
@@ -323,11 +356,37 @@ def get_artist_discovery_service() -> ArtistDiscoveryService:
     musicbrainz_repo = get_musicbrainz_repository()
     library_cache = get_library_cache()
     lidarr_repo = get_lidarr_repository()
+    lastfm_repo = get_lastfm_repository()
+    preferences_service = get_preferences_service()
+    memory_cache = get_cache()
     return ArtistDiscoveryService(
         listenbrainz_repo=listenbrainz_repo,
         musicbrainz_repo=musicbrainz_repo,
         library_cache=library_cache,
         lidarr_repo=lidarr_repo,
+        memory_cache=memory_cache,
+        lastfm_repo=lastfm_repo,
+        preferences_service=preferences_service,
+    )
+
+
+@lru_cache(maxsize=1)
+def get_artist_enrichment_service() -> ArtistEnrichmentService:
+    lastfm_repo = get_lastfm_repository()
+    preferences_service = get_preferences_service()
+    return ArtistEnrichmentService(
+        lastfm_repo=lastfm_repo,
+        preferences_service=preferences_service,
+    )
+
+
+@lru_cache(maxsize=1)
+def get_album_enrichment_service() -> AlbumEnrichmentService:
+    lastfm_repo = get_lastfm_repository()
+    preferences_service = get_preferences_service()
+    return AlbumEnrichmentService(
+        lastfm_repo=lastfm_repo,
+        preferences_service=preferences_service,
     )
 
 
@@ -350,7 +409,8 @@ def get_search_enrichment_service() -> SearchEnrichmentService:
     mb_repo = get_musicbrainz_repository()
     lb_repo = get_listenbrainz_repository()
     preferences_service = get_preferences_service()
-    return SearchEnrichmentService(mb_repo, lb_repo, preferences_service)
+    lastfm_repo = get_lastfm_repository()
+    return SearchEnrichmentService(mb_repo, lb_repo, preferences_service, lastfm_repo)
 
 
 @lru_cache(maxsize=1)
@@ -374,6 +434,35 @@ def get_youtube_service() -> YouTubeService:
 
 
 @lru_cache(maxsize=1)
+def get_lastfm_repository() -> LastFmRepository:
+    http_client = _get_configured_http_client()
+    preferences = get_preferences_service()
+    lf_settings = preferences.get_lastfm_connection()
+    cache = get_cache()
+    return LastFmRepository(
+        http_client=http_client,
+        cache=cache,
+        api_key=lf_settings.api_key,
+        shared_secret=lf_settings.shared_secret,
+        session_key=lf_settings.session_key,
+    )
+
+
+@lru_cache(maxsize=1)
+def get_lastfm_auth_service() -> LastFmAuthService:
+    lastfm_repo = get_lastfm_repository()
+    return LastFmAuthService(lastfm_repo=lastfm_repo)
+
+
+@lru_cache(maxsize=1)
+def get_scrobble_service() -> ScrobbleService:
+    lastfm_repo = get_lastfm_repository()
+    listenbrainz_repo = get_listenbrainz_repository()
+    preferences_service = get_preferences_service()
+    return ScrobbleService(lastfm_repo, listenbrainz_repo, preferences_service)
+
+
+@lru_cache(maxsize=1)
 def get_discover_service() -> DiscoverService:
     listenbrainz_repo = get_listenbrainz_repository()
     jellyfin_repo = get_jellyfin_repository()
@@ -383,6 +472,7 @@ def get_discover_service() -> DiscoverService:
     memory_cache = get_cache()
     library_cache = get_library_cache()
     wikidata_repo = get_wikidata_repository()
+    lastfm_repo = get_lastfm_repository()
     return DiscoverService(
         listenbrainz_repo=listenbrainz_repo,
         jellyfin_repo=jellyfin_repo,
@@ -392,7 +482,15 @@ def get_discover_service() -> DiscoverService:
         memory_cache=memory_cache,
         library_cache=library_cache,
         wikidata_repo=wikidata_repo,
+        lastfm_repo=lastfm_repo,
     )
+
+
+@lru_cache(maxsize=1)
+def get_discover_queue_manager() -> DiscoverQueueManager:
+    discover_service = get_discover_service()
+    preferences_service = get_preferences_service()
+    return DiscoverQueueManager(discover_service, preferences_service)
 
 
 @lru_cache(maxsize=1)
@@ -448,6 +546,7 @@ SettingsServiceDep = Annotated[SettingsService, Depends(get_settings_service)]
 ArtistDiscoveryServiceDep = Annotated[ArtistDiscoveryService, Depends(get_artist_discovery_service)]
 AlbumDiscoveryServiceDep = Annotated[AlbumDiscoveryService, Depends(get_album_discovery_service)]
 DiscoverServiceDep = Annotated[DiscoverService, Depends(get_discover_service)]
+DiscoverQueueManagerDep = Annotated[DiscoverQueueManager, Depends(get_discover_queue_manager)]
 YouTubeRepositoryDep = Annotated[YouTubeRepository, Depends(get_youtube_repo)]
 YouTubeServiceDep = Annotated[YouTubeService, Depends(get_youtube_service)]
 RequestHistoryStoreDep = Annotated[RequestHistoryStore, Depends(get_request_history_store)]
@@ -456,6 +555,23 @@ StreamServiceDep = Annotated[StreamService, Depends(get_stream_service)]
 JellyfinPlaybackServiceDep = Annotated[JellyfinPlaybackService, Depends(get_jellyfin_playback_service)]
 LocalFilesServiceDep = Annotated[LocalFilesService, Depends(get_local_files_service)]
 JellyfinLibraryServiceDep = Annotated[JellyfinLibraryService, Depends(get_jellyfin_library_service)]
+LastFmRepositoryDep = Annotated[LastFmRepository, Depends(get_lastfm_repository)]
+LastFmAuthServiceDep = Annotated[LastFmAuthService, Depends(get_lastfm_auth_service)]
+ScrobbleServiceDep = Annotated[ScrobbleService, Depends(get_scrobble_service)]
+
+
+def clear_lastfm_dependent_caches() -> None:
+    """Clear LRU caches for all services that hold a reference to LastFmRepository."""
+    get_artist_discovery_service.cache_clear()
+    get_artist_enrichment_service.cache_clear()
+    get_album_enrichment_service.cache_clear()
+    get_search_enrichment_service.cache_clear()
+    get_scrobble_service.cache_clear()
+    get_home_charts_service.cache_clear()
+    get_home_service.cache_clear()
+    get_discover_service.cache_clear()
+    get_discover_queue_manager.cache_clear()
+    get_lastfm_auth_service.cache_clear()
 
 
 async def init_app_state(app) -> None:
@@ -463,6 +579,12 @@ async def init_app_state(app) -> None:
 
 
 async def cleanup_app_state() -> None:
+    try:
+        queue_mgr = get_discover_queue_manager()
+        queue_mgr.invalidate()
+    except Exception:
+        pass
+
     await close_http_clients()
 
     get_cache.cache_clear()
@@ -492,11 +614,15 @@ async def cleanup_app_state() -> None:
     get_youtube_repo.cache_clear()
     get_youtube_service.cache_clear()
     get_discover_service.cache_clear()
+    get_discover_queue_manager.cache_clear()
     get_request_history_store.cache_clear()
     get_requests_page_service.cache_clear()
     get_stream_service.cache_clear()
     get_jellyfin_playback_service.cache_clear()
     get_local_files_service.cache_clear()
     get_jellyfin_library_service.cache_clear()
+    get_lastfm_repository.cache_clear()
+    get_lastfm_auth_service.cache_clear()
+    get_scrobble_service.cache_clear()
 
     logger.info("Application state cleaned up")

@@ -7,6 +7,7 @@ from api.v1.schemas.library import LibraryAlbum, LibraryArtist, LibraryStatsResp
 from infrastructure.cache.persistent_cache import LibraryCache
 from infrastructure.cache.memory_cache import CacheInterface
 from infrastructure.cache.disk_cache import DiskMetadataCache
+from infrastructure.cover_urls import prefer_release_group_cover_url
 from core.exceptions import ExternalServiceError
 from services.cache_status_service import CacheStatusService
 from services.library_precache_service import LibraryPrecacheService
@@ -26,6 +27,7 @@ class LibraryService:
         preferences_service: 'PreferencesService',
         memory_cache: CacheInterface | None = None,
         disk_cache: DiskMetadataCache | None = None,
+        artist_discovery_service: Any = None,
     ):
         self._lidarr_repo = lidarr_repo
         self._library_cache = library_cache
@@ -33,7 +35,10 @@ class LibraryService:
         self._preferences_service = preferences_service
         self._memory_cache = memory_cache
         self._disk_cache = disk_cache
-        self._precache_service = LibraryPrecacheService(lidarr_repo, cover_repo, preferences_service, library_cache)
+        self._precache_service = LibraryPrecacheService(
+            lidarr_repo, cover_repo, preferences_service, library_cache,
+            artist_discovery_service=artist_discovery_service,
+        )
         self._last_sync_time: float = 0.0
         self._last_manual_sync: float = 0.0
         self._manual_sync_cooldown: float = 60.0
@@ -47,6 +52,10 @@ class LibraryService:
             self._preferences_service.save_lidarr_settings(updated_settings)
         except Exception as e:
             logger.warning(f"Failed to update last_sync timestamp: {e}")
+
+    @staticmethod
+    def _normalized_album_cover_url(album_mbid: str | None, cover_url: str | None) -> str | None:
+        return prefer_release_group_cover_url(album_mbid, cover_url, size=500)
 
     async def get_library(self) -> list[LibraryAlbum]:
         try:
@@ -64,7 +73,10 @@ class LibraryService:
                     year=album.get('year'),
                     monitored=bool(album.get('monitored', 1)),
                     quality=None,
-                    cover_url=album.get('cover_url'),
+                    cover_url=self._normalized_album_cover_url(
+                        album.get('mbid'),
+                        album.get('cover_url'),
+                    ),
                     musicbrainz_id=album.get('mbid'),
                     artist_mbid=album.get('artist_mbid'),
                     date_added=album.get('date_added')
@@ -133,7 +145,10 @@ class LibraryService:
                         year=album.get('year'),
                         monitored=bool(album.get('monitored', 1)),
                         quality=None,
-                        cover_url=album.get('cover_url'),
+                        cover_url=self._normalized_album_cover_url(
+                            album.get('mbid'),
+                            album.get('cover_url'),
+                        ),
                         musicbrainz_id=album.get('mbid'),
                         artist_mbid=album.get('artist_mbid'),
                         date_added=album.get('date_added')
@@ -192,7 +207,10 @@ class LibraryService:
                     'artist_name': album.artist,
                     'title': album.album,
                     'year': album.year,
-                    'cover_url': album.cover_url,
+                    'cover_url': self._normalized_album_cover_url(
+                        album.musicbrainz_id,
+                        album.cover_url,
+                    ),
                     'monitored': album.monitored,
                     'date_added': album.date_added
                 }
