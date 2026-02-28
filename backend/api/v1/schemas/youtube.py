@@ -19,6 +19,7 @@ class YouTubeTrackLink(AppStruct):
     artist_name: str
     embed_url: str
     created_at: str
+    album_name: str = ""
 
 
 class YouTubeLink(AppStruct):

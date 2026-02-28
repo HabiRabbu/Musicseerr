@@ -1,8 +1,9 @@
 export function formatListenCount(count: number | null, compact = false): string {
 	if (count == null) return '';
 	const suffix = compact ? '' : ' plays';
-	if (count >= 1000000) return `${(count / 1000000).toFixed(1)}M${suffix}`;
-	if (count >= 1000) return `${(count / 1000).toFixed(1)}K${suffix}`;
+	if (count >= 1_000_000_000) return `${(count / 1_000_000_000).toFixed(1)}B${suffix}`;
+	if (count >= 1_000_000) return `${(count / 1_000_000).toFixed(1)}M${suffix}`;
+	if (count >= 1_000) return `${(count / 1_000).toFixed(1)}K${suffix}`;
 	return `${count}${suffix}`;
 }
 

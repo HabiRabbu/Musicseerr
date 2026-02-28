@@ -599,6 +599,7 @@ export type YouTubeTrackLink = {
 	artist_name: string;
 	embed_url: string;
 	created_at: string;
+	album_name?: string;
 };
 
 export type YouTubeTrackLinkResponse = {

@@ -20,7 +20,7 @@
 	import { fetchActiveRequestCount, type RequestCountChangedDetail } from '$lib/utils/requestsApi';
 	import { createNavigationProgressController } from '$lib/utils/navigationProgress';
 	import { fromStore } from 'svelte/store';
-	import { User, Settings, Search, House, Compass, Menu, Tv, Headphones, Download, PanelLeft, TriangleAlert, Info, X } from 'lucide-svelte';
+	import { Settings, Search, House, Compass, Menu, Tv, Headphones, Download, PanelLeft, TriangleAlert, Info, X } from 'lucide-svelte';
 	import type { Snippet } from 'svelte';
 
 	let { children }: { children: Snippet } = $props();
@@ -30,7 +30,6 @@
 	let requestCountInterval: ReturnType<typeof setInterval> | null = null;
 	let requestsPageActive = false;
 	let modalQuery = $state('');
-	let userDropdown: HTMLDetailsElement;
 	let showNavigationProgress = $state(false);
 
 	const NAV_PROGRESS_DELAY_MS = 120;
@@ -52,11 +51,7 @@
 		navigationProgress.finish();
 	});
 
-	function handleClickOutside(event: MouseEvent) {
-		if (userDropdown && userDropdown.open && !userDropdown.contains(event.target as Node)) {
-			userDropdown.open = false;
-		}
-	}
+
 
 	async function pollRequestCount() {
 		try {
@@ -95,7 +90,6 @@
 		initCacheTTLs();
 		libraryStore.initialize();
 		void integrationStore.ensureLoaded();
-		document.addEventListener('click', handleClickOutside);
 		document.addEventListener('keydown', handleGlobalKeydown);
 		window.addEventListener('request-count-changed', handleRequestCountChanged);
 		window.addEventListener('requests-page-active', handleRequestsPageActive);
@@ -108,7 +102,6 @@
 	onDestroy(() => {
 		navigationProgress.cleanup();
 		if (browser) {
-			document.removeEventListener('click', handleClickOutside);
 			document.removeEventListener('keydown', handleGlobalKeydown);
 			window.removeEventListener('request-count-changed', handleRequestCountChanged);
 			window.removeEventListener('requests-page-active', handleRequestsPageActive);
@@ -192,11 +185,6 @@
 		goto(resolve(routeId, { id: result.musicbrainz_id }));
 	}
 
-	function handleSettingsClick() {
-		userDropdown.open = false;
-		goto('/settings');
-	}
-
 	const integrations = fromStore(integrationStore);
 	const lidarrConfigured = $derived(integrations.current.lidarr || !integrations.current.loaded);
 </script>
@@ -231,25 +219,6 @@
 					{/if}
 				</div>
 				<div class="navbar-end w-auto">
-					<details class="dropdown dropdown-end" bind:this={userDropdown}>
-						<summary class="btn btn-ghost btn-circle btn-lg" aria-label="User Profile">
-							<User class="h-6 w-6" />
-						</summary>
-						<ul class="dropdown-content menu bg-base-200 rounded-box z-[100] w-52 p-2 shadow">
-							<li>
-								<a
-									href="/settings"
-									onclick={(e: MouseEvent) => {
-										e.preventDefault();
-										handleSettingsClick();
-									}}
-								>
-									<Settings class="h-5 w-5" />
-									Settings
-								</a>
-							</li>
-						</ul>
-					</details>
 				</div>
 			</div>
 
@@ -380,13 +349,24 @@
 						</li>
 					{/if}
 				</ul>
-				<div class="m-2 is-drawer-close:tooltip is-drawer-close:tooltip-right" data-tip="Open">
-					<label
-						for="main-drawer"
-						class="btn btn-ghost btn-circle drawer-button is-drawer-open:rotate-y-180"
-					>
-						<PanelLeft class="h-5 w-5" />
-					</label>
+				<div class="w-full p-2 flex flex-col gap-1">
+					<div class="is-drawer-close:tooltip is-drawer-close:tooltip-right" data-tip="Settings">
+						<a
+							href="/settings"
+							class="btn btn-ghost btn-circle"
+							aria-label="Settings"
+						>
+							<Settings class="h-5 w-5" />
+						</a>
+					</div>
+					<div class="is-drawer-close:tooltip is-drawer-close:tooltip-right" data-tip="Open">
+						<label
+							for="main-drawer"
+							class="btn btn-ghost btn-circle drawer-button is-drawer-open:rotate-y-180"
+						>
+							<PanelLeft class="h-5 w-5" />
+						</label>
+					</div>
 				</div>
 			</div>
 		</div>

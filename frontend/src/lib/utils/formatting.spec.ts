@@ -41,4 +41,14 @@ describe('formatListenCount', () => {
 		expect.assertions(1);
 		expect(formatListenCount(2500000, true)).toBe('2.5M');
 	});
+
+	it('formats billions', () => {
+		expect.assertions(1);
+		expect(formatListenCount(3596400000)).toBe('3.6B plays');
+	});
+
+	it('formats billions compact', () => {
+		expect.assertions(1);
+		expect(formatListenCount(3596400000, true)).toBe('3.6B');
+	});
 });

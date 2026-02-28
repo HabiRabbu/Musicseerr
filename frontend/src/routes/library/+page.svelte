@@ -10,7 +10,7 @@
 	import Pagination from '$lib/components/Pagination.svelte';
 	import { recentlyAddedStore } from '$lib/stores/recentlyAdded';
 	import type { Artist, Album } from '$lib/types';
-	import { CircleX, X, RefreshCw, ChevronRight } from 'lucide-svelte';
+	import { CircleX, X, RefreshCw, ChevronRight, Search } from 'lucide-svelte';
 
 	type LibraryArtist = {
 		name: string;
@@ -51,6 +51,7 @@
 	let currentAlbumPage = 1;
 	let artistsVisibleCount = 15;
 	const ARTISTS_LOAD_MORE = 15;
+	let searchQuery = '';
 
 	$: recentlyAdded = $recentlyAddedStore.data ?? { artists: [], albums: [] };
 	$: loadingRecentlyAdded = $recentlyAddedStore.loading && !$recentlyAddedStore.data;
@@ -145,7 +146,18 @@
 	}
 
 	function loadMoreArtists() {
-		artistsVisibleCount = Math.min(artistsVisibleCount + ARTISTS_LOAD_MORE, allArtists.length);
+		artistsVisibleCount = Math.min(artistsVisibleCount + ARTISTS_LOAD_MORE, filteredArtists.length);
+	}
+
+	function handleSearchInput(): void {
+		currentAlbumPage = 1;
+		artistsVisibleCount = 15;
+	}
+
+	function clearSearch(): void {
+		searchQuery = '';
+		currentAlbumPage = 1;
+		artistsVisibleCount = 15;
 	}
 
 	function convertToArtist(libArtist: LibraryArtist): Artist {
@@ -163,9 +175,20 @@
 		};
 	}
 
-	$: displayedArtists = allArtists.slice(0, artistsVisibleCount);
-	$: totalAlbumPages = Math.ceil(allAlbums.length / albumsPerPage);
-	$: displayedAlbums = allAlbums.slice(
+	$: searchTerm = searchQuery.trim().toLowerCase();
+	$: isSearching = searchTerm.length > 0;
+	$: filteredArtists = isSearching
+		? allArtists.filter((a) => a.name.toLowerCase().includes(searchTerm))
+		: allArtists;
+	$: filteredAlbums = isSearching
+		? allAlbums.filter((a) =>
+				a.album.toLowerCase().includes(searchTerm) ||
+				a.artist.toLowerCase().includes(searchTerm)
+			)
+		: allAlbums;
+	$: displayedArtists = filteredArtists.slice(0, artistsVisibleCount);
+	$: totalAlbumPages = Math.ceil(filteredAlbums.length / albumsPerPage);
+	$: displayedAlbums = filteredAlbums.slice(
 		(currentAlbumPage - 1) * albumsPerPage,
 		currentAlbumPage * albumsPerPage
 	);
@@ -207,6 +230,7 @@
 		</button>
 	</div>
 
+	{#if !isSearching}
 	<section class="mb-8">
 		<h2 class="text-2xl font-semibold mb-4">Recently Added</h2>
 		{#if loadingRecentlyAdded}
@@ -230,6 +254,29 @@
 			</div>
 		{/if}
 	</section>
+	{/if}
+
+	<div class="flex flex-wrap items-center gap-3 mb-6">
+		<div class="relative">
+			<Search class="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 opacity-40 pointer-events-none" />
+			<input
+				type="text"
+				placeholder="Search artists & albums..."
+				class="input input-sm pl-8 w-56"
+				bind:value={searchQuery}
+				oninput={handleSearchInput}
+				aria-label="Search library"
+			/>
+		</div>
+		{#if isSearching}
+			<button class="btn btn-sm btn-ghost btn-square" onclick={clearSearch} aria-label="Clear search">
+				<X class="h-4 w-4" />
+			</button>
+			<span class="text-sm opacity-50">
+				{filteredArtists.length} artists • {filteredAlbums.length} albums
+			</span>
+		{/if}
+	</div>
 
 	<section class="mb-8">
 		<div class="flex justify-between items-center mb-4">
@@ -242,13 +289,13 @@
 			<div class="flex gap-4 overflow-x-auto scrollbar-hide pb-2">
 				{#each Array(8) as _}<div class="w-32 sm:w-36 md:w-44 flex-shrink-0"><ArtistCardSkeleton /></div>{/each}
 			</div>
-		{:else if allArtists.length > 0}
+		{:else if filteredArtists.length > 0}
 			<div in:fade={{ duration: 300 }}>
 				<HorizontalCarousel class="pb-2" onNearEnd={loadMoreArtists}>
 					{#each displayedArtists as artist (artist.mbid)}
 						<div class="w-32 sm:w-36 md:w-44 flex-shrink-0"><ArtistCard artist={convertToArtist(artist)} /></div>
 					{/each}
-					{#if artistsVisibleCount < allArtists.length}
+					{#if artistsVisibleCount < filteredArtists.length}
 						<div class="w-32 sm:w-36 md:w-44 flex-shrink-0 flex items-center justify-center">
 							<button class="btn btn-ghost btn-sm" onclick={loadMoreArtists}>Load more...</button>
 						</div>
@@ -257,7 +304,7 @@
 			</div>
 		{:else}
 			<div class="p-8 bg-base-200 rounded-box text-center text-base-content/50">
-				<p>No artists in library</p>
+				<p>{isSearching ? 'No matching artists' : 'No artists in library'}</p>
 			</div>
 		{/if}
 	</section>
@@ -276,7 +323,7 @@
 			<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
 				{#each Array(12) as _}<AlbumCardSkeleton />{/each}
 			</div>
-		{:else if allAlbums.length > 0}
+		{:else if filteredAlbums.length > 0}
 			<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4" in:fade={{ duration: 300 }}>
 				{#each displayedAlbums as album, index (album.foreignAlbumId || `${album.album}-${album.artist}-${index}`)}
 					<AlbumCard album={convertToAlbum(album)} />
@@ -289,12 +336,12 @@
 			{/if}
 		{:else}
 			<div class="p-8 bg-base-200 rounded-box text-center text-base-content/50">
-				<p>No albums in library</p>
+				<p>{isSearching ? 'No matching albums' : 'No albums in library'}</p>
 			</div>
 		{/if}
 	</section>
 
-	{#if !loadingArtists && !loadingAlbums && allArtists.length === 0 && allAlbums.length === 0}
+	{#if !isSearching && !loadingArtists && !loadingAlbums && allArtists.length === 0 && allAlbums.length === 0}
 		<div class="flex flex-col items-center justify-center min-h-[200px] text-center mt-8">
 			<div class="text-6xl mb-4">📚</div>
 			<h2 class="text-2xl font-semibold mb-2">No items in library</h2>
