@@ -16,6 +16,7 @@
 	import SourceSwitcher from '$lib/components/SourceSwitcher.svelte';
 	import LastFmEnrichment from '$lib/components/LastFmEnrichment.svelte';
 	import LibraryAlbumsCarousel from '$lib/components/LibraryAlbumsCarousel.svelte';
+	import ArtistPageToc from '$lib/components/ArtistPageToc.svelte';
 	import { requestAlbum } from '$lib/utils/albumRequest';
 	import { getArtistDiscoveryCache, setArtistDiscoveryCache } from '$lib/stores/discoveryCache';
 	import { integrationStore } from '$lib/stores/integration';
@@ -72,6 +73,24 @@
 		artistInfo: ArtistInfo;
 		pagination: ArtistReleasePaginationState;
 	};
+
+	type ArtistTocSection = {
+		id: string;
+		label: string;
+	};
+
+	let tocSections: ArtistTocSection[] = [];
+
+	$: tocSections = artist
+		? [
+				{ id: 'section-overview', label: 'Overview' },
+				{ id: 'section-about', label: 'About' },
+				{ id: 'section-similar', label: 'Similar Artists' },
+				...(artist.albums.length > 0 ? [{ id: 'section-albums', label: 'Albums' }] : []),
+				...(artist.eps.length > 0 ? [{ id: 'section-eps', label: 'EPs' }] : []),
+				...(artist.singles.length > 0 ? [{ id: 'section-singles', label: 'Singles' }] : [])
+			]
+		: [];
 
 	function sortReleasesByYear(releases: ArtistInfo['albums']) {
 		return [...releases].sort((a, b) => {
@@ -510,145 +529,159 @@
 			<AlbumGridSkeleton title="Albums" count={12} />
 		</div>
 	{:else if artist}
-		<div class="space-y-4 sm:space-y-6 lg:space-y-8">
-			<ArtistHero {artist} showBackButton />
+		<div class="xl:grid xl:grid-cols-[9rem_minmax(0,1fr)] xl:gap-4">
+			<ArtistPageToc sections={tocSections} />
 
-			<div class="flex flex-wrap items-center gap-x-4 gap-y-2 justify-center sm:justify-start">
-				{#if artist.country}
-					<span class="text-sm text-base-content/80 flex items-center gap-1.5">
-						<span>🌍</span> {artist.country}
-					</span>
-				{/if}
-				{#if artist.life_span?.begin}
-					<span class="text-sm text-base-content/80 flex items-center gap-1.5">
-						<span>📅</span> {artist.life_span.begin}{#if artist.life_span.end}&nbsp;–&nbsp;{artist.life_span.end}{/if}
-					</span>
-				{/if}
-				{#if artist.albums.length + artist.eps.length + artist.singles.length > 0}
-					<span class="text-sm text-base-content/80 flex items-center gap-1.5">
-						<span>💿</span> {artist.albums.length + artist.eps.length + artist.singles.length} releases
-					</span>
-				{/if}
-			</div>
+			<div class="space-y-4 sm:space-y-6 lg:space-y-8">
+				<section id="section-overview" class="space-y-4 scroll-mt-24">
+					<ArtistHero {artist} showBackButton />
 
-			{#if artist.tags.length > 0}
-				<div class="flex flex-wrap gap-2 justify-center sm:justify-start -mt-2">
-					{#each artist.tags.slice(0, 10) as tag}
-						<a
-							href="/genre?name={encodeURIComponent(tag)}"
-							class="badge badge-lg cursor-pointer hover:opacity-80 transition-opacity"
-							style="background-color: {colors.primary}; color: {colors.secondary};"
-						>{tag}</a>
-					{/each}
-				</div>
-			{/if}
+					<div class="flex flex-wrap items-center gap-x-4 gap-y-2 justify-center sm:justify-start">
+						{#if artist.country}
+							<span class="text-sm text-base-content/80 flex items-center gap-1.5">
+								<span>🌍</span> {artist.country}
+							</span>
+						{/if}
+						{#if artist.life_span?.begin}
+							<span class="text-sm text-base-content/80 flex items-center gap-1.5">
+								<span>📅</span> {artist.life_span.begin}{#if artist.life_span.end}&nbsp;–&nbsp;{artist.life_span.end}{/if}
+							</span>
+						{/if}
+						{#if artist.albums.length + artist.eps.length + artist.singles.length > 0}
+							<span class="text-sm text-base-content/80 flex items-center gap-1.5">
+								<span>💿</span> {artist.albums.length + artist.eps.length + artist.singles.length} releases
+							</span>
+						{/if}
+					</div>
 
-			{#if !lastfmEnrichment?.bio}
-				<ArtistDescription description={artist.description} loading={loadingExtended} />
-			{/if}
+					{#if artist.tags.length > 0}
+						<div class="flex flex-wrap gap-2 justify-center sm:justify-start -mt-2">
+							{#each artist.tags.slice(0, 10) as tag}
+								<a
+									href="/genre?name={encodeURIComponent(tag)}"
+									class="badge badge-lg cursor-pointer hover:opacity-80 transition-opacity"
+									style="background-color: {colors.primary}; color: {colors.secondary};"
+								>{tag}</a>
+							{/each}
+						</div>
+					{/if}
+				</section>
 
-			{#if $integrationStore.lastfm}
-				<LastFmEnrichment
-					enrichment={lastfmEnrichment}
-					loading={loadingLastfm}
-					enabled={$integrationStore.lastfm}
+				<section id="section-about" class="space-y-4 scroll-mt-24">
+					{#if !lastfmEnrichment?.bio}
+						<ArtistDescription description={artist.description} loading={loadingExtended} />
+					{/if}
+
+					{#if $integrationStore.lastfm}
+						<LastFmEnrichment
+							enrichment={lastfmEnrichment}
+							loading={loadingLastfm}
+							enabled={$integrationStore.lastfm}
+						/>
+					{/if}
+				</section>
+
+				<LibraryAlbumsCarousel
+					releases={[...artist.albums, ...artist.eps, ...artist.singles]}
+					artistName={artist.name}
+					loading={loadingBasic}
 				/>
-			{/if}
 
-			<LibraryAlbumsCarousel
-				releases={[...artist.albums, ...artist.eps, ...artist.singles]}
-				artistName={artist.name}
-				loading={loadingBasic}
-			/>
-
-			<!-- Source Switcher (only visible when multiple sources available) -->
-			<div class="flex items-center justify-end mt-8 mb-4">
-				<SourceSwitcher
-					pageKey="artist"
-					onSourceChange={handleSourceChange}
-				/>
-			</div>
-
-			<div class="flex flex-col md:flex-row gap-6 md:items-stretch">
-				<div class="flex-1 min-w-0">
-					<TopAlbumsList 
-						albums={topAlbums?.albums || []} 
-						loading={loadingTopAlbums} 
-						configured={topAlbums?.configured ?? true} 
-						source={topAlbums?.source || ''}
+				<!-- Source Switcher (only visible when multiple sources available) -->
+				<div class="flex items-center justify-end mt-8 mb-4">
+					<SourceSwitcher
+						pageKey="artist"
+						onSourceChange={handleSourceChange}
 					/>
 				</div>
-				<div class="shrink-0 bg-base-content/25 h-px w-full md:w-px md:h-auto md:self-stretch" aria-hidden="true"></div>
-				<div class="flex-1 min-w-0">
-					<TopSongsList 
-						songs={topSongs?.songs || []} 
-						loading={loadingTopSongs} 
-						configured={topSongs?.configured ?? true} 
-						source={topSongs?.source || ''}
-					/>
-				</div>
-			</div>
 
-			<!-- Similar Artists Carousel -->
-			<div class="mt-8">
-				<SimilarArtistsCarousel 
-					artists={similarArtists?.similar_artists || []} 
-					loading={loadingSimilar} 
-					configured={similarArtists?.configured ?? true} 
-				/>
-			</div>
-
-			{#if hasMoreReleases || loadingMoreReleases}
-				<div class="flex items-center justify-center gap-3 p-4 bg-base-300 rounded-box mb-6" style="border: 2px solid {colors.accent};">
-					<span class="loading loading-spinner loading-md" style="color: {colors.accent};"></span>
-					<div class="flex flex-col items-start">
-						<span class="font-semibold text-base" style="color: {colors.accent};">Loading all releases...</span>
-						<span class="text-sm text-base-content/70">Loaded {loadedReleaseCount} of {totalReleaseCount} releases</span>
+				<div class="flex flex-col md:flex-row gap-6 md:items-stretch">
+					<div class="flex-1 min-w-0">
+						<TopAlbumsList
+							albums={topAlbums?.albums || []}
+							loading={loadingTopAlbums}
+							configured={topAlbums?.configured ?? true}
+							source={topAlbums?.source || ''}
+						/>
+					</div>
+					<div class="shrink-0 bg-base-content/25 h-px w-full md:w-px md:h-auto md:self-stretch" aria-hidden="true"></div>
+					<div class="flex-1 min-w-0">
+						<TopSongsList
+							songs={topSongs?.songs || []}
+							loading={loadingTopSongs}
+							configured={topSongs?.configured ?? true}
+							source={topSongs?.source || ''}
+						/>
 					</div>
 				</div>
-			{/if}
-			
+
+				<!-- Similar Artists Carousel -->
+				<section id="section-similar" class="mt-8 scroll-mt-24">
+					<SimilarArtistsCarousel
+						artists={similarArtists?.similar_artists || []}
+						loading={loadingSimilar}
+						configured={similarArtists?.configured ?? true}
+					/>
+				</section>
+
+				{#if hasMoreReleases || loadingMoreReleases}
+					<div class="flex items-center justify-center gap-3 p-4 bg-base-300 rounded-box mb-6" style="border: 2px solid {colors.accent};">
+						<span class="loading loading-spinner loading-md" style="color: {colors.accent};"></span>
+						<div class="flex flex-col items-start">
+							<span class="font-semibold text-base" style="color: {colors.accent};">Loading all releases...</span>
+							<span class="text-sm text-base-content/70">Loaded {loadedReleaseCount} of {totalReleaseCount} releases</span>
+						</div>
+					</div>
+				{/if}
+
 				{#if artist.albums.length > 0}
-				<ReleaseList
-					title="Albums"
-					releases={artist.albums}
-					collapsed={albumsCollapsed}
-					requestingIds={requestingAlbums}
-					showLoadingIndicator={hasMoreReleases || loadingMoreReleases}
-					artistName={artist.name}
-					onRequest={handleRequest}
-					onRemoved={handleReleaseRemoved}
-					onToggleCollapse={() => (albumsCollapsed = !albumsCollapsed)}
-				/>
-			{/if}
+					<section id="section-albums" class="scroll-mt-24">
+						<ReleaseList
+							title="Albums"
+							releases={artist.albums}
+							collapsed={albumsCollapsed}
+							requestingIds={requestingAlbums}
+							showLoadingIndicator={hasMoreReleases || loadingMoreReleases}
+							artistName={artist.name}
+							onRequest={handleRequest}
+							onRemoved={handleReleaseRemoved}
+							onToggleCollapse={() => (albumsCollapsed = !albumsCollapsed)}
+						/>
+					</section>
+				{/if}
 
-			{#if artist.eps.length > 0}
-				<ReleaseList
-					title="EPs"
-					releases={artist.eps}
-					collapsed={epsCollapsed}
-					requestingIds={requestingAlbums}
-					showLoadingIndicator={hasMoreReleases || loadingMoreReleases}
-					artistName={artist.name}
-					onRequest={handleRequest}
-					onRemoved={handleReleaseRemoved}
-					onToggleCollapse={() => (epsCollapsed = !epsCollapsed)}
-				/>
-			{/if}
+				{#if artist.eps.length > 0}
+					<section id="section-eps" class="scroll-mt-24">
+						<ReleaseList
+							title="EPs"
+							releases={artist.eps}
+							collapsed={epsCollapsed}
+							requestingIds={requestingAlbums}
+							showLoadingIndicator={hasMoreReleases || loadingMoreReleases}
+							artistName={artist.name}
+							onRequest={handleRequest}
+							onRemoved={handleReleaseRemoved}
+							onToggleCollapse={() => (epsCollapsed = !epsCollapsed)}
+						/>
+					</section>
+				{/if}
 
-			{#if artist.singles.length > 0}
-				<ReleaseList
-					title="Singles"
-					releases={artist.singles}
-					collapsed={singlesCollapsed}
-					requestingIds={requestingAlbums}
-					showLoadingIndicator={hasMoreReleases || loadingMoreReleases}
-					artistName={artist.name}
-					onRequest={handleRequest}
-					onRemoved={handleReleaseRemoved}
-					onToggleCollapse={() => (singlesCollapsed = !singlesCollapsed)}
-				/>
-			{/if}
+				{#if artist.singles.length > 0}
+					<section id="section-singles" class="scroll-mt-24">
+						<ReleaseList
+							title="Singles"
+							releases={artist.singles}
+							collapsed={singlesCollapsed}
+							requestingIds={requestingAlbums}
+							showLoadingIndicator={hasMoreReleases || loadingMoreReleases}
+							artistName={artist.name}
+							onRequest={handleRequest}
+							onRemoved={handleReleaseRemoved}
+							onToggleCollapse={() => (singlesCollapsed = !singlesCollapsed)}
+						/>
+					</section>
+				{/if}
+			</div>
 		</div>
 	{:else}
 		<div class="flex items-center justify-center min-h-[50vh]">
