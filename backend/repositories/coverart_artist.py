@@ -10,8 +10,10 @@ from urllib.parse import quote
 import httpx
 import msgspec
 
+from core.exceptions import ExternalServiceError, RateLimitedError
 from infrastructure.cache.memory_cache import CacheInterface
 from infrastructure.queue.priority_queue import RequestPriority
+from infrastructure.resilience.retry import CircuitOpenError
 
 if TYPE_CHECKING:
     from repositories.musicbrainz_repository import MusicBrainzRepository
@@ -21,6 +23,20 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 LOCAL_SOURCE_TIMEOUT_SECONDS = 1.0
 T = TypeVar("T")
+DEFAULT_EXTERNAL_USER_AGENT = "Musicseerr/1.0 (contact@musicseerr.com; https://www.musicseerr.com)"
+
+
+class TransientImageFetchError(Exception):
+    pass
+
+
+TRANSIENT_FETCH_EXCEPTIONS = (
+    CircuitOpenError,
+    httpx.TimeoutException,
+    httpx.NetworkError,
+    ExternalServiceError,
+    RateLimitedError,
+)
 
 
 class _WikidataValue(msgspec.Struct):
@@ -35,12 +51,8 @@ class _WikidataClaim(msgspec.Struct):
     mainsnak: _WikidataSnak | None = None
 
 
-class _WikidataEntity(msgspec.Struct):
+class _WikidataClaimsResponse(msgspec.Struct):
     claims: dict[str, list[_WikidataClaim]] = {}
-
-
-class _WikidataEntityResponse(msgspec.Struct):
-    entities: dict[str, _WikidataEntity] = {}
 
 
 class _CommonsImageInfo(msgspec.Struct):
@@ -91,6 +103,7 @@ class ArtistImageFetcher:
         mb_repo: 'MusicBrainzRepository' | None = None,
         lidarr_repo: 'LidarrRepository' | None = None,
         jellyfin_repo: 'JellyfinRepository' | None = None,
+        user_agent: str | None = None,
     ):
         self._http_get = http_get_fn
         self._write_disk_cache = write_cache_fn
@@ -98,6 +111,10 @@ class ArtistImageFetcher:
         self._mb_repo = mb_repo
         self._lidarr_repo = lidarr_repo
         self._jellyfin_repo = jellyfin_repo
+        resolved_user_agent = user_agent
+        if not resolved_user_agent or resolved_user_agent.lower().startswith("python-httpx"):
+            resolved_user_agent = DEFAULT_EXTERNAL_USER_AGENT
+        self._external_headers = {"User-Agent": resolved_user_agent}
 
     async def fetch_artist_image(
         self,
@@ -107,22 +124,38 @@ class ArtistImageFetcher:
     ) -> tuple[bytes, str, str] | None:
         logger.info(f"[IMG] Fetching artist image for {artist_id[:8]}... (size={size})")
         result = None
+        had_transient_failure = False
+        last_transient_error: Exception | None = None
         try:
-            result = await asyncio.wait_for(
+            result, had_transient_failure = await asyncio.wait_for(
                 self._fetch_local_sources(artist_id, size, file_path),
                 timeout=LOCAL_SOURCE_TIMEOUT_SECONDS,
             )
         except TimeoutError:
             logger.debug(f"[IMG] Timed out local source lookup for {artist_id[:8]}...")
+            had_transient_failure = True
+            last_transient_error = TimeoutError(
+                f"Timed out local source lookup for {artist_id}"
+            )
         if result:
             logger.info(f"[IMG] SUCCESS from local source for {artist_id[:8]}...")
             return result
         logger.info(f"[IMG] Local sources failed for {artist_id[:8]}..., trying Wikidata")
-        result = await self._fetch_from_wikidata(artist_id, size, file_path)
+        try:
+            result = await self._fetch_from_wikidata(artist_id, size, file_path)
+        except TRANSIENT_FETCH_EXCEPTIONS as exc:
+            had_transient_failure = True
+            last_transient_error = exc
+            logger.warning(f"[IMG] Transient Wikidata fetch failure for {artist_id[:8]}...: {exc}")
+            result = None
         if result:
             logger.info(f"[IMG] SUCCESS from Wikidata for {artist_id[:8]}...")
             return result
         logger.info(f"[IMG] FAILED: No image found for {artist_id[:8]}... from any source")
+        if had_transient_failure:
+            raise TransientImageFetchError(
+                f"Transient failure while fetching artist image for {artist_id}"
+            ) from last_transient_error
         return None
 
     async def _fetch_local_sources(
@@ -130,11 +163,27 @@ class ArtistImageFetcher:
         artist_id: str,
         size: int | None,
         file_path: Path,
-    ) -> tuple[bytes, str, str] | None:
-        result = await self._fetch_from_lidarr(artist_id, size, file_path)
+    ) -> tuple[tuple[bytes, str, str] | None, bool]:
+        had_transient_failure = False
+
+        try:
+            result = await self._fetch_from_lidarr(artist_id, size, file_path)
+        except TRANSIENT_FETCH_EXCEPTIONS as exc:
+            had_transient_failure = True
+            logger.warning(f"[IMG:Lidarr] Transient failure for {artist_id[:8]}: {exc}")
+            result = None
+
         if result:
-            return result
-        return await self._fetch_from_jellyfin(artist_id, file_path)
+            return result, had_transient_failure
+
+        try:
+            result = await self._fetch_from_jellyfin(artist_id, file_path)
+        except TRANSIENT_FETCH_EXCEPTIONS as exc:
+            had_transient_failure = True
+            logger.warning(f"[IMG:Jellyfin] Transient failure for {artist_id[:8]}: {exc}")
+            result = None
+
+        return result, had_transient_failure
 
     async def _fetch_from_lidarr(
         self,
@@ -167,6 +216,8 @@ class ArtistImageFetcher:
             task = asyncio.create_task(self._write_disk_cache(file_path, content, content_type, {"source": "lidarr"}))
             task.add_done_callback(_log_task_error)
             return (content, content_type, "lidarr")
+        except TRANSIENT_FETCH_EXCEPTIONS:
+            raise
         except Exception as e:
             logger.warning(f"[IMG:Lidarr] Exception for {artist_id[:8]}: {e}")
             return None
@@ -203,6 +254,8 @@ class ArtistImageFetcher:
             )
             task.add_done_callback(_log_task_error)
             return (content, content_type, "jellyfin")
+        except TRANSIENT_FETCH_EXCEPTIONS:
+            raise
         except Exception as e:
             logger.warning(f"[IMG:Jellyfin] Exception for {artist_id[:8]}: {e}")
             return None
@@ -217,8 +270,8 @@ class ArtistImageFetcher:
         wikidata_url = await self._cache.get(cache_key)
         if wikidata_url is None:
             wikidata_url = await self._lookup_wikidata_url(artist_id)
-            ttl = 86400 if wikidata_url else 3600
-            await self._cache.set(cache_key, wikidata_url, ttl_seconds=ttl)
+            if wikidata_url:
+                await self._cache.set(cache_key, wikidata_url, ttl_seconds=86400)
         if not wikidata_url:
             return None
         try:
@@ -227,20 +280,20 @@ class ArtistImageFetcher:
             if not wikidata_id:
                 logger.debug(f"Could not parse Wikidata Q-id from URL: {wikidata_url}")
                 return None
-            api_url = f"https://www.wikidata.org/wiki/Special:EntityData/{wikidata_id}.json"
+            api_url = (
+                f"https://www.wikidata.org/w/api.php"
+                f"?action=wbgetclaims&entity={wikidata_id}&property=P18&format=json"
+            )
             response = await self._http_get(
                 api_url,
                 RequestPriority.IMAGE_FETCH,
                 source="wikidata",
+                headers=self._external_headers,
             )
             if response.status_code != 200:
                 return None
-            data = _decode_json_response(response, _WikidataEntityResponse)
-            entity = data.entities.get(wikidata_id)
-            if entity is None:
-                return None
-
-            image_claims = entity.claims.get("P18", [])
+            data = _decode_json_response(response, _WikidataClaimsResponse)
+            image_claims = data.claims.get("P18", [])
             if not image_claims:
                 return None
             first_claim = image_claims[0]
@@ -262,6 +315,7 @@ class ArtistImageFetcher:
                 commons_api,
                 RequestPriority.IMAGE_FETCH,
                 source="wikimedia",
+                headers=self._external_headers,
             )
             if commons_response.status_code != 200:
                 return None
@@ -282,6 +336,7 @@ class ArtistImageFetcher:
                 image_url,
                 RequestPriority.IMAGE_FETCH,
                 source="wikimedia",
+                headers=self._external_headers,
             )
             if response.status_code == 200:
                 content_type = response.headers.get("content-type", "")
@@ -299,6 +354,8 @@ class ArtistImageFetcher:
                 )
                 task.add_done_callback(_log_task_error)
                 return (content, content_type, "wikidata")
+        except TRANSIENT_FETCH_EXCEPTIONS:
+            raise
         except Exception as e:
             logger.error(f"Error fetching artist image for {artist_id}: {e}")
         return None
@@ -336,6 +393,8 @@ class ArtistImageFetcher:
                         return ext_url
             logger.info(f"[IMG:Wikidata] No wikidata link found for {artist_id[:8]}")
             return None
+        except TRANSIENT_FETCH_EXCEPTIONS:
+            raise
         except Exception as e:
             logger.error(f"[IMG:Wikidata] Failed to fetch artist metadata for {artist_id}: {e}")
             return None

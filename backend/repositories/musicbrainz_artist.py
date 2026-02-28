@@ -2,13 +2,16 @@ import asyncio
 import logging
 from typing import Any
 
+import httpx
 import msgspec
 
 from api.v1.schemas.search import SearchResult
+from core.exceptions import ExternalServiceError
 from services.preferences_service import PreferencesService
 from infrastructure.cache.memory_cache import CacheInterface
 from infrastructure.cache.cache_keys import mb_artist_search_key, mb_artist_detail_key
 from infrastructure.queue.priority_queue import RequestPriority
+from infrastructure.resilience.retry import CircuitOpenError
 from repositories.musicbrainz_base import (
     mb_api_get,
     mb_deduplicator,
@@ -178,6 +181,8 @@ class MusicBrainzArtistMixin:
                 return None
             await self._cache.set(cache_key, result, ttl_seconds=86400)
             return result
+        except (CircuitOpenError, httpx.HTTPError, ExternalServiceError):
+            raise
         except Exception as e:
             logger.error(f"Failed to fetch artist relations {mbid}: {e}")
             return None

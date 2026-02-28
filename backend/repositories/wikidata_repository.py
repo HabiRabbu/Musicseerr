@@ -33,11 +33,14 @@ class _WikidataClaim(msgspec.Struct):
 
 class _WikidataEntity(msgspec.Struct):
     sitelinks: dict[str, _WikidataSiteLink] = {}
-    claims: dict[str, list[_WikidataClaim]] = {}
 
 
 class _WikidataEntityResponse(msgspec.Struct):
     entities: dict[str, _WikidataEntity] = {}
+
+
+class _WikidataClaimsResponse(msgspec.Struct):
+    claims: dict[str, list[_WikidataClaim]] = {}
 
 
 class _WikipediaPage(msgspec.Struct):
@@ -204,18 +207,17 @@ class WikidataRepository:
             return cached
         
         try:
-            entity_url = f"https://www.wikidata.org/wiki/Special:EntityData/{wikidata_id}.json"
-            response = await self._client.get(entity_url)
+            api_url = (
+                f"https://www.wikidata.org/w/api.php"
+                f"?action=wbgetclaims&entity={wikidata_id}&property=P18&format=json"
+            )
+            response = await self._client.get(api_url)
             
             if response.status_code != 200:
                 return None
             
-            data = _decode_json_response(response, _WikidataEntityResponse)
-            entity = data.entities.get(wikidata_id)
-            if entity is None:
-                return None
-
-            image_claims = entity.claims.get("P18", [])
+            data = _decode_json_response(response, _WikidataClaimsResponse)
+            image_claims = data.claims.get("P18", [])
             if not image_claims:
                 return None
 

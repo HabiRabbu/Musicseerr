@@ -17,6 +17,7 @@ def mock_cover_repo():
     mock.get_release_group_cover_etag = AsyncMock(return_value='etag-rg')
     mock.get_release_cover_etag = AsyncMock(return_value='etag-rel')
     mock.get_artist_image_etag = AsyncMock(return_value='etag-artist')
+    mock.debug_artist_image = AsyncMock(side_effect=lambda _artist_id, debug_info: debug_info)
     return mock
 
 
@@ -110,3 +111,16 @@ def test_artist_returns_304_when_etag_matches(client, mock_cover_repo):
 
     assert response.status_code == 304
     mock_cover_repo.get_artist_image.assert_not_awaited()
+
+
+def test_debug_artist_cover_recommends_negative_cache(client, mock_cover_repo):
+    async def _debug_with_negative(_artist_id, debug_info):
+        debug_info['disk_cache']['negative_250'] = True
+        return debug_info
+
+    mock_cover_repo.debug_artist_image = AsyncMock(side_effect=_debug_with_negative)
+
+    response = client.get('/api/covers/debug/artist/33333333-3333-3333-3333-333333333333')
+
+    assert response.status_code == 200
+    assert 'negative cache entry' in response.json()['recommendation'].lower()

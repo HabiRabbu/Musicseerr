@@ -228,6 +228,8 @@ async def debug_artist_cover(
         "disk_cache": {
             "exists_250": False,
             "exists_500": False,
+            "negative_250": False,
+            "negative_500": False,
             "meta_250": None,
             "meta_500": None,
         },
@@ -245,6 +247,7 @@ async def debug_artist_cover(
             "wikidata_url_cached": False,
             "cached_value": None,
         },
+        "circuit_breakers": {},
         "recommendation": None,
     }
     
@@ -258,8 +261,16 @@ async def debug_artist_cover(
     
     debug_info = await coverart_repo.debug_artist_image(validated_id, debug_info)
     
-    if debug_info["disk_cache"]["exists_250"] or debug_info["disk_cache"]["exists_500"]:
+    if debug_info["disk_cache"]["negative_250"] or debug_info["disk_cache"]["negative_500"]:
+        debug_info["recommendation"] = "Artist has a negative cache entry. Wait for expiry or purge negative cache."
+    elif debug_info["disk_cache"]["exists_250"] or debug_info["disk_cache"]["exists_500"]:
         debug_info["recommendation"] = "Image is cached on disk - should load successfully."
+    elif any(
+        breaker.get("state") == "open"
+        for breaker in debug_info.get("circuit_breakers", {}).values()
+        if isinstance(breaker, dict)
+    ):
+        debug_info["recommendation"] = "One or more cover fetch circuit breakers are OPEN. Retry after cooldown or reset breakers."
     elif debug_info["lidarr"]["has_image_url"]:
         debug_info["recommendation"] = "Lidarr has an image URL - fetch should succeed from Lidarr."
     elif debug_info["musicbrainz"]["has_wikidata_relation"]:

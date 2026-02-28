@@ -35,7 +35,7 @@ MusicSeerr is a self-hosted music request and discovery app built around [Lidarr
 MusicSeerr has a full in-app audio player with support for multiple playback sources per track:
 - **Jellyfin** streams audio from your Jellyfin server with a configurable codec (AAC, MP3, Opus, FLAC, and more) and bitrate. Playback progress is reported back to Jellyfin automatically.
 - **Local Files** plays directly from your mounted music directory, without going through Jellyfin.
-- **YouTube** plays a linked YouTube album when no local copy exists yet.
+- **YouTube** plays a linked YouTube album when no local copy exists yet - Note: This is in a *half*-working state.
 
 ### Discovery
 - **Home page** shows trending artists, popular albums, recently added library items, genre browsing, and "Because You Listened To" carousels driven by ListenBrainz data.
@@ -54,9 +54,6 @@ Every track you play can be scrobbled to ListenBrainz and Last.fm simultaneously
 
 ### Playlists & Queuing
 Build playlists and queues from your Jellyfin library, local files, and YouTube-linked albums, playable through the same player.
-
-### Authentication
-MusicSeerr supports user login and API key-based access. Most API endpoints require a valid session or API key.
 
 ### Settings
 All integrations are configured through the in-app settings UI:

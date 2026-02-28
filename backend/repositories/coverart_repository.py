@@ -14,12 +14,12 @@ import msgspec
 
 from core.exceptions import ExternalServiceError, RateLimitedError
 from infrastructure.cache.memory_cache import CacheInterface
-from infrastructure.resilience.retry import with_retry, CircuitBreaker
+from infrastructure.resilience.retry import with_retry, CircuitBreaker, CircuitOpenError
 from infrastructure.resilience.rate_limiter import TokenBucketRateLimiter
 from infrastructure.validators import validate_mbid
 from infrastructure.queue.priority_queue import RequestPriority, get_priority_queue
 from infrastructure.http.deduplication import RequestDeduplicator
-from repositories.coverart_artist import ArtistImageFetcher
+from repositories.coverart_artist import ArtistImageFetcher, TransientImageFetchError
 from repositories.coverart_album import AlbumCoverFetcher
 from repositories.coverart_disk_cache import CoverDiskCache
 
@@ -179,6 +179,7 @@ class CoverArtRepository:
             mb_repo=mb_repo,
             lidarr_repo=lidarr_repo,
             jellyfin_repo=jellyfin_repo,
+            user_agent=self._client.headers.get("User-Agent"),
         )
         self._album_fetcher = AlbumCoverFetcher(
             http_get_fn=self._http_get,
@@ -481,10 +482,19 @@ class CoverArtRepository:
         logger.debug(f"Cache MISS (disk): Artist image {artist_id[:8]}... - fetching from Wikidata")
 
         dedupe_key = f"artist:img:{artist_id}:{size}"
-        result = await _deduplicator.dedupe(
-            dedupe_key,
-            lambda: self._artist_fetcher.fetch_artist_image(artist_id, size, file_path)
-        )
+        try:
+            result = await _deduplicator.dedupe(
+                dedupe_key,
+                lambda: self._artist_fetcher.fetch_artist_image(artist_id, size, file_path)
+            )
+        except (TransientImageFetchError, CircuitOpenError, httpx.HTTPError, ExternalServiceError, RateLimitedError) as e:
+            logger.warning(
+                "Transient artist image fetch failure for %s: %s",
+                artist_id[:8],
+                e,
+            )
+            return None
+
         if result is None:
             await self._disk_cache.write_negative(file_path, ttl_seconds=COVER_NEGATIVE_TTL_SECONDS)
         else:
@@ -631,19 +641,29 @@ class CoverArtRepository:
 
         debug_info["disk_cache"]["exists_250"] = file_path_250.exists()
         debug_info["disk_cache"]["exists_500"] = file_path_500.exists()
+        debug_info["disk_cache"]["negative_250"] = await self._disk_cache.is_negative(file_path_250)
+        debug_info["disk_cache"]["negative_500"] = await self._disk_cache.is_negative(file_path_500)
+
+        debug_info["circuit_breakers"] = {
+            "coverart": _coverart_circuit_breaker.get_state(),
+            "lidarr": _lidarr_cover_circuit_breaker.get_state(),
+            "jellyfin": _jellyfin_cover_circuit_breaker.get_state(),
+            "wikidata": _wikidata_cover_circuit_breaker.get_state(),
+            "wikimedia": _wikimedia_cover_circuit_breaker.get_state(),
+            "generic": _generic_cover_circuit_breaker.get_state(),
+        }
 
         for size, file_path in [("250", file_path_250), ("500", file_path_500)]:
-            if file_path.exists():
-                meta_path = file_path.with_suffix('.meta.json')
-                if meta_path.exists():
-                    try:
-                        async with aiofiles.open(meta_path, 'r') as f:
-                            debug_info["disk_cache"][f"meta_{size}"] = msgspec.json.decode(
-                                (await f.read()).encode("utf-8"),
-                                type=dict[str, object],
-                            )
-                    except Exception as e:
-                        debug_info["disk_cache"][f"meta_{size}"] = f"Error reading: {e}"
+            meta_path = file_path.with_suffix('.meta.json')
+            if meta_path.exists():
+                try:
+                    async with aiofiles.open(meta_path, 'r') as f:
+                        debug_info["disk_cache"][f"meta_{size}"] = msgspec.json.decode(
+                            (await f.read()).encode("utf-8"),
+                            type=dict[str, object],
+                        )
+                except Exception as e:
+                    debug_info["disk_cache"][f"meta_{size}"] = f"Error reading: {e}"
 
         if self._lidarr_repo:
             debug_info["lidarr"]["configured"] = True

@@ -4,11 +4,14 @@ from unittest.mock import AsyncMock, MagicMock
 import httpx
 import pytest
 
+import repositories.coverart_repository as coverart_repository_module
+from repositories.coverart_artist import TransientImageFetchError
 from repositories.coverart_repository import CoverArtRepository
 
 
 RELEASE_GROUP_MBID = '11111111-1111-1111-1111-111111111111'
 RELEASE_MBID = '22222222-2222-2222-2222-222222222222'
+ARTIST_MBID = '33333333-3333-3333-3333-333333333333'
 
 
 @pytest.mark.asyncio
@@ -62,3 +65,55 @@ async def test_non_image_payload_is_not_stored_in_memory_cache(tmp_path):
 
         assert first == second == (b'not-image', 'text/plain', 'disk')
         assert repo._disk_cache.read.await_count == 2
+
+
+@pytest.mark.asyncio
+async def test_artist_transient_fetch_failure_does_not_write_negative_cache(tmp_path, monkeypatch):
+    async with httpx.AsyncClient() as http_client:
+        cache = MagicMock()
+        repo = CoverArtRepository(http_client=http_client, cache=cache, cache_dir=tmp_path)
+
+        repo._disk_cache.read = AsyncMock(return_value=None)
+        repo._disk_cache.is_negative = AsyncMock(return_value=False)
+        repo._disk_cache.write_negative = AsyncMock()
+
+        async def dedupe_raise_transient(_key, _factory):
+            raise TransientImageFetchError('transient fetch failure')
+
+        monkeypatch.setattr(coverart_repository_module._deduplicator, 'dedupe', dedupe_raise_transient)
+
+        result = await repo.get_artist_image(ARTIST_MBID, size=500)
+
+        assert result is None
+        repo._disk_cache.write_negative.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_artist_definitive_miss_writes_negative_cache(tmp_path, monkeypatch):
+    async with httpx.AsyncClient() as http_client:
+        cache = MagicMock()
+        repo = CoverArtRepository(http_client=http_client, cache=cache, cache_dir=tmp_path)
+
+        repo._disk_cache.read = AsyncMock(return_value=None)
+        repo._disk_cache.is_negative = AsyncMock(return_value=False)
+        repo._disk_cache.write_negative = AsyncMock()
+
+        async def dedupe_return_none(_key, _factory):
+            return None
+
+        monkeypatch.setattr(coverart_repository_module._deduplicator, 'dedupe', dedupe_return_none)
+
+        result = await repo.get_artist_image(ARTIST_MBID, size=500)
+
+        assert result is None
+        repo._disk_cache.write_negative.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_artist_fetcher_uses_non_default_user_agent_for_external_requests(tmp_path):
+    async with httpx.AsyncClient() as http_client:
+        cache = MagicMock()
+        repo = CoverArtRepository(http_client=http_client, cache=cache, cache_dir=tmp_path)
+
+        assert repo._artist_fetcher._external_headers is not None
+        assert repo._artist_fetcher._external_headers['User-Agent'].startswith('Musicseerr/')
