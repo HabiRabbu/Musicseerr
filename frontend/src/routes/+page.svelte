@@ -17,6 +17,7 @@
 		isHomeCacheStale,
 		getGreeting
 	} from '$lib/utils/homeCache';
+	import { isAbortError } from '$lib/utils/errorHandling';
 	import { removeQueueCachedData } from '$lib/utils/discoverQueueCache';
 
 	let homeData: HomeResponse | null = null;
@@ -74,7 +75,7 @@
 				}
 			}
 		} catch (e) {
-			if (e instanceof Error && e.name === 'AbortError') {
+			if (isAbortError(e)) {
 				return;
 			}
 			if (!homeData) {
@@ -110,7 +111,7 @@
 				}
 			}
 		} catch (e) {
-			if (e instanceof Error && e.name === 'AbortError') {
+			if (isAbortError(e)) {
 				return;
 			}
 		} finally {

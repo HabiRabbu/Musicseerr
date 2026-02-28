@@ -6,6 +6,9 @@
 	import { getCoverUrl } from '$lib/utils/errorHandling';
 	import { X, Music, Shuffle, SkipBack, AlertCircle, Pause, Play, SkipForward, Volume2, ExternalLink, Check, CircleX } from 'lucide-svelte';
 
+	let coverImgError = $state(false);
+	let lastCoverKey = '';
+
 	function formatTime(seconds: number): string {
 		if (!seconds || isNaN(seconds)) return '0:00';
 		const mins = Math.floor(seconds / 60);
@@ -36,9 +39,21 @@
 		}
 	}
 
-	$: nowPlayingCoverUrl = playerStore.nowPlaying
-		? getCoverUrl(playerStore.nowPlaying.coverUrl, playerStore.nowPlaying.albumId)
-		: null;
+	const nowPlayingCoverUrl = $derived.by(() => {
+		const np = playerStore.nowPlaying;
+		if (!np) return null;
+		return getCoverUrl(np.coverUrl, np.albumId);
+	});
+
+	$effect(() => {
+		const np = playerStore.nowPlaying;
+		if (!np) return;
+		const key = `${np.albumId}:${np.coverUrl ?? ''}`;
+		if (key !== lastCoverKey) {
+			lastCoverKey = key;
+			coverImgError = false;
+		}
+	});
 </script>
 
 {#if playerStore.isPlayerVisible && playerStore.nowPlaying}
@@ -58,11 +73,12 @@
 		<div class="flex items-center h-full px-4 gap-4 max-w-screen-2xl mx-auto">
 			<!-- Left: Cover Art + Info -->
 			<div class="flex items-center gap-3 min-w-0 w-1/4">
-				{#if nowPlayingCoverUrl}
+				{#if nowPlayingCoverUrl && !coverImgError}
 					<img
 						src={nowPlayingCoverUrl}
 						alt={playerStore.nowPlaying.albumName}
 						class="w-[60px] h-[60px] rounded-lg shadow-lg ring-1 ring-base-content/10 object-cover flex-shrink-0"
+						onerror={() => { coverImgError = true; }}
 					/>
 				{:else}
 					<div class="w-[60px] h-[60px] rounded-lg shadow-lg bg-base-200 flex items-center justify-center flex-shrink-0">

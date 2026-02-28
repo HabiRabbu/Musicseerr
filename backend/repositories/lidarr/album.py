@@ -12,10 +12,7 @@ logger = logging.getLogger(__name__)
 
 class LidarrAlbumRepository(LidarrHistoryRepository):
     async def get_all_albums(self) -> list[dict[str, Any]]:
-        data = await self._get("/api/v1/album")
-        if not data or not isinstance(data, list):
-            return []
-        return data
+        return await self._get_all_albums_raw()
 
     async def search_for_album(self, term: str) -> list[dict]:
         params = {"term": term}
@@ -232,6 +229,7 @@ class LidarrAlbumRepository(LidarrHistoryRepository):
         try:
             params = {"deleteFiles": str(delete_files).lower(), "addImportListExclusion": "false"}
             await self._delete(f"/api/v1/album/{album_id}", params=params)
+            await self._invalidate_album_list_caches()
             logger.info(f"Deleted album ID {album_id} (deleteFiles={delete_files})")
             return True
         except Exception as e:
@@ -344,9 +342,8 @@ class LidarrAlbumRepository(LidarrHistoryRepository):
             except Exception:
                 pass
 
-        await self._cache.clear_prefix("lidarr:library:mbids:")
+        await self._invalidate_album_list_caches()
         await self._cache.clear_prefix("lidarr:artists:mbids")
-        await self._cache.clear_prefix("lidarr_requested")
 
         msg = "Album added & monitored" if action == "added" else "Album exists; monitored ensured"
         return {

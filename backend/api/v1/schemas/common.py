@@ -1,29 +1,40 @@
-from typing import Literal, Optional
-from pydantic import BaseModel, Field
+from typing import Literal
+
+from infrastructure.msgspec_fastapi import AppStruct
 
 
-class SuccessResponse(BaseModel):
-    success: bool = True
-    message: Optional[str] = None
+GenreArtistMap = dict[str, str | None]
 
 
-class ErrorResponse(BaseModel):
-    success: bool = False
-    error: str
-    details: Optional[str] = None
+class IntegrationStatus(AppStruct):
+    listenbrainz: bool
+    jellyfin: bool
+    lidarr: bool
+    youtube: bool
+    lastfm: bool
 
 
-class ServiceStatus(BaseModel):
+class ServiceStatus(AppStruct):
     status: Literal["ok", "error"]
-    version: Optional[str] = None
-    message: Optional[str] = None
+    version: str | None = None
+    message: str | None = None
 
 
-class StatusReport(BaseModel):
+class StatusReport(AppStruct):
     status: Literal["ok", "degraded", "error"]
     services: dict[str, ServiceStatus]
 
 
-class LastFmTagSchema(BaseModel):
+class LastFmTagSchema(AppStruct):
     name: str
-    url: Optional[str] = None
+    url: str | None = None
+
+
+class StatusMessageResponse(AppStruct):
+    status: str
+    message: str
+
+
+class VerifyConnectionResponse(AppStruct):
+    valid: bool
+    message: str

@@ -1,10 +1,15 @@
 <script lang="ts">
 	import { page } from '$app/stores';
 	import { onMount, onDestroy } from 'svelte';
-	import { goto, beforeNavigate } from '$app/navigation';
+	import { beforeNavigate } from '$app/navigation';
 	import GenreArtistCard from '$lib/components/GenreArtistCard.svelte';
 	import GenreAlbumCard from '$lib/components/GenreAlbumCard.svelte';
+	import { CACHE_KEYS, CACHE_TTL } from '$lib/constants';
 	import type { GenreDetailResponse } from '$lib/types';
+	import { createAbortable } from '$lib/utils/abortController';
+	import { albumHrefOrNull, artistHrefOrNull } from '$lib/utils/entityRoutes';
+	import { isAbortError } from '$lib/utils/errorHandling';
+	import { createLocalStorageCache } from '$lib/utils/localStorageCache';
 	import { ArrowLeft, BookOpen, Star, Music2 } from 'lucide-svelte';
 
 	let genreName = $state('');
@@ -13,7 +18,7 @@
 	let error = $state('');
 	let heroArtistMbid: string | null = $state(null);
 	let heroImageLoaded = $state(false);
-	let abortController: AbortController | null = null;
+	const genreRequestAbortable = createAbortable();
 	let lastLoadedGenre = '';
 
 	let artistOffset = $state(0);
@@ -21,8 +26,22 @@
 	let loadingMoreArtists = $state(false);
 	let loadingMoreAlbums = $state(false);
 	const PAGE_SIZE = 50;
+	const genreDetailCache = createLocalStorageCache<GenreDetailResponse>(
+		CACHE_KEYS.GENRE_DETAIL_CACHE,
+		CACHE_TTL.GENRE_DETAIL,
+		{ maxEntries: 60 }
+	);
 
 	let activeTab: 'artists' | 'albums' = $state('artists');
+
+	function getGenreCacheSuffix(): string {
+		return encodeURIComponent(genreName.trim().toLowerCase());
+	}
+
+	function persistGenreCache() {
+		if (!genreData || !genreName) return;
+		genreDetailCache.set(genreData, getGenreCacheSuffix());
+	}
 
 	$effect(() => {
 		genreName = $page.url.searchParams.get('name') || '';
@@ -34,13 +53,15 @@
 		heroImageLoaded = false;
 		try {
 			const response = await fetch(`/api/home/genre-artist/${encodeURIComponent(genreName)}`, {
-				signal: abortController?.signal
+				signal: genreRequestAbortable.signal
 			});
 			if (response.ok) {
 				const data = await response.json();
 				heroArtistMbid = data.artist_mbid;
 			}
-		} catch {}
+		} catch (e) {
+			if (isAbortError(e)) return;
+		}
 	}
 
 	async function loadGenreData() {
@@ -49,7 +70,23 @@
 			loading = false;
 			return;
 		}
-		loading = true;
+
+		const cacheSuffix = getGenreCacheSuffix();
+		const cachedGenreData = genreDetailCache.get(cacheSuffix);
+		const hasCachedGenreData = !!cachedGenreData?.data;
+		const shouldRefresh = !cachedGenreData || genreDetailCache.isStale(cachedGenreData.timestamp);
+
+		if (hasCachedGenreData) {
+			genreData = cachedGenreData.data;
+			loading = false;
+		}
+
+		if (!shouldRefresh) {
+			error = '';
+			return;
+		}
+
+		loading = !hasCachedGenreData;
 		error = '';
 		artistOffset = 0;
 		albumOffset = 0;
@@ -57,17 +94,26 @@
 		try {
 			const response = await fetch(
 				`/api/home/genre/${encodeURIComponent(genreName)}?limit=${PAGE_SIZE}`,
-				{ signal: abortController?.signal }
+				{ signal: genreRequestAbortable.signal }
 			);
 			if (response.ok) {
-				genreData = await response.json();
+				const data: GenreDetailResponse = await response.json();
+				genreData = data;
+				genreDetailCache.set(data, cacheSuffix);
 			} else {
+				if (!hasCachedGenreData) {
+					error = 'Failed to load genre data';
+				}
+			}
+		} catch (e) {
+			if (isAbortError(e)) return;
+			if (!hasCachedGenreData) {
 				error = 'Failed to load genre data';
 			}
-		} catch {
-			error = 'Failed to load genre data';
 		} finally {
-			loading = false;
+			if (!hasCachedGenreData) {
+				loading = false;
+			}
 		}
 	}
 
@@ -78,16 +124,20 @@
 
 		try {
 			const response = await fetch(
-				`/api/home/genre/${encodeURIComponent(genreName)}?limit=${PAGE_SIZE}&artist_offset=${artistOffset}`
+				`/api/home/genre/${encodeURIComponent(genreName)}?limit=${PAGE_SIZE}&artist_offset=${artistOffset}`,
+				{ signal: genreRequestAbortable.signal }
 			);
 			if (response.ok) {
 				const data: GenreDetailResponse = await response.json();
 				if (genreData.popular && data.popular) {
 					genreData.popular.artists = [...genreData.popular.artists, ...data.popular.artists];
 					genreData.popular.has_more_artists = data.popular.has_more_artists;
+					persistGenreCache();
 				}
 			}
-		} catch {}
+		} catch (e) {
+			if (isAbortError(e)) return;
+		}
 		loadingMoreArtists = false;
 	}
 
@@ -98,32 +148,32 @@
 
 		try {
 			const response = await fetch(
-				`/api/home/genre/${encodeURIComponent(genreName)}?limit=${PAGE_SIZE}&album_offset=${albumOffset}`
+				`/api/home/genre/${encodeURIComponent(genreName)}?limit=${PAGE_SIZE}&album_offset=${albumOffset}`,
+				{ signal: genreRequestAbortable.signal }
 			);
 			if (response.ok) {
 				const data: GenreDetailResponse = await response.json();
 				if (genreData.popular && data.popular) {
 					genreData.popular.albums = [...genreData.popular.albums, ...data.popular.albums];
 					genreData.popular.has_more_albums = data.popular.has_more_albums;
+					persistGenreCache();
 				}
 			}
-		} catch {}
+		} catch (e) {
+			if (isAbortError(e)) return;
+		}
 		loadingMoreAlbums = false;
 	}
 
 	function loadData() {
-		if (abortController) abortController.abort();
-		abortController = new AbortController();
+		genreRequestAbortable.reset();
 		lastLoadedGenre = genreName;
-		loadGenreData();
-		loadHeroArtist();
+		void loadGenreData();
+		void loadHeroArtist();
 	}
 
 	function cleanup() {
-		if (abortController) {
-			abortController.abort();
-			abortController = null;
-		}
+		genreRequestAbortable.abort();
 	}
 
 	onMount(() => {
@@ -247,7 +297,7 @@
 								<GenreArtistCard
 									{artist}
 									showLibraryBadge={true}
-									onclick={() => artist.mbid && goto(`/artist/${artist.mbid}`)}
+									href={artistHrefOrNull(artist.mbid)}
 								/>
 							{/each}
 						</div>
@@ -262,7 +312,7 @@
 								<GenreAlbumCard
 									{album}
 									showLibraryBadge={true}
-									onclick={() => album.mbid && goto(`/album/${album.mbid}`)}
+									href={albumHrefOrNull(album.mbid)}
 								/>
 							{/each}
 						</div>
@@ -316,7 +366,7 @@
 							{#each genreData.popular?.artists ?? [] as artist (artist.mbid || artist.name)}
 								<GenreArtistCard
 									{artist}
-									onclick={() => artist.mbid && goto(`/artist/${artist.mbid}`)}
+									href={artistHrefOrNull(artist.mbid)}
 								/>
 							{/each}
 						</div>
@@ -349,7 +399,7 @@
 							{#each genreData.popular?.albums ?? [] as album (album.mbid || album.name)}
 								<GenreAlbumCard
 									{album}
-									onclick={() => album.mbid && goto(`/album/${album.mbid}`)}
+									href={albumHrefOrNull(album.mbid)}
 								/>
 							{/each}
 						</div>

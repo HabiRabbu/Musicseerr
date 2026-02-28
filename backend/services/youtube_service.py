@@ -3,9 +3,13 @@ import re
 import uuid
 from datetime import datetime, timezone
 
-from api.v1.schemas.youtube import YouTubeLink, YouTubeTrackLink, UNSET
+import msgspec
+
+from api.v1.schemas.discover import YouTubeQuotaResponse
+from api.v1.schemas.youtube import YouTubeLink, YouTubeTrackLink, YouTubeTrackLinkFailure
 from core.exceptions import ConfigurationError, ExternalServiceError, ResourceNotFoundError, ValidationError
 from infrastructure.cache.persistent_cache import LibraryCache
+from infrastructure.serialization import to_jsonable
 from repositories.youtube import YouTubeRepository
 
 logger = logging.getLogger(__name__)
@@ -92,7 +96,7 @@ class YouTubeService:
     async def delete_link(self, album_id: str) -> None:
         await self._library_cache.delete_youtube_link(album_id)
 
-    def get_quota_status(self) -> dict:
+    def get_quota_status(self) -> YouTubeQuotaResponse:
         return self._youtube_repo.get_quota_status()
 
     async def generate_track_link(
@@ -145,31 +149,35 @@ class YouTubeService:
         album_name: str,
         artist_name: str,
         tracks: list[dict],
-    ) -> tuple[list[YouTubeTrackLink], list[dict]]:
+    ) -> tuple[list[YouTubeTrackLink], list[YouTubeTrackLinkFailure]]:
         if not self._youtube_repo.is_configured:
             raise ConfigurationError("YouTube API is not configured")
 
         generated: list[YouTubeTrackLink] = []
-        failed: list[dict] = []
+        failed: list[YouTubeTrackLinkFailure] = []
         batch_to_save: list[dict] = []
 
         for track in tracks:
             if self._youtube_repo.quota_remaining <= 0:
-                failed.append({
-                    "track_number": track["track_number"],
-                    "track_name": track["track_name"],
-                    "reason": "Quota exceeded",
-                })
+                failed.append(
+                    YouTubeTrackLinkFailure(
+                        track_number=track["track_number"],
+                        track_name=track["track_name"],
+                        reason="Quota exceeded",
+                    )
+                )
                 continue
 
             try:
                 video_id = await self._youtube_repo.search_video(track["track_name"], artist_name)
                 if not video_id:
-                    failed.append({
-                        "track_number": track["track_number"],
-                        "track_name": track["track_name"],
-                        "reason": "No video found",
-                    })
+                    failed.append(
+                        YouTubeTrackLinkFailure(
+                            track_number=track["track_number"],
+                            track_name=track["track_name"],
+                            reason="No video found",
+                        )
+                    )
                     continue
 
                 now = datetime.now(timezone.utc).isoformat()
@@ -185,13 +193,15 @@ class YouTubeService:
                     created_at=now,
                 )
                 generated.append(link)
-                batch_to_save.append({**link.model_dump(), "album_name": album_name})
+                batch_to_save.append({**to_jsonable(link), "album_name": album_name})
             except Exception as e:
-                failed.append({
-                    "track_number": track["track_number"],
-                    "track_name": track["track_name"],
-                    "reason": str(e),
-                })
+                failed.append(
+                    YouTubeTrackLinkFailure(
+                        track_number=track["track_number"],
+                        track_name=track["track_name"],
+                        reason=str(e),
+                    )
+                )
 
         if batch_to_save:
             await self._library_cache.save_youtube_track_links_batch(album_id, batch_to_save)
@@ -241,7 +251,7 @@ class YouTubeService:
         youtube_url: str | None = None,
         album_name: str | None = None,
         artist_name: str | None = None,
-        cover_url: str | None = None,
+        cover_url: str | None | msgspec.UnsetType = msgspec.UNSET,
     ) -> YouTubeLink:
         existing = await self._library_cache.get_youtube_link(album_id)
         if not existing:
@@ -258,7 +268,7 @@ class YouTubeService:
 
         final_album_name = album_name or existing["album_name"]
         final_artist_name = artist_name or existing["artist_name"]
-        final_cover_url = existing.get("cover_url") if cover_url == UNSET else cover_url
+        final_cover_url = existing.get("cover_url") if cover_url is msgspec.UNSET else cover_url
 
         return await self._save_and_return_link(
             album_id=album_id,

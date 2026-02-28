@@ -12,6 +12,9 @@ from api.v1.schemas.discover import (
     DiscoverQueueItemLight,
     DiscoverQueueEnrichment,
     DiscoverQueueResponse,
+    DiscoverIntegrationStatus,
+    DiscoverIgnoredRelease,
+    QueueSettings,
 )
 from api.v1.schemas.home import (
     HomeSection,
@@ -33,6 +36,7 @@ from services.home_transformers import HomeDataTransformers
 from infrastructure.cache.memory_cache import CacheInterface
 from infrastructure.cache.persistent_cache import LibraryCache
 from infrastructure.cover_urls import prefer_artist_cover_url
+from infrastructure.serialization import clone_with_updates
 from infrastructure.validators import clean_lastfm_bio, strip_html_tags
 from repositories.listenbrainz_models import ListenBrainzArtist
 
@@ -113,18 +117,18 @@ class DiscoverService:
             return "listenbrainz"
         return resolved
 
-    def _get_queue_settings(self) -> dict:
+    def _get_queue_settings(self) -> QueueSettings:
         adv = self._preferences.get_advanced_settings()
-        return {
-            "queue_size": adv.discover_queue_size,
-            "queue_ttl": adv.discover_queue_ttl,
-            "seed_artists": adv.discover_queue_seed_artists,
-            "wildcard_slots": adv.discover_queue_wildcard_slots,
-            "similar_artists_limit": adv.discover_queue_similar_artists_limit,
-            "albums_per_similar": adv.discover_queue_albums_per_similar,
-            "enrich_ttl": adv.discover_queue_enrich_ttl,
-            "lastfm_mbid_max_lookups": adv.discover_queue_lastfm_mbid_max_lookups,
-        }
+        return QueueSettings(
+            queue_size=adv.discover_queue_size,
+            queue_ttl=adv.discover_queue_ttl,
+            seed_artists=adv.discover_queue_seed_artists,
+            wildcard_slots=adv.discover_queue_wildcard_slots,
+            similar_artists_limit=adv.discover_queue_similar_artists_limit,
+            albums_per_similar=adv.discover_queue_albums_per_similar,
+            enrich_ttl=adv.discover_queue_enrich_ttl,
+            lastfm_mbid_max_lookups=adv.discover_queue_lastfm_mbid_max_lookups,
+        )
 
     def _get_discover_cache_key(self, source: str | None = None) -> str:
         resolved = self.resolve_source(source)
@@ -137,7 +141,7 @@ class DiscoverService:
             cached = await self._memory_cache.get(cache_key)
             if cached is not None:
                 if isinstance(cached, DiscoverResponse):
-                    return cached.model_copy(update={"refreshing": self._building})
+                    return clone_with_updates(cached, {"refreshing": self._building})
         if not self._building:
             asyncio.create_task(self.warm_cache(source=resolved_source))
         return DiscoverResponse(
@@ -146,14 +150,14 @@ class DiscoverService:
             refreshing=True,
         )
 
-    def _get_integration_status(self) -> dict[str, bool]:
-        return {
-            "listenbrainz": self._is_listenbrainz_enabled(),
-            "jellyfin": self._is_jellyfin_enabled(),
-            "lidarr": self._is_lidarr_configured(),
-            "youtube": self._is_youtube_enabled(),
-            "lastfm": self._is_lastfm_enabled(),
-        }
+    def _get_integration_status(self) -> DiscoverIntegrationStatus:
+        return DiscoverIntegrationStatus(
+            listenbrainz=self._is_listenbrainz_enabled(),
+            jellyfin=self._is_jellyfin_enabled(),
+            lidarr=self._is_lidarr_configured(),
+            youtube=self._is_youtube_enabled(),
+            lastfm=self._is_lastfm_enabled(),
+        )
 
     async def get_discover_preview(self) -> DiscoverPreview | None:
         if not self._memory_cache:
@@ -307,9 +311,17 @@ class DiscoverService:
 
         response.fresh_releases = self._build_fresh_releases(results, library_mbids)
 
-        response.missing_essentials = await self._build_missing_essentials(
-            results, library_mbids
-        )
+        post_tasks = {
+            "missing_essentials": self._build_missing_essentials(results, library_mbids),
+            "lastfm_weekly_album_chart": self._build_lastfm_weekly_album_chart(
+                results, library_mbids
+            ),
+            "lastfm_recent_scrobbles": self._build_lastfm_recent_scrobbles(
+                results, library_mbids
+            ),
+        }
+        post_results = await self._execute_tasks(post_tasks)
+        response.missing_essentials = post_results.get("missing_essentials")
 
         response.rediscover = self._build_rediscover(results, library_mbids, jf_enabled)
 
@@ -347,12 +359,8 @@ class DiscoverService:
         response.lastfm_weekly_artist_chart = self._build_lastfm_weekly_artist_chart(
             results, library_mbids, seen_artist_mbids
         )
-        response.lastfm_weekly_album_chart = await self._build_lastfm_weekly_album_chart(
-            results, library_mbids
-        )
-        response.lastfm_recent_scrobbles = await self._build_lastfm_recent_scrobbles(
-            results, library_mbids
-        )
+        response.lastfm_weekly_album_chart = post_results.get("lastfm_weekly_album_chart")
+        response.lastfm_recent_scrobbles = post_results.get("lastfm_recent_scrobbles")
 
         response.service_prompts = self._build_service_prompts()
 
@@ -770,31 +778,48 @@ class DiscoverService:
         ]
         qualifying_artists.sort(key=lambda x: -x[1])
 
-        all_missing: list[HomeAlbum] = []
-        for artist_mbid, _ in qualifying_artists[:10]:
+        semaphore = asyncio.Semaphore(3)
+
+        async def _fetch_artist_missing(artist_mbid: str) -> list[HomeAlbum]:
             try:
-                top_releases = await self._lb_repo.get_artist_top_release_groups(
-                    artist_mbid, count=10
-                )
-                artist_missing = 0
-                for rg in top_releases:
-                    if artist_missing >= MISSING_ESSENTIALS_MAX_PER_ARTIST:
-                        break
-                    rg_mbid = rg.release_group_mbid
-                    if not rg_mbid or rg_mbid.lower() in library_album_mbids:
-                        continue
-                    all_missing.append(HomeAlbum(
-                        mbid=rg_mbid,
-                        name=rg.release_group_name,
-                        artist_name=rg.artist_name,
-                        listen_count=rg.listen_count,
-                        in_library=False,
-                    ))
-                    artist_missing += 1
+                async with semaphore:
+                    top_releases = await self._lb_repo.get_artist_top_release_groups(
+                        artist_mbid, count=10
+                    )
             except Exception as e:
                 logger.debug(f"Failed to get releases for artist {artist_mbid[:8]}: {e}")
+                return []
+
+            artist_missing = 0
+            artist_items: list[HomeAlbum] = []
+            for rg in top_releases:
+                if artist_missing >= MISSING_ESSENTIALS_MAX_PER_ARTIST:
+                    break
+                rg_mbid = rg.release_group_mbid
+                if not rg_mbid or rg_mbid.lower() in library_album_mbids:
+                    continue
+                artist_items.append(HomeAlbum(
+                    mbid=rg_mbid,
+                    name=rg.release_group_name,
+                    artist_name=rg.artist_name,
+                    listen_count=rg.listen_count,
+                    in_library=False,
+                ))
+                artist_missing += 1
+
+            return artist_items
+
+        artist_results = await asyncio.gather(
+            *(_fetch_artist_missing(artist_mbid) for artist_mbid, _ in qualifying_artists[:10]),
+            return_exceptions=True,
+        )
+
+        all_missing: list[HomeAlbum] = []
+        for result in artist_results:
+            if isinstance(result, Exception):
+                logger.debug("Failed to fetch missing essentials batch item: %s", result)
                 continue
-            await asyncio.sleep(0.2)
+            all_missing.extend(result)
 
         if not all_missing:
             return None
@@ -941,25 +966,27 @@ class DiscoverService:
                 genre_names.append(name)
 
         all_artists: list[HomeArtist] = []
+        tag_results = await asyncio.gather(
+            *(self._mb_repo.search_artists_by_tag(genre_name, limit=10) for genre_name in genre_names),
+            return_exceptions=True,
+        )
 
-        for genre_name in genre_names:
-            try:
-                tag_artists = await self._mb_repo.search_artists_by_tag(genre_name, limit=10)
-                for artist in tag_artists:
-                    if artist is None:
-                        continue
-                    mbid = artist.musicbrainz_id
-                    if not mbid or mbid.lower() in seen_artist_mbids:
-                        continue
-                    all_artists.append(HomeArtist(
-                        mbid=mbid,
-                        name=artist.title if hasattr(artist, 'title') else str(artist),
-                        in_library=mbid.lower() in library_mbids,
-                    ))
-                    seen_artist_mbids.add(mbid.lower())
-            except Exception as e:
-                logger.debug(f"Failed to search artists for genre '{genre_name}': {e}")
+        for genre_name, tag_artists in zip(genre_names, tag_results):
+            if isinstance(tag_artists, Exception):
+                logger.debug(f"Failed to search artists for genre '{genre_name}': {tag_artists}")
                 continue
+            for artist in tag_artists:
+                if artist is None:
+                    continue
+                mbid = artist.musicbrainz_id
+                if not mbid or mbid.lower() in seen_artist_mbids:
+                    continue
+                all_artists.append(HomeArtist(
+                    mbid=mbid,
+                    name=artist.title if hasattr(artist, 'title') else str(artist),
+                    in_library=mbid.lower() in library_mbids,
+                ))
+                seen_artist_mbids.add(mbid.lower())
 
         if not all_artists:
             return None
@@ -981,43 +1008,57 @@ class DiscoverService:
         if not top_artists or not self._lfm_repo:
             return None
 
+        artist_info_results = await asyncio.gather(
+            *(
+                self._lfm_repo.get_artist_info(artist.name, mbid=artist.mbid)
+                for artist in top_artists[:5]
+            ),
+            return_exceptions=True,
+        )
+
         genre_names: list[str] = []
-        for artist in top_artists[:5]:
-            try:
-                info = await self._lfm_repo.get_artist_info(artist.name, mbid=artist.mbid)
-                if info and info.tags:
-                    for tag in info.tags[:2]:
-                        if tag.name and tag.name.lower() not in [g.lower() for g in genre_names]:
-                            genre_names.append(tag.name)
-                            if len(genre_names) >= 3:
-                                break
-            except Exception as e:
-                logger.debug("Failed to get artist info for genre extraction: %s", e)
+        seen_genres: set[str] = set()
+        for info in artist_info_results:
+            if isinstance(info, Exception):
+                logger.debug("Failed to get artist info for genre extraction: %s", info)
                 continue
+            if info and info.tags:
+                for tag in info.tags[:2]:
+                    if tag.name and tag.name.lower() not in seen_genres:
+                        genre_names.append(tag.name)
+                        seen_genres.add(tag.name.lower())
+                        if len(genre_names) >= 3:
+                            break
             if len(genre_names) >= 3:
                 break
 
         if not genre_names:
             return None
 
+        tag_top_artist_results = await asyncio.gather(
+            *(
+                self._lfm_repo.get_tag_top_artists(genre_name, limit=10)
+                for genre_name in genre_names
+            ),
+            return_exceptions=True,
+        )
+
         all_artists: list[HomeArtist] = []
-        for genre_name in genre_names:
-            try:
-                tag_artists = await self._lfm_repo.get_tag_top_artists(genre_name, limit=10)
-                for artist in tag_artists:
-                    mbid = artist.mbid
-                    if not mbid or mbid.lower() in seen_artist_mbids:
-                        continue
-                    all_artists.append(HomeArtist(
-                        mbid=mbid,
-                        name=artist.name,
-                        listen_count=artist.playcount,
-                        in_library=mbid.lower() in library_mbids,
-                    ))
-                    seen_artist_mbids.add(mbid.lower())
-            except Exception as e:
-                logger.debug("Failed to get tag top artists for '%s': %s", genre_name, e)
+        for genre_name, tag_artists in zip(genre_names, tag_top_artist_results):
+            if isinstance(tag_artists, Exception):
+                logger.debug("Failed to get tag top artists for '%s': %s", genre_name, tag_artists)
                 continue
+            for artist in tag_artists:
+                mbid = artist.mbid
+                if not mbid or mbid.lower() in seen_artist_mbids:
+                    continue
+                all_artists.append(HomeArtist(
+                    mbid=mbid,
+                    name=artist.name,
+                    listen_count=artist.playcount,
+                    in_library=mbid.lower() in library_mbids,
+                ))
+                seen_artist_mbids.add(mbid.lower())
 
         if not all_artists:
             return None
@@ -1256,7 +1297,7 @@ class DiscoverService:
     async def build_queue(self, count: int | None = None, source: str | None = None) -> DiscoverQueueResponse:
         qs = self._get_queue_settings()
         if count is None:
-            count = qs["queue_size"]
+            count = qs.queue_size
         resolved_source = self.resolve_source(source)
         logger.info("Building discover queue: requested_source=%s, resolved_source=%s", source, resolved_source)
         lb_enabled = self._is_listenbrainz_enabled()
@@ -1372,7 +1413,7 @@ class DiscoverService:
         self,
         seeds: list[ListenBrainzArtist],
         excluded_mbids: set[str],
-        qs: dict[str, int],
+        qs: QueueSettings,
     ) -> list[list[DiscoverQueueItemLight]]:
         pools: list[list[DiscoverQueueItemLight]] = [[] for _ in range(len(seeds))]
 
@@ -1385,7 +1426,7 @@ class DiscoverService:
             try:
                 similar = await self._lb_repo.get_similar_artists(
                     seed_mbid,
-                    max_similar=qs["similar_artists_limit"],
+                    max_similar=qs.similar_artists_limit,
                 )
                 for sim_artist in similar:
                     sim_mbid = self._normalize_mbid(sim_artist.artist_mbid)
@@ -1395,7 +1436,7 @@ class DiscoverService:
                     try:
                         release_groups = await self._lb_repo.get_artist_top_release_groups(
                             sim_mbid,
-                            count=qs["albums_per_similar"],
+                            count=qs.albums_per_similar,
                         )
                     except Exception as e:
                         logger.debug(f"Failed to get releases for similar artist: {e}")
@@ -1681,8 +1722,8 @@ class DiscoverService:
 
         qs = self._get_queue_settings()
         use_lastfm = resolved_source == "lastfm" and lfm_enabled and self._lfm_repo is not None
-        seeds = seed_artists[:qs["seed_artists"]]
-        wildcard_slots = qs["wildcard_slots"]
+        seeds = seed_artists[:qs.seed_artists]
+        wildcard_slots = qs.wildcard_slots
         personalized_target = max(count - wildcard_slots, 0)
         seed_target = max(4, (personalized_target // max(len(seeds), 1)) + 3)
         excluded_mbids = ignored_mbids | library_album_mbids
@@ -1700,7 +1741,7 @@ class DiscoverService:
                     similar_raw = await self._lfm_repo.get_similar_artists(
                         seed.artist_name,
                         mbid=seed_mbid,
-                        limit=qs["similar_artists_limit"],
+                        limit=qs.similar_artists_limit,
                     )
                     valid_sims = [
                         sim
@@ -1713,7 +1754,7 @@ class DiscoverService:
                             self._lfm_repo.get_artist_top_albums(
                                 sim.name,
                                 mbid=sim.mbid,
-                                limit=qs["albums_per_similar"],
+                                limit=qs.albums_per_similar,
                             )
                             for sim in valid_sims
                         ],
@@ -1750,13 +1791,13 @@ class DiscoverService:
                 self._strategy_lb_loved_artists(
                     username or "",
                     excluded_mbids,
-                    qs["albums_per_similar"],
+                    qs.albums_per_similar,
                 ),
                 self._strategy_lb_top_artist_deep_cuts(
                     username or "",
                     deep_cut_excluded,
                     listened_release_group_mbids,
-                    qs["albums_per_similar"],
+                    qs.albums_per_similar,
                 ),
                 return_exceptions=True,
             )
@@ -1913,6 +1954,38 @@ class DiscoverService:
         except Exception as e:
             logger.debug(f"Failed to get wildcard albums: {e}")
             wildcards = []
+
+        if not wildcards:
+            if use_lastfm:
+                decade_tags = ["2020s", "2010s", "2000s", "1990s", "1980s", "1970s"]
+                for decade in decade_tags:
+                    if len(wildcards) >= target:
+                        break
+                    try:
+                        decade_releases = await self._mb_repo.search_release_groups_by_tag(
+                            tag=decade,
+                            limit=25,
+                            offset=0,
+                        )
+                    except Exception:
+                        continue
+                    for release in decade_releases:
+                        if len(wildcards) >= target:
+                            break
+                        rg_mbid = self._normalize_mbid(getattr(release, "musicbrainz_id", None))
+                        if not rg_mbid or rg_mbid.lower() in exclude:
+                            continue
+                        wildcards.append(DiscoverQueueItemLight(
+                            release_group_mbid=rg_mbid,
+                            album_name=getattr(release, "title", "Unknown"),
+                            artist_name=getattr(release, "artist", "Unknown") or "Unknown",
+                            artist_mbid="",
+                            cover_url=f"/api/covers/release-group/{rg_mbid}?size=500",
+                            recommendation_reason="Trending on Last.fm",
+                            is_wildcard=True,
+                            in_library=False,
+                        ))
+                        exclude.add(rg_mbid.lower())
 
         if not wildcards:
             logger.warning("Failed to populate any wildcard albums for discover queue")
@@ -2202,7 +2275,7 @@ class DiscoverService:
         await asyncio.gather(_get_artist_and_bio(), _get_listen_count(), _apply_lastfm_fallback())
 
         if self._memory_cache:
-            enrich_ttl = self._get_queue_settings()["enrich_ttl"]
+            enrich_ttl = self._get_queue_settings().enrich_ttl
             await self._memory_cache.set(cache_key, enrichment, enrich_ttl)
 
         return enrichment
@@ -2232,7 +2305,8 @@ class DiscoverService:
                 release_group_mbid, artist_mbid, release_name, artist_name
             )
 
-    async def get_ignored_releases(self) -> list[dict]:
+    async def get_ignored_releases(self) -> list[DiscoverIgnoredRelease]:
         if self._library_cache:
-            return await self._library_cache.get_ignored_releases()
+            rows = await self._library_cache.get_ignored_releases()
+            return [DiscoverIgnoredRelease(**row) for row in rows]
         return []

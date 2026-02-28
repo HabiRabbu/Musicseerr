@@ -4,9 +4,10 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException, Path, Query, Depends, Request
 from fastapi.responses import Response
 from core.dependencies import get_coverart_repository
+from infrastructure.msgspec_fastapi import MsgSpecRoute
 from repositories.coverart_repository import CoverArtRepository
 
-router = APIRouter(prefix="/api/covers", tags=["covers"])
+router = APIRouter(route_class=MsgSpecRoute, prefix="/api/covers", tags=["covers"])
 log = logging.getLogger(__name__)
 
 _ALLOWED_SIZES = {"250", "500", "1200"}

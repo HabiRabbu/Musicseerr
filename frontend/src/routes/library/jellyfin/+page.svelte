@@ -5,11 +5,14 @@
 	import SourceAlbumModal from '$lib/components/SourceAlbumModal.svelte';
 	import {
 		getJellyfinSidebarCachedData,
+		getJellyfinAlbumsListCachedData,
 		isJellyfinSidebarCacheStale,
+		isJellyfinAlbumsListCacheStale,
+		setJellyfinAlbumsListCachedData,
 		setJellyfinSidebarCachedData
 	} from '$lib/utils/jellyfinLibraryCache';
 	import { launchJellyfinPlayback } from '$lib/player/launchJellyfinPlayback';
-	import { getCoverUrl } from '$lib/utils/errorHandling';
+	import { getCoverUrl, isAbortError } from '$lib/utils/errorHandling';
 	import type {
 		JellyfinAlbumSummary,
 		JellyfinPaginatedResponse,
@@ -34,6 +37,7 @@
 	let searchQuery = $state('');
 	let searchTimeout: ReturnType<typeof setTimeout> | null = null;
 	let fetchId = 0;
+	let albumsAbortController: AbortController | null = null;
 	let sidebarAbortController: AbortController | null = null;
 	let playingAlbumId = $state<string | null>(null);
 
@@ -42,9 +46,22 @@
 
 	const PAGE_SIZE = 48;
 
+	function getAlbumsListCacheKey(offset: number): string {
+		const search = searchQuery.trim() || '';
+		const genre = selectedGenre || '';
+		return `${sortBy}:${sortOrder}:${genre}:${search}:${PAGE_SIZE}:${offset}`;
+	}
+
 	async function fetchAlbums(reset: boolean = false): Promise<void> {
 		const id = ++fetchId;
 		fetchError = '';
+
+		if (albumsAbortController) {
+			albumsAbortController.abort();
+		}
+		albumsAbortController = new AbortController();
+		const signal = albumsAbortController.signal;
+
 		if (reset) {
 			loading = true;
 			albums = [];
@@ -54,31 +71,60 @@
 
 		try {
 			const offset = reset ? 0 : albums.length;
+			const cacheKey = getAlbumsListCacheKey(offset);
+			const cached = getJellyfinAlbumsListCachedData(cacheKey);
+			if (cached) {
+				albums = reset ? cached.data.items : [...albums, ...cached.data.items];
+				total = cached.data.total;
+				loading = false;
+				loadingMore = false;
+				if (!isJellyfinAlbumsListCacheStale(cached.timestamp)) {
+					return;
+				}
+			}
 
 			if (searchQuery.trim()) {
-				const res = await fetch(API.jellyfinLibrary.search(searchQuery.trim()));
+				const res = await fetch(API.jellyfinLibrary.search(searchQuery.trim()), { signal });
 				if (id !== fetchId) return;
 				if (res.ok) {
 					const data = await res.json();
 					albums = data.albums ?? [];
 					total = albums.length;
+					setJellyfinAlbumsListCachedData(
+						{
+							items: albums,
+							total
+						},
+						cacheKey
+					);
 				} else {
 					fetchError = 'Failed to search albums';
 				}
 			} else {
 				const res = await fetch(
-					API.jellyfinLibrary.albums(PAGE_SIZE, offset, sortBy, selectedGenre || undefined, sortOrder)
+					API.jellyfinLibrary.albums(PAGE_SIZE, offset, sortBy, selectedGenre || undefined, sortOrder),
+					{ signal }
 				);
 				if (id !== fetchId) return;
 				if (res.ok) {
 					const data: JellyfinPaginatedResponse = await res.json();
 					albums = reset ? data.items : [...albums, ...data.items];
 					total = data.total;
+					setJellyfinAlbumsListCachedData(
+						{
+							items: data.items,
+							total: data.total
+						},
+						cacheKey
+					);
 				} else {
 					fetchError = 'Failed to load albums';
 				}
 			}
-		} catch {
+		} catch (e) {
+			if (isAbortError(e)) {
+				return;
+			}
 			if (id === fetchId) fetchError = 'Failed to connect to Jellyfin';
 		} finally {
 			if (id === fetchId) {
@@ -159,7 +205,7 @@
 				});
 			}
 		} catch (e) {
-			if (e instanceof Error && e.name === 'AbortError') {
+			if (isAbortError(e)) {
 				return;
 			}
 		}
@@ -232,6 +278,10 @@
 
 	onDestroy(() => {
 		if (searchTimeout) clearTimeout(searchTimeout);
+		if (albumsAbortController) {
+			albumsAbortController.abort();
+			albumsAbortController = null;
+		}
 		if (sidebarAbortController) {
 			sidebarAbortController.abort();
 			sidebarAbortController = null;

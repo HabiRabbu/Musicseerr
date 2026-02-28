@@ -1,207 +1,167 @@
-from pydantic import BaseModel, Field
+from api.v1.schemas.common import GenreArtistMap, IntegrationStatus
+from infrastructure.msgspec_fastapi import AppStruct
 
 
-class HomeArtist(BaseModel):
-    mbid: str | None = Field(default=None, description="MusicBrainz artist ID")
-    name: str = Field(description="Artist name")
-    image_url: str | None = Field(default=None, description="Artist image URL")
-    listen_count: int | None = Field(default=None, description="Total listen count")
-    in_library: bool = Field(default=False, description="Whether artist is in Lidarr library")
-    source: str | None = Field(default=None, description="Data source (listenbrainz, lastfm, etc.)")
+class HomeArtist(AppStruct):
+    name: str
+    mbid: str | None = None
+    image_url: str | None = None
+    listen_count: int | None = None
+    in_library: bool = False
+    source: str | None = None
 
 
-class HomeAlbum(BaseModel):
-    mbid: str | None = Field(default=None, description="MusicBrainz release group ID")
-    name: str = Field(description="Album name")
-    artist_name: str | None = Field(default=None, description="Artist name")
-    artist_mbid: str | None = Field(default=None, description="MusicBrainz artist ID")
-    image_url: str | None = Field(default=None, description="Album cover URL")
-    release_date: str | None = Field(default=None, description="Release date")
-    listen_count: int | None = Field(default=None, description="Total listen count")
-    in_library: bool = Field(default=False, description="Whether album is in library")
-    requested: bool = Field(default=False, description="Whether album is requested/in queue")
-    source: str | None = Field(default=None, description="Data source (listenbrainz, lastfm, etc.)")
+class HomeAlbum(AppStruct):
+    name: str
+    mbid: str | None = None
+    artist_name: str | None = None
+    artist_mbid: str | None = None
+    image_url: str | None = None
+    release_date: str | None = None
+    listen_count: int | None = None
+    in_library: bool = False
+    requested: bool = False
+    source: str | None = None
 
 
-class HomeTrack(BaseModel):
-    mbid: str | None = Field(default=None, description="MusicBrainz recording ID")
-    name: str = Field(description="Track name")
-    artist_name: str | None = Field(default=None, description="Artist name")
-    artist_mbid: str | None = Field(default=None, description="MusicBrainz artist ID")
-    album_name: str | None = Field(default=None, description="Album name")
-    listen_count: int | None = Field(default=None, description="Listen count")
-    listened_at: str | None = Field(default=None, description="When the track was listened to")
-    image_url: str | None = Field(default=None, description="Track or album image URL")
+class HomeTrack(AppStruct):
+    name: str
+    mbid: str | None = None
+    artist_name: str | None = None
+    artist_mbid: str | None = None
+    album_name: str | None = None
+    listen_count: int | None = None
+    listened_at: str | None = None
+    image_url: str | None = None
 
 
-class HomeGenre(BaseModel):
-    name: str = Field(description="Genre name")
-    listen_count: int | None = Field(default=None, description="Listen count for this genre")
-    artist_count: int | None = Field(default=None, description="Number of artists in this genre")
-    artist_mbid: str | None = Field(default=None, description="MBID of a representative artist for this genre")
+class HomeGenre(AppStruct):
+    name: str
+    listen_count: int | None = None
+    artist_count: int | None = None
+    artist_mbid: str | None = None
 
 
-class HomeSection(BaseModel):
-    title: str = Field(description="Section title")
-    type: str = Field(description="Section type: artists, albums, tracks, genres")
-    items: list[HomeArtist | HomeAlbum | HomeTrack | HomeGenre] = Field(
-        default_factory=list,
-        description="Section items"
-    )
-    source: str | None = Field(
-        default=None,
-        description="Data source: listenbrainz, jellyfin, lidarr, or None for fallback"
-    )
-    fallback_message: str | None = Field(
-        default=None,
-        description="Message to show when no data is available"
-    )
-    connect_service: str | None = Field(
-        default=None,
-        description="Service to connect to enable this section"
-    )
+class HomeSection(AppStruct):
+    title: str
+    type: str
+    items: list[HomeArtist | HomeAlbum | HomeTrack | HomeGenre] = []
+    source: str | None = None
+    fallback_message: str | None = None
+    connect_service: str | None = None
 
 
-class ServicePrompt(BaseModel):
-    service: str = Field(description="Service identifier: listenbrainz, jellyfin")
-    title: str = Field(description="Prompt title")
-    description: str = Field(description="Prompt description")
-    icon: str = Field(description="Emoji icon")
-    color: str = Field(description="Color theme: primary, secondary, accent")
-    features: list[str] = Field(default_factory=list, description="List of features")
+class ServicePrompt(AppStruct):
+    service: str
+    title: str
+    description: str
+    icon: str
+    color: str
+    features: list[str] = []
 
 
-class HomeResponse(BaseModel):
-    recently_added: HomeSection | None = Field(
-        default=None, description="Recently added albums from Lidarr"
-    )
-    library_artists: HomeSection | None = Field(
-        default=None, description="Artists in your library"
-    )
-    library_albums: HomeSection | None = Field(
-        default=None, description="Albums in your library"
-    )
-    recommended_artists: HomeSection | None = Field(
-        default=None, description="Recommended artists based on listening history"
-    )
-    trending_artists: HomeSection | None = Field(
-        default=None, description="Trending artists globally"
-    )
-    popular_albums: HomeSection | None = Field(
-        default=None, description="Popular albums right now"
-    )
-    recently_played: HomeSection | None = Field(
-        default=None, description="Recently played tracks"
-    )
-    top_genres: HomeSection | None = Field(
-        default=None, description="User's top genres"
-    )
-    genre_list: HomeSection | None = Field(
-        default=None, description="List of available genres"
-    )
-    fresh_releases: HomeSection | None = Field(
-        default=None, description="New releases from followed artists"
-    )
-    favorite_artists: HomeSection | None = Field(
-        default=None, description="User's favorite artists"
-    )
-    your_top_albums: HomeSection | None = Field(
-        default=None, description="User's personal top albums from listening history"
-    )
-    service_prompts: list[ServicePrompt] = Field(
-        default_factory=list,
-        description="Prompts for connecting additional services"
-    )
-    integration_status: dict[str, bool] = Field(
-        default_factory=dict,
-        description="Status of integrations: listenbrainz, jellyfin, lidarr"
-    )
-    genre_artists: dict[str, str | None] = Field(
-        default_factory=dict,
-        description="Map of genre name to representative artist MBID"
-    )
-    discover_preview: "DiscoverPreview | None" = Field(
-        default=None,
-        description="Preview teaser from discover cache for home page"
-    )
+class HomeIntegrationStatus(IntegrationStatus):
+    localfiles: bool = False
 
 
-class DiscoverPreview(BaseModel):
-    seed_artist: str = Field(description="Name of the seed artist")
-    seed_artist_mbid: str = Field(description="MusicBrainz ID of the seed artist")
-    items: list[HomeArtist] = Field(default_factory=list, description="Preview artist items")
+class DiscoverPreview(AppStruct):
+    seed_artist: str
+    seed_artist_mbid: str
+    items: list[HomeArtist] = []
 
 
-class GenreDetailRequest(BaseModel):
-    genre: str = Field(description="Genre name to fetch details for")
-    limit: int = Field(default=50, ge=1, le=200, description="Number of artists to return")
+class HomeResponse(AppStruct):
+    recently_added: HomeSection | None = None
+    library_artists: HomeSection | None = None
+    library_albums: HomeSection | None = None
+    recommended_artists: HomeSection | None = None
+    trending_artists: HomeSection | None = None
+    popular_albums: HomeSection | None = None
+    recently_played: HomeSection | None = None
+    top_genres: HomeSection | None = None
+    genre_list: HomeSection | None = None
+    fresh_releases: HomeSection | None = None
+    favorite_artists: HomeSection | None = None
+    your_top_albums: HomeSection | None = None
+    service_prompts: list[ServicePrompt] = []
+    integration_status: HomeIntegrationStatus | None = None
+    genre_artists: GenreArtistMap = {}
+    discover_preview: DiscoverPreview | None = None
 
 
-class GenreLibrarySection(BaseModel):
-    artists: list[HomeArtist] = Field(default_factory=list, description="Library artists in this genre")
-    albums: list[HomeAlbum] = Field(default_factory=list, description="Library albums in this genre")
-    artist_count: int = Field(default=0, description="Total library artists in genre")
-    album_count: int = Field(default=0, description="Total library albums in genre")
+class GenreLibrarySection(AppStruct):
+    artists: list[HomeArtist] = []
+    albums: list[HomeAlbum] = []
+    artist_count: int = 0
+    album_count: int = 0
 
 
-class GenrePopularSection(BaseModel):
-    artists: list[HomeArtist] = Field(default_factory=list, description="Popular artists in this genre")
-    albums: list[HomeAlbum] = Field(default_factory=list, description="Popular albums in this genre")
-    has_more_artists: bool = Field(default=False, description="Whether more artists can be loaded")
-    has_more_albums: bool = Field(default=False, description="Whether more albums can be loaded")
+class GenrePopularSection(AppStruct):
+    artists: list[HomeArtist] = []
+    albums: list[HomeAlbum] = []
+    has_more_artists: bool = False
+    has_more_albums: bool = False
 
 
-class GenreDetailResponse(BaseModel):
-    genre: str = Field(description="Genre name")
-    library: GenreLibrarySection | None = Field(default=None, description="Library items in this genre")
-    popular: GenrePopularSection | None = Field(default=None, description="Popular items in this genre")
-    artists: list[HomeArtist] = Field(default_factory=list, description="Artists in this genre (legacy)")
-    total_count: int | None = Field(default=None, description="Total number of artists (legacy)")
+class GenreDetailResponse(AppStruct):
+    genre: str
+    library: GenreLibrarySection | None = None
+    popular: GenrePopularSection | None = None
+    artists: list[HomeArtist] = []
+    total_count: int | None = None
 
 
-class TrendingTimeRange(BaseModel):
-    range_key: str = Field(description="Range key: this_week, this_month, this_year, all_time")
-    label: str = Field(description="Human readable label")
-    featured: HomeArtist | None = Field(default=None, description="Featured top artist")
-    items: list[HomeArtist] = Field(default_factory=list, description="Trending artists")
-    total_count: int = Field(default=0, description="Total count of items")
+class TrendingTimeRange(AppStruct):
+    range_key: str
+    label: str
+    featured: HomeArtist | None = None
+    items: list[HomeArtist] = []
+    total_count: int = 0
 
 
-class TrendingArtistsResponse(BaseModel):
-    this_week: TrendingTimeRange = Field(description="This week's trending artists")
-    this_month: TrendingTimeRange = Field(description="This month's trending artists")
-    this_year: TrendingTimeRange = Field(description="This year's trending artists")
-    all_time: TrendingTimeRange = Field(description="All time trending artists")
+class TrendingArtistsResponse(AppStruct):
+    this_week: TrendingTimeRange
+    this_month: TrendingTimeRange
+    this_year: TrendingTimeRange
+    all_time: TrendingTimeRange
 
 
-class PopularTimeRange(BaseModel):
-    range_key: str = Field(description="Range key: this_week, this_month, this_year, all_time")
-    label: str = Field(description="Human readable label")
-    featured: HomeAlbum | None = Field(default=None, description="Featured top album")
-    items: list[HomeAlbum] = Field(default_factory=list, description="Popular albums")
-    total_count: int = Field(default=0, description="Total count of items")
+class PopularTimeRange(AppStruct):
+    range_key: str
+    label: str
+    featured: HomeAlbum | None = None
+    items: list[HomeAlbum] = []
+    total_count: int = 0
 
 
-class PopularAlbumsResponse(BaseModel):
-    this_week: PopularTimeRange = Field(description="This week's popular albums")
-    this_month: PopularTimeRange = Field(description="This month's popular albums")
-    this_year: PopularTimeRange = Field(description="This year's popular albums")
-    all_time: PopularTimeRange = Field(description="All time popular albums")
+class PopularAlbumsResponse(AppStruct):
+    this_week: PopularTimeRange
+    this_month: PopularTimeRange
+    this_year: PopularTimeRange
+    all_time: PopularTimeRange
 
 
-class TrendingArtistsRangeResponse(BaseModel):
-    range_key: str = Field(description="Range key used")
-    label: str = Field(description="Human readable label")
-    items: list[HomeArtist] = Field(default_factory=list, description="Trending artists")
-    offset: int = Field(default=0, description="Current offset")
-    limit: int = Field(default=25, description="Items per page")
-    has_more: bool = Field(default=False, description="Whether more items exist")
+class TrendingArtistsRangeResponse(AppStruct):
+    range_key: str
+    label: str
+    items: list[HomeArtist] = []
+    offset: int = 0
+    limit: int = 25
+    has_more: bool = False
 
 
-class PopularAlbumsRangeResponse(BaseModel):
-    range_key: str = Field(description="Range key used")
-    label: str = Field(description="Human readable label")
-    items: list[HomeAlbum] = Field(default_factory=list, description="Popular albums")
-    offset: int = Field(default=0, description="Current offset")
-    limit: int = Field(default=25, description="Items per page")
-    has_more: bool = Field(default=False, description="Whether more items exist")
+class PopularAlbumsRangeResponse(AppStruct):
+    range_key: str
+    label: str
+    items: list[HomeAlbum] = []
+    offset: int = 0
+    limit: int = 25
+    has_more: bool = False
+
+
+class GenreArtistResponse(AppStruct):
+    artist_mbid: str | None = None
+
+
+class GenreArtistsBatchResponse(AppStruct):
+    genre_artists: dict[str, str | None] = {}

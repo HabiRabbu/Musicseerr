@@ -1,7 +1,7 @@
 import asyncio
 import logging
 from typing import Any, Optional
-from api.v1.schemas.artist import ArtistInfo, ArtistExtendedInfo, ArtistReleases, ExternalLink
+from api.v1.schemas.artist import ArtistInfo, ArtistExtendedInfo, ArtistReleases, ExternalLink, ReleaseItem
 from repositories.protocols import MusicBrainzRepositoryProtocol, LidarrRepositoryProtocol, WikidataRepositoryProtocol
 from services.preferences_service import PreferencesService
 from services.artist_utils import (
@@ -159,7 +159,7 @@ class ArtistService:
         self,
         lidarr_albums: list[dict[str, Any]],
         library_album_mbids: set[str]
-    ) -> tuple[list[dict], list[dict], list[dict]]:
+    ) -> tuple[list[ReleaseItem], list[ReleaseItem], list[ReleaseItem]]:
         prefs = self._preferences_service.get_preferences()
         included_primary_types = set(t.lower() for t in prefs.primary_types)
         included_secondary_types = set(t.lower() for t in prefs.secondary_types)
@@ -205,11 +205,11 @@ class ArtistService:
             )
             for release_list in (artist_info.albums, artist_info.singles, artist_info.eps):
                 for rg in release_list:
-                    rg_id = (rg.get("id") or "").lower()
+                    rg_id = (rg.id or "").lower()
                     if not rg_id:
                         continue
-                    rg["in_library"] = rg_id in library_mbids
-                    rg["requested"] = rg_id in requested_mbids and not rg["in_library"]
+                    rg.in_library = rg_id in library_mbids
+                    rg.requested = rg_id in requested_mbids and not rg.in_library
             artist_info.in_library = artist_info.musicbrainz_id.lower() in artist_mbids
         except Exception as e:
             logger.warning(f"Failed to refresh library flags: {e}")
@@ -369,7 +369,7 @@ class ArtistService:
         mb_artist: dict[str, Any],
         album_mbids: set[str],
         requested_mbids: set[str] = None
-    ) -> tuple[list[dict], list[dict], list[dict]]:
+    ) -> tuple[list[ReleaseItem], list[ReleaseItem], list[ReleaseItem]]:
         prefs = self._preferences_service.get_preferences()
         included_primary_types = set(t.lower() for t in prefs.primary_types)
         included_secondary_types = set(t.lower() for t in prefs.secondary_types)

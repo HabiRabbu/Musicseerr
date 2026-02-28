@@ -9,16 +9,17 @@ from api.v1.schemas.scrobble import (
 )
 from core.dependencies import get_scrobble_service
 from core.exceptions import ConfigurationError, ExternalServiceError
+from infrastructure.msgspec_fastapi import MsgSpecBody, MsgSpecRoute
 from services.scrobble_service import ScrobbleService
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/scrobble", tags=["scrobble"])
+router = APIRouter(route_class=MsgSpecRoute, prefix="/api/scrobble", tags=["scrobble"])
 
 
 @router.post("/now-playing", response_model=ScrobbleResponse)
 async def report_now_playing(
-    request: NowPlayingRequest,
+    request: NowPlayingRequest = MsgSpecBody(NowPlayingRequest),
     scrobble_service: ScrobbleService = Depends(get_scrobble_service),
 ) -> ScrobbleResponse:
     try:
@@ -36,7 +37,7 @@ async def report_now_playing(
 
 @router.post("/submit", response_model=ScrobbleResponse)
 async def submit_scrobble(
-    request: ScrobbleRequest,
+    request: ScrobbleRequest = MsgSpecBody(ScrobbleRequest),
     scrobble_service: ScrobbleService = Depends(get_scrobble_service),
 ) -> ScrobbleResponse:
     try:

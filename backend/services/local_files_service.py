@@ -21,6 +21,7 @@ from core.exceptions import ExternalServiceError, ResourceNotFoundError
 from infrastructure.cache.memory_cache import CacheInterface
 from infrastructure.cover_urls import prefer_release_group_cover_url
 from infrastructure.constants import STREAM_CHUNK_SIZE
+from infrastructure.serialization import to_jsonable
 from repositories.lidarr.repository import LidarrRepository
 from services.preferences_service import PreferencesService
 
@@ -469,7 +470,7 @@ class LocalFilesService:
 
         await self._cache.set(
             cache_key,
-            [summary.model_dump() for summary in summaries],
+            [to_jsonable(summary) for summary in summaries],
             ttl_seconds=ttl_seconds,
         )
         return summaries
@@ -491,7 +492,7 @@ class LocalFilesService:
         stats = await asyncio.to_thread(self._scan_storage_sync, root)
 
         await self._cache.set(
-            cache_key, stats.model_dump(), ttl_seconds=ttl_seconds
+            cache_key, to_jsonable(stats), ttl_seconds=ttl_seconds
         )
         return stats
 

@@ -2,7 +2,6 @@ import asyncio
 import hashlib
 import logging
 from collections import OrderedDict
-from dataclasses import dataclass
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 from pathlib import Path
@@ -11,6 +10,7 @@ from urllib.parse import urlparse
 
 import aiofiles
 import httpx
+import msgspec
 
 from core.exceptions import ExternalServiceError, RateLimitedError
 from infrastructure.cache.memory_cache import CacheInterface
@@ -83,8 +83,7 @@ _coverart_rate_limiter = TokenBucketRateLimiter(rate=1.0, capacity=1)
 _deduplicator = RequestDeduplicator()
 
 
-@dataclass(slots=True)
-class _CoverMemoryEntry:
+class _CoverMemoryEntry(msgspec.Struct):
     content: bytes
     content_type: str
     source: str
@@ -627,8 +626,6 @@ class CoverArtRepository:
         return await self._disk_cache.promote_to_persistent(identifier, identifier_type)
 
     async def debug_artist_image(self, artist_id: str, debug_info: dict) -> dict:
-        import json
-
         file_path_250 = self._disk_cache.get_file_path(f"artist_{artist_id}_250", "img")
         file_path_500 = self._disk_cache.get_file_path(f"artist_{artist_id}_500", "img")
 
@@ -641,7 +638,10 @@ class CoverArtRepository:
                 if meta_path.exists():
                     try:
                         async with aiofiles.open(meta_path, 'r') as f:
-                            debug_info["disk_cache"][f"meta_{size}"] = json.loads(await f.read())
+                            debug_info["disk_cache"][f"meta_{size}"] = msgspec.json.decode(
+                                (await f.read()).encode("utf-8"),
+                                type=dict[str, object],
+                            )
                     except Exception as e:
                         debug_info["disk_cache"][f"meta_{size}"] = f"Error reading: {e}"
 

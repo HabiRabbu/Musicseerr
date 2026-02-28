@@ -1,6 +1,7 @@
 <script lang="ts">
 	import '../app.css';
-	import { goto, beforeNavigate } from '$app/navigation';
+	import { browser } from '$app/environment';
+	import { goto, beforeNavigate, afterNavigate } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { errorModal } from '$lib/stores/errorModal';
 	import { libraryStore } from '$lib/stores/library';
@@ -17,18 +18,38 @@
 	import { onMount, onDestroy } from 'svelte';
 	import { cancelPendingImages } from '$lib/utils/lazyImage';
 	import { fetchActiveRequestCount, type RequestCountChangedDetail } from '$lib/utils/requestsApi';
+	import { createNavigationProgressController } from '$lib/utils/navigationProgress';
 	import { fromStore } from 'svelte/store';
 	import { User, Settings, Search, House, Compass, Menu, Tv, Headphones, Download, PanelLeft, TriangleAlert, Info, X } from 'lucide-svelte';
+	import type { Snippet } from 'svelte';
 
-	let query = '';
+	let { children }: { children: Snippet } = $props();
+
+	let query = $state('');
 	let activeRequestCount = $state(0);
 	let requestCountInterval: ReturnType<typeof setInterval> | null = null;
 	let requestsPageActive = false;
-	let modalQuery = '';
+	let modalQuery = $state('');
 	let userDropdown: HTMLDetailsElement;
+	let showNavigationProgress = $state(false);
+
+	const NAV_PROGRESS_DELAY_MS = 120;
+	const NAV_PROGRESS_MIN_VISIBLE_MS = 220;
+	const navigationProgress = createNavigationProgressController({
+		delayMs: NAV_PROGRESS_DELAY_MS,
+		minVisibleMs: NAV_PROGRESS_MIN_VISIBLE_MS,
+		onVisibleChange: (visible) => {
+			showNavigationProgress = visible;
+		}
+	});
 
 	beforeNavigate(() => {
+		navigationProgress.start();
 		cancelPendingImages();
+	});
+
+	afterNavigate(() => {
+		navigationProgress.finish();
 	});
 
 	function handleClickOutside(event: MouseEvent) {
@@ -85,10 +106,13 @@
 	});
 
 	onDestroy(() => {
-		document.removeEventListener('click', handleClickOutside);
-		document.removeEventListener('keydown', handleGlobalKeydown);
-		window.removeEventListener('request-count-changed', handleRequestCountChanged);
-		window.removeEventListener('requests-page-active', handleRequestsPageActive);
+		navigationProgress.cleanup();
+		if (browser) {
+			document.removeEventListener('click', handleClickOutside);
+			document.removeEventListener('keydown', handleGlobalKeydown);
+			window.removeEventListener('request-count-changed', handleRequestCountChanged);
+			window.removeEventListener('requests-page-active', handleRequestsPageActive);
+		}
 		if (requestCountInterval) clearInterval(requestCountInterval);
 	});
 
@@ -178,6 +202,12 @@
 </script>
 
 <div data-theme="musicseerr">
+	{#if showNavigationProgress}
+		<div class="fixed top-0 left-0 right-0 z-[120] pointer-events-none">
+			<progress class="progress progress-primary w-full h-1"></progress>
+		</div>
+	{/if}
+
 	<div class="drawer drawer-open">
 		<input id="main-drawer" type="checkbox" class="drawer-toggle" />
 
@@ -224,7 +254,7 @@
 			</div>
 
 			<div class="flex-1" class:pb-24={playerStore.isPlayerVisible}>
-				<slot />
+				{@render children()}
 			</div>
 		</div>
 

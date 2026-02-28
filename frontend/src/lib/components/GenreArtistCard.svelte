@@ -7,15 +7,21 @@
 		artist: HomeArtist;
 		showLibraryBadge?: boolean;
 		onclick?: () => void;
+		href?: string | null;
 	}
 
-	let { artist, showLibraryBadge = false, onclick }: Props = $props();
+	let { artist, showLibraryBadge = false, onclick, href = null }: Props = $props();
 </script>
 
-<button
-	type="button"
-	class="card bg-base-200/50 hover:bg-base-200 transition-all duration-200 cursor-pointer group"
-	{onclick}
+<svelte:element
+	this={href ? 'a' : 'button'}
+	href={href ?? undefined}
+	type={href ? undefined : 'button'}
+	onclick={href ? undefined : onclick}
+	onkeydown={href || !onclick ? undefined : (e: KeyboardEvent) => e.key === 'Enter' && onclick()}
+	role={href || !onclick ? undefined : 'button'}
+	tabindex={href || !onclick ? undefined : 0}
+	class="card bg-base-200/50 hover:bg-base-200 transition-all duration-200 group {href || onclick ? 'cursor-pointer' : 'cursor-default'}"
 >
 	<figure class="flex justify-center pt-4 relative">
 		<ArtistImage mbid={artist.mbid || ''} alt={artist.name} size="md" lazy={false} />
@@ -31,4 +37,4 @@
 			<p class="text-xs text-base-content/50">{artist.listen_count} album{artist.listen_count !== 1 ? 's' : ''}</p>
 		{/if}
 	</div>
-</button>
+</svelte:element>

@@ -16,6 +16,7 @@
 		applyArtistEnrichment,
 		applyAlbumEnrichment
 	} from '$lib/utils/enrichment';
+	import { isAbortError } from '$lib/utils/errorHandling';
 	import { Check, ArrowRight } from 'lucide-svelte';
 
 	export let data: { query: string };
@@ -75,14 +76,29 @@
 			enrichmentSource = enrichment.source;
 			artists = applyArtistEnrichment(artists, enrichment);
 			albums = applyAlbumEnrichment(albums, enrichment);
+			searchStore.setEnrichmentSource(enrichmentSource);
 		} catch (error) {
-			if (error instanceof Error && error.name === 'AbortError') {
+			if (isAbortError(error)) {
 				return;
 			}
 		}
 	}
 
 	async function performSearch(q: string) {
+		const normalizedQuery = q.trim();
+		const cached = searchStore.getCache(normalizedQuery, { allowStale: true });
+		const hasCachedResults = !!cached;
+		const shouldRefresh = !cached || searchStore.isStale(cached.timestamp);
+
+		if (cached) {
+			hasSearched = true;
+			artists = cached.artists;
+			albums = cached.albums;
+			enrichmentSource = cached.enrichmentSource;
+			loadingArtists = false;
+			loadingAlbums = false;
+		}
+
 		if (abortController) {
 			abortController.abort();
 		}
@@ -90,23 +106,31 @@
 			enrichmentController.abort();
 		}
 
-		if (!q.trim()) {
+		if (!normalizedQuery) {
 			artists = [];
 			albums = [];
 			hasSearched = false;
+			enrichmentSource = 'none';
 			searchStore.clear();
+			return;
+		}
+
+		if (!shouldRefresh) {
 			return;
 		}
 
 		abortController = new AbortController();
 		hasSearched = true;
-		artists = [];
-		albums = [];
+		if (!hasCachedResults) {
+			artists = [];
+			albums = [];
+			enrichmentSource = 'none';
+		}
 		loadingArtists = true;
 		loadingAlbums = true;
 
 		const fetchArtists = fetch(
-			`/api/search?q=${encodeURIComponent(q)}&limit_artists=6&limit_albums=0&buckets=artists`,
+			`/api/search?q=${encodeURIComponent(normalizedQuery)}&limit_artists=6&limit_albums=0&buckets=artists`,
 			{
 				signal: abortController.signal
 			}
@@ -121,7 +145,7 @@
 				loadingArtists = false;
 			})
 			.catch((error) => {
-				if (error instanceof Error && error.name === 'AbortError') {
+				if (isAbortError(error)) {
 					return;
 				}
 				artists = [];
@@ -129,7 +153,7 @@
 			});
 
 		const fetchAlbums = fetch(
-			`/api/search?q=${encodeURIComponent(q)}&limit_artists=0&limit_albums=24&buckets=albums`,
+			`/api/search?q=${encodeURIComponent(normalizedQuery)}&limit_artists=0&limit_albums=24&buckets=albums`,
 			{
 				signal: abortController.signal
 			}
@@ -144,7 +168,7 @@
 				loadingAlbums = false;
 			})
 			.catch((error) => {
-				if (error instanceof Error && error.name === 'AbortError') {
+				if (isAbortError(error)) {
 					return;
 				}
 				albums = [];
@@ -153,9 +177,9 @@
 
 		await Promise.allSettled([fetchArtists, fetchAlbums]);
 
-		searchStore.setResults(q, artists, albums);
+		searchStore.setResults(normalizedQuery, artists, albums, enrichmentSource);
 
-		fetchEnrichment();
+		void fetchEnrichment();
 	}
 
 	let lastQuery = '';

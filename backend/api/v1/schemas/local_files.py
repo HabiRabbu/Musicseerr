@@ -1,7 +1,7 @@
-from pydantic import BaseModel, Field
+from infrastructure.msgspec_fastapi import AppStruct
 
 
-class LocalTrackInfo(BaseModel):
+class LocalTrackInfo(AppStruct):
     track_file_id: int
     title: str
     track_number: int
@@ -12,14 +12,14 @@ class LocalTrackInfo(BaseModel):
     date_added: str | None = None
 
 
-class LocalAlbumMatch(BaseModel):
+class LocalAlbumMatch(AppStruct):
     found: bool
-    tracks: list[LocalTrackInfo] = Field(default_factory=list)
+    tracks: list[LocalTrackInfo] = []
     total_size_bytes: int = 0
     primary_format: str | None = None
 
 
-class LocalAlbumSummary(BaseModel):
+class LocalAlbumSummary(AppStruct):
     lidarr_album_id: int
     musicbrainz_id: str
     name: str
@@ -33,20 +33,20 @@ class LocalAlbumSummary(BaseModel):
     date_added: str | None = None
 
 
-class LocalPaginatedResponse(BaseModel):
-    items: list[LocalAlbumSummary] = Field(default_factory=list)
+class LocalPaginatedResponse(AppStruct):
+    items: list[LocalAlbumSummary] = []
     total: int = 0
     offset: int = 0
     limit: int = 50
 
 
-class FormatInfo(BaseModel):
+class FormatInfo(AppStruct):
     count: int = 0
     size_bytes: int = 0
     size_human: str = "0 B"
 
 
-class LocalStorageStats(BaseModel):
+class LocalStorageStats(AppStruct):
     total_tracks: int = 0
     total_albums: int = 0
     total_artists: int = 0
@@ -54,4 +54,4 @@ class LocalStorageStats(BaseModel):
     total_size_human: str = "0 B"
     disk_free_bytes: int = 0
     disk_free_human: str = "0 B"
-    format_breakdown: dict[str, FormatInfo] = Field(default_factory=dict)
+    format_breakdown: dict[str, FormatInfo] = {}

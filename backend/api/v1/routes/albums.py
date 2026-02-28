@@ -9,10 +9,11 @@ from services.album_service import AlbumService
 from services.album_discovery_service import AlbumDiscoveryService
 from services.album_enrichment_service import AlbumEnrichmentService
 from infrastructure.validators import is_unknown_mbid
+from infrastructure.msgspec_fastapi import MsgSpecRoute
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/album", tags=["album"])
+router = APIRouter(route_class=MsgSpecRoute, prefix="/api/album", tags=["album"])
 
 
 @router.get("/{album_id}", response_model=AlbumInfo)

@@ -1,7 +1,11 @@
+from __future__ import annotations
+
 import asyncio
 import logging
 from pathlib import Path
-from typing import Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
+
+import msgspec
 
 from infrastructure.validators import validate_mbid
 from infrastructure.queue.priority_queue import RequestPriority
@@ -12,6 +16,17 @@ if TYPE_CHECKING:
     from repositories.jellyfin_repository import JellyfinRepository
 
 logger = logging.getLogger(__name__)
+
+
+class _ReleaseGroupMetadataResponse(msgspec.Struct):
+    release: str | None = None
+
+
+def _decode_json_response(response, decode_type: type[_ReleaseGroupMetadataResponse]) -> _ReleaseGroupMetadataResponse:
+    content = getattr(response, "content", None)
+    if isinstance(content, (bytes, bytearray, memoryview)):
+        return msgspec.json.decode(content, type=decode_type)
+    return msgspec.convert(response.json(), type=decode_type)
 
 
 def _log_task_error(task: asyncio.Task) -> None:
@@ -40,9 +55,9 @@ class AlbumCoverFetcher:
         self,
         http_get_fn,
         write_cache_fn,
-        lidarr_repo: Optional['LidarrRepository'] = None,
-        mb_repo: Optional['MusicBrainzRepository'] = None,
-        jellyfin_repo: Optional['JellyfinRepository'] = None,
+        lidarr_repo: 'LidarrRepository' | None = None,
+        mb_repo: 'MusicBrainzRepository' | None = None,
+        jellyfin_repo: 'JellyfinRepository' | None = None,
     ):
         self._http_get = http_get_fn
         self._write_disk_cache = write_cache_fn
@@ -53,9 +68,9 @@ class AlbumCoverFetcher:
     async def fetch_release_group_cover(
         self,
         release_group_id: str,
-        size: Optional[str],
+        size: str | None,
         file_path: Path
-    ) -> Optional[tuple[bytes, str, str]]:
+    ) -> tuple[bytes, str, str] | None:
         size_int = int(size) if size and size.isdigit() else 500
         result = None
         try:
@@ -100,7 +115,7 @@ class AlbumCoverFetcher:
         release_group_id: str,
         file_path: Path,
         size: int,
-    ) -> Optional[tuple[bytes, str, str]]:
+    ) -> tuple[bytes, str, str] | None:
         result = await self._fetch_from_lidarr(release_group_id, file_path, size=size)
         if result:
             return result
@@ -109,9 +124,9 @@ class AlbumCoverFetcher:
     async def _get_cover_from_best_release(
         self,
         release_group_id: str,
-        size: Optional[str],
+        size: str | None,
         cache_path: Path,
-    ) -> Optional[tuple[bytes, str, str]]:
+    ) -> tuple[bytes, str, str] | None:
         try:
             metadata_url = f"{COVER_ART_ARCHIVE_BASE}/release-group/{release_group_id}"
             response = await self._http_get(
@@ -122,8 +137,8 @@ class AlbumCoverFetcher:
             )
             if response.status_code != 200:
                 return None
-            data = response.json()
-            release_url = data.get("release", "")
+            data = _decode_json_response(response, _ReleaseGroupMetadataResponse)
+            release_url = data.release or ""
             if not release_url:
                 return None
             release_id = release_url.split("/")[-1]
@@ -163,8 +178,8 @@ class AlbumCoverFetcher:
         self,
         release_group_id: str,
         file_path: Path,
-        size: Optional[int] = 500
-    ) -> Optional[tuple[bytes, str, str]]:
+        size: int | None = 500
+    ) -> tuple[bytes, str, str] | None:
         if not self._lidarr_repo:
             return None
         try:
@@ -195,7 +210,7 @@ class AlbumCoverFetcher:
         self,
         musicbrainz_id: str,
         file_path: Path,
-    ) -> Optional[tuple[bytes, str, str]]:
+    ) -> tuple[bytes, str, str] | None:
         if not self._jellyfin_repo or not self._jellyfin_repo.is_configured():
             return None
         try:
@@ -230,9 +245,9 @@ class AlbumCoverFetcher:
     async def fetch_release_cover(
         self,
         release_id: str,
-        size: Optional[str],
+        size: str | None,
         file_path: Path
-    ) -> Optional[tuple[bytes, str, str]]:
+    ) -> tuple[bytes, str, str] | None:
         result = None
         try:
             result = await asyncio.wait_for(
@@ -272,8 +287,8 @@ class AlbumCoverFetcher:
         self,
         release_id: str,
         file_path: Path,
-        size: Optional[str],
-    ) -> Optional[tuple[bytes, str, str]]:
+        size: str | None,
+    ) -> tuple[bytes, str, str] | None:
         size_int = int(size) if size and size.isdigit() else 500
         release_group_id = None
         if self._mb_repo:

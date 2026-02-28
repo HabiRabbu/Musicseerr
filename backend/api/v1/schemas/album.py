@@ -1,63 +1,62 @@
-from typing import Optional
-from pydantic import BaseModel, Field
 from api.v1.schemas.common import LastFmTagSchema
+from infrastructure.msgspec_fastapi import AppStruct
 
 
-class Track(BaseModel):
+class Track(AppStruct):
     position: int
     title: str
-    length: Optional[int] = None
-    recording_id: Optional[str] = None
+    length: int | None = None
+    recording_id: str | None = None
 
 
-class AlbumInfo(BaseModel):
+class AlbumInfo(AppStruct):
     title: str
     musicbrainz_id: str
     artist_name: str
     artist_id: str
-    release_date: Optional[str] = None
-    year: Optional[int] = None
-    type: Optional[str] = None
-    label: Optional[str] = None
-    barcode: Optional[str] = None
-    country: Optional[str] = None
-    disambiguation: Optional[str] = None
-    tracks: list[Track] = Field(default_factory=list)
+    release_date: str | None = None
+    year: int | None = None
+    type: str | None = None
+    label: str | None = None
+    barcode: str | None = None
+    country: str | None = None
+    disambiguation: str | None = None
+    tracks: list[Track] = []
     total_tracks: int = 0
-    total_length: Optional[int] = None
+    total_length: int | None = None
     in_library: bool = False
     requested: bool = False
-    cover_url: Optional[str] = None
+    cover_url: str | None = None
 
 
-class AlbumBasicInfo(BaseModel):
+class AlbumBasicInfo(AppStruct):
     """Minimal album info for fast initial load - no tracks."""
     title: str
     musicbrainz_id: str
     artist_name: str
     artist_id: str
-    release_date: Optional[str] = None
-    year: Optional[int] = None
-    type: Optional[str] = None
-    disambiguation: Optional[str] = None
+    release_date: str | None = None
+    year: int | None = None
+    type: str | None = None
+    disambiguation: str | None = None
     in_library: bool = False
     requested: bool = False
-    cover_url: Optional[str] = None
+    cover_url: str | None = None
 
 
-class AlbumTracksInfo(BaseModel):
+class AlbumTracksInfo(AppStruct):
     """Track list and extended details - loaded asynchronously."""
-    tracks: list[Track] = Field(default_factory=list)
+    tracks: list[Track] = []
     total_tracks: int = 0
-    total_length: Optional[int] = None
-    label: Optional[str] = None
-    barcode: Optional[str] = None
-    country: Optional[str] = None
+    total_length: int | None = None
+    label: str | None = None
+    barcode: str | None = None
+    country: str | None = None
 
 
-class LastFmAlbumEnrichment(BaseModel):
-    summary: Optional[str] = None
-    tags: list[LastFmTagSchema] = Field(default_factory=list)
+class LastFmAlbumEnrichment(AppStruct):
+    summary: str | None = None
+    tags: list[LastFmTagSchema] = []
     listeners: int = 0
     playcount: int = 0
-    url: Optional[str] = None
+    url: str | None = None

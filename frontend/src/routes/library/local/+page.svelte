@@ -5,11 +5,14 @@
 	import SourceAlbumModal from '$lib/components/SourceAlbumModal.svelte';
 	import {
 		getLocalFilesSidebarCachedData,
+		getLocalFilesAlbumsListCachedData,
 		isLocalFilesSidebarCacheStale,
+		isLocalFilesAlbumsListCacheStale,
+		setLocalFilesAlbumsListCachedData,
 		setLocalFilesSidebarCachedData
 	} from '$lib/utils/localFilesCache';
 	import { launchLocalPlayback } from '$lib/player/launchLocalPlayback';
-	import { getCoverUrl } from '$lib/utils/errorHandling';
+	import { getCoverUrl, isAbortError } from '$lib/utils/errorHandling';
 	import type {
 		LocalAlbumSummary,
 		LocalPaginatedResponse,
@@ -31,6 +34,7 @@
 	let searchQuery = $state('');
 	let searchTimeout: ReturnType<typeof setTimeout> | null = null;
 	let fetchId = 0;
+	let albumsAbortController: AbortController | null = null;
 	let sidebarAbortController: AbortController | null = null;
 	let playingAlbumId = $state<number | null>(null);
 
@@ -39,9 +43,21 @@
 
 	const PAGE_SIZE = 48;
 
+	function getAlbumsListCacheKey(offset: number): string {
+		const search = searchQuery.trim() || '';
+		return `${sortBy}:${sortOrder}:${search}:${PAGE_SIZE}:${offset}`;
+	}
+
 	async function fetchAlbums(reset: boolean = false): Promise<void> {
 		const id = ++fetchId;
 		fetchError = '';
+
+		if (albumsAbortController) {
+			albumsAbortController.abort();
+		}
+		albumsAbortController = new AbortController();
+		const signal = albumsAbortController.signal;
+
 		if (reset) {
 			loading = true;
 			albums = [];
@@ -51,6 +67,18 @@
 
 		try {
 			const offset = reset ? 0 : albums.length;
+			const cacheKey = getAlbumsListCacheKey(offset);
+			const cached = getLocalFilesAlbumsListCachedData(cacheKey);
+			if (cached) {
+				albums = reset ? cached.data.items : [...albums, ...cached.data.items];
+				total = cached.data.total;
+				loading = false;
+				loadingMore = false;
+				if (!isLocalFilesAlbumsListCacheStale(cached.timestamp)) {
+					return;
+				}
+			}
+
 			const url = API.local.albums(
 				PAGE_SIZE,
 				offset,
@@ -58,16 +86,26 @@
 				searchQuery.trim() || undefined,
 				sortOrder
 			);
-			const res = await fetch(url);
+			const res = await fetch(url, { signal });
 			if (id !== fetchId) return;
 			if (res.ok) {
 				const data: LocalPaginatedResponse = await res.json();
 				albums = reset ? data.items : [...albums, ...data.items];
 				total = data.total;
+				setLocalFilesAlbumsListCachedData(
+					{
+						items: data.items,
+						total: data.total
+					},
+					cacheKey
+				);
 			} else {
 				fetchError = 'Failed to load albums';
 			}
-		} catch {
+		} catch (e) {
+			if (isAbortError(e)) {
+				return;
+			}
 			if (id === fetchId) fetchError = 'Failed to connect to local files service';
 		} finally {
 			if (id === fetchId) {
@@ -128,7 +166,7 @@
 				});
 			}
 		} catch (e) {
-			if (e instanceof Error && e.name === 'AbortError') {
+			if (isAbortError(e)) {
 				return;
 			}
 		}
@@ -205,6 +243,10 @@
 
 	onDestroy(() => {
 		if (searchTimeout) clearTimeout(searchTimeout);
+		if (albumsAbortController) {
+			albumsAbortController.abort();
+			albumsAbortController = null;
+		}
 		if (sidebarAbortController) {
 			sidebarAbortController.abort();
 			sidebarAbortController = null;

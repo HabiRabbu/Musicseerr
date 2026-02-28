@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
 	import { browser } from '$app/environment';
-	import { goto } from '$app/navigation';
 	import type { ArtistInfo, ArtistReleases, SimilarArtistsResponse, TopSongsResponse, TopAlbumsResponse, LastFmArtistEnrichment } from '$lib/types';
 	import { colors } from '$lib/colors';
 	import ArtistHeaderSkeleton from '$lib/components/ArtistHeaderSkeleton.svelte';
@@ -21,6 +20,13 @@
 	import { getArtistDiscoveryCache, setArtistDiscoveryCache } from '$lib/stores/discoveryCache';
 	import { integrationStore } from '$lib/stores/integration';
 	import { musicSourceStore, type MusicSource } from '$lib/stores/musicSource';
+	import {
+		artistBasicCache,
+		artistExtendedCache,
+		artistLastFmCache
+	} from '$lib/utils/artistDetailCache';
+	import { hydrateDetailCacheEntry } from '$lib/utils/detailCacheHydration';
+	import { isAbortError } from '$lib/utils/errorHandling';
 
 	export let data: { artistId: string };
 
@@ -55,8 +61,20 @@
 	let lastfmEnrichment: LastFmArtistEnrichment | null = null;
 	let loadingLastfm = true;
 
-	function sortReleasesByYear(releases: any[]) {
-		return releases.sort((a, b) => {
+	type ArtistReleasePaginationState = {
+		loadedReleaseCount: number;
+		hasMoreReleases: boolean;
+		totalReleaseCount: number;
+		currentOffset: number;
+	};
+
+	type ArtistReleaseSortingResult = {
+		artistInfo: ArtistInfo;
+		pagination: ArtistReleasePaginationState;
+	};
+
+	function sortReleasesByYear(releases: ArtistInfo['albums']) {
+		return [...releases].sort((a, b) => {
 			const yearA = a.year;
 			const yearB = b.year;
 			if (yearA === null || yearA === undefined) return 1;
@@ -65,9 +83,96 @@
 		});
 	}
 
+	function applyArtistReleaseSorting(artistInfo: ArtistInfo): ArtistReleaseSortingResult {
+		const sortedArtistInfo: ArtistInfo = {
+			...artistInfo,
+			albums: sortReleasesByYear(artistInfo.albums),
+			singles: sortReleasesByYear(artistInfo.singles),
+			eps: sortReleasesByYear(artistInfo.eps)
+		};
+		const nextLoadedReleaseCount =
+			sortedArtistInfo.albums.length +
+			sortedArtistInfo.singles.length +
+			sortedArtistInfo.eps.length;
+
+		const releaseGroupCount = sortedArtistInfo.release_group_count || 0;
+		const nextHasMoreReleases =
+			releaseGroupCount > nextLoadedReleaseCount ||
+			(releaseGroupCount === 0 && nextLoadedReleaseCount >= BATCH_SIZE);
+		const nextTotalReleaseCount = nextHasMoreReleases
+			? (releaseGroupCount || nextLoadedReleaseCount)
+			: nextLoadedReleaseCount;
+		const nextOffset = nextHasMoreReleases ? BATCH_SIZE : 0;
+
+		return {
+			artistInfo: sortedArtistInfo,
+			pagination: {
+				loadedReleaseCount: nextLoadedReleaseCount,
+				hasMoreReleases: nextHasMoreReleases,
+				totalReleaseCount: nextTotalReleaseCount,
+				currentOffset: nextOffset
+			}
+		};
+	}
+
+	function applyArtistReleasePaginationState(pagination: ArtistReleasePaginationState): void {
+		loadedReleaseCount = pagination.loadedReleaseCount;
+		hasMoreReleases = pagination.hasMoreReleases;
+		totalReleaseCount = pagination.totalReleaseCount;
+		currentOffset = pagination.currentOffset;
+	}
+
+	function hydrateFromCache(artistId: string): {
+		refreshBasic: boolean;
+		refreshExtended: boolean;
+		refreshLastfm: boolean;
+	} {
+		const refreshBasic = hydrateDetailCacheEntry({
+			cache: artistBasicCache,
+			cacheKey: artistId,
+			onHydrate: (cachedArtist) => {
+				const sortedResult = applyArtistReleaseSorting(cachedArtist);
+				artist = sortedResult.artistInfo;
+				applyArtistReleasePaginationState(sortedResult.pagination);
+				loadingBasic = false;
+			}
+		});
+
+		const refreshExtended = artist
+			? hydrateDetailCacheEntry({
+					cache: artistExtendedCache,
+					cacheKey: artistId,
+					onHydrate: (cachedExtended) => {
+						artist = {
+							...artist!,
+							description: cachedExtended.description,
+							image: cachedExtended.image
+						};
+						loadingExtended = false;
+					}
+				})
+			: true;
+
+		const refreshLastfm = hydrateDetailCacheEntry({
+			cache: artistLastFmCache,
+			cacheKey: artistId,
+			onHydrate: (cachedLastFmEnrichment) => {
+				lastfmEnrichment = cachedLastFmEnrichment;
+				loadingLastfm = false;
+			}
+		});
+
+		return { refreshBasic, refreshExtended, refreshLastfm };
+	}
+
 	async function fetchArtist(force = false) {
-		if (!artist) loadingBasic = true;
-		if (!artist) loadingExtended = true;
+		const { refreshBasic, refreshExtended, refreshLastfm } = force
+			? { refreshBasic: true, refreshExtended: true, refreshLastfm: true }
+			: hydrateFromCache(data.artistId);
+
+		if (!artist || refreshBasic) loadingBasic = true;
+		if (!artist || refreshExtended) loadingExtended = true;
+		if (refreshLastfm) loadingLastfm = true;
 		if (!similarArtists && !topSongs && !topAlbums) {
 			loadingSimilar = true;
 			loadingTopSongs = true;
@@ -81,14 +186,21 @@
 		abortController = new AbortController();
 
 		await musicSourceStore.load();
-		await fetchBasicInfo(force);
+
+		if (refreshBasic || !artist) {
+			await fetchBasicInfo(force);
+		}
 
 		if (artist) {
-			fetchExtendedInfo(force, artist);
-			fetchLastFmEnrichment();
-			await fetchDiscoveryData(musicSourceStore.getPageSource('artist'));
+			if (refreshExtended) {
+				void fetchExtendedInfo(force, artist);
+			}
+			if (refreshLastfm) {
+				void fetchLastFmEnrichment();
+			}
+			void fetchDiscoveryData(musicSourceStore.getPageSource('artist'));
 			if (hasMoreReleases) {
-				fetchMoreReleases();
+				void fetchMoreReleases();
 			}
 		}
 	}
@@ -103,31 +215,19 @@
 			});
 			
 			if (res.ok) {
-				artist = await res.json();
+				const artistData: ArtistInfo = await res.json();
 				
-				if (artist) {
-					artist.albums = sortReleasesByYear(artist.albums);
-					artist.singles = sortReleasesByYear(artist.singles);
-					artist.eps = sortReleasesByYear(artist.eps);
-					loadedReleaseCount = artist.albums.length + artist.singles.length + artist.eps.length;
-					
-					const releaseGroupCount = artist.release_group_count || 0;
-					
-					if (releaseGroupCount > loadedReleaseCount || 
-					    (releaseGroupCount === 0 && loadedReleaseCount >= BATCH_SIZE)) {
-						hasMoreReleases = true;
-						totalReleaseCount = releaseGroupCount || loadedReleaseCount;
-						currentOffset = BATCH_SIZE;
-
-					} else {
-						hasMoreReleases = false;
-					}
+				if (artistData) {
+					const sortedResult = applyArtistReleaseSorting(artistData);
+					artist = sortedResult.artistInfo;
+					applyArtistReleasePaginationState(sortedResult.pagination);
+					artistBasicCache.set(artist, data.artistId);
 				}
 			} else {
 				error = 'Failed to load artist';
 			}
 		} catch (e) {
-			if (e instanceof Error && e.name === 'AbortError') {
+			if (isAbortError(e)) {
 				return;
 			}
 			error = 'Error loading artist';
@@ -152,10 +252,18 @@
 					artist.description = extendedInfo.description;
 					artist.image = extendedInfo.image;
 					artist = artist;
+					artistExtendedCache.set(
+						{
+							description: extendedInfo.description ?? null,
+							image: extendedInfo.image ?? null
+						},
+						data.artistId
+					);
+					artistBasicCache.set(artist, data.artistId);
 				}
 			}
 		} catch (e) {
-			if (e instanceof Error && e.name === 'AbortError') {
+			if (isAbortError(e)) {
 				return;
 			}
 		} finally {
@@ -188,17 +296,17 @@
 
 		const similarPromise = fetch(`/api/artist/${data.artistId}/similar?count=15&source=${activeSource}`, { signal })
 			.then(async (res) => { if (res.ok) similarArtists = await res.json(); })
-			.catch((e) => { if (!(e instanceof Error && e.name === 'AbortError')) { /* ignore */ } })
+			.catch((e) => { if (!isAbortError(e)) { /* ignore */ } })
 			.finally(() => { loadingSimilar = false; });
 
 		const songsPromise = fetch(`/api/artist/${data.artistId}/top-songs?count=10&source=${activeSource}`, { signal })
 			.then(async (res) => { if (res.ok) topSongs = await res.json(); })
-			.catch((e) => { if (!(e instanceof Error && e.name === 'AbortError')) { /* ignore */ } })
+			.catch((e) => { if (!isAbortError(e)) { /* ignore */ } })
 			.finally(() => { loadingTopSongs = false; });
 
 		const albumsPromise = fetch(`/api/artist/${data.artistId}/top-albums?count=10&source=${activeSource}`, { signal })
 			.then(async (res) => { if (res.ok) topAlbums = await res.json(); })
-			.catch((e) => { if (!(e instanceof Error && e.name === 'AbortError')) { /* ignore */ } })
+			.catch((e) => { if (!isAbortError(e)) { /* ignore */ } })
 			.finally(() => { loadingTopAlbums = false; });
 
 		await Promise.all([similarPromise, songsPromise, albumsPromise]);
@@ -225,9 +333,12 @@
 			);
 			if (res.ok) {
 				lastfmEnrichment = await res.json();
+				if (lastfmEnrichment) {
+					artistLastFmCache.set(lastfmEnrichment, data.artistId);
+				}
 			}
 		} catch (e) {
-			if (e instanceof Error && e.name === 'AbortError') return;
+			if (isAbortError(e)) return;
 		} finally {
 			loadingLastfm = false;
 		}
@@ -284,7 +395,7 @@
 				}
 			}
 		} catch (e) {
-			if (e instanceof Error && e.name === 'AbortError') {
+			if (isAbortError(e)) {
 				return;
 			}
 			hasMoreReleases = false;
@@ -361,6 +472,7 @@
 				if (release) {
 					release.requested = true;
 					artist = artist;
+					artistBasicCache.set(artist, data.artistId);
 				}
 
 				showToast = true;
@@ -380,6 +492,7 @@
 			showArtistRemovedModal = true;
 		}
 		artist = artist;
+		artistBasicCache.set(artist, data.artistId);
 	}
 </script>
 

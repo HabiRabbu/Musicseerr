@@ -107,8 +107,9 @@ async def test_stream_track_raises_on_missing_file(service):
 @pytest.mark.asyncio
 async def test_stream_track_raises_on_path_traversal(service):
     svc, lidarr, music_dir, cache = service
+    traversal_path = str(music_dir / ".." / ".." / "etc" / "passwd")
     lidarr.get_track_file = AsyncMock(
-        return_value={"path": "/etc/passwd"}
+        return_value={"path": traversal_path}
     )
 
     with pytest.raises(PermissionError, match="outside music directory"):

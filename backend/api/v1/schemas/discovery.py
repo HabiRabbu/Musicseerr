@@ -1,70 +1,69 @@
-from typing import Optional
-from pydantic import BaseModel, Field
+from infrastructure.msgspec_fastapi import AppStruct
 
 
-class SimilarArtist(BaseModel):
+class SimilarArtist(AppStruct):
     musicbrainz_id: str
     name: str
     listen_count: int = 0
     in_library: bool = False
-    image_url: Optional[str] = None
+    image_url: str | None = None
 
 
-class SimilarArtistsResponse(BaseModel):
-    similar_artists: list[SimilarArtist] = Field(default_factory=list)
+class SimilarArtistsResponse(AppStruct):
+    similar_artists: list[SimilarArtist] = []
     source: str = "listenbrainz"
     configured: bool = True
 
 
-class TopSong(BaseModel):
-    recording_mbid: Optional[str] = None
+class TopSong(AppStruct):
     title: str
     artist_name: str
-    release_mbid: Optional[str] = None
-    release_name: Optional[str] = None
+    recording_mbid: str | None = None
+    release_mbid: str | None = None
+    release_name: str | None = None
     listen_count: int = 0
 
 
-class TopSongsResponse(BaseModel):
-    songs: list[TopSong] = Field(default_factory=list)
+class TopSongsResponse(AppStruct):
+    songs: list[TopSong] = []
     source: str = "listenbrainz"
     configured: bool = True
 
 
-class TopAlbum(BaseModel):
-    release_group_mbid: Optional[str] = None
+class TopAlbum(AppStruct):
     title: str
     artist_name: str
-    year: Optional[int] = None
+    release_group_mbid: str | None = None
+    year: int | None = None
     listen_count: int = 0
     in_library: bool = False
     requested: bool = False
-    cover_url: Optional[str] = None
+    cover_url: str | None = None
 
 
-class TopAlbumsResponse(BaseModel):
-    albums: list[TopAlbum] = Field(default_factory=list)
+class TopAlbumsResponse(AppStruct):
+    albums: list[TopAlbum] = []
     source: str = "listenbrainz"
     configured: bool = True
 
 
-class DiscoveryAlbum(BaseModel):
+class DiscoveryAlbum(AppStruct):
     musicbrainz_id: str
     title: str
     artist_name: str
-    artist_id: Optional[str] = None
-    year: Optional[int] = None
+    artist_id: str | None = None
+    year: int | None = None
     in_library: bool = False
     requested: bool = False
-    cover_url: Optional[str] = None
+    cover_url: str | None = None
 
 
-class SimilarAlbumsResponse(BaseModel):
-    albums: list[DiscoveryAlbum] = Field(default_factory=list)
+class SimilarAlbumsResponse(AppStruct):
+    albums: list[DiscoveryAlbum] = []
     source: str = "listenbrainz"
     configured: bool = True
 
 
-class MoreByArtistResponse(BaseModel):
-    albums: list[DiscoveryAlbum] = Field(default_factory=list)
+class MoreByArtistResponse(AppStruct):
+    albums: list[DiscoveryAlbum] = []
     artist_name: str = ""

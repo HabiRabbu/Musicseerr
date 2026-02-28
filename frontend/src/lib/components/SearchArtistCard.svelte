@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { Artist, EnrichmentSource } from '$lib/types';
-	import { goto } from '$app/navigation';
+	import { artistHref } from '$lib/utils/entityRoutes';
 	import { formatListenCount } from '$lib/utils/formatting';
 	import { getListenTitle } from '$lib/utils/enrichment';
 	import { Music2 } from 'lucide-svelte';
@@ -10,16 +10,11 @@
 	export let enrichmentSource: EnrichmentSource = 'none';
 
 	$: listenTitle = getListenTitle(enrichmentSource, 'artist');
-
-	function handleClick() {
-		goto(`/artist/${artist.musicbrainz_id}`);
-	}
 </script>
 
-<button
-	type="button"
+<a
+	href={artistHref(artist.musicbrainz_id)}
 	class="card bg-base-100 w-full shadow-sm flex-shrink-0 cursor-pointer transition-transform hover:scale-105 hover:shadow-lg"
-	onclick={handleClick}
 >
 	<figure class="flex justify-center pt-4">
 		<ArtistImage mbid={artist.musicbrainz_id} alt={artist.title} size="lg" />
@@ -63,4 +58,4 @@
 			{/if}
 		</div>
 	</div>
-</button>
+</a>

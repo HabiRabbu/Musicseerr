@@ -2,7 +2,7 @@ import logging
 from repositories.protocols import LidarrRepositoryProtocol
 from infrastructure.queue.request_queue import RequestQueue
 from infrastructure.cache.request_history import RequestHistoryStore
-from api.v1.schemas.request import QueueStatusResponse
+from api.v1.schemas.request import QueueStatusResponse, RequestResponse
 from core.exceptions import ExternalServiceError
 from services.request_utils import extract_cover_url
 
@@ -20,7 +20,7 @@ class RequestService:
         self._request_queue = request_queue
         self._request_history = request_history
     
-    async def request_album(self, musicbrainz_id: str, artist: str | None = None, album: str | None = None, year: int | None = None) -> dict:
+    async def request_album(self, musicbrainz_id: str, artist: str | None = None, album: str | None = None, year: int | None = None) -> RequestResponse:
         try:
             result = await self._request_queue.add(musicbrainz_id)
 
@@ -54,11 +54,11 @@ class RequestService:
             except Exception as e:
                 logger.error("Failed to persist request history for %s: %s", musicbrainz_id, e)
 
-            return {
-                "success": True,
-                "message": result["message"],
-                "lidarr_response": payload,
-            }
+            return RequestResponse(
+                success=True,
+                message=result["message"],
+                lidarr_response=payload,
+            )
         except Exception as e:
             logger.error("Failed to request album %s: %s", musicbrainz_id, e)
             raise ExternalServiceError(f"Failed to request album: {e}")

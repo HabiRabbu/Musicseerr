@@ -8,15 +8,19 @@ from api.v1.schemas.library import (
     RecentlyAddedResponse,
     LibraryStatsResponse,
     AlbumRemoveResponse,
-    AlbumRemovePreviewResponse
+    AlbumRemovePreviewResponse,
+    SyncLibraryResponse,
+    LibraryMbidsResponse,
+    LibraryGroupedResponse,
 )
 from core.dependencies import get_library_service
 from core.exceptions import ExternalServiceError
+from infrastructure.msgspec_fastapi import MsgSpecRoute
 from services.library_service import LibraryService
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/library", tags=["library"])
+router = APIRouter(route_class=MsgSpecRoute, prefix="/api/library", tags=["library"])
 
 
 @router.get("/", response_model=LibraryResponse)
@@ -65,7 +69,7 @@ async def get_recently_added(
         raise HTTPException(status_code=500, detail="Failed to load recently added")
 
 
-@router.post("/sync")
+@router.post("/sync", response_model=SyncLibraryResponse)
 async def sync_library(
     library_service: LibraryService = Depends(get_library_service)
 ):
@@ -92,7 +96,7 @@ async def get_library_stats(
         raise HTTPException(status_code=500, detail="Failed to load stats")
 
 
-@router.get("/mbids")
+@router.get("/mbids", response_model=LibraryMbidsResponse)
 async def get_library_mbids(
     library_service: LibraryService = Depends(get_library_service)
 ):
@@ -101,18 +105,18 @@ async def get_library_mbids(
             library_service.get_library_mbids(),
             library_service.get_requested_mbids(),
         )
-        return {"mbids": mbids, "requested_mbids": requested}
+        return LibraryMbidsResponse(mbids=mbids, requested_mbids=requested)
     except Exception as e:
         logger.error(f"Failed to get library mbids: {e}")
         raise HTTPException(status_code=500, detail="Failed to load library")
 
 
-@router.get("/grouped")
+@router.get("/grouped", response_model=LibraryGroupedResponse)
 async def get_library_grouped(
     library_service: LibraryService = Depends(get_library_service)
 ):
     grouped = await library_service.get_library_grouped()
-    return {"library": grouped}
+    return LibraryGroupedResponse(library=grouped)
 
 
 @router.get("/album/{album_mbid}/removal-preview", response_model=AlbumRemovePreviewResponse)
@@ -121,8 +125,7 @@ async def get_album_removal_preview(
     library_service: LibraryService = Depends(get_library_service)
 ):
     try:
-        result = await library_service.get_album_removal_preview(album_mbid)
-        return AlbumRemovePreviewResponse(**result)
+        return await library_service.get_album_removal_preview(album_mbid)
     except ExternalServiceError as e:
         logger.error(f"Failed to get album removal preview: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -138,8 +141,7 @@ async def remove_album(
     library_service: LibraryService = Depends(get_library_service)
 ):
     try:
-        result = await library_service.remove_album(album_mbid, delete_files=delete_files)
-        return AlbumRemoveResponse(**result)
+        return await library_service.remove_album(album_mbid, delete_files=delete_files)
     except ExternalServiceError as e:
         logger.error(f"Failed to remove album: {e}")
         raise HTTPException(status_code=500, detail=str(e))

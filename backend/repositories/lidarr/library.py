@@ -1,9 +1,16 @@
 import logging
 from datetime import datetime
 from typing import Any
-from api.v1.schemas.library import LibraryAlbum
+from api.v1.schemas.library import LibraryAlbum, LibraryGroupedAlbum, LibraryGroupedArtist
 from infrastructure.cover_urls import prefer_release_group_cover_url
-from infrastructure.cache.cache_keys import lidarr_library_mbids_key, lidarr_artist_mbids_key
+from infrastructure.cache.cache_keys import (
+    lidarr_library_albums_key,
+    lidarr_library_artists_key,
+    lidarr_library_mbids_key,
+    lidarr_artist_mbids_key,
+    lidarr_library_grouped_key,
+    lidarr_requested_mbids_key,
+)
 from .base import LidarrBase
 
 logger = logging.getLogger(__name__)
@@ -11,7 +18,12 @@ logger = logging.getLogger(__name__)
 
 class LidarrLibraryRepository(LidarrBase):
     async def get_library(self, include_unmonitored: bool = False) -> list[LibraryAlbum]:
-        data = await self._get("/api/v1/album")
+        cache_key = lidarr_library_albums_key(include_unmonitored)
+        cached_result = await self._cache.get(cache_key)
+        if cached_result is not None:
+            return cached_result
+
+        data = await self._get_all_albums_raw()
         out: list[LibraryAlbum] = []
         filtered_count = 0
 
@@ -66,10 +78,16 @@ class LidarrLibraryRepository(LidarrBase):
         if filtered_count > 0:
             logger.info(f"Filtered out {filtered_count} unmonitored albums from library")
 
+        await self._cache.set(cache_key, out, ttl_seconds=300)
         return out
 
     async def get_artists_from_library(self, include_unmonitored: bool = False) -> list[dict]:
-        albums_data = await self._get("/api/v1/album")
+        cache_key = lidarr_library_artists_key(include_unmonitored)
+        cached_result = await self._cache.get(cache_key)
+        if cached_result is not None:
+            return cached_result
+
+        albums_data = await self._get_all_albums_raw()
         artists_dict: dict[str, dict] = {}
         filtered_count = 0
 
@@ -111,11 +129,18 @@ class LidarrLibraryRepository(LidarrBase):
         if filtered_count > 0:
             logger.info(f"Filtered out {filtered_count} unmonitored albums from artist extraction")
 
-        return list(artists_dict.values())
+        result = list(artists_dict.values())
+        await self._cache.set(cache_key, result, ttl_seconds=300)
+        return result
 
-    async def get_library_grouped(self) -> list[dict[str, Any]]:
-        data = await self._get("/api/v1/album")
-        grouped: dict[str, list[dict[str, Any]]] = {}
+    async def get_library_grouped(self) -> list[LibraryGroupedArtist]:
+        cache_key = lidarr_library_grouped_key()
+        cached_result = await self._cache.get(cache_key)
+        if cached_result is not None:
+            return cached_result
+
+        data = await self._get_all_albums_raw()
+        grouped: dict[str, list[LibraryGroupedAlbum]] = {}
 
         for item in data:
             artist = item.get("artist", {}).get("artistName", "Unknown")
@@ -136,15 +161,20 @@ class LidarrLibraryRepository(LidarrBase):
             )
 
             grouped.setdefault(artist, []).append(
-                {
-                    "title": title,
-                    "year": year,
-                    "monitored": item.get("monitored", False),
-                    "cover_url": cover,
-                }
+                LibraryGroupedAlbum(
+                    title=title,
+                    year=year,
+                    monitored=item.get("monitored", False),
+                    cover_url=cover,
+                )
             )
 
-        return [{"artist": artist, "albums": albums} for artist, albums in grouped.items()]
+        result = [
+            LibraryGroupedArtist(artist=artist, albums=albums)
+            for artist, albums in grouped.items()
+        ]
+        await self._cache.set(cache_key, result, ttl_seconds=300)
+        return result
 
     async def get_library_mbids(self, include_release_ids: bool = True) -> set[str]:
         cache_key = lidarr_library_mbids_key(include_release_ids)
@@ -153,7 +183,7 @@ class LidarrLibraryRepository(LidarrBase):
         if cached_result is not None:
             return cached_result
 
-        data = await self._get("/api/v1/album")
+        data = await self._get_all_albums_raw()
         ids: set[str] = set()
         for item in data:
             if not item.get("monitored", False):
@@ -196,13 +226,13 @@ class LidarrLibraryRepository(LidarrBase):
         return ids
 
     async def get_requested_mbids(self) -> set[str]:
-        cache_key = "lidarr_requested_mbids"
+        cache_key = lidarr_requested_mbids_key()
 
         cached_result = await self._cache.get(cache_key)
         if cached_result is not None:
             return cached_result
 
-        data = await self._get("/api/v1/album")
+        data = await self._get_all_albums_raw()
         ids: set[str] = set()
         for item in data:
             if not item.get("monitored", False):

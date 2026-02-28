@@ -1,28 +1,24 @@
-from dataclasses import dataclass
+import msgspec
 
 from core.exceptions import ExternalServiceError
 
 
-@dataclass
-class LastFmToken:
+class LastFmToken(msgspec.Struct):
     token: str
 
 
-@dataclass
-class LastFmSession:
+class LastFmSession(msgspec.Struct):
     name: str
     key: str
     subscriber: int = 0
 
 
-@dataclass
-class LastFmTag:
+class LastFmTag(msgspec.Struct):
     name: str
     url: str = ""
 
 
-@dataclass
-class LastFmArtist:
+class LastFmArtist(msgspec.Struct):
     name: str
     mbid: str | None = None
     playcount: int = 0
@@ -30,8 +26,7 @@ class LastFmArtist:
     url: str = ""
 
 
-@dataclass
-class LastFmAlbum:
+class LastFmAlbum(msgspec.Struct):
     name: str
     artist_name: str
     mbid: str | None = None
@@ -41,8 +36,7 @@ class LastFmAlbum:
     image_url: str = ""
 
 
-@dataclass
-class LastFmTrack:
+class LastFmTrack(msgspec.Struct):
     name: str
     artist_name: str
     mbid: str | None = None
@@ -51,16 +45,14 @@ class LastFmTrack:
     url: str = ""
 
 
-@dataclass
-class LastFmSimilarArtist:
+class LastFmSimilarArtist(msgspec.Struct):
     name: str
     mbid: str | None = None
     match: float = 0.0
     url: str = ""
 
 
-@dataclass
-class LastFmArtistInfo:
+class LastFmArtistInfo(msgspec.Struct):
     name: str
     mbid: str | None = None
     listeners: int = 0
@@ -71,16 +63,14 @@ class LastFmArtistInfo:
     similar: list[LastFmSimilarArtist] | None = None
 
 
-@dataclass
-class LastFmAlbumTrack:
+class LastFmAlbumTrack(msgspec.Struct):
     name: str
     duration: int = 0
     rank: int = 0
     url: str = ""
 
 
-@dataclass
-class LastFmAlbumInfo:
+class LastFmAlbumInfo(msgspec.Struct):
     name: str
     artist_name: str
     mbid: str | None = None
@@ -93,8 +83,7 @@ class LastFmAlbumInfo:
     tracks: list[LastFmAlbumTrack] | None = None
 
 
-@dataclass
-class LastFmRecentTrack:
+class LastFmRecentTrack(msgspec.Struct):
     track_name: str
     artist_name: str
     album_name: str = ""
@@ -105,8 +94,7 @@ class LastFmRecentTrack:
     image_url: str = ""
 
 
-@dataclass
-class LastFmLovedTrack:
+class LastFmLovedTrack(msgspec.Struct):
     track_name: str
     artist_name: str
     album_name: str = ""

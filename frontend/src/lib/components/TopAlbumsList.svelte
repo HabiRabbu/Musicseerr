@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
+	import { albumHref } from '$lib/utils/entityRoutes';
 	import { onMount } from 'svelte';
 	import { Music2, Download } from 'lucide-svelte';
 	import type { TopAlbum } from '$lib/types';
@@ -32,10 +32,6 @@
 		});
 		return unsubscribe;
 	});
-
-	function handleClick(mbid: string | null | undefined) {
-		if (mbid) goto(`/album/${mbid}`);
-	}
 
 	function isInLibrary(album: TopAlbum): boolean {
 		const mbid = album.release_group_mbid?.toLowerCase();
@@ -104,12 +100,9 @@
 		<div class="space-y-1">
 			{#each albums as album}
 				{#if album.release_group_mbid}
-				<div
+				<a
+					href={albumHref(album.release_group_mbid)}
 					class="flex items-center gap-3 p-2 rounded-lg hover:bg-base-200 cursor-pointer transition-colors group"
-					role="button"
-					tabindex="0"
-					onclick={() => handleClick(album.release_group_mbid)}
-					onkeydown={(e) => e.key === 'Enter' && handleClick(album.release_group_mbid)}
 				>
 						<div class="w-12 h-12 flex-shrink-0 relative">
 							<AlbumImage mbid={album.release_group_mbid} alt={album.title} size="full" className="w-12 h-12 rounded" />
@@ -165,7 +158,7 @@
 							{/if}
 						</button>
 					{/if}
-				</div>
+				</a>
 				{:else}
 				<div class="flex items-center gap-3 p-2 rounded-lg transition-colors {source === 'lastfm' ? 'opacity-75' : ''}">
 					{#if source === 'lastfm'}

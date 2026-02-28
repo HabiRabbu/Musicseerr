@@ -3,18 +3,20 @@ import time
 from fastapi import APIRouter, Query, Path, BackgroundTasks, Depends
 from api.v1.schemas.search import (
     SearchResponse,
+    SearchBucketResponse,
     EnrichmentResponse,
     EnrichmentBatchRequest,
     SuggestResponse,
 )
 from core.dependencies import get_search_service, get_coverart_repository, get_search_enrichment_service
+from infrastructure.msgspec_fastapi import MsgSpecBody, MsgSpecRoute
 from services.search_service import SearchService
 from services.search_enrichment_service import SearchEnrichmentService
 from repositories.coverart_repository import CoverArtRepository
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/search", tags=["search"])
+router = APIRouter(route_class=MsgSpecRoute, prefix="/api/search", tags=["search"])
 
 
 @router.get("", response_model=SearchResponse)
@@ -72,7 +74,7 @@ async def suggest(
     return result
 
 
-@router.get("/{bucket}")
+@router.get("/{bucket}", response_model=SearchBucketResponse)
 async def search_bucket(
     bucket: str = Path(..., pattern="^(artists|albums)$"),
     q: str = Query(..., min_length=1, description="Search term"),
@@ -86,7 +88,7 @@ async def search_bucket(
         limit=limit,
         offset=offset
     )
-    return {"bucket": bucket, "limit": limit, "offset": offset, "results": results}
+    return SearchBucketResponse(bucket=bucket, limit=limit, offset=offset, results=results)
 
 
 @router.get("/enrich/batch", response_model=EnrichmentResponse)
@@ -106,7 +108,7 @@ async def enrich_search_results(
 
 @router.post("/enrich/batch", response_model=EnrichmentResponse)
 async def enrich_search_results_post(
-    body: EnrichmentBatchRequest,
+    body: EnrichmentBatchRequest = MsgSpecBody(EnrichmentBatchRequest),
     enrichment_service: SearchEnrichmentService = Depends(get_search_enrichment_service),
 ):
     return await enrichment_service.enrich_batch(body)

@@ -9,12 +9,28 @@ type JellyfinSidebarData = {
 	stats: JellyfinLibraryStats | null;
 };
 
-const jellyfinSidebarCache = createLocalStorageCache<JellyfinSidebarData>(
+type JellyfinAlbumsListData = {
+	items: JellyfinAlbumSummary[];
+	total: number;
+};
+
+export const jellyfinSidebarCache = createLocalStorageCache<JellyfinSidebarData>(
 	CACHE_KEYS.JELLYFIN_SIDEBAR,
 	CACHE_TTL.JELLYFIN_SIDEBAR
+);
+
+export const jellyfinAlbumsListCache = createLocalStorageCache<JellyfinAlbumsListData>(
+	CACHE_KEYS.JELLYFIN_ALBUMS_LIST,
+	CACHE_TTL.JELLYFIN_ALBUMS_LIST,
+	{ maxEntries: 80 }
 );
 
 export const getJellyfinSidebarCachedData = jellyfinSidebarCache.get;
 export const setJellyfinSidebarCachedData = jellyfinSidebarCache.set;
 export const isJellyfinSidebarCacheStale = jellyfinSidebarCache.isStale;
 export const updateJellyfinSidebarCacheTTL = jellyfinSidebarCache.updateTTL;
+
+export const getJellyfinAlbumsListCachedData = jellyfinAlbumsListCache.get;
+export const setJellyfinAlbumsListCachedData = jellyfinAlbumsListCache.set;
+export const isJellyfinAlbumsListCacheStale = jellyfinAlbumsListCache.isStale;
+export const updateJellyfinAlbumsListCacheTTL = jellyfinAlbumsListCache.updateTTL;

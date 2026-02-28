@@ -2,6 +2,8 @@ import asyncio
 import httpx
 import logging
 from typing import Any
+
+import msgspec
 from core.exceptions import ExternalServiceError
 from infrastructure.cache.memory_cache import CacheInterface
 from infrastructure.resilience.retry import with_retry, CircuitBreaker
@@ -27,6 +29,17 @@ _listenbrainz_circuit_breaker = CircuitBreaker(
 _listenbrainz_rate_limiter = TokenBucketRateLimiter(rate=5.0, capacity=10)
 
 LISTENBRAINZ_API_URL = "https://api.listenbrainz.org"
+
+ListenBrainzJsonObject = dict[str, Any]
+ListenBrainzJsonArray = list[ListenBrainzJsonObject]
+ListenBrainzJson = ListenBrainzJsonObject | ListenBrainzJsonArray
+
+
+def _decode_json_response(response: httpx.Response) -> ListenBrainzJson:
+    content = getattr(response, "content", None)
+    if isinstance(content, (bytes, bytearray, memoryview)):
+        return msgspec.json.decode(content, type=ListenBrainzJson)
+    return response.json()
 
 
 class ListenBrainzRepository:
@@ -107,8 +120,8 @@ class ListenBrainzRepository:
                     )
 
                 try:
-                    return response.json()
-                except ValueError:
+                    return _decode_json_response(response)
+                except (msgspec.DecodeError, ValueError, TypeError):
                     return None
 
             except httpx.HTTPError as e:
@@ -150,7 +163,7 @@ class ListenBrainzRepository:
             if response.status_code != 200:
                 return False, f"Validation failed (HTTP {response.status_code})"
             
-            result = response.json()
+            result = _decode_json_response(response)
             if result and "payload" in result:
                 count = result.get("payload", {}).get("count", 0)
                 return True, f"User found with {count:,} listens"
@@ -179,7 +192,7 @@ class ListenBrainzRepository:
             if response.status_code != 200:
                 return False, "Token invalid or expired"
             
-            result = response.json()
+            result = _decode_json_response(response)
             if result and result.get("valid"):
                 username = result.get("user_name", self._username)
                 return True, f"Successfully connected as '{username}'"

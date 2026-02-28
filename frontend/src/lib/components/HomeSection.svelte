@@ -8,6 +8,7 @@
 	} from '$lib/types';
 	import { ArrowRight, X, Check, Music2, Tv, Sparkles, Search } from 'lucide-svelte';
 	import { goto } from '$app/navigation';
+	import { albumHrefOrNull, artistHrefOrNull } from '$lib/utils/entityRoutes';
 	import { formatListenCount, formatListenedAt } from '$lib/utils/formatting';
 	import ArtistImage from './ArtistImage.svelte';
 	import AlbumImage from './AlbumImage.svelte';
@@ -21,20 +22,8 @@
 
 	let { section, showConnectCard = true, headerLink = null }: Props = $props();
 
-	function handleArtistClick(artist: HomeArtist) {
-		if (artist.mbid) goto(`/artist/${artist.mbid}`);
-	}
-
-	function handleAlbumClick(album: HomeAlbum) {
-		if (album.mbid) goto(`/album/${album.mbid}`);
-	}
-
-	function handleTrackClick(track: HomeTrack) {
-		if (track.artist_mbid) goto(`/artist/${track.artist_mbid}`);
-	}
-
-	function handleGenreClick(genre: HomeGenre) {
-		goto(`/genre?name=${encodeURIComponent(genre.name)}`);
+	function getGenreHref(genre: HomeGenre): string {
+		return `/genre?name=${encodeURIComponent(genre.name)}`;
 	}
 
 	function handleAlbumSearch(album: HomeAlbum) {
@@ -132,14 +121,14 @@
 		<div class="flex flex-wrap gap-2">
 			{#each section.items as item}
 				{#if isGenre(item)}
-					<button class="btn btn-sm btn-outline" onclick={() => handleGenreClick(item)}>
+					<a href={getGenreHref(item)} class="btn btn-sm btn-outline">
 						{item.name}
 						{#if item.listen_count}
 							<span class="badge badge-ghost badge-xs ml-1"
 								>{formatListenCount(item.listen_count)}</span
 							>
 						{/if}
-					</button>
+					</a>
 				{/if}
 			{/each}
 		</div>
@@ -147,15 +136,14 @@
 		<HorizontalCarousel class="-mx-4 px-4 sm:mx-0 sm:px-0 pb-2">
 			{#each section.items as item}
 				{#if isArtist(item)}
+					{@const artistHref = artistHrefOrNull(item.mbid)}
 					<div class="w-32 sm:w-36 md:w-44 flex-shrink-0">
-						<div
-							class="card bg-base-100 w-full shadow-sm transition-transform {item.mbid
+						<svelte:element
+							this={artistHref ? 'a' : 'div'}
+							href={artistHref ?? undefined}
+							class="card bg-base-100 w-full shadow-sm transition-transform {artistHref
 								? 'cursor-pointer hover:scale-105 active:scale-95 hover:shadow-lg'
 								: 'cursor-default opacity-80'}"
-							onclick={() => handleArtistClick(item)}
-							onkeydown={(e) => e.key === 'Enter' && handleArtistClick(item)}
-							role="button"
-							tabindex="0"
 						>
 							<figure class="flex justify-center pt-4 relative">
 								<ArtistImage mbid={item.mbid ?? ''} alt={item.name} size="md" lazy={true} />
@@ -179,18 +167,17 @@
 									<p class="text-xs text-base-content/50">{formatListenCount(item.listen_count)}</p>
 								{/if}
 							</div>
-						</div>
+						</svelte:element>
 					</div>
 				{:else if isAlbum(item)}
+					{@const albumHref = albumHrefOrNull(item.mbid)}
 					<div class="w-32 sm:w-36 md:w-44 flex-shrink-0">
-						<div
-							class="card bg-base-100 w-full shadow-sm transition-transform {item.mbid
+						<svelte:element
+							this={albumHref ? 'a' : 'div'}
+							href={albumHref ?? undefined}
+							class="card bg-base-100 w-full shadow-sm transition-transform {albumHref
 								? 'cursor-pointer hover:scale-105 active:scale-95 hover:shadow-lg'
 								: 'cursor-default opacity-90'}"
-							onclick={() => handleAlbumClick(item)}
-							onkeydown={(e) => e.key === 'Enter' && handleAlbumClick(item)}
-							role="button"
-							tabindex="0"
 						>
 							<figure class="aspect-square overflow-hidden relative">
 								<AlbumImage
@@ -226,18 +213,17 @@
 									<p class="text-xs text-base-content/50 line-clamp-1">{item.artist_name}</p>
 								{/if}
 							</div>
-						</div>
+						</svelte:element>
 					</div>
 				{:else if isTrack(item)}
+					{@const trackArtistHref = artistHrefOrNull(item.artist_mbid)}
 					<div class="w-56 sm:w-64 md:w-72 flex-shrink-0">
-						<div
-							class="card card-side bg-base-100 w-full shadow-sm transition-all {item.artist_mbid
+						<svelte:element
+							this={trackArtistHref ? 'a' : 'div'}
+							href={trackArtistHref ?? undefined}
+							class="card card-side bg-base-100 w-full shadow-sm transition-all {trackArtistHref
 								? 'cursor-pointer hover:shadow-lg active:scale-95'
 								: 'cursor-default opacity-90'}"
-							onclick={() => handleTrackClick(item)}
-							onkeydown={(e) => e.key === 'Enter' && handleTrackClick(item)}
-							role="button"
-							tabindex="0"
 						>
 							<figure class="w-16 h-16 flex-shrink-0">
 								{#if item.image_url}
@@ -272,7 +258,7 @@
 									</div>
 								{/if}
 							</div>
-						</div>
+						</svelte:element>
 					</div>
 				{/if}
 			{/each}

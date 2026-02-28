@@ -8,6 +8,7 @@ from api.v1.schemas.home import (
     ServicePrompt,
     HomeArtist,
     DiscoverPreview,
+    HomeIntegrationStatus,
 )
 from repositories.protocols import (
     ListenBrainzRepositoryProtocol,
@@ -89,15 +90,15 @@ class HomeService:
             return "listenbrainz"
         return resolved
 
-    def get_integration_status(self) -> dict[str, bool]:
-        return {
-            "listenbrainz": self._is_listenbrainz_enabled(),
-            "jellyfin": self._is_jellyfin_enabled(),
-            "lidarr": self._is_lidarr_configured(),
-            "youtube": self._is_youtube_enabled(),
-            "localfiles": self._is_local_files_enabled(),
-            "lastfm": self._is_lastfm_enabled(),
-        }
+    def get_integration_status(self) -> HomeIntegrationStatus:
+        return HomeIntegrationStatus(
+            listenbrainz=self._is_listenbrainz_enabled(),
+            jellyfin=self._is_jellyfin_enabled(),
+            lidarr=self._is_lidarr_configured(),
+            youtube=self._is_youtube_enabled(),
+            localfiles=self._is_local_files_enabled(),
+            lastfm=self._is_lastfm_enabled(),
+        )
 
     async def get_genre_artist(self, genre_name: str) -> str | None:
         VARIOUS_ARTISTS_MBID = "89ad4ac3-39f7-470e-963a-56509c546377"
@@ -159,9 +160,9 @@ class HomeService:
                 return cached
         
         integration_status = self.get_integration_status()
-        lb_enabled = integration_status["listenbrainz"]
-        lidarr_configured = integration_status["lidarr"]
-        lfm_enabled = integration_status.get("lastfm", False)
+        lb_enabled = integration_status.listenbrainz
+        lidarr_configured = integration_status.lidarr
+        lfm_enabled = integration_status.lastfm
         username = self._get_listenbrainz_username()
         lfm_username = self._get_lastfm_username()
         

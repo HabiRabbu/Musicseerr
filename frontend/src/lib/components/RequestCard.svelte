@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
+	import { albumHref, artistHref } from '$lib/utils/entityRoutes';
 	import AlbumImage from './AlbumImage.svelte';
 	import DeleteAlbumModal from './DeleteAlbumModal.svelte';
 	import ArtistRemovedModal from './ArtistRemovedModal.svelte';
@@ -84,16 +84,7 @@
 	const isFailedState = $derived(
 		item.status === 'importFailed' || item.status === 'importBlocked' || item.status === 'failed'
 	);
-
-	function handleAlbumClick() {
-		goto(`/album/${item.musicbrainz_id}`);
-	}
-
-	function handleArtistClick(e: Event) {
-		e.stopPropagation();
-		const mbid = 'artist_mbid' in item ? item.artist_mbid : null;
-		if (mbid) goto(`/artist/${mbid}`);
-	}
+	const artistMbid = $derived('artist_mbid' in item ? item.artist_mbid : null);
 
 	function handleCancelClick(e: Event) {
 		e.stopPropagation();
@@ -144,17 +135,17 @@
 </script>
 
 <div
-	class="flex flex-col bg-base-200 rounded-box hover:bg-base-300 transition-colors cursor-pointer"
+	class="relative flex flex-col bg-base-200 rounded-box hover:bg-base-300 transition-colors"
 	class:border-error={isFailedState}
 	class:border={isFailedState}
 >
-	<div
-		class="flex items-center gap-4 p-4"
-		onclick={handleAlbumClick}
-		onkeydown={(e) => e.key === 'Enter' && handleAlbumClick()}
-		role="button"
-		tabindex="0"
-	>
+	<a
+		href={albumHref(item.musicbrainz_id)}
+		class="absolute inset-0 z-0 rounded-box"
+		aria-label="Open {item.album_title}"
+	></a>
+
+	<div class="relative z-10 flex items-center gap-4 p-4 pointer-events-none">
 		<div class="w-16 h-16 sm:w-20 sm:h-20 flex-shrink-0 rounded-lg overflow-hidden">
 			<AlbumImage
 				mbid={item.musicbrainz_id}
@@ -167,13 +158,19 @@
 		</div>
 
 		<div class="flex-1 min-w-0">
-			<h3 class="font-semibold text-base-content line-clamp-1">{item.album_title}</h3>
-			<button
-				class="text-sm text-base-content/70 hover:text-primary transition-colors line-clamp-1 text-left"
-				onclick={handleArtistClick}
-			>
-				{item.artist_name}
-			</button>
+			<p class="font-semibold text-base-content line-clamp-1">
+				{item.album_title}
+			</p>
+			{#if artistMbid}
+				<a
+					href={artistHref(artistMbid)}
+					class="text-sm text-base-content/70 hover:text-primary transition-colors line-clamp-1 text-left pointer-events-auto"
+				>
+					{item.artist_name}
+				</a>
+			{:else}
+				<p class="text-sm text-base-content/70 line-clamp-1 text-left">{item.artist_name}</p>
+			{/if}
 			<p class="text-xs text-base-content/50 mt-0.5">
 				Requested {formatRelativeTime(item.requested_at)}
 				{#if item.year}
@@ -182,7 +179,7 @@
 			</p>
 		</div>
 
-		<div class="flex flex-col items-end gap-2 flex-shrink-0">
+		<div class="flex flex-col items-end gap-2 flex-shrink-0 pointer-events-auto">
 			<span class="badge {statusBadge.class} badge-sm">{statusBadge.label}</span>
 
 			{#if isActive && activeItem.status === 'downloading'}

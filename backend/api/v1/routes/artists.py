@@ -9,10 +9,11 @@ from services.artist_service import ArtistService
 from services.artist_discovery_service import ArtistDiscoveryService
 from services.artist_enrichment_service import ArtistEnrichmentService
 from infrastructure.validators import is_unknown_mbid
+from infrastructure.msgspec_fastapi import MsgSpecRoute
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/artist", tags=["artist"])
+router = APIRouter(route_class=MsgSpecRoute, prefix="/api/artist", tags=["artist"])
 
 
 @router.get("/{artist_id}", response_model=ArtistInfo)

@@ -1,5 +1,7 @@
 from typing import Any, Optional, Callable
 
+from api.v1.schemas.artist import LifeSpan, ReleaseItem
+
 _PLATFORM_PATTERNS: dict[str, tuple[str, str]] = {
     "instagram.com": ("Instagram", "social"),
     "twitter.com": ("Twitter", "social"),
@@ -67,14 +69,14 @@ def extract_aliases(mb_artist: dict[str, Any], limit: int = 10) -> list[str]:
     return aliases
 
 
-def extract_life_span(mb_artist: dict[str, Any]) -> Optional[dict[str, Optional[str]]]:
+def extract_life_span(mb_artist: dict[str, Any]) -> LifeSpan | None:
     if life_span := mb_artist.get("life-span"):
         ended = life_span.get("ended")
-        return {
-            "begin": life_span.get("begin"),
-            "end": life_span.get("end"),
-            "ended": str(ended).lower() if ended is not None else None,
-        }
+        return LifeSpan(
+            begin=life_span.get("begin"),
+            end=life_span.get("end"),
+            ended=str(ended).lower() if ended is not None else None,
+        )
     return None
 
 
@@ -109,9 +111,9 @@ def categorize_release_groups(
         included_primary_types = {"album", "single", "ep", "broadcast", "other"}
     if requested_mbids is None:
         requested_mbids = set()
-    albums = []
-    singles = []
-    eps = []
+    albums: list[ReleaseItem] = []
+    singles: list[ReleaseItem] = []
+    eps: list[ReleaseItem] = []
     if rg_list := mb_artist.get("release-group-list", []):
         for rg in rg_list:
             rg_id = rg.get("id")
@@ -128,17 +130,17 @@ def categorize_release_groups(
             rg_id_lower = rg_id.lower() if rg_id else ""
             in_library = rg_id_lower in album_mbids if rg_id else False
             requested = rg_id_lower in requested_mbids if rg_id and not in_library else False
-            rg_data = {
-                "id": rg_id,
-                "title": rg.get("title"),
-                "type": rg.get("primary-type"),
-                "first_release_date": rg.get("first-release-date"),
-                "in_library": in_library,
-                "requested": requested,
-            }
-            if date := rg_data.get("first_release_date"):
+            rg_data = ReleaseItem(
+                id=rg_id,
+                title=rg.get("title"),
+                type=rg.get("primary-type"),
+                first_release_date=rg.get("first-release-date"),
+                in_library=in_library,
+                requested=requested,
+            )
+            if date := rg_data.first_release_date:
                 try:
-                    rg_data["year"] = int(date.split("-")[0])
+                    rg_data.year = int(date.split("-")[0])
                 except (ValueError, AttributeError):
                     pass
             if primary_type == "album":
@@ -148,7 +150,7 @@ def categorize_release_groups(
             elif primary_type == "ep":
                 eps.append(rg_data)
         for lst in [albums, singles, eps]:
-            lst.sort(key=lambda x: (x.get("year") is None, -(x.get("year") or 0)))
+            lst.sort(key=lambda x: (x.year is None, -(x.year or 0)))
     return albums, singles, eps
 
 
@@ -156,10 +158,10 @@ def categorize_lidarr_albums(
     lidarr_albums: list[dict[str, Any]],
     included_primary_types: set[str],
     included_secondary_types: set[str],
-) -> tuple[list[dict], list[dict], list[dict]]:
-    albums = []
-    singles = []
-    eps = []
+) -> tuple[list[ReleaseItem], list[ReleaseItem], list[ReleaseItem]]:
+    albums: list[ReleaseItem] = []
+    singles: list[ReleaseItem] = []
+    eps: list[ReleaseItem] = []
     for album in lidarr_albums:
         album_type = (album.get("album_type") or "").lower()
         secondary_types = set(map(str.lower, album.get("secondary_types", []) or []))
@@ -176,15 +178,15 @@ def categorize_lidarr_albums(
         monitored = album.get("monitored", False)
         in_library = track_file_count > 0
         requested = monitored and track_file_count == 0
-        album_data = {
-            "id": mbid,
-            "title": album.get("title"),
-            "type": album.get("album_type"),
-            "first_release_date": album.get("release_date"),
-            "year": album.get("year"),
-            "in_library": in_library,
-            "requested": requested,
-        }
+        album_data = ReleaseItem(
+            id=mbid,
+            title=album.get("title"),
+            type=album.get("album_type"),
+            first_release_date=album.get("release_date"),
+            year=album.get("year"),
+            in_library=in_library,
+            requested=requested,
+        )
         if album_type == "album":
             albums.append(album_data)
         elif album_type == "single":
@@ -192,7 +194,7 @@ def categorize_lidarr_albums(
         elif album_type == "ep":
             eps.append(album_data)
     for lst in [albums, singles, eps]:
-        lst.sort(key=lambda x: (x.get("year") is None, -(x.get("year") or 0)))
+        lst.sort(key=lambda x: (x.year is None, -(x.year or 0)))
     return albums, singles, eps
 
 
@@ -222,11 +224,11 @@ def build_base_artist_info(
     in_library: bool,
     tags: list[str],
     aliases: list[str],
-    life_span: Optional[dict[str, Any]],
+    life_span: LifeSpan | None,
     external_links: list,
-    albums: list[dict],
-    singles: list[dict],
-    eps: list[dict],
+    albums: list[ReleaseItem],
+    singles: list[ReleaseItem],
+    eps: list[ReleaseItem],
     description: Optional[str] = None,
     image: Optional[str] = None,
     release_group_count: Optional[int] = None,

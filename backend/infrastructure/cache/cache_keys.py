@@ -40,6 +40,18 @@ def mb_release_key(release_id: str, includes: Optional[list[str]] = None) -> str
     return f"mb:release:detail:{release_id}:{includes_str}"
 
 
+def lidarr_library_albums_key(include_unmonitored: bool = False) -> str:
+    """Generate cache key for full Lidarr library album list."""
+    suffix = "all" if include_unmonitored else "monitored"
+    return f"lidarr:library:albums:{suffix}"
+
+
+def lidarr_library_artists_key(include_unmonitored: bool = False) -> str:
+    """Generate cache key for Lidarr library artist list."""
+    suffix = "all" if include_unmonitored else "monitored"
+    return f"lidarr:library:artists:{suffix}"
+
+
 def lidarr_library_mbids_key(include_release_ids: bool = False) -> str:
     """Generate cache key for Lidarr library MBIDs."""
     suffix = "with_releases" if include_release_ids else "albums_only"
@@ -49,6 +61,21 @@ def lidarr_library_mbids_key(include_release_ids: bool = False) -> str:
 def lidarr_artist_mbids_key() -> str:
     """Generate cache key for Lidarr artist MBIDs."""
     return "lidarr:artists:mbids"
+
+
+def lidarr_raw_albums_key() -> str:
+    """Generate cache key for raw Lidarr album payload."""
+    return "lidarr:raw:albums"
+
+
+def lidarr_library_grouped_key() -> str:
+    """Generate cache key for grouped Lidarr library albums."""
+    return "lidarr:library:grouped"
+
+
+def lidarr_requested_mbids_key() -> str:
+    """Generate cache key for Lidarr requested (pending download) MBIDs."""
+    return "lidarr_requested_mbids"
 
 
 def lidarr_status_key() -> str:

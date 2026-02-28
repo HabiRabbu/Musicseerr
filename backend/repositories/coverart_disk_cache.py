@@ -1,14 +1,22 @@
 import asyncio
 import hashlib
-import json
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 import aiofiles
+import msgspec
 
 logger = logging.getLogger(__name__)
+
+
+def _encode_json(data: object) -> str:
+    return msgspec.json.encode(data).decode("utf-8")
+
+
+def _decode_json(text: str) -> dict[str, Any]:
+    return msgspec.json.decode(text.encode("utf-8"), type=dict[str, Any])
 
 
 def _log_task_error(task: asyncio.Task) -> None:
@@ -81,7 +89,7 @@ class CoverDiskCache:
             async def write_meta():
                 meta_path = file_path.with_suffix('.meta.json')
                 async with aiofiles.open(meta_path, 'w') as f:
-                    await f.write(json.dumps(meta))
+                    await f.write(_encode_json(meta))
 
             async def write_wikidata():
                 if extra_meta and 'wikidata_url' in extra_meta:
@@ -110,7 +118,7 @@ class CoverDiskCache:
             }
             meta_path = file_path.with_suffix(".meta.json")
             async with aiofiles.open(meta_path, "w") as f:
-                await f.write(json.dumps(meta))
+                await f.write(_encode_json(meta))
         except Exception as e:
             logger.warning(f"Failed to write negative disk cache: {e}")
 
@@ -120,7 +128,7 @@ class CoverDiskCache:
             return False
         try:
             async with aiofiles.open(meta_path, "r") as f:
-                meta = json.loads(await f.read())
+                meta = _decode_json(await f.read())
 
             if not meta.get("negative", False):
                 return False
@@ -157,7 +165,7 @@ class CoverDiskCache:
                 meta_path = file_path.with_suffix('.meta.json')
                 if meta_path.exists():
                     async with aiofiles.open(meta_path, 'r') as f:
-                        return json.loads(await f.read())
+                        return _decode_json(await f.read())
                 return None
 
             content, meta = await asyncio.gather(read_content(), read_meta())
@@ -199,7 +207,7 @@ class CoverDiskCache:
         try:
             meta['last_accessed'] = datetime.now().timestamp()
             async with aiofiles.open(meta_file, 'w') as f:
-                await f.write(json.dumps(meta))
+                await f.write(_encode_json(meta))
         except Exception:
             pass
 
@@ -210,7 +218,7 @@ class CoverDiskCache:
 
         try:
             async with aiofiles.open(meta_path, 'r') as f:
-                meta = json.loads(await f.read())
+                meta = _decode_json(await f.read())
 
             if 'expires_at' in meta and not meta.get('is_monitored', False):
                 now = datetime.now().timestamp()
@@ -274,7 +282,7 @@ class CoverDiskCache:
                 if meta_path.exists():
                     try:
                         async with aiofiles.open(meta_path, 'r') as f:
-                            meta = json.loads(await f.read())
+                            meta = _decode_json(await f.read())
                     except Exception:
                         meta = {}
 
@@ -335,12 +343,12 @@ class CoverDiskCache:
                     meta_path = file_path.with_suffix('.meta.json')
                     if file_path.exists() and meta_path.exists():
                         async with aiofiles.open(meta_path, 'r') as f:
-                            meta = json.loads(await f.read())
+                            meta = _decode_json(await f.read())
                         if not meta.get('is_monitored', False):
                             meta['is_monitored'] = True
                             meta.pop('expires_at', None)
                             async with aiofiles.open(meta_path, 'w') as f:
-                                await f.write(json.dumps(meta))
+                                await f.write(_encode_json(meta))
                             logger.debug(f"Promoted cover cache to persistent: {identifier_type}={identifier}, size={size}")
             return True
         except Exception as e:

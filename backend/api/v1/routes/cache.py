@@ -3,10 +3,11 @@ from fastapi import APIRouter, HTTPException
 
 from api.v1.schemas.cache import CacheStats, CacheClearResponse
 from core.dependencies import get_cache_service
+from infrastructure.msgspec_fastapi import MsgSpecRoute
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/cache", tags=["cache"])
+router = APIRouter(route_class=MsgSpecRoute, prefix="/api/cache", tags=["cache"])
 
 
 @router.get("/stats", response_model=CacheStats)

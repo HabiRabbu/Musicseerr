@@ -2,13 +2,15 @@ import asyncio
 import logging
 from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
+import msgspec
 
 from api.v1.schemas.cache_status import CacheSyncStatus
+from infrastructure.msgspec_fastapi import MsgSpecRoute
 from services.cache_status_service import CacheStatusService
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/cache/sync", tags=["cache"])
+router = APIRouter(route_class=MsgSpecRoute, prefix="/api/cache/sync", tags=["cache"])
 
 
 @router.get("/status", response_model=CacheSyncStatus)
@@ -54,8 +56,7 @@ async def stream_sync_status():
                 'total_albums': progress.total_albums,
                 'processed_albums': progress.processed_albums
             }
-            import json
-            yield f"data: {json.dumps(initial_data)}\n\n"
+            yield f"data: {msgspec.json.encode(initial_data).decode('utf-8')}\n\n"
 
             while True:
                 try:

@@ -77,7 +77,7 @@ class LidarrHistoryRepository(LidarrBase):
     async def _supplement_with_track_files(self, album_dates: dict, limit: int) -> dict:
         try:
             albums_data, all_track_files = await asyncio.gather(
-                self._get("/api/v1/album"),
+                self._get_all_albums_raw(),
                 self._get("/api/v1/trackfile")
             )
 

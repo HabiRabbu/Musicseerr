@@ -1,8 +1,9 @@
-import json
 import logging
 import threading
 from typing import Optional, TypeVar, Type
-from pydantic import BaseModel
+from typing import Any
+
+import msgspec
 from api.v1.schemas.settings import (
     UserPreferences,
     LidarrSettings,
@@ -20,11 +21,12 @@ from api.v1.schemas.settings import (
 from api.v1.schemas.advanced_settings import AdvancedSettings
 from core.config import Settings
 from core.exceptions import ConfigurationError
-from infrastructure.file_utils import atomic_write_json
+from infrastructure.file_utils import atomic_write_json, read_json
+from infrastructure.serialization import to_jsonable
 
 logger = logging.getLogger(__name__)
 
-T = TypeVar('T', bound=BaseModel)
+T = TypeVar('T', bound=msgspec.Struct)
 
 
 class PreferencesService:
@@ -44,8 +46,8 @@ class PreferencesService:
                 return self._config_cache
 
             try:
-                with open(self._config_path, encoding='utf-8') as f:
-                    self._config_cache = json.load(f)
+                loaded = read_json(self._config_path, default={})
+                self._config_cache = loaded if isinstance(loaded, dict) else {}
             except Exception as e:
                 logger.error(f"Failed to load config: {e}")
                 self._config_cache = {}
@@ -62,14 +64,19 @@ class PreferencesService:
         config = self._load_config()
         data = config.get(key, {})
         try:
-            return model(**data) if data else (default_factory() if default_factory else model())
+            if not (isinstance(model, type) and issubclass(model, msgspec.Struct)):
+                raise TypeError(f"Preferences section model must be msgspec.Struct, got {model!r}")
+
+            if data:
+                return msgspec.convert(data, type=model)
+            return default_factory() if default_factory else model()
         except Exception as e:
             logger.error(f"Failed to parse {key}: {e}")
             return default_factory() if default_factory else model()
 
-    def _save_section(self, key: str, value: BaseModel) -> None:
+    def _save_section(self, key: str, value: Any) -> None:
         config = self._load_config().copy()
-        config[key] = value.model_dump()
+        config[key] = to_jsonable(value)
         self._save_config(config)
 
     def get_preferences(self) -> UserPreferences:

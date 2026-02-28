@@ -1,5 +1,6 @@
 import logging
-from dataclasses import dataclass
+
+import msgspec
 
 from api.v1.schemas.settings import (
     LidarrConnectionSettings,
@@ -8,6 +9,8 @@ from api.v1.schemas.settings import (
     LidarrVerifyResponse,
     LidarrMetadataProfilePreferences,
     UserPreferences,
+    LidarrProfileSummary,
+    LidarrRootFolderSummary,
 )
 from core.config import Settings, get_settings
 from core.exceptions import ExternalServiceError
@@ -18,15 +21,13 @@ from repositories.jellyfin_models import JellyfinUser
 logger = logging.getLogger(__name__)
 
 
-@dataclass
-class JellyfinVerifyResult:
+class JellyfinVerifyResult(msgspec.Struct):
     success: bool
     message: str
     users: list[JellyfinUser] | None = None
 
 
-@dataclass
-class ListenBrainzVerifyResult:
+class ListenBrainzVerifyResult(msgspec.Struct):
     valid: bool
     message: str
 
@@ -73,19 +74,19 @@ class SettingsService:
 
             quality_profiles_raw = await temp_repo.get_quality_profiles()
             quality_profiles = [
-                {"id": int(p.get("id", 0)), "name": str(p.get("name", "Unknown"))}
+                 LidarrProfileSummary(id=int(p.get("id", 0)), name=str(p.get("name", "Unknown")))
                 for p in quality_profiles_raw
             ]
 
             metadata_profiles_raw = await temp_repo.get_metadata_profiles()
             metadata_profiles = [
-                {"id": int(p.get("id", 0)), "name": str(p.get("name", "Unknown"))}
+                 LidarrProfileSummary(id=int(p.get("id", 0)), name=str(p.get("name", "Unknown")))
                 for p in metadata_profiles_raw
             ]
 
             root_folders_raw = await temp_repo.get_root_folders()
             root_folders = [
-                {"id": str(r.get("id", "")), "path": str(r.get("path", ""))}
+                 LidarrRootFolderSummary(id=str(r.get("id", "")), path=str(r.get("path", "")))
                 for r in root_folders_raw
             ]
 

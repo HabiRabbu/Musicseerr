@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { Album, EnrichmentSource } from '$lib/types';
 	import { colors } from '$lib/colors';
-	import { goto } from '$app/navigation';
+	import { albumHref } from '$lib/utils/entityRoutes';
 	import { libraryStore } from '$lib/stores/library';
 	import { requestAlbum } from '$lib/utils/albumRequest';
 	import { formatListenCount } from '$lib/utils/formatting';
@@ -49,10 +49,6 @@
 		onremoved?.();
 	}
 
-	function handleClick() {
-		goto(`/album/${album.musicbrainz_id}`);
-	}
-
 	function getTypeBadgeClass(type: string): string {
 		const lower = type.toLowerCase();
 		if (lower.includes('ep')) return 'badge-warning';
@@ -63,29 +59,66 @@
 	}
 </script>
 
-<div
-	class="card bg-base-100 w-full shadow-sm flex-shrink-0 group relative cursor-pointer transition-transform hover:scale-105 hover:shadow-lg active:scale-95"
-	onclick={handleClick}
-	onkeydown={(e) => e.key === 'Enter' && handleClick()}
-	role="button"
-	tabindex="0"
->
-	<figure class="aspect-square overflow-hidden relative">
-		<AlbumImage
-			mbid={album.musicbrainz_id}
-			customUrl={album.cover_url}
-			alt={album.title}
-			size="full"
-			rounded="none"
-			className="w-full h-full"
-		/>
+<div class="card bg-base-100 w-full shadow-sm flex-shrink-0 group relative transition-transform hover:scale-105 hover:shadow-lg">
+	<a
+		href={albumHref(album.musicbrainz_id)}
+		class="block h-full relative z-0 transition-transform active:scale-95"
+		aria-label="Open {album.title}"
+	>
+		<figure class="aspect-square overflow-hidden relative">
+			<AlbumImage
+				mbid={album.musicbrainz_id}
+				customUrl={album.cover_url}
+				alt={album.title}
+				size="full"
+				rounded="none"
+				className="w-full h-full"
+			/>
 
-		{#if album.type_info && album.type_info !== 'Album'}
-			<div class="absolute top-2 left-2">
-				<span class="badge badge-sm {getTypeBadgeClass(album.type_info)}">{album.type_info}</span>
-			</div>
-		{/if}
-	</figure>
+			{#if album.type_info && album.type_info !== 'Album'}
+				<div class="absolute top-2 left-2">
+					<span class="badge badge-sm {getTypeBadgeClass(album.type_info)}">{album.type_info}</span>
+				</div>
+			{/if}
+		</figure>
+
+		<div class="card-body p-3">
+			<h2 class="card-title text-sm line-clamp-2 min-h-[2.5rem]">{album.title}</h2>
+			<p class="text-xs opacity-70 line-clamp-1">
+				{#if album.year}{album.year}{:else}Unknown{/if}
+				{#if album.artist}
+					<span class="opacity-50 mx-1">•</span>
+					{album.artist}
+				{/if}
+			</p>
+
+			{#if album.listen_count != null}
+				<div class="flex items-center gap-1 mt-1">
+				{#if enrichmentSource === 'lastfm'}
+					<span
+						class="badge badge-sm border-0"
+						style="background-color: rgb(var(--brand-lastfm) / 0.15); color: rgb(var(--brand-lastfm));"
+						title={listenTitle}
+					>
+						Last.fm {formatListenCount(album.listen_count, true)}
+					</span>
+				{:else if enrichmentSource === 'listenbrainz'}
+					<span
+						class="badge badge-sm border-0"
+						style="background-color: rgb(var(--brand-listenbrainz) / 0.15); color: rgb(var(--brand-listenbrainz));"
+						title={listenTitle}
+					>
+						LB {formatListenCount(album.listen_count, true)}
+					</span>
+				{:else}
+					<span class="badge badge-sm badge-ghost" title={listenTitle}>
+						<Music2 class="inline h-3 w-3" /> {formatListenCount(album.listen_count, true)}
+					</span>
+				{/if}
+				</div>
+			{/if}
+		</div>
+	</a>
 
 	{#if inLibrary}
 		<LibraryBadge
@@ -93,7 +126,7 @@
 			musicbrainzId={album.musicbrainz_id}
 			albumTitle={album.title}
 			artistName={album.artist || 'Unknown'}
-			positioning="absolute top-2 right-2"
+			positioning="absolute top-2 right-2 z-20"
 			ondeleted={handleDeleted}
 		/>
 	{:else if isRequested}
@@ -102,55 +135,18 @@
 			musicbrainzId={album.musicbrainz_id}
 			albumTitle={album.title}
 			artistName={album.artist || 'Unknown'}
-			positioning="absolute top-2 right-2"
+			positioning="absolute top-2 right-2 z-20"
 			ondeleted={handleDeleted}
 		/>
 	{/if}
 
-	<div class="card-body p-3">
-		<h2 class="card-title text-sm line-clamp-2 min-h-[2.5rem]">{album.title}</h2>
-		<p class="text-xs opacity-70 line-clamp-1">
-			{#if album.year}{album.year}{:else}Unknown{/if}
-			{#if album.artist}
-				<span class="opacity-50 mx-1">•</span>
-				{album.artist}
-			{/if}
-		</p>
-
-		{#if album.listen_count != null}
-			<div class="flex items-center gap-1 mt-1">
-			{#if enrichmentSource === 'lastfm'}
-				<span
-					class="badge badge-sm border-0"
-					style="background-color: rgb(var(--brand-lastfm) / 0.15); color: rgb(var(--brand-lastfm));"
-					title={listenTitle}
-				>
-					Last.fm {formatListenCount(album.listen_count, true)}
-				</span>
-			{:else if enrichmentSource === 'listenbrainz'}
-				<span
-					class="badge badge-sm border-0"
-					style="background-color: rgb(var(--brand-listenbrainz) / 0.15); color: rgb(var(--brand-listenbrainz));"
-					title={listenTitle}
-				>
-					LB {formatListenCount(album.listen_count, true)}
-				</span>
-			{:else}
-				<span class="badge badge-sm badge-ghost" title={listenTitle}>
-					<Music2 class="inline h-3 w-3" /> {formatListenCount(album.listen_count, true)}
-				</span>
-			{/if}
-			</div>
-		{/if}
-	</div>
-
 	{#if !inLibrary && !isRequested}
 		<button
-			class="absolute bottom-2 right-2 btn btn-square btn-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 border-none shadow-lg"
+			class="absolute bottom-2 right-2 z-20 btn btn-square btn-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 border-none shadow-lg"
 			style="background-color: {colors.accent};"
 			onclick={handleRequest}
 			disabled={requesting}
-			aria-label="Request album"
+			aria-label="Request {album.title}"
 		>
 			{#if requesting}
 				<span class="loading loading-spinner loading-sm" style="color: {colors.secondary};"></span>

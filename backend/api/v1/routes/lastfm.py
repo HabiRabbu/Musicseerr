@@ -16,12 +16,13 @@ from core.dependencies import (
     clear_lastfm_dependent_caches,
 )
 from core.exceptions import ConfigurationError, ExternalServiceError, TokenNotAuthorizedError
+from infrastructure.msgspec_fastapi import MsgSpecBody, MsgSpecRoute
 from services.lastfm_auth_service import LastFmAuthService
 from services.preferences_service import PreferencesService
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/lastfm", tags=["lastfm"])
+router = APIRouter(route_class=MsgSpecRoute, prefix="/api/lastfm", tags=["lastfm"])
 
 
 @router.post("/auth/token", response_model=LastFmAuthTokenResponse)
@@ -70,7 +71,7 @@ async def request_auth_token(
 
 @router.post("/auth/session", response_model=LastFmAuthSessionResponse)
 async def exchange_auth_session(
-    request: LastFmAuthSessionRequest,
+    request: LastFmAuthSessionRequest = MsgSpecBody(LastFmAuthSessionRequest),
     auth_service: LastFmAuthService = Depends(get_lastfm_auth_service),
     preferences_service: PreferencesService = Depends(get_preferences_service),
 ):

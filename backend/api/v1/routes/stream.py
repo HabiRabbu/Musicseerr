@@ -11,13 +11,14 @@ from core.dependencies import (
     get_local_files_service,
 )
 from core.exceptions import ExternalServiceError, PlaybackNotAllowedError, ResourceNotFoundError
+from infrastructure.msgspec_fastapi import MsgSpecBody, MsgSpecRoute
 from services.stream_service import StreamService
 from services.jellyfin_playback_service import JellyfinPlaybackService
 from services.local_files_service import LocalFilesService
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/stream", tags=["streaming"])
+router = APIRouter(route_class=MsgSpecRoute, prefix="/api/stream", tags=["streaming"])
 
 
 @router.get("/jellyfin/{item_id}")
@@ -70,7 +71,7 @@ async def start_jellyfin_playback(
 @router.post("/jellyfin/{item_id}/progress", status_code=204)
 async def report_jellyfin_progress(
     item_id: str,
-    body: ProgressReportRequest,
+    body: ProgressReportRequest = MsgSpecBody(ProgressReportRequest),
     playback_service: JellyfinPlaybackService = Depends(get_jellyfin_playback_service),
 ) -> Response:
     try:
@@ -89,7 +90,7 @@ async def report_jellyfin_progress(
 @router.post("/jellyfin/{item_id}/stop", status_code=204)
 async def stop_jellyfin_playback(
     item_id: str,
-    body: StopReportRequest,
+    body: StopReportRequest = MsgSpecBody(StopReportRequest),
     playback_service: JellyfinPlaybackService = Depends(get_jellyfin_playback_service),
 ) -> Response:
     try:

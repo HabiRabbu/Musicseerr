@@ -8,6 +8,7 @@
 	import { colors } from '$lib/colors';
 	import { searchStore } from '$lib/stores/search';
 	import { fetchEnrichmentBatch, applyAlbumEnrichment } from '$lib/utils/enrichment';
+	import { isAbortError } from '$lib/utils/errorHandling';
 	import { Check } from 'lucide-svelte';
 
 	export let data: { query: string };
@@ -22,7 +23,6 @@
 	let abortController: AbortController | null = null;
 	let enrichmentController: AbortController | null = null;
 	let observer: IntersectionObserver | null = null;
-	let initializedFromCache = false;
 	let enrichmentSource: EnrichmentSource = 'none';
 
 	function navigateBack() {
@@ -64,8 +64,9 @@
 
 			enrichmentSource = enrichment.source;
 			albums = applyAlbumEnrichment(albums, enrichment);
+			searchStore.setEnrichmentSource(enrichmentSource);
 		} catch (error) {
-			if (error instanceof Error && error.name === 'AbortError') {
+			if (isAbortError(error)) {
 				return;
 			}
 		}
@@ -118,7 +119,7 @@
 				hasMore = false;
 			}
 		} catch (error) {
-			if (error instanceof Error && error.name === 'AbortError') {
+			if (isAbortError(error)) {
 				return;
 			}
 			hasMore = false;
@@ -142,20 +143,28 @@
 			observer = null;
 		}
 
-		const cache = searchStore.getCache(data.query);
+		const cache = searchStore.getCache(data.query, { allowStale: true });
 		if (cache && cache.albums.length > 0) {
 			albums = cache.albums;
-			offset = 0;
-			hasMore = true;
-			initializedFromCache = true;
-			fetchEnrichment(albums);
-			loadMore();
+			enrichmentSource = cache.enrichmentSource;
+			offset = cache.albums.length;
+			hasMore = cache.albums.length >= limit;
+			const needsEnrichment = albums.filter((a) => a.listen_count == null);
+			if (needsEnrichment.length > 0) {
+				void fetchEnrichment(needsEnrichment);
+			}
+
+			if (searchStore.isStale(cache.timestamp)) {
+				offset = 0;
+				hasMore = true;
+				void loadMore();
+			}
 		} else {
 			albums = [];
 			offset = 0;
 			hasMore = true;
-			initializedFromCache = false;
-			loadMore();
+			enrichmentSource = 'none';
+			void loadMore();
 		}
 	}
 

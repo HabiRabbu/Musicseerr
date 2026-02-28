@@ -1,44 +1,46 @@
 import time
 
-from pydantic import BaseModel, Field, field_validator
+import msgspec
+
+from infrastructure.msgspec_fastapi import AppStruct
 
 
-class NowPlayingRequest(BaseModel):
-    track_name: str = Field(description="Track name")
-    artist_name: str = Field(description="Artist name")
-    album_name: str = Field(default="", description="Album name")
-    duration_ms: int = Field(default=0, ge=0, description="Track duration in milliseconds")
-    mbid: str | None = Field(default=None, description="MusicBrainz recording ID")
+class NowPlayingRequest(AppStruct):
+    track_name: str
+    artist_name: str
+    album_name: str = ""
+    duration_ms: int = 0
+    mbid: str | None = None
+
+    def __post_init__(self) -> None:
+        if self.duration_ms < 0:
+            raise ValueError("duration_ms must be >= 0")
 
 
-class ScrobbleRequest(BaseModel):
-    track_name: str = Field(description="Track name")
-    artist_name: str = Field(description="Artist name")
-    album_name: str = Field(default="", description="Album name")
-    timestamp: int = Field(description="Unix epoch timestamp when the track was played")
-    duration_ms: int = Field(default=0, ge=0, description="Track duration in milliseconds")
-    mbid: str | None = Field(default=None, description="MusicBrainz recording ID")
+class ScrobbleRequest(AppStruct):
+    track_name: str
+    artist_name: str
+    timestamp: int
+    album_name: str = ""
+    duration_ms: int = 0
+    mbid: str | None = None
 
-    @field_validator("timestamp")
-    @classmethod
-    def validate_timestamp(cls, v: int) -> int:
+    def __post_init__(self) -> None:
         now = int(time.time())
         max_age = 14 * 24 * 60 * 60
-        if v > now + 60:
+        if self.duration_ms < 0:
+            raise ValueError("duration_ms must be >= 0")
+        if self.timestamp > now + 60:
             raise ValueError("Timestamp cannot be in the future")
-        if v < now - max_age:
+        if self.timestamp < now - max_age:
             raise ValueError("Timestamp cannot be older than 14 days")
-        return v
 
 
-class ServiceResult(BaseModel):
-    success: bool = Field(description="Whether the scrobble was accepted by this service")
-    error: str | None = Field(default=None, description="Error message if submission failed")
+class ServiceResult(AppStruct):
+    success: bool
+    error: str | None = None
 
 
-class ScrobbleResponse(BaseModel):
-    accepted: bool = Field(description="Whether at least one service accepted the scrobble")
-    services: dict[str, ServiceResult] = Field(
-        default_factory=dict,
-        description="Per-service submission results",
-    )
+class ScrobbleResponse(AppStruct):
+    accepted: bool
+    services: dict[str, ServiceResult] = {}

@@ -7,15 +7,21 @@
 		album: HomeAlbum;
 		showLibraryBadge?: boolean;
 		onclick?: () => void;
+		href?: string | null;
 	}
 
-	let { album, showLibraryBadge = false, onclick }: Props = $props();
+	let { album, showLibraryBadge = false, onclick, href = null }: Props = $props();
 </script>
 
-<button
-	type="button"
-	class="card bg-base-200/50 hover:bg-base-200 transition-all duration-200 cursor-pointer group"
-	{onclick}
+<svelte:element
+	this={href ? 'a' : 'button'}
+	href={href ?? undefined}
+	type={href ? undefined : 'button'}
+	onclick={href ? undefined : onclick}
+	onkeydown={href || !onclick ? undefined : (e: KeyboardEvent) => e.key === 'Enter' && onclick()}
+	role={href || !onclick ? undefined : 'button'}
+	tabindex={href || !onclick ? undefined : 0}
+	class="card bg-base-200/50 hover:bg-base-200 transition-all duration-200 group {href || onclick ? 'cursor-pointer' : 'cursor-default'}"
 >
 	<figure class="aspect-square overflow-hidden relative rounded-t-2xl">
 		<AlbumImage
@@ -41,4 +47,4 @@
 			{/if}
 		</p>
 	</div>
-</button>
+</svelte:element>

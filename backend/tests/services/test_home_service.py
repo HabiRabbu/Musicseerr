@@ -136,8 +136,8 @@ class TestHomeServiceSourceSelection:
         )
         response = await service.get_home_data("listenbrainz")
         assert response.integration_status is not None
-        assert response.integration_status.get("lastfm") is True
-        assert response.integration_status.get("listenbrainz") is True
+        assert response.integration_status.lastfm is True
+        assert response.integration_status.listenbrainz is True
 
     @pytest.mark.asyncio
     async def test_popular_album_in_library_uses_album_mbids_not_artist_mbids(self):

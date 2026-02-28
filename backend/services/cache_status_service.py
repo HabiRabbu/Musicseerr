@@ -1,10 +1,10 @@
 import asyncio
-import json
 import logging
 import threading
 import time
 from typing import Optional, TYPE_CHECKING
-from dataclasses import dataclass, asdict
+
+import msgspec
 
 if TYPE_CHECKING:
     from infrastructure.cache.persistent_cache import LibraryCache
@@ -12,8 +12,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-@dataclass
-class CacheSyncProgress:
+class CacheSyncProgress(msgspec.Struct):
     is_syncing: bool
     phase: Optional[str]
     total_items: int
@@ -83,7 +82,7 @@ class CacheStatusService:
 
     async def broadcast_progress(self) -> None:
         progress = self.get_progress()
-        data = json.dumps({
+        data = msgspec.json.encode({
             'is_syncing': progress.is_syncing,
             'phase': progress.phase,
             'total_items': progress.total_items,
@@ -96,7 +95,7 @@ class CacheStatusService:
             'processed_artists': progress.processed_artists,
             'total_albums': progress.total_albums,
             'processed_albums': progress.processed_albums
-        })
+        }).decode("utf-8")
         with self._sse_lock:
             dead_queues = []
             for queue in self._sse_subscribers:

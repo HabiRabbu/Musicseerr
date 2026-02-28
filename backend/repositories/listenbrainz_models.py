@@ -1,24 +1,23 @@
-from dataclasses import dataclass
+import msgspec
 
 
-@dataclass
-class ListenBrainzArtist:
+class ListenBrainzArtist(msgspec.Struct):
     artist_name: str
     listen_count: int
     artist_mbids: list[str] | None = None
 
 
-@dataclass
-class ListenBrainzReleaseGroup:
+class ListenBrainzReleaseGroup(msgspec.Struct):
     release_group_name: str
     artist_name: str
     listen_count: int
     release_group_mbid: str | None = None
     artist_mbids: list[str] | None = None
+    caa_release_mbid: str | None = None
+    caa_id: int | None = None
 
 
-@dataclass
-class ListenBrainzRecording:
+class ListenBrainzRecording(msgspec.Struct):
     track_name: str
     artist_name: str
     listen_count: int
@@ -28,8 +27,7 @@ class ListenBrainzRecording:
     artist_mbids: list[str] | None = None
 
 
-@dataclass
-class ListenBrainzListen:
+class ListenBrainzListen(msgspec.Struct):
     track_name: str
     artist_name: str
     listened_at: int
@@ -39,23 +37,20 @@ class ListenBrainzListen:
     artist_mbids: list[str] | None = None
 
 
-@dataclass
-class ListenBrainzGenreActivity:
+class ListenBrainzGenreActivity(msgspec.Struct):
     genre: str
     listen_count: int
     hour: int | None = None
 
 
-@dataclass
-class ListenBrainzSimilarArtist:
+class ListenBrainzSimilarArtist(msgspec.Struct):
     artist_mbid: str
     artist_name: str
     listen_count: int
     score: float | None = None
 
 
-@dataclass
-class ListenBrainzFeedbackRecording:
+class ListenBrainzFeedbackRecording(msgspec.Struct):
     track_name: str
     artist_name: str
     release_name: str | None = None

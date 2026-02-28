@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { browser } from '$app/environment';
 	import { goto } from '$app/navigation';
+	import { onDestroy } from 'svelte';
 	import type { AlbumBasicInfo, AlbumTracksInfo, SimilarAlbumsResponse, MoreByArtistResponse, YouTubeTrackLink, YouTubeLink, YouTubeQuotaStatus, JellyfinAlbumMatch, LocalAlbumMatch, LastFmAlbumEnrichment } from '$lib/types';
 	import { colors } from '$lib/colors';
 	import { libraryStore } from '$lib/stores/library';
@@ -24,7 +25,14 @@
 	import ArtistRemovedModal from '$lib/components/ArtistRemovedModal.svelte';
 	import { launchJellyfinPlayback } from '$lib/player/launchJellyfinPlayback';
 	import { launchLocalPlayback } from '$lib/player/launchLocalPlayback';
-	import { getCoverUrl } from '$lib/utils/errorHandling';
+	import { getCoverUrl, isAbortError } from '$lib/utils/errorHandling';
+	import {
+		albumBasicCache,
+		albumDiscoveryCache,
+		albumLastFmCache,
+		albumTracksCache
+	} from '$lib/utils/albumDetailCache';
+	import { hydrateDetailCacheEntry } from '$lib/utils/detailCacheHydration';
 	import type { PlaybackMeta } from '$lib/player/types';
 	import { Check, Trash2, Clock, Plus } from 'lucide-svelte';
 
@@ -64,6 +72,7 @@
 	$: localTrackMap = new Map(localMatch?.tracks.map(t => [t.track_number, t]) ?? []);
 
 	let currentAlbumId: string | null = null;
+	let abortController: AbortController | null = null;
 
 	$: inLibrary = $libraryStore.initialized
 		? libraryStore.isInLibrary(album?.musicbrainz_id)
@@ -77,6 +86,11 @@
 	}
 
 	function resetState() {
+		if (abortController) {
+			abortController.abort();
+			abortController = null;
+		}
+
 		album = null;
 		tracksInfo = null;
 		error = null;
@@ -96,46 +110,134 @@
 		loadingLastfm = true;
 	}
 
-	async function loadAlbum() {
-		await fetchBasicInfo();
-		if (album) {
-			fetchTracksInfo();
-			fetchDiscoveryData();
-			fetchYouTubeData();
-			await integrationStore.ensureLoaded();
-			fetchLastFmEnrichment();
-			fetchJellyfinAlbumData();
-			fetchLocalAlbumData();
-		}
+	function hydrateFromCache(albumId: string): {
+		refreshBasic: boolean;
+		refreshTracks: boolean;
+		refreshDiscovery: boolean;
+		refreshLastfm: boolean;
+	} {
+		const refreshBasic = hydrateDetailCacheEntry({
+			cache: albumBasicCache,
+			cacheKey: albumId,
+			onHydrate: (cachedAlbum) => {
+				album = cachedAlbum;
+				loadingBasic = false;
+			}
+		});
+
+		const refreshTracks = hydrateDetailCacheEntry({
+			cache: albumTracksCache,
+			cacheKey: albumId,
+			onHydrate: (cachedTracksInfo) => {
+				tracksInfo = cachedTracksInfo;
+				loadingTracks = false;
+			}
+		});
+
+		const refreshDiscovery = hydrateDetailCacheEntry({
+			cache: albumDiscoveryCache,
+			cacheKey: albumId,
+			onHydrate: (cachedDiscovery) => {
+				moreByArtist = cachedDiscovery.moreByArtist;
+				similarAlbums = cachedDiscovery.similarAlbums;
+				loadingDiscovery = false;
+			}
+		});
+
+		const refreshLastfm = hydrateDetailCacheEntry({
+			cache: albumLastFmCache,
+			cacheKey: albumId,
+			onHydrate: (cachedLastFmEnrichment) => {
+				lastfmEnrichment = cachedLastFmEnrichment;
+				loadingLastfm = false;
+			}
+		});
+
+		return { refreshBasic, refreshTracks, refreshDiscovery, refreshLastfm };
 	}
 
-	async function fetchBasicInfo() {
+	async function loadAlbum() {
+		const { refreshBasic, refreshTracks, refreshDiscovery, refreshLastfm } = hydrateFromCache(data.albumId);
+
+		if (abortController) {
+			abortController.abort();
+		}
+		abortController = new AbortController();
+		const signal = abortController.signal;
+
+		if (refreshBasic) {
+			await fetchBasicInfo(signal);
+		}
+		if (signal.aborted || !album) {
+			return;
+		}
+
+		if (refreshTracks) {
+			void fetchTracksInfo(signal);
+		}
+		if (refreshDiscovery) {
+			void fetchDiscoveryData(signal);
+		}
+		void fetchYouTubeData(signal);
+		if (refreshLastfm) {
+			void fetchLastFmEnrichment(signal);
+		}
+
+		void (async () => {
+			try {
+				await integrationStore.ensureLoaded();
+				if (signal.aborted) return;
+				void fetchJellyfinAlbumData(signal);
+				void fetchLocalAlbumData(signal);
+			} catch {
+				// ignore integration loading errors
+			}
+		})();
+	}
+
+	async function fetchBasicInfo(signal?: AbortSignal) {
 		try {
-			const res = await fetch(`/api/album/${data.albumId}/basic`);
+			const res = await fetch(`/api/album/${data.albumId}/basic`, { signal });
 			if (res.ok) {
 				album = await res.json();
+				if (album) {
+					albumBasicCache.set(album, data.albumId);
+				}
 			} else {
 				error = 'Failed to load album';
 			}
 		} catch (e) {
+			if (isAbortError(e)) {
+				return;
+			}
 			error = 'Error loading album';
 		} finally {
-			loadingBasic = false;
+			if (!signal?.aborted) {
+				loadingBasic = false;
+			}
 		}
 	}
 
-	async function fetchTracksInfo() {
+	async function fetchTracksInfo(signal?: AbortSignal) {
 		try {
-			const res = await fetch(`/api/album/${data.albumId}/tracks`);
+			const res = await fetch(`/api/album/${data.albumId}/tracks`, { signal });
 			if (res.ok) {
 				tracksInfo = await res.json();
+				if (tracksInfo) {
+					albumTracksCache.set(tracksInfo, data.albumId);
+				}
 			}
 		} catch (e) {
+			if (isAbortError(e)) {
+				return;
+			}
 		}
-		loadingTracks = false;
+		if (!signal?.aborted) {
+			loadingTracks = false;
+		}
 	}
 
-	async function fetchDiscoveryData() {
+	async function fetchDiscoveryData(signal?: AbortSignal) {
 		if (!album?.artist_id) {
 			loadingDiscovery = false;
 			return;
@@ -143,60 +245,86 @@
 		loadingDiscovery = true;
 		try {
 			const [moreRes, similarRes] = await Promise.all([
-				fetch(`/api/album/${data.albumId}/more-by-artist?artist_id=${album.artist_id}`),
-				fetch(`/api/album/${data.albumId}/similar?artist_id=${album.artist_id}`)
+				fetch(`/api/album/${data.albumId}/more-by-artist?artist_id=${album.artist_id}`, { signal }),
+				fetch(`/api/album/${data.albumId}/similar?artist_id=${album.artist_id}`, { signal })
 			]);
 
 			if (moreRes.ok) moreByArtist = await moreRes.json();
 			if (similarRes.ok) similarAlbums = await similarRes.json();
+			albumDiscoveryCache.set(
+				{
+					moreByArtist,
+					similarAlbums
+				},
+				data.albumId
+			);
 		} catch (e) {
+			if (isAbortError(e)) {
+				return;
+			}
 		} finally {
-			loadingDiscovery = false;
+			if (!signal?.aborted) {
+				loadingDiscovery = false;
+			}
 		}
 	}
 
-	async function fetchYouTubeData() {
+	async function fetchYouTubeData(signal?: AbortSignal) {
 		try {
 			const [linkRes, tracksRes] = await Promise.all([
-				fetch(API.youtube.link(data.albumId)),
-				fetch(API.youtube.trackLinks(data.albumId))
+				fetch(API.youtube.link(data.albumId), { signal }),
+				fetch(API.youtube.trackLinks(data.albumId), { signal })
 			]);
 			if (linkRes.status === 200) albumLink = await linkRes.json();
 			if (tracksRes.ok) trackLinks = await tracksRes.json();
-		} catch {}
+		} catch (e) {
+			if (isAbortError(e)) {
+				return;
+			}
+		}
 	}
 
-	async function fetchJellyfinAlbumData() {
+	async function fetchJellyfinAlbumData(signal?: AbortSignal) {
 		if (!$integrationStore.jellyfin) return;
 		loadingJellyfin = true;
 		try {
-			const res = await fetch(API.jellyfinLibrary.albumMatch(data.albumId));
+			const res = await fetch(API.jellyfinLibrary.albumMatch(data.albumId), { signal });
 			if (res.ok) {
 				jellyfinMatch = await res.json();
 			}
 		} catch (e) {
+			if (isAbortError(e)) {
+				return;
+			}
 			console.error('Failed to fetch Jellyfin album data:', e);
 		} finally {
-			loadingJellyfin = false;
+			if (!signal?.aborted) {
+				loadingJellyfin = false;
+			}
 		}
 	}
 
-	async function fetchLocalAlbumData() {
+	async function fetchLocalAlbumData(signal?: AbortSignal) {
 		if (!$integrationStore.localfiles) return;
 		loadingLocal = true;
 		try {
-			const res = await fetch(API.local.albumMatch(data.albumId));
+			const res = await fetch(API.local.albumMatch(data.albumId), { signal });
 			if (res.ok) {
 				localMatch = await res.json();
 			}
 		} catch (e) {
+			if (isAbortError(e)) {
+				return;
+			}
 			console.error('Failed to fetch local album data:', e);
 		} finally {
-			loadingLocal = false;
+			if (!signal?.aborted) {
+				loadingLocal = false;
+			}
 		}
 	}
 
-	async function fetchLastFmEnrichment() {
+	async function fetchLastFmEnrichment(signal?: AbortSignal) {
 		if (!album) {
 			loadingLastfm = false;
 			return;
@@ -212,16 +340,31 @@
 				artist_name: album.artist_name,
 				album_name: album.title
 			});
-			const res = await fetch(`/api/album/${data.albumId}/lastfm?${params.toString()}`);
+			const res = await fetch(`/api/album/${data.albumId}/lastfm?${params.toString()}`, { signal });
 			if (res.ok) {
 				lastfmEnrichment = await res.json();
+				if (lastfmEnrichment) {
+					albumLastFmCache.set(lastfmEnrichment, data.albumId);
+				}
 			}
 		} catch (e) {
+			if (isAbortError(e)) {
+				return;
+			}
 			console.error('Failed to fetch Last.fm album data:', e);
 		} finally {
-			loadingLastfm = false;
+			if (!signal?.aborted) {
+				loadingLastfm = false;
+			}
 		}
 	}
+
+	onDestroy(() => {
+		if (abortController) {
+			abortController.abort();
+			abortController = null;
+		}
+	});
 
 	function handleTrackGenerated(link: YouTubeTrackLink): void {
 		trackLinks = [...trackLinks.filter((tl) => tl.track_number !== link.track_number), link]
@@ -255,6 +398,7 @@
 			if (result.success && album) {
 				album.requested = true;
 				album = album;
+				albumBasicCache.set(album, data.albumId);
 				toastMessage = 'Added to Library';
 				toastType = 'success';
 				showToast = true;
@@ -274,6 +418,7 @@
 			album.in_library = false;
 			album.requested = false;
 			album = album;
+			albumBasicCache.set(album, data.albumId);
 		}
 		toastMessage = 'Removed from Library';
 		toastType = 'success';

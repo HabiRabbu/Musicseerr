@@ -1,18 +1,18 @@
-from pydantic import BaseModel, Field
+from infrastructure.msgspec_fastapi import AppStruct
 
 
-class JellyfinTrackInfo(BaseModel):
-    jellyfin_id: str = Field(description="Jellyfin item ID")
+class JellyfinTrackInfo(AppStruct):
+    jellyfin_id: str
     title: str
     track_number: int
-    duration_seconds: float = Field(ge=0)
+    duration_seconds: float
     album_name: str = ""
     artist_name: str = ""
     codec: str | None = None
     bitrate: int | None = None
 
 
-class JellyfinAlbumSummary(BaseModel):
+class JellyfinAlbumSummary(AppStruct):
     jellyfin_id: str
     name: str
     artist_name: str = ""
@@ -23,7 +23,7 @@ class JellyfinAlbumSummary(BaseModel):
     artist_musicbrainz_id: str | None = None
 
 
-class JellyfinAlbumDetail(BaseModel):
+class JellyfinAlbumDetail(AppStruct):
     jellyfin_id: str
     name: str
     artist_name: str = ""
@@ -32,16 +32,16 @@ class JellyfinAlbumDetail(BaseModel):
     image_url: str | None = None
     musicbrainz_id: str | None = None
     artist_musicbrainz_id: str | None = None
-    tracks: list[JellyfinTrackInfo] = Field(default_factory=list)
+    tracks: list[JellyfinTrackInfo] = []
 
 
-class JellyfinAlbumMatch(BaseModel):
+class JellyfinAlbumMatch(AppStruct):
     found: bool
     jellyfin_album_id: str | None = None
-    tracks: list[JellyfinTrackInfo] = Field(default_factory=list)
+    tracks: list[JellyfinTrackInfo] = []
 
 
-class JellyfinArtistSummary(BaseModel):
+class JellyfinArtistSummary(AppStruct):
     jellyfin_id: str
     name: str
     image_url: str | None = None
@@ -49,20 +49,20 @@ class JellyfinArtistSummary(BaseModel):
     musicbrainz_id: str | None = None
 
 
-class JellyfinLibraryStats(BaseModel):
+class JellyfinLibraryStats(AppStruct):
     total_tracks: int = 0
     total_albums: int = 0
     total_artists: int = 0
 
 
-class JellyfinSearchResponse(BaseModel):
-    albums: list[JellyfinAlbumSummary] = Field(default_factory=list)
-    artists: list[JellyfinArtistSummary] = Field(default_factory=list)
-    tracks: list[JellyfinTrackInfo] = Field(default_factory=list)
+class JellyfinSearchResponse(AppStruct):
+    albums: list[JellyfinAlbumSummary] = []
+    artists: list[JellyfinArtistSummary] = []
+    tracks: list[JellyfinTrackInfo] = []
 
 
-class JellyfinPaginatedResponse(BaseModel):
-    items: list[JellyfinAlbumSummary] = Field(default_factory=list)
+class JellyfinPaginatedResponse(AppStruct):
+    items: list[JellyfinAlbumSummary] = []
     total: int = 0
     offset: int = 0
     limit: int = 50

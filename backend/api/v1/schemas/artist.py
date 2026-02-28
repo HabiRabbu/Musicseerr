@@ -1,61 +1,76 @@
-from typing import Optional
-from pydantic import BaseModel, Field
 from api.v1.schemas.common import LastFmTagSchema
+from infrastructure.msgspec_fastapi import AppStruct
 
 
-class ExternalLink(BaseModel):
+class ExternalLink(AppStruct):
     type: str
     url: str
     label: str
     category: str = "other"
 
 
-class ArtistInfo(BaseModel):
+class LifeSpan(AppStruct):
+    begin: str | None = None
+    end: str | None = None
+    ended: str | None = None
+
+
+class ReleaseItem(AppStruct):
+    id: str | None = None
+    title: str | None = None
+    type: str | None = None
+    first_release_date: str | None = None
+    year: int | None = None
+    in_library: bool = False
+    requested: bool = False
+
+
+class ArtistInfo(AppStruct):
     name: str
     musicbrainz_id: str
-    disambiguation: Optional[str] = None
-    type: Optional[str] = None
-    country: Optional[str] = None
-    life_span: Optional[dict[str, Optional[str]]] = None
-    description: Optional[str] = None
-    image: Optional[str] = None
-    fanart_url: Optional[str] = None
-    banner_url: Optional[str] = None
-    tags: list[str] = Field(default_factory=list)
-    aliases: list[str] = Field(default_factory=list)
-    external_links: list[ExternalLink] = Field(default_factory=list)
+    disambiguation: str | None = None
+    type: str | None = None
+    country: str | None = None
+    life_span: LifeSpan | None = None
+    description: str | None = None
+    image: str | None = None
+    fanart_url: str | None = None
+    banner_url: str | None = None
+    tags: list[str] = []
+    aliases: list[str] = []
+    external_links: list[ExternalLink] = []
     in_library: bool = False
-    albums: list[dict] = Field(default_factory=list)
-    singles: list[dict] = Field(default_factory=list)
-    eps: list[dict] = Field(default_factory=list)
+    albums: list[ReleaseItem] = []
+    singles: list[ReleaseItem] = []
+    eps: list[ReleaseItem] = []
     release_group_count: int = 0
 
 
-class ArtistExtendedInfo(BaseModel):
-    description: Optional[str] = None
-    image: Optional[str] = None
+class ArtistExtendedInfo(AppStruct):
+    description: str | None = None
+    image: str | None = None
 
 
-class ArtistReleases(BaseModel):
-    albums: list[dict] = Field(default_factory=list)
-    singles: list[dict] = Field(default_factory=list)
-    eps: list[dict] = Field(default_factory=list)
+class ArtistReleases(AppStruct):
+    albums: list[ReleaseItem] = []
+    singles: list[ReleaseItem] = []
+    eps: list[ReleaseItem] = []
     total_count: int = 0
     has_more: bool = False
 
 
-class LastFmSimilarArtistSchema(BaseModel):
+class LastFmSimilarArtistSchema(AppStruct):
     name: str
-    mbid: Optional[str] = None
+    mbid: str | None = None
     match: float = 0.0
-    url: Optional[str] = None
+    url: str | None = None
 
 
-class LastFmArtistEnrichment(BaseModel):
-    bio: Optional[str] = None
-    summary: Optional[str] = None
-    tags: list[LastFmTagSchema] = Field(default_factory=list)
+class LastFmArtistEnrichment(AppStruct):
+    bio: str | None = None
+    summary: str | None = None
+    tags: list[LastFmTagSchema] = []
     listeners: int = 0
     playcount: int = 0
-    similar_artists: list[LastFmSimilarArtistSchema] = Field(default_factory=list)
-    url: Optional[str] = None
+    similar_artists: list[LastFmSimilarArtistSchema] = []
+    url: str | None = None

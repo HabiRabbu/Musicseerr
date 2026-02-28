@@ -5,7 +5,7 @@
 	import CarouselSkeleton from './CarouselSkeleton.svelte';
 	import ArtistImage from './ArtistImage.svelte';
 	import { colors } from '$lib/colors';
-	import { goto } from '$app/navigation';
+	import { artistHref } from '$lib/utils/entityRoutes';
 
 	interface Props {
 		artists: SimilarArtist[];
@@ -14,10 +14,6 @@
 	}
 
 	let { artists, loading = false, configured = true }: Props = $props();
-
-	function handleClick(mbid: string) {
-		goto(`/artist/${mbid}`);
-	}
 </script>
 
 <div>
@@ -37,12 +33,9 @@
 	{:else}
 		<HorizontalCarousel>
 			{#each artists as artist}
-				<div
+				<a
+					href={artistHref(artist.musicbrainz_id)}
 					class="w-32 flex-shrink-0 cursor-pointer"
-					role="button"
-					tabindex="0"
-					onclick={() => handleClick(artist.musicbrainz_id)}
-					onkeydown={(e) => e.key === 'Enter' && handleClick(artist.musicbrainz_id)}
 				>
 					<div class="relative group">
 						<div
@@ -65,7 +58,7 @@
 						{/if}
 					</div>
 					<p class="text-center text-sm mt-2 truncate font-medium">{artist.name}</p>
-				</div>
+				</a>
 			{/each}
 		</HorizontalCarousel>
 	{/if}

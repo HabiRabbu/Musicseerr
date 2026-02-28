@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
+	import { albumHref } from '$lib/utils/entityRoutes';
 	import { ChevronDown, Download } from 'lucide-svelte';
 	import { colors } from '$lib/colors';
 	import AlbumImage from './AlbumImage.svelte';
@@ -28,10 +28,6 @@
 	export let onToggleCollapse: () => void;
 	export let onRemoved: ((result: RemoveResult) => void) | undefined = undefined;
 
-	function goToAlbum(albumId: string) {
-		goto(`/album/${albumId}`);
-	}
-
 	function handleDeleted(rg: Release, result: RemoveResult) {
 		rg.in_library = false;
 		rg.requested = false;
@@ -55,9 +51,9 @@
 			<div class="list" role="list">
 				{#each releases as rg}
 					<div class="list-row group hover:bg-base-200 transition-colors p-0" role="listitem">
-						<button
+						<a
+							href={albumHref(rg.id)}
 							class="flex items-center gap-2 sm:gap-3 flex-1 p-2 sm:p-3 cursor-pointer text-left min-w-0"
-							on:click={() => goToAlbum(rg.id)}
 						>
 							<AlbumImage
 								mbid={rg.id}
@@ -72,7 +68,7 @@
 									{#if rg.year}{rg.year}{/if}
 								</div>
 							</div>
-						</button>
+						</a>
 						<div class="flex items-center flex-shrink-0 ml-auto mr-3 sm:mr-4">
 							{#if rg.in_library}
 								<LibraryBadge

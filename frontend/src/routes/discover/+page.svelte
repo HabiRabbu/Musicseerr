@@ -12,6 +12,7 @@
 	import PageHeader from '$lib/components/PageHeader.svelte';
 	import { getDiscoverCachedData, setDiscoverCachedData, isDiscoverCacheStale } from '$lib/utils/discoverCache';
 	import { removeAllQueueCachedData } from '$lib/utils/discoverQueueCache';
+	import { isAbortError } from '$lib/utils/errorHandling';
 	import { formatLastUpdated } from '$lib/utils/formatting';
 	import { musicSourceStore, type MusicSource } from '$lib/stores/musicSource';
 	import { discoverQueueStatusStore } from '$lib/stores/discoverQueueStatus';
@@ -95,7 +96,7 @@
 				error = 'Failed to load discover data';
 			}
 		} catch (e) {
-			if (e instanceof Error && e.name === 'AbortError') return;
+			if (isAbortError(e)) return;
 			if (!discoverData) error = 'Failed to load discover data';
 		} finally {
 			loading = false;
@@ -129,7 +130,7 @@
 				}
 			}
 		} catch (e) {
-			if (e instanceof Error && e.name === 'AbortError') return;
+			if (isAbortError(e)) return;
 		} finally {
 			refreshing = false;
 			isUpdating = false;

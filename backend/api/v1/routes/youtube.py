@@ -16,16 +16,17 @@ from api.v1.schemas.youtube import (
     YouTubeTrackLinkResponse,
 )
 from core.dependencies import YouTubeServiceDep
+from infrastructure.msgspec_fastapi import MsgSpecBody, MsgSpecRoute
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/youtube", tags=["YouTube"])
+router = APIRouter(route_class=MsgSpecRoute, prefix="/api/youtube", tags=["YouTube"])
 
 
 @router.post("/generate", response_model=YouTubeLinkResponse)
 async def generate_link(
-    request: YouTubeLinkGenerateRequest,
     youtube_service: YouTubeServiceDep,
+    request: YouTubeLinkGenerateRequest = MsgSpecBody(YouTubeLinkGenerateRequest),
 ) -> YouTubeLinkResponse:
     link = await youtube_service.generate_link(
         artist_name=request.artist_name,
@@ -36,7 +37,7 @@ async def generate_link(
     quota = youtube_service.get_quota_status()
     return YouTubeLinkResponse(
         link=link,
-        quota=YouTubeQuotaResponse(**quota),
+        quota=quota,
     )
 
 
@@ -69,8 +70,8 @@ async def delete_link(
 @router.put("/link/{album_id}", response_model=YouTubeLink)
 async def update_link(
     album_id: str,
-    request: YouTubeLinkUpdateRequest,
     youtube_service: YouTubeServiceDep,
+    request: YouTubeLinkUpdateRequest = MsgSpecBody(YouTubeLinkUpdateRequest),
 ) -> YouTubeLink:
     return await youtube_service.update_link(
         album_id=album_id,
@@ -83,8 +84,8 @@ async def update_link(
 
 @router.post("/manual", response_model=YouTubeLink)
 async def save_manual_link(
-    request: YouTubeManualLinkRequest,
     youtube_service: YouTubeServiceDep,
+    request: YouTubeManualLinkRequest = MsgSpecBody(YouTubeManualLinkRequest),
 ) -> YouTubeLink:
     return await youtube_service.save_manual_link(
         album_name=request.album_name,
@@ -97,8 +98,8 @@ async def save_manual_link(
 
 @router.post("/generate-track", response_model=YouTubeTrackLinkResponse)
 async def generate_track_link(
-    request: YouTubeTrackLinkGenerateRequest,
     youtube_service: YouTubeServiceDep,
+    request: YouTubeTrackLinkGenerateRequest = MsgSpecBody(YouTubeTrackLinkGenerateRequest),
 ) -> YouTubeTrackLinkResponse:
     track_link = await youtube_service.generate_track_link(
         album_id=request.album_id,
@@ -110,14 +111,14 @@ async def generate_track_link(
     quota = youtube_service.get_quota_status()
     return YouTubeTrackLinkResponse(
         track_link=track_link,
-        quota=YouTubeQuotaResponse(**quota),
+        quota=quota,
     )
 
 
 @router.post("/generate-tracks", response_model=YouTubeTrackLinkBatchResponse)
 async def generate_track_links_batch(
-    request: YouTubeTrackLinkBatchGenerateRequest,
     youtube_service: YouTubeServiceDep,
+    request: YouTubeTrackLinkBatchGenerateRequest = MsgSpecBody(YouTubeTrackLinkBatchGenerateRequest),
 ) -> YouTubeTrackLinkBatchResponse:
     tracks = [
         {"track_name": t.track_name, "track_number": t.track_number}
@@ -133,7 +134,7 @@ async def generate_track_links_batch(
     return YouTubeTrackLinkBatchResponse(
         track_links=generated,
         failed=failed,
-        quota=YouTubeQuotaResponse(**quota),
+        quota=quota,
     )
 
 
@@ -158,5 +159,4 @@ async def delete_track_link(
 async def get_quota(
     youtube_service: YouTubeServiceDep,
 ) -> YouTubeQuotaResponse:
-    quota = youtube_service.get_quota_status()
-    return YouTubeQuotaResponse(**quota)
+    return youtube_service.get_quota_status()

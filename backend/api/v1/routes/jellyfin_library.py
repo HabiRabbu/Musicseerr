@@ -15,11 +15,12 @@ from api.v1.schemas.jellyfin import (
 )
 from core.dependencies import get_jellyfin_library_service
 from core.exceptions import ExternalServiceError
+from infrastructure.msgspec_fastapi import MsgSpecRoute
 from services.jellyfin_library_service import JellyfinLibraryService
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/jellyfin", tags=["jellyfin-library"])
+router = APIRouter(route_class=MsgSpecRoute, prefix="/api/jellyfin", tags=["jellyfin-library"])
 
 
 @router.get("/albums", response_model=JellyfinPaginatedResponse)

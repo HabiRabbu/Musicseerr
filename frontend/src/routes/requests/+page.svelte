@@ -14,6 +14,7 @@
 		clearHistoryItem,
 		notifyRequestCountChanged
 	} from '$lib/utils/requestsApi';
+	import { isAbortError } from '$lib/utils/errorHandling';
 
 	let activeTab = $state<'active' | 'history'>('active');
 
@@ -32,10 +33,27 @@
 	let historyFilter = $state<string | undefined>(undefined);
 
 	let pollInterval: ReturnType<typeof setInterval> | null = null;
-	let isPolling = false;
+	let activeAbortController: AbortController | null = null;
+	let historyAbortController: AbortController | null = null;
+	let activeRequestId = 0;
+	let historyRequestId = 0;
 	let toastShow = $state(false);
 	let toastMessage = $state('');
 	let toastType = $state<'success' | 'error' | 'info'>('success');
+
+	function abortActiveLoad() {
+		if (activeAbortController) {
+			activeAbortController.abort();
+			activeAbortController = null;
+		}
+	}
+
+	function abortHistoryLoad() {
+		if (historyAbortController) {
+			historyAbortController.abort();
+			historyAbortController = null;
+		}
+	}
 
 	function showToast(message: string, type: 'success' | 'error' | 'info' = 'success') {
 		toastMessage = message;
@@ -44,34 +62,66 @@
 	}
 
 	async function loadActive() {
-		if (isPolling) return;
-		isPolling = true;
+		const requestId = ++activeRequestId;
+		abortActiveLoad();
+		const controller = new AbortController();
+		activeAbortController = controller;
 		try {
-			const data = await fetchActiveRequests();
+			const data = await fetchActiveRequests(controller.signal);
+			if (controller.signal.aborted || requestId !== activeRequestId) {
+				return;
+			}
 			activeItems = data.items;
 			activeCount = data.count;
 			notifyRequestCountChanged(activeCount);
 			activeError = null;
 		} catch (e) {
+			if (isAbortError(e)) {
+				return;
+			}
 			activeError = 'Failed to load active requests';
 		} finally {
-			activeLoading = false;
-			isPolling = false;
+			if (!controller.signal.aborted && requestId === activeRequestId) {
+				activeLoading = false;
+			}
+			if (activeAbortController === controller) {
+				activeAbortController = null;
+			}
 		}
 	}
 
 	async function loadHistory() {
+		const requestId = ++historyRequestId;
+		abortHistoryLoad();
+		const controller = new AbortController();
+		historyAbortController = controller;
 		historyLoading = true;
 		try {
-			const data = await fetchRequestHistory(historyPage, historyPageSize, historyFilter);
+			const data = await fetchRequestHistory(
+				historyPage,
+				historyPageSize,
+				historyFilter,
+				controller.signal
+			);
+			if (controller.signal.aborted || requestId !== historyRequestId) {
+				return;
+			}
 			historyItems = data.items;
 			historyTotal = data.total;
 			historyTotalPages = data.total_pages;
 			historyError = null;
 		} catch (e) {
+			if (isAbortError(e)) {
+				return;
+			}
 			historyError = 'Failed to load request history';
 		} finally {
-			historyLoading = false;
+			if (!controller.signal.aborted && requestId === historyRequestId) {
+				historyLoading = false;
+			}
+			if (historyAbortController === controller) {
+				historyAbortController = null;
+			}
 		}
 	}
 
@@ -86,6 +136,7 @@
 			clearInterval(pollInterval);
 			pollInterval = null;
 		}
+		abortActiveLoad();
 	}
 
 	function handleVisibility() {
@@ -99,6 +150,7 @@
 	function switchTab(tab: 'active' | 'history') {
 		activeTab = tab;
 		if (tab === 'active') {
+			abortHistoryLoad();
 			startPolling();
 		} else {
 			stopPolling();
@@ -175,6 +227,8 @@
 
 	onDestroy(() => {
 		stopPolling();
+		abortActiveLoad();
+		abortHistoryLoad();
 		document.removeEventListener('visibilitychange', handleVisibility);
 		window.dispatchEvent(new CustomEvent('requests-page-active', { detail: false }));
 	});

@@ -1,6 +1,8 @@
 import asyncio
 import logging
-from typing import Any, Optional
+from typing import Any
+
+import msgspec
 
 from api.v1.schemas.search import SearchResult
 from services.preferences_service import PreferencesService
@@ -16,6 +18,15 @@ from repositories.musicbrainz_base import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+class _ArtistSearchPayload(msgspec.Struct):
+    artists: list[dict[str, Any]] = msgspec.field(default_factory=list)
+
+
+class _ArtistReleaseGroupsPayload(msgspec.Struct):
+    release_groups: list[dict[str, Any]] = msgspec.field(name="release-groups", default_factory=list)
+    release_group_count: int = msgspec.field(name="release-group-count", default=0)
 
 
 FILTERED_ARTIST_MBIDS = {
@@ -35,7 +46,7 @@ class MusicBrainzArtistMixin:
     _cache: CacheInterface
     _preferences_service: PreferencesService
 
-    def _map_artist_to_result(self, artist: dict[str, Any]) -> Optional[SearchResult]:
+    def _map_artist_to_result(self, artist: dict[str, Any]) -> SearchResult | None:
         artist_id = artist.get("id", "")
         if artist_id in FILTERED_ARTIST_MBIDS:
             return None
@@ -77,8 +88,9 @@ class MusicBrainzArtistMixin:
                     "offset": offset,
                 },
                 priority=RequestPriority.USER_INITIATED,
+                decode_type=_ArtistSearchPayload,
             )
-            artists = result.get("artists", [])
+            artists = result.artists
             artists = dedupe_by_id(artists)
 
             results = []
@@ -117,8 +129,9 @@ class MusicBrainzArtistMixin:
                     "offset": offset,
                 },
                 priority=RequestPriority.BACKGROUND_SYNC,
+                decode_type=_ArtistSearchPayload,
             )
-            artists = result.get("artists", [])
+            artists = result.artists
             artists = dedupe_by_id(artists)
 
             results = [r for a in artists[:limit] if (r := self._map_artist_to_result(a)) is not None]
@@ -130,7 +143,7 @@ class MusicBrainzArtistMixin:
             logger.error(f"MusicBrainz artist tag search failed for '{tag}': {e}")
             return []
 
-    async def get_artist_by_id(self, mbid: str) -> Optional[dict]:
+    async def get_artist_by_id(self, mbid: str) -> dict | None:
         cache_key = mb_artist_detail_key(mbid)
 
         cached = await self._cache.get(cache_key)
@@ -140,7 +153,7 @@ class MusicBrainzArtistMixin:
         dedupe_key = f"mb:artist:{mbid}"
         return await mb_deduplicator.dedupe(dedupe_key, lambda: self._fetch_artist_by_id(mbid, cache_key))
 
-    async def get_artist_relations(self, mbid: str) -> Optional[dict]:
+    async def get_artist_relations(self, mbid: str) -> dict | None:
         detail_key = mb_artist_detail_key(mbid)
         cached = await self._cache.get(detail_key)
         if cached is not None:
@@ -154,7 +167,7 @@ class MusicBrainzArtistMixin:
         dedupe_key = f"mb:artist_rels:{mbid}"
         return await mb_deduplicator.dedupe(dedupe_key, lambda: self._fetch_artist_relations(mbid, rels_key))
 
-    async def _fetch_artist_relations(self, mbid: str, cache_key: str) -> Optional[dict]:
+    async def _fetch_artist_relations(self, mbid: str, cache_key: str) -> dict | None:
         try:
             result = await mb_api_get(
                 f"/artist/{mbid}",
@@ -169,7 +182,7 @@ class MusicBrainzArtistMixin:
             logger.error(f"Failed to fetch artist relations {mbid}: {e}")
             return None
 
-    async def _fetch_artist_by_id(self, mbid: str, cache_key: str) -> Optional[dict]:
+    async def _fetch_artist_by_id(self, mbid: str, cache_key: str) -> dict | None:
         try:
             limit = 50
 
@@ -183,14 +196,15 @@ class MusicBrainzArtistMixin:
                     "/release-group",
                     params={"artist": mbid, "limit": limit, "offset": 0},
                     priority=RequestPriority.USER_INITIATED,
+                    decode_type=_ArtistReleaseGroupsPayload,
                 ),
             )
 
             if not artist_result:
                 return None
 
-            all_release_groups = browse_result.get("release-groups", [])
-            total_count = int(browse_result.get("release-group-count", 0))
+            all_release_groups = browse_result.release_groups
+            total_count = int(browse_result.release_group_count)
 
             if all_release_groups:
                 artist_result["release-group-list"] = all_release_groups
@@ -227,10 +241,11 @@ class MusicBrainzArtistMixin:
                 "/release-group",
                 params={"artist": artist_mbid, "limit": limit, "offset": offset},
                 priority=RequestPriority.BACKGROUND_SYNC,
+                decode_type=_ArtistReleaseGroupsPayload,
             )
 
-            release_groups = result.get("release-groups", [])
-            total_count = int(result.get("release-group-count", 0))
+            release_groups = result.release_groups
+            total_count = int(result.release_group_count)
 
             return release_groups, total_count
         except Exception as e:

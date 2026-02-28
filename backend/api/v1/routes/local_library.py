@@ -12,11 +12,12 @@ from api.v1.schemas.local_files import (
 )
 from core.dependencies import get_local_files_service
 from core.exceptions import ExternalServiceError
+from infrastructure.msgspec_fastapi import MsgSpecRoute
 from services.local_files_service import LocalFilesService
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/local", tags=["local-files"])
+router = APIRouter(route_class=MsgSpecRoute, prefix="/api/local", tags=["local-files"])
 
 
 @router.get("/albums", response_model=LocalPaginatedResponse)

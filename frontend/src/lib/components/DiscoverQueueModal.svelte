@@ -13,6 +13,7 @@
 	import { discoverQueueStatusStore } from '$lib/stores/discoverQueueStatus';
 	import { getCacheTTLs } from '$lib/stores/cacheTtl';
 	import { resolveQueueCloseAction } from '$lib/utils/discoverQueueActions';
+	import { isAbortError } from '$lib/utils/errorHandling';
 	import AlbumImage from './AlbumImage.svelte';
 	import DQVideoSection from './DQVideoSection.svelte';
 	import DQInfoGrid from './DQInfoGrid.svelte';
@@ -151,7 +152,7 @@
 				discoverQueueStatusStore.triggerGenerate(false, source);
 			}
 		} catch (e) {
-			if (e instanceof DOMException && e.name === 'AbortError') return;
+			if (isAbortError(e)) return;
 			console.error('Failed to fetch discover queue:', e);
 		} finally {
 			loading = false;
@@ -233,7 +234,7 @@
 				}
 				return null;
 			} catch (e) {
-				if (e instanceof DOMException && e.name === 'AbortError') return null;
+				if (isAbortError(e)) return null;
 				console.error('Failed to enrich item:', e);
 				if (queue[index]?.release_group_mbid === mbid && !queue[index]?.enrichment) {
 					queue[index] = { ...queue[index], enrichment: emptyEnrichment() };

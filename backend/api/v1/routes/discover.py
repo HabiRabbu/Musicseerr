@@ -5,23 +5,26 @@ from api.v1.schemas.discover import (
     DiscoverResponse,
     DiscoverQueueResponse,
     DiscoverQueueEnrichment,
+    DiscoverIgnoredRelease,
     DiscoverQueueIgnoreRequest,
     DiscoverQueueValidateRequest,
     DiscoverQueueValidateResponse,
-    QueueStatusResponse,
+    DiscoverQueueStatusResponse,
     QueueGenerateRequest,
     QueueGenerateResponse,
     YouTubeSearchResponse,
     YouTubeQuotaResponse,
 )
+from api.v1.schemas.common import StatusMessageResponse
 from core.dependencies import get_discover_service, get_discover_queue_manager, get_youtube_repo
+from infrastructure.msgspec_fastapi import MsgSpecBody, MsgSpecRoute
 from repositories.youtube import YouTubeRepository
 from services.discover_service import DiscoverService
 from services.discover_queue_manager import DiscoverQueueManager
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/discover", tags=["discover"])
+router = APIRouter(route_class=MsgSpecRoute, prefix="/api/discover", tags=["discover"])
 
 
 @router.get("", response_model=DiscoverResponse)
@@ -36,13 +39,13 @@ async def get_discover_data(
         raise HTTPException(status_code=500, detail="Failed to load discover page")
 
 
-@router.post("/refresh")
+@router.post("/refresh", response_model=StatusMessageResponse)
 async def refresh_discover_data(
     discover_service: DiscoverService = Depends(get_discover_service),
 ):
     try:
         await discover_service.refresh_discover_data()
-        return {"status": "ok", "message": "Discover refresh triggered"}
+        return StatusMessageResponse(status="ok", message="Discover refresh triggered")
     except Exception as e:
         logger.error(f"Failed to trigger discover refresh: {e}")
         raise HTTPException(status_code=500, detail="Failed to trigger refresh")
@@ -68,7 +71,7 @@ async def get_discover_queue(
         raise HTTPException(status_code=500, detail="Failed to build discover queue")
 
 
-@router.get("/queue/status", response_model=QueueStatusResponse)
+@router.get("/queue/status", response_model=DiscoverQueueStatusResponse)
 async def get_queue_status(
     source: Literal["listenbrainz", "lastfm"] | None = Query(default=None, description="Data source"),
     discover_service: DiscoverService = Depends(get_discover_service),
@@ -80,7 +83,7 @@ async def get_queue_status(
 
 @router.post("/queue/generate", response_model=QueueGenerateResponse)
 async def generate_queue(
-    body: QueueGenerateRequest,
+    body: QueueGenerateRequest = MsgSpecBody(QueueGenerateRequest),
     discover_service: DiscoverService = Depends(get_discover_service),
     queue_manager: DiscoverQueueManager = Depends(get_discover_queue_manager),
 ):
@@ -107,7 +110,7 @@ async def enrich_queue_item(
 
 @router.post("/queue/ignore", status_code=204)
 async def ignore_queue_item(
-    body: DiscoverQueueIgnoreRequest,
+    body: DiscoverQueueIgnoreRequest = MsgSpecBody(DiscoverQueueIgnoreRequest),
     discover_service: DiscoverService = Depends(get_discover_service),
 ):
     try:
@@ -119,7 +122,7 @@ async def ignore_queue_item(
         raise HTTPException(status_code=500, detail="Failed to ignore album")
 
 
-@router.get("/queue/ignored")
+@router.get("/queue/ignored", response_model=list[DiscoverIgnoredRelease])
 async def get_ignored_items(
     discover_service: DiscoverService = Depends(get_discover_service),
 ):
@@ -132,7 +135,7 @@ async def get_ignored_items(
 
 @router.post("/queue/validate", response_model=DiscoverQueueValidateResponse)
 async def validate_queue(
-    body: DiscoverQueueValidateRequest,
+    body: DiscoverQueueValidateRequest = MsgSpecBody(DiscoverQueueValidateRequest),
     discover_service: DiscoverService = Depends(get_discover_service),
 ):
     try:
@@ -170,4 +173,4 @@ async def youtube_quota(
 ):
     if not yt_repo or not yt_repo.is_configured:
         raise HTTPException(status_code=404, detail="YouTube not configured")
-    return YouTubeQuotaResponse(**yt_repo.get_quota_status())
+    return yt_repo.get_quota_status()

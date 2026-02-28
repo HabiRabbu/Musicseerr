@@ -1,7 +1,8 @@
 import logging
-from typing import Any, Optional
+from typing import Any, TypeVar
 
 import httpx
+import msgspec
 
 from core.exceptions import ExternalServiceError
 from infrastructure.resilience.retry import with_retry, CircuitBreaker
@@ -24,7 +25,22 @@ mb_rate_limiter = TokenBucketRateLimiter(rate=1.0, capacity=5)
 
 mb_deduplicator = RequestDeduplicator()
 
-_http_client: Optional[httpx.AsyncClient] = None
+_http_client: httpx.AsyncClient | None = None
+T = TypeVar("T")
+
+
+def _decode_json_response(response: httpx.Response) -> dict[str, Any]:
+    content = getattr(response, "content", None)
+    if isinstance(content, (bytes, bytearray, memoryview)):
+        return msgspec.json.decode(content, type=dict[str, Any])
+    return response.json()
+
+
+def _decode_typed_response(response: httpx.Response, decode_type: type[T]) -> T:
+    content = getattr(response, "content", None)
+    if isinstance(content, (bytes, bytearray, memoryview)):
+        return msgspec.json.decode(content, type=decode_type)
+    return msgspec.convert(response.json(), type=decode_type)
 
 
 def set_mb_http_client(client: httpx.AsyncClient) -> None:
@@ -45,9 +61,10 @@ def get_mb_http_client() -> httpx.AsyncClient:
 )
 async def mb_api_get(
     path: str,
-    params: Optional[dict[str, Any]] = None,
+    params: dict[str, Any] | None = None,
     priority: RequestPriority = RequestPriority.USER_INITIATED,
-) -> dict[str, Any]:
+    decode_type: type[T] | None = None,
+) -> dict[str, Any] | T:
     priority_mgr = get_priority_queue()
     semaphore = await priority_mgr.acquire_slot(priority)
     async with semaphore:
@@ -58,6 +75,8 @@ async def mb_api_get(
         request_params["fmt"] = "json"
         response = await client.get(url, params=request_params)
         if response.status_code == 404:
+            if decode_type is not None:
+                return decode_type()
             return {}
         if response.status_code == 503:
             raise ExternalServiceError(f"MusicBrainz rate limited (503): {path}")
@@ -65,12 +84,17 @@ async def mb_api_get(
             raise ExternalServiceError(
                 f"MusicBrainz API error ({response.status_code}): {path}"
             )
-        return response.json()
+        try:
+            if decode_type is not None:
+                return _decode_typed_response(response, decode_type)
+            return _decode_json_response(response)
+        except (msgspec.DecodeError, msgspec.ValidationError, TypeError) as exc:
+            raise ExternalServiceError(f"MusicBrainz returned invalid JSON payload for {path}: {exc}") from exc
 
 
 def should_include_release(
     release_group: dict[str, Any],
-    included_secondary_types: Optional[set[str]] = None
+    included_secondary_types: set[str] | None = None
 ) -> bool:
     secondary_types = set(map(str.lower, release_group.get("secondary-types", []) or []))
 
@@ -84,7 +108,7 @@ def should_include_release(
     return bool(secondary_types.intersection(included_secondary_types))
 
 
-def extract_artist_name(release_group: dict[str, Any]) -> Optional[str]:
+def extract_artist_name(release_group: dict[str, Any]) -> str | None:
     artist_credit = release_group.get("artist-credit", [])
     if not isinstance(artist_credit, list) or not artist_credit:
         return None
@@ -95,7 +119,7 @@ def extract_artist_name(release_group: dict[str, Any]) -> Optional[str]:
     return None
 
 
-def parse_year(date_str: Optional[str]) -> Optional[int]:
+def parse_year(date_str: str | None) -> int | None:
     if not date_str:
         return None
     year = date_str.split("-", 1)[0]

@@ -582,3 +582,77 @@ class TestDiscoverQueuePersonalization:
 
         assert "listened-rg-1" not in mbids, "Deep cuts should exclude listened release groups"
         assert "deep-cut-new" in mbids, "Unheard deep cuts should be included"
+
+
+class TestDiscoverPerformanceHotpaths:
+    @pytest.mark.asyncio
+    async def test_missing_essentials_does_not_use_per_artist_sleep(self, monkeypatch):
+        service, lb_repo, _, _ = _make_service(lb_enabled=True, lfm_enabled=False)
+
+        sleep_mock = AsyncMock()
+        monkeypatch.setattr("services.discover_service.asyncio.sleep", sleep_mock)
+
+        library_albums = [
+            MagicMock(artist_mbid="artist-1", musicbrainz_id="in-lib-1"),
+            MagicMock(artist_mbid="artist-1", musicbrainz_id="in-lib-2"),
+            MagicMock(artist_mbid="artist-1", musicbrainz_id="in-lib-3"),
+        ]
+        lb_repo.get_artist_top_release_groups = AsyncMock(
+            return_value=[
+                MagicMock(
+                    release_group_mbid="new-rg-1",
+                    release_group_name="Missing Album",
+                    artist_name="Artist 1",
+                    listen_count=25,
+                )
+            ]
+        )
+
+        section = await service._build_missing_essentials(
+            {
+                "library_artists": [MagicMock(musicbrainz_id="artist-1")],
+                "library_albums": library_albums,
+            },
+            library_mbids=set(),
+        )
+
+        sleep_mock.assert_not_awaited()
+        lb_repo.get_artist_top_release_groups.assert_awaited_once_with("artist-1", count=10)
+        assert section is not None
+        assert section.items[0].mbid == "new-rg-1"
+
+    @pytest.mark.asyncio
+    async def test_popular_in_genres_lastfm_handles_partial_failures(self):
+        service, _, lfm_repo, _ = _make_service(lb_enabled=False, lfm_enabled=True)
+        from types import SimpleNamespace
+
+        top_artists = [
+            SimpleNamespace(name="A", mbid="a-mbid"),
+            SimpleNamespace(name="B", mbid="b-mbid"),
+            SimpleNamespace(name="C", mbid="c-mbid"),
+        ]
+
+        info_1 = SimpleNamespace(
+            tags=[SimpleNamespace(name="Rock"), SimpleNamespace(name="Indie")]
+        )
+        info_3 = SimpleNamespace(tags=[SimpleNamespace(name="Shoegaze")])
+        lfm_repo.get_artist_info = AsyncMock(side_effect=[info_1, Exception("boom"), info_3])
+
+        async def _tag_side_effect(genre_name: str, limit: int = 10):
+            if genre_name.lower() == "rock":
+                return [SimpleNamespace(mbid="artist-rock", name="Rock Artist", playcount=42)]
+            if genre_name.lower() == "indie":
+                raise Exception("tag fail")
+            return [SimpleNamespace(mbid="artist-shoe", name="Shoe Artist", playcount=30)]
+
+        lfm_repo.get_tag_top_artists = AsyncMock(side_effect=_tag_side_effect)
+
+        section = await service._build_popular_in_genres_lastfm(
+            {"lfm_user_top_artists_for_genres": top_artists},
+            library_mbids=set(),
+            seen_artist_mbids=set(),
+        )
+
+        assert section is not None
+        assert {item.mbid for item in section.items} == {"artist-rock", "artist-shoe"}
+        assert section.source == "lastfm"

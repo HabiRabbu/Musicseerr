@@ -1,9 +1,9 @@
-from dataclasses import dataclass
 from typing import Any
 
+import msgspec
 
-@dataclass
-class JellyfinItem:
+
+class JellyfinItem(msgspec.Struct):
     """Represents a Jellyfin library item (artist, album, or track)."""
 
     id: str
@@ -29,8 +29,7 @@ class JellyfinItem:
     child_count: int | None = None
 
 
-@dataclass
-class JellyfinUser:
+class JellyfinUser(msgspec.Struct):
     id: str
     name: str
 

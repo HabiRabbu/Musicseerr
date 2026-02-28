@@ -1,12 +1,14 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onDestroy, onMount } from 'svelte';
 	import { goto } from '$app/navigation';
-	import AlbumImage from './AlbumImage.svelte';
-	import ArtistImage from './ArtistImage.svelte';
-	import { formatListenCount } from '$lib/utils/formatting';
+	import { CACHE_KEYS, CACHE_TTL } from '$lib/constants';
+	import { albumHref, artistHref } from '$lib/utils/entityRoutes';
+	import { createLocalStorageCache } from '$lib/utils/localStorageCache';
+	import { isAbortError } from '$lib/utils/errorHandling';
+	import TimeRangeCard from './TimeRangeCard.svelte';
 	import { getTimeRangeFallbackPath } from '$lib/utils/timeRangeFallback';
 	import type { HomeAlbum, HomeArtist } from '$lib/types';
-	import { ChevronLeft, ChevronDown, Check, Search } from 'lucide-svelte';
+	import { ChevronLeft, ChevronDown } from 'lucide-svelte';
 
 	type TimeRangeKey = 'this_week' | 'this_month' | 'this_year' | 'all_time';
 	type ItemType = 'album' | 'artist';
@@ -49,8 +51,33 @@
 	let expandedData: RangeResponse | null = null;
 	let loading = true;
 	let loadingMore = false;
+	let paginationError: string | null = null;
 	let mounted = false;
 	let lastSourceKey = '';
+	let overviewAbortController: AbortController | null = null;
+	let expandAbortController: AbortController | null = null;
+	let loadMoreAbortController: AbortController | null = null;
+
+	const overviewCache = createLocalStorageCache<OverviewData>(
+		CACHE_KEYS.TIME_RANGE_OVERVIEW_CACHE,
+		CACHE_TTL.TIME_RANGE_OVERVIEW,
+		{ maxEntries: 40 }
+	);
+
+	function getOverviewCacheSuffix(): string {
+		const encodedEndpoint = encodeURIComponent(endpoint);
+		const sourceKey = source ?? 'none';
+		return `${itemType}:${sourceKey}:${encodedEndpoint}`;
+	}
+
+	function abortInFlightRequests() {
+		overviewAbortController?.abort();
+		expandAbortController?.abort();
+		loadMoreAbortController?.abort();
+		overviewAbortController = null;
+		expandAbortController = null;
+		loadMoreAbortController = null;
+	}
 
 	onMount(async () => {
 		mounted = true;
@@ -58,7 +85,12 @@
 		await loadOverview();
 	});
 
+	onDestroy(() => {
+		abortInFlightRequests();
+	});
+
 	$: if (mounted && (source ?? '') !== lastSourceKey) {
+		abortInFlightRequests();
 		lastSourceKey = source ?? '';
 		expandedRange = null;
 		expandedData = null;
@@ -72,15 +104,49 @@
 	}
 
 	async function loadOverview() {
-		loading = true;
-		try {
-			const res = await fetch(withSource(`${endpoint}?limit=10`));
-			if (res.ok) {
-				overviewData = await res.json();
-			}
-		} catch {
-		} finally {
+		const cacheSuffix = getOverviewCacheSuffix();
+		const cachedOverview = overviewCache.get(cacheSuffix);
+		const hasCachedOverview = !!cachedOverview?.data;
+		const shouldRefresh = !cachedOverview || overviewCache.isStale(cachedOverview.timestamp);
+
+		if (hasCachedOverview) {
+			overviewData = cachedOverview.data;
 			loading = false;
+		}
+
+		if (!shouldRefresh) {
+			return;
+		}
+
+		if (!hasCachedOverview) {
+			loading = true;
+		}
+
+		overviewAbortController?.abort();
+		const controller = new AbortController();
+		overviewAbortController = controller;
+
+		try {
+			const res = await fetch(withSource(`${endpoint}?limit=10`), { signal: controller.signal });
+			if (res.ok) {
+				const data: OverviewData = await res.json();
+				if (controller.signal.aborted) {
+					return;
+				}
+				overviewData = data;
+				overviewCache.set(data, cacheSuffix);
+			}
+		} catch (error) {
+			if (isAbortError(error)) {
+				return;
+			}
+		} finally {
+			if (!controller.signal.aborted) {
+				loading = false;
+			}
+			if (overviewAbortController === controller) {
+				overviewAbortController = null;
+			}
 		}
 	}
 
@@ -88,19 +154,38 @@
 		if (expandedRange === rangeKey) {
 			expandedRange = null;
 			expandedData = null;
+			paginationError = null;
 			return;
 		}
 
 		expandedRange = rangeKey;
+		paginationError = null;
 		loadingMore = true;
+		expandAbortController?.abort();
+		const controller = new AbortController();
+		expandAbortController = controller;
 		try {
-			const res = await fetch(withSource(`${endpoint}/${rangeKey}?limit=25&offset=0`));
+			const res = await fetch(withSource(`${endpoint}/${rangeKey}?limit=25&offset=0`), {
+				signal: controller.signal
+			});
 			if (res.ok) {
-				expandedData = await res.json();
+				const data: RangeResponse = await res.json();
+				if (controller.signal.aborted) {
+					return;
+				}
+				expandedData = data;
 			}
-		} catch {
+		} catch (error) {
+			if (isAbortError(error)) {
+				return;
+			}
 		} finally {
-			loadingMore = false;
+			if (!controller.signal.aborted) {
+				loadingMore = false;
+			}
+			if (expandAbortController === controller) {
+				expandAbortController = null;
+			}
 		}
 	}
 
@@ -108,27 +193,49 @@
 		if (!expandedRange || !expandedData || loadingMore || !expandedData.has_more) return;
 
 		loadingMore = true;
+		paginationError = null;
+		loadMoreAbortController?.abort();
+		const controller = new AbortController();
+		loadMoreAbortController = controller;
 		try {
 			const newOffset = expandedData.offset + expandedData.limit;
-			const res = await fetch(withSource(`${endpoint}/${expandedRange}?limit=25&offset=${newOffset}`));
+			const res = await fetch(withSource(`${endpoint}/${expandedRange}?limit=25&offset=${newOffset}`), {
+				signal: controller.signal
+			});
 			if (res.ok) {
 				const moreData: RangeResponse = await res.json();
+				if (controller.signal.aborted) {
+					return;
+				}
 				expandedData = {
 					...moreData,
 					items: [...expandedData.items, ...moreData.items]
 				};
 			}
-		} catch {
+		} catch (error) {
+			if (isAbortError(error)) {
+				return;
+			}
+			paginationError = `Failed to load more ${itemType}s.`;
 		} finally {
-			loadingMore = false;
+			if (!controller.signal.aborted) {
+				loadingMore = false;
+			}
+			if (loadMoreAbortController === controller) {
+				loadMoreAbortController = null;
+			}
 		}
 	}
 
-	function handleItemClick(item: HomeAlbum | HomeArtist) {
-		if (item.mbid) {
-			goto(`/${itemType}/${item.mbid}`);
-			return;
+	function getItemHref(item: HomeAlbum | HomeArtist): string | null {
+		if (!item.mbid) return null;
+		if (itemType === 'album') {
+			return albumHref(item.mbid);
 		}
+		return artistHref(item.mbid);
+	}
+
+	function handleItemClick(item: HomeAlbum | HomeArtist) {
 		const fallbackPath = getFallbackSearchPath(item);
 		if (fallbackPath) {
 			goto(fallbackPath);
@@ -148,15 +255,11 @@
 		if (!overviewData) return null;
 		return overviewData[rangeKey]?.featured || null;
 	}
-
-	function isAlbum(item: HomeAlbum | HomeArtist): item is HomeAlbum {
-		return itemType === 'album';
-	}
 </script>
 
 <div class="container mx-auto p-4 md:p-6 lg:p-8">
 	<div class="mb-6 flex items-center gap-4">
-		<button class="btn btn-circle btn-ghost" on:click={() => goto('/')} aria-label="Back to home">
+		<button class="btn btn-circle btn-ghost" onclick={() => goto('/')} aria-label="Back to home">
 			<ChevronLeft class="h-6 w-6" />
 		</button>
 		<div>
@@ -174,7 +277,7 @@
 			<div class="mb-4 text-6xl">{errorEmoji}</div>
 			<h2 class="mb-2 text-2xl font-semibold">Unable to load {itemType}s</h2>
 			<p class="mb-4 text-base-content/70">Please try again later.</p>
-			<button class="btn btn-primary" on:click={loadOverview}>Retry</button>
+			<button class="btn btn-primary" onclick={loadOverview}>Retry</button>
 		</div>
 	{:else}
 		<div class="space-y-8">
@@ -186,7 +289,7 @@
 				<section class="rounded-2xl bg-base-200/50 p-4 sm:p-6">
 					<button
 						class="mb-4 flex w-full items-center justify-between text-left"
-						on:click={() => expandRange(range.key)}
+						onclick={() => expandRange(range.key)}
 						aria-label="{isExpanded ? 'Collapse' : 'Expand'} {range.label}"
 					>
 						<h2 class="text-xl font-bold sm:text-2xl">{range.label}</h2>
@@ -201,144 +304,31 @@
 					{#if !isExpanded}
 						<div class="grid gap-4 lg:grid-cols-3">
 							{#if featured}
-								<div
-									class="card cursor-pointer overflow-hidden bg-base-100 shadow-lg transition-all hover:shadow-xl lg:col-span-1"
-									on:click={() => handleItemClick(featured)}
-									on:keydown={(e) => e.key === 'Enter' && handleItemClick(featured)}
-									role="button"
-									tabindex="0"
-								>
-									<figure class="relative aspect-square w-full">
-										{#if itemType === 'album'}
-											<AlbumImage
-												mbid={featured.mbid || ''}
-												alt={featured.name}
-												size="xl"
-												rounded="none"
-												className="w-full h-full"
-												customUrl={(featured as HomeAlbum).image_url || null}
-											/>
-										{:else}
-											<ArtistImage
-												mbid={featured.mbid || ''}
-												alt={featured.name}
-												size="full"
-												rounded="none"
-												className="w-full h-full"
-												lazy={false}
-											/>
-										{/if}
-										<div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
-										<div class="absolute left-3 top-3 flex items-center gap-2">
-											<span class="badge badge-primary badge-lg font-bold">#1</span>
-											<span class="badge badge-ghost badge-sm">Most Popular</span>
-										</div>
-										{#if featured.in_library}
-											<div class="badge badge-success absolute right-3 top-3">
-												<Check class="h-3 w-3" />
-												In Library
-											</div>
-										{/if}
-										<div class="absolute inset-x-0 bottom-0 p-4 text-white">
-											<h3 class="line-clamp-2 text-lg font-bold sm:text-xl">{featured.name}</h3>
-											{#if isAlbum(featured) && featured.artist_name}
-												<p class="line-clamp-1 text-sm text-white/80">{featured.artist_name}</p>
-											{/if}
-											{#if featured.listen_count !== null && featured.listen_count !== undefined}
-												<p class="mt-1 text-sm text-white/60">🎧 {formatListenCount(featured.listen_count)}</p>
-											{/if}
-										</div>
-										{#if !featured.mbid}
-											<button
-												type="button"
-												class="btn btn-ghost btn-xs btn-circle absolute bottom-3 right-3 text-white"
-												title={itemType === 'album' ? 'Search album' : 'Search artist'}
-												on:click={(e) => {
-													e.stopPropagation();
-													handleItemClick(featured);
-												}}
-											>
-												<Search class="h-3 w-3" />
-											</button>
-										{/if}
-									</figure>
-								</div>
+								{@const featuredHref = getItemHref(featured)}
+								<TimeRangeCard
+									item={featured}
+									itemType={itemType}
+									href={featuredHref}
+									rank={1}
+									variant="featured"
+									className="overflow-hidden bg-base-100 shadow-lg transition-all hover:shadow-xl lg:col-span-1"
+									onFallbackClick={handleItemClick}
+								/>
 							{/if}
 
 							<div class="grid-cards-overview lg:col-span-2">
 								{#each items.slice(0, 8) as item, idx}
 									{@const rank = idx + 2}
-									<div
-										class="card cursor-pointer bg-base-100 shadow-sm transition-all hover:scale-105 hover:shadow-lg active:scale-95"
-										on:click={() => handleItemClick(item)}
-										on:keydown={(e) => e.key === 'Enter' && handleItemClick(item)}
-										role="button"
-										tabindex="0"
-									>
-										{#if itemType === 'album'}
-											<figure class="relative aspect-square overflow-hidden">
-												<AlbumImage
-													mbid={item.mbid || ''}
-													alt={item.name}
-													size="md"
-													rounded="none"
-													className="w-full h-full"
-													customUrl={(item as HomeAlbum).image_url || null}
-												/>
-												{#if item.in_library}
-													<div class="badge badge-success badge-sm absolute right-1 top-1">
-														<Check class="h-3 w-3" />
-													</div>
-												{/if}
-												<div class="badge badge-neutral badge-sm absolute bottom-1 left-1 font-bold">#{rank}</div>
-													{#if !item.mbid}
-														<button
-															type="button"
-															class="btn btn-ghost btn-xs btn-circle absolute bottom-1 right-1"
-															title="Search artist"
-															on:click={(e) => {
-																e.stopPropagation();
-																handleItemClick(item);
-															}}
-														>
-															<Search class="h-3 w-3" />
-														</button>
-													{/if}
-											</figure>
-										{:else}
-											<figure class="relative flex justify-center pt-4">
-												<ArtistImage mbid={item.mbid || ''} alt={item.name} size="md" lazy={false} />
-												{#if item.in_library}
-													<div class="badge badge-success badge-sm absolute right-1 top-1">
-														<Check class="h-3 w-3" />
-													</div>
-												{/if}
-												<div class="badge badge-neutral badge-sm absolute bottom-1 left-1 font-bold">#{rank}</div>
-												{#if !item.mbid}
-													<button
-														type="button"
-														class="btn btn-ghost btn-xs btn-circle absolute bottom-1 right-1"
-														title="Search artist"
-														on:click={(e) => {
-															e.stopPropagation();
-															handleItemClick(item);
-														}}
-													>
-														<Search class="h-3 w-3" />
-													</button>
-												{/if}
-											</figure>
-										{/if}
-										<div class="card-body p-2">
-											<h3 class="card-title line-clamp-1 text-xs">{item.name}</h3>
-											{#if isAlbum(item) && item.artist_name}
-												<p class="line-clamp-1 text-xs text-base-content/50">{item.artist_name}</p>
-											{/if}
-											{#if item.listen_count !== null && item.listen_count !== undefined}
-												<p class="text-xs text-base-content/40">{formatListenCount(item.listen_count)}</p>
-											{/if}
-										</div>
-									</div>
+									{@const itemHref = getItemHref(item)}
+									<TimeRangeCard
+										item={item}
+										itemType={itemType}
+										href={itemHref}
+										rank={rank}
+										variant="overview"
+										className="bg-base-100 shadow-sm transition-all hover:scale-105 hover:shadow-lg active:scale-95"
+										onFallbackClick={handleItemClick}
+									/>
 								{/each}
 							</div>
 						</div>
@@ -351,89 +341,22 @@
 							<div class="grid-cards">
 								{#each expandedData.items as item, idx}
 									{@const rank = idx + 1}
-									<div
-										class="card cursor-pointer bg-base-100 shadow-sm transition-all hover:scale-105 hover:shadow-lg active:scale-95"
-										on:click={() => handleItemClick(item)}
-										on:keydown={(e) => e.key === 'Enter' && handleItemClick(item)}
-										role="button"
-										tabindex="0"
-									>
-										{#if itemType === 'album'}
-											<figure class="relative aspect-square overflow-hidden">
-												<AlbumImage
-													mbid={item.mbid || ''}
-													alt={item.name}
-													size="md"
-													rounded="none"
-													className="w-full h-full"
-													customUrl={(item as HomeAlbum).image_url || null}
-												/>
-												{#if item.in_library}
-													<div class="badge badge-success badge-sm absolute right-1 top-1">
-														<Check class="h-3 w-3" />
-													</div>
-												{/if}
-												<div class="badge badge-sm absolute bottom-1 left-1 font-bold {rank <= 3 ? 'badge-primary' : 'badge-neutral'}">#{rank}</div>
-													{#if !item.mbid}
-														<button
-															type="button"
-															class="btn btn-ghost btn-xs btn-circle absolute bottom-1 right-1"
-															title="Search album"
-															on:click={(e) => {
-																e.stopPropagation();
-																handleItemClick(item);
-															}}
-														>
-															<Search class="h-3 w-3" />
-														</button>
-													{/if}
-											</figure>
-										{:else}
-											<figure class="relative aspect-square overflow-hidden">
-												<ArtistImage
-													mbid={item.mbid || ''}
-													alt={item.name}
-													size="full"
-													rounded="none"
-													className="w-full h-full"
-												/>
-												{#if item.in_library}
-													<div class="badge badge-success badge-sm absolute right-1 top-1">
-														<Check class="h-3 w-3" />
-													</div>
-												{/if}
-												<div class="badge badge-sm absolute bottom-1 left-1 font-bold {rank <= 3 ? 'badge-primary' : 'badge-neutral'}">#{rank}</div>
-												{#if !item.mbid}
-													<button
-														type="button"
-														class="btn btn-ghost btn-xs btn-circle absolute bottom-1 right-1"
-														title="Search artist"
-														on:click={(e) => {
-															e.stopPropagation();
-															handleItemClick(item);
-														}}
-													>
-														<Search class="h-3 w-3" />
-													</button>
-												{/if}
-											</figure>
-										{/if}
-										<div class="card-body p-2 sm:p-3">
-											<h3 class="card-title line-clamp-1 text-xs sm:text-sm">{item.name}</h3>
-											{#if isAlbum(item) && item.artist_name}
-												<p class="line-clamp-1 text-xs text-base-content/50">{item.artist_name}</p>
-											{/if}
-											{#if item.listen_count !== null && item.listen_count !== undefined}
-												<p class="text-xs text-base-content/40">{formatListenCount(item.listen_count)}</p>
-											{/if}
-										</div>
-									</div>
+									{@const itemHref = getItemHref(item)}
+									<TimeRangeCard
+										item={item}
+										itemType={itemType}
+										href={itemHref}
+										rank={rank}
+										variant="expanded"
+										className="bg-base-100 shadow-sm transition-all hover:scale-105 hover:shadow-lg active:scale-95"
+										onFallbackClick={handleItemClick}
+									/>
 								{/each}
 							</div>
 
 							{#if expandedData.has_more}
 								<div class="mt-6 flex justify-center">
-									<button class="btn btn-outline btn-wide" on:click={loadMore} disabled={loadingMore}>
+									<button class="btn btn-outline btn-wide" onclick={loadMore} disabled={loadingMore}>
 										{#if loadingMore}
 											<span class="loading loading-spinner loading-sm"></span>
 										{:else}
@@ -441,6 +364,9 @@
 										{/if}
 									</button>
 								</div>
+								{#if paginationError}
+									<p class="mt-2 text-center text-sm text-error">{paginationError}</p>
+								{/if}
 							{/if}
 						{/if}
 					{/if}

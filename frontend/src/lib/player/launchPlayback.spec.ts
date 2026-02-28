@@ -59,6 +59,19 @@ describe('launchLocalPlayback', () => {
 		);
 	});
 
+	it('always sets a non-null coverUrl on queue items', () => {
+		const tracks: LocalTrackInfo[] = [
+			{ track_file_id: 1, title: 'A', track_number: 1, format: 'flac', size_bytes: 1000 }
+		];
+		const metaWithNullCover: PlaybackMeta = { ...meta, coverUrl: null };
+
+		launchLocalPlayback(tracks, 0, false, metaWithNullCover);
+
+		const items: QueueItem[] = vi.mocked(playerStore.playQueue).mock.calls[0][0];
+		expect(items[0].coverUrl).toBeTruthy();
+		expect(typeof items[0].coverUrl).toBe('string');
+	});
+
 	it('passes startIndex and shuffle through to playerStore', () => {
 		const tracks: LocalTrackInfo[] = [
 			{
@@ -113,6 +126,27 @@ describe('launchJellyfinPlayback', () => {
 				format: 'flac'
 			})
 		);
+	});
+
+	it('always sets a non-null coverUrl on queue items', () => {
+		const tracks: JellyfinTrackInfo[] = [
+			{
+				jellyfin_id: 'jf-abc',
+				title: 'Song',
+				track_number: 1,
+				duration_seconds: 120,
+				album_name: 'Album',
+				artist_name: 'Artist',
+				codec: 'mp3'
+			}
+		];
+		const metaWithNullCover: PlaybackMeta = { ...meta, coverUrl: null };
+
+		launchJellyfinPlayback(tracks, 0, false, metaWithNullCover);
+
+		const items: QueueItem[] = vi.mocked(playerStore.playQueue).mock.calls[0][0];
+		expect(items[0].coverUrl).toBeTruthy();
+		expect(typeof items[0].coverUrl).toBe('string');
 	});
 
 	it('aligns streamUrl format parameter with QueueItem format', () => {

@@ -2,11 +2,12 @@ import logging
 from fastapi import APIRouter, Depends
 from api.v1.schemas.common import StatusReport
 from core.dependencies import get_status_service
+from infrastructure.msgspec_fastapi import MsgSpecRoute
 from services.status_service import StatusService
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/status", tags=["status"])
+router = APIRouter(route_class=MsgSpecRoute, prefix="/api/status", tags=["status"])
 
 
 @router.get("", response_model=StatusReport)

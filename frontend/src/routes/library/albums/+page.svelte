@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
+	import { infiniteSentinel } from '$lib/actions/infiniteSentinel';
 	import AlbumCard from '$lib/components/AlbumCard.svelte';
 	import type { Album } from '$lib/types';
 	import { ChevronLeft } from 'lucide-svelte';
@@ -19,6 +20,8 @@
 	let allAlbums: LibraryAlbum[] = [];
 	let loading = true;
 	let error: string | null = null;
+	let visibleArtistCount = 12;
+	const ARTIST_GROUP_BATCH_SIZE = 8;
 
 	onMount(async () => {
 		await loadAlbums();
@@ -63,6 +66,16 @@
 	}, {} as Record<string, LibraryAlbum[]>);
 
 	$: sortedArtistNames = Object.keys(albumsByArtist).sort((a, b) => a.localeCompare(b));
+	$: displayedArtistNames = sortedArtistNames.slice(0, visibleArtistCount);
+
+	function loadMoreArtistGroups() {
+		if (visibleArtistCount >= sortedArtistNames.length) return;
+		visibleArtistCount = Math.min(
+			visibleArtistCount + ARTIST_GROUP_BATCH_SIZE,
+			sortedArtistNames.length
+		);
+	}
+
 </script>
 
 <div class="container mx-auto p-4 md:p-6 lg:p-8">
@@ -101,7 +114,7 @@
 		</div>
 	{:else}
 		<div class="space-y-8">
-			{#each sortedArtistNames as artistName}
+			{#each displayedArtistNames as artistName}
 				<div>
 					<div class="divider divider-start text-xl font-bold text-secondary">{artistName}</div>
 					<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
@@ -111,6 +124,18 @@
 					</div>
 				</div>
 			{/each}
+
+			{#if displayedArtistNames.length < sortedArtistNames.length}
+				<div
+					class="h-8 flex items-center justify-center"
+					use:infiniteSentinel={{
+						enabled: displayedArtistNames.length < sortedArtistNames.length && !loading,
+						onIntersect: loadMoreArtistGroups
+					}}
+				>
+					<span class="loading loading-dots loading-sm"></span>
+				</div>
+			{/if}
 		</div>
 	{/if}
 </div>

@@ -1,73 +1,81 @@
-from typing import Literal, Optional
-from pydantic import BaseModel, Field
+from typing import Literal
+
+from infrastructure.msgspec_fastapi import AppStruct
 
 EnrichmentSource = Literal["listenbrainz", "lastfm", "none"]
 
 
-class SearchResult(BaseModel):
+class SearchResult(AppStruct):
     type: str
     title: str
-    artist: Optional[str] = None
-    year: Optional[int] = None
     musicbrainz_id: str
+    artist: str | None = None
+    year: int | None = None
     in_library: bool = False
     requested: bool = False
-    cover_url: Optional[str] = None
-    disambiguation: Optional[str] = None
-    type_info: Optional[str] = None
+    cover_url: str | None = None
+    disambiguation: str | None = None
+    type_info: str | None = None
     score: int = 0
 
 
-class SearchResponse(BaseModel):
-    artists: list[SearchResult] = Field(default_factory=list)
-    albums: list[SearchResult] = Field(default_factory=list)
+class SearchResponse(AppStruct):
+    artists: list[SearchResult] = []
+    albums: list[SearchResult] = []
 
 
-class ArtistEnrichment(BaseModel):
+class SearchBucketResponse(AppStruct):
+    bucket: str
+    limit: int
+    offset: int
+    results: list[SearchResult] = []
+
+
+class ArtistEnrichment(AppStruct):
     musicbrainz_id: str
-    release_group_count: Optional[int] = None
-    listen_count: Optional[int] = None
+    release_group_count: int | None = None
+    listen_count: int | None = None
 
 
-class AlbumEnrichment(BaseModel):
+class AlbumEnrichment(AppStruct):
     musicbrainz_id: str
-    track_count: Optional[int] = None
-    listen_count: Optional[int] = None
+    track_count: int | None = None
+    listen_count: int | None = None
 
 
-class ArtistEnrichmentRequest(BaseModel):
+class ArtistEnrichmentRequest(AppStruct):
     musicbrainz_id: str
     name: str = ""
 
 
-class AlbumEnrichmentRequest(BaseModel):
+class AlbumEnrichmentRequest(AppStruct):
     musicbrainz_id: str
     artist_name: str = ""
     album_name: str = ""
 
 
-class EnrichmentBatchRequest(BaseModel):
-    artists: list[ArtistEnrichmentRequest] = Field(default_factory=list)
-    albums: list[AlbumEnrichmentRequest] = Field(default_factory=list)
+class EnrichmentBatchRequest(AppStruct):
+    artists: list[ArtistEnrichmentRequest] = []
+    albums: list[AlbumEnrichmentRequest] = []
 
 
-class EnrichmentResponse(BaseModel):
-    artists: list[ArtistEnrichment] = Field(default_factory=list)
-    albums: list[AlbumEnrichment] = Field(default_factory=list)
+class EnrichmentResponse(AppStruct):
+    artists: list[ArtistEnrichment] = []
+    albums: list[AlbumEnrichment] = []
     source: EnrichmentSource = "none"
 
 
-class SuggestResult(BaseModel):
+class SuggestResult(AppStruct):
     type: Literal["artist", "album"]
     title: str
-    artist: Optional[str] = None
-    year: Optional[int] = None
     musicbrainz_id: str
+    artist: str | None = None
+    year: int | None = None
     in_library: bool = False
     requested: bool = False
-    disambiguation: Optional[str] = None
+    disambiguation: str | None = None
     score: int = 0
 
 
-class SuggestResponse(BaseModel):
-    results: list[SuggestResult] = Field(default_factory=list)
+class SuggestResponse(AppStruct):
+    results: list[SuggestResult] = []

@@ -1,10 +1,11 @@
-import json
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import quote_plus
 
 import httpx
+import msgspec
+from api.v1.schemas.discover import YouTubeQuotaResponse
 
 logger = logging.getLogger(__name__)
 
@@ -12,6 +13,30 @@ YOUTUBE_SEARCH_URL = "https://www.googleapis.com/youtube/v3/search"
 DEFAULT_DAILY_QUOTA_LIMIT = 80
 SEARCH_COST = 100
 QUOTA_FILE = Path("/app/cache/youtube_quota.json")
+
+
+class YouTubeQuotaState(msgspec.Struct):
+    date: str = ""
+    count: int = 0
+
+
+class _YouTubeSearchId(msgspec.Struct):
+    videoId: str | None = None
+
+
+class _YouTubeSearchItem(msgspec.Struct):
+    id: _YouTubeSearchId | None = None
+
+
+class _YouTubeSearchResponse(msgspec.Struct):
+    items: list[_YouTubeSearchItem] = []
+
+
+def _decode_json_response(response: httpx.Response, decode_type: type[_YouTubeSearchResponse]) -> _YouTubeSearchResponse:
+    content = getattr(response, "content", None)
+    if isinstance(content, (bytes, bytearray, memoryview)):
+        return msgspec.json.decode(content, type=decode_type)
+    return msgspec.convert(response.json(), type=decode_type)
 
 
 class YouTubeRepository:
@@ -32,11 +57,11 @@ class YouTubeRepository:
     def _load_quota(self) -> None:
         try:
             if QUOTA_FILE.exists():
-                data = json.loads(QUOTA_FILE.read_text())
-                saved_date = data.get("date", "")
+                data = msgspec.json.decode(QUOTA_FILE.read_bytes(), type=YouTubeQuotaState)
+                saved_date = data.date
                 today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
                 if saved_date == today:
-                    self._daily_count = data.get("count", 0)
+                    self._daily_count = data.count
                     self._quota_date = saved_date
                 else:
                     self._daily_count = 0
@@ -48,9 +73,7 @@ class YouTubeRepository:
     def _save_quota(self) -> None:
         try:
             QUOTA_FILE.parent.mkdir(parents=True, exist_ok=True)
-            QUOTA_FILE.write_text(
-                json.dumps({"date": self._quota_date, "count": self._daily_count})
-            )
+            QUOTA_FILE.write_bytes(msgspec.json.encode(YouTubeQuotaState(date=self._quota_date, count=self._daily_count)))
         except Exception as e:
             logger.warning(f"Failed to save YouTube quota state: {e}")
 
@@ -73,14 +96,14 @@ class YouTubeRepository:
         self._check_and_reset_quota()
         return max(0, self._daily_quota_limit - self._daily_count)
 
-    def get_quota_status(self) -> dict:
+    def get_quota_status(self) -> YouTubeQuotaResponse:
         self._check_and_reset_quota()
-        return {
-            "used": self._daily_count,
-            "limit": self._daily_quota_limit,
-            "remaining": max(0, self._daily_quota_limit - self._daily_count),
-            "date": self._quota_date,
-        }
+        return YouTubeQuotaResponse(
+            used=self._daily_count,
+            limit=self._daily_quota_limit,
+            remaining=max(0, self._daily_quota_limit - self._daily_count),
+            date=self._quota_date,
+        )
 
     async def search_video(self, artist: str, album: str) -> str | None:
         if not self._api_key:
@@ -117,11 +140,10 @@ class YouTubeRepository:
                 return None
 
             response.raise_for_status()
-            data = response.json()
+            data = _decode_json_response(response, _YouTubeSearchResponse)
 
-            items = data.get("items", [])
-            if items:
-                video_id = items[0].get("id", {}).get("videoId")
+            if data.items:
+                video_id = data.items[0].id.videoId if data.items[0].id else None
                 self._cache[cache_key] = video_id
                 return video_id
 

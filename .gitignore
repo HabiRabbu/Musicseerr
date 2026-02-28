@@ -30,6 +30,7 @@ frontend/.svelte-kit/
 frontend/build/
 frontend/dist/
 frontend/.vite/
+.vite/
 
 # Docker / local config
 docker-compose.yml

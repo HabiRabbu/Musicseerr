@@ -1,11 +1,14 @@
+from __future__ import annotations
+
 import asyncio
 import logging
 import re
 from pathlib import Path
-from typing import Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, TypeVar
 from urllib.parse import quote
 
 import httpx
+import msgspec
 
 from infrastructure.cache.memory_cache import CacheInterface
 from infrastructure.queue.priority_queue import RequestPriority
@@ -17,6 +20,51 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 LOCAL_SOURCE_TIMEOUT_SECONDS = 1.0
+T = TypeVar("T")
+
+
+class _WikidataValue(msgspec.Struct):
+    value: str | None = None
+
+
+class _WikidataSnak(msgspec.Struct):
+    datavalue: _WikidataValue | None = None
+
+
+class _WikidataClaim(msgspec.Struct):
+    mainsnak: _WikidataSnak | None = None
+
+
+class _WikidataEntity(msgspec.Struct):
+    claims: dict[str, list[_WikidataClaim]] = {}
+
+
+class _WikidataEntityResponse(msgspec.Struct):
+    entities: dict[str, _WikidataEntity] = {}
+
+
+class _CommonsImageInfo(msgspec.Struct):
+    url: str | None = None
+    thumburl: str | None = None
+
+
+class _CommonsPage(msgspec.Struct):
+    imageinfo: list[_CommonsImageInfo] = []
+
+
+class _CommonsQuery(msgspec.Struct):
+    pages: dict[str, _CommonsPage] = {}
+
+
+class _CommonsQueryResponse(msgspec.Struct):
+    query: _CommonsQuery | None = None
+
+
+def _decode_json_response(response: httpx.Response, decode_type: type[T]) -> T:
+    content = getattr(response, "content", None)
+    if isinstance(content, (bytes, bytearray, memoryview)):
+        return msgspec.json.decode(content, type=decode_type)
+    return msgspec.convert(response.json(), type=decode_type)
 
 
 def _log_task_error(task: asyncio.Task) -> None:
@@ -40,9 +88,9 @@ class ArtistImageFetcher:
         http_get_fn,
         write_cache_fn,
         cache: CacheInterface,
-        mb_repo: Optional['MusicBrainzRepository'] = None,
-        lidarr_repo: Optional['LidarrRepository'] = None,
-        jellyfin_repo: Optional['JellyfinRepository'] = None,
+        mb_repo: 'MusicBrainzRepository' | None = None,
+        lidarr_repo: 'LidarrRepository' | None = None,
+        jellyfin_repo: 'JellyfinRepository' | None = None,
     ):
         self._http_get = http_get_fn
         self._write_disk_cache = write_cache_fn
@@ -54,9 +102,9 @@ class ArtistImageFetcher:
     async def fetch_artist_image(
         self,
         artist_id: str,
-        size: Optional[int],
+        size: int | None,
         file_path: Path
-    ) -> Optional[tuple[bytes, str, str]]:
+    ) -> tuple[bytes, str, str] | None:
         logger.info(f"[IMG] Fetching artist image for {artist_id[:8]}... (size={size})")
         result = None
         try:
@@ -80,9 +128,9 @@ class ArtistImageFetcher:
     async def _fetch_local_sources(
         self,
         artist_id: str,
-        size: Optional[int],
+        size: int | None,
         file_path: Path,
-    ) -> Optional[tuple[bytes, str, str]]:
+    ) -> tuple[bytes, str, str] | None:
         result = await self._fetch_from_lidarr(artist_id, size, file_path)
         if result:
             return result
@@ -91,9 +139,9 @@ class ArtistImageFetcher:
     async def _fetch_from_lidarr(
         self,
         artist_id: str,
-        size: Optional[int],
+        size: int | None,
         file_path: Path
-    ) -> Optional[tuple[bytes, str, str]]:
+    ) -> tuple[bytes, str, str] | None:
         if not self._lidarr_repo:
             logger.debug(f"[IMG:Lidarr] No Lidarr repo configured for {artist_id[:8]}")
             return None
@@ -127,7 +175,7 @@ class ArtistImageFetcher:
         self,
         artist_id: str,
         file_path: Path,
-    ) -> Optional[tuple[bytes, str, str]]:
+    ) -> tuple[bytes, str, str] | None:
         if not self._jellyfin_repo or not self._jellyfin_repo.is_configured():
             return None
         try:
@@ -162,9 +210,9 @@ class ArtistImageFetcher:
     async def _fetch_from_wikidata(
         self,
         artist_id: str,
-        size: Optional[int],
+        size: int | None,
         file_path: Path
-    ) -> Optional[tuple[bytes, str, str]]:
+    ) -> tuple[bytes, str, str] | None:
         cache_key = f"artist_wikidata:{artist_id}"
         wikidata_url = await self._cache.get(cache_key)
         if wikidata_url is None:
@@ -187,13 +235,20 @@ class ArtistImageFetcher:
             )
             if response.status_code != 200:
                 return None
-            data = response.json()
-            entity = data.get("entities", {}).get(wikidata_id, {})
-            claims = entity.get("claims", {})
-            image_claims = claims.get("P18", [])
+            data = _decode_json_response(response, _WikidataEntityResponse)
+            entity = data.entities.get(wikidata_id)
+            if entity is None:
+                return None
+
+            image_claims = entity.claims.get("P18", [])
             if not image_claims:
                 return None
-            filename = image_claims[0].get("mainsnak", {}).get("datavalue", {}).get("value")
+            first_claim = image_claims[0]
+            filename = (
+                first_claim.mainsnak.datavalue.value
+                if first_claim.mainsnak and first_claim.mainsnak.datavalue
+                else None
+            )
             if not filename:
                 return None
             commons_api = (
@@ -210,16 +265,16 @@ class ArtistImageFetcher:
             )
             if commons_response.status_code != 200:
                 return None
-            commons_data = commons_response.json()
-            pages = commons_data.get("query", {}).get("pages", {})
+            commons_data = _decode_json_response(commons_response, _CommonsQueryResponse)
+            pages = commons_data.query.pages if commons_data.query else {}
             image_url = None
             for page in pages.values():
-                imageinfo = page.get("imageinfo", [])
+                imageinfo = page.imageinfo
                 if imageinfo:
-                    if size and "thumburl" in imageinfo[0]:
-                        image_url = imageinfo[0].get("thumburl")
+                    if size and imageinfo[0].thumburl:
+                        image_url = imageinfo[0].thumburl
                     else:
-                        image_url = imageinfo[0].get("url")
+                        image_url = imageinfo[0].url
                     break
             if not image_url:
                 return None
@@ -248,7 +303,7 @@ class ArtistImageFetcher:
             logger.error(f"Error fetching artist image for {artist_id}: {e}")
         return None
 
-    async def _lookup_wikidata_url(self, artist_id: str) -> Optional[str]:
+    async def _lookup_wikidata_url(self, artist_id: str) -> str | None:
         logger.info(f"[IMG:Wikidata] Looking up wikidata URL for {artist_id[:8]}...")
         if not self._mb_repo:
             logger.warning(f"[IMG:Wikidata] MusicBrainz repository not available for {artist_id}")

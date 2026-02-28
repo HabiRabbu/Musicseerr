@@ -4,7 +4,16 @@ import time
 from enum import Enum
 from typing import Any
 
-from api.v1.schemas.discover import DiscoverQueueEnrichment, DiscoverQueueResponse
+import msgspec
+
+from api.v1.schemas.discover import (
+    DiscoverQueueEnrichment,
+    DiscoverQueueItemFull,
+    DiscoverQueueResponse,
+    DiscoverQueueStatusResponse,
+    QueueGenerateResponse,
+)
+from infrastructure.serialization import clone_with_updates
 from services.discover_service import DiscoverService
 from services.preferences_service import PreferencesService
 
@@ -54,20 +63,37 @@ class DiscoverQueueManager:
             return True
         return (time.time() - state.built_at) > self._get_ttl()
 
-    def get_status(self, source: str) -> dict[str, Any]:
+    def get_status(self, source: str) -> DiscoverQueueStatusResponse:
         state = self._get_state(source)
-        result: dict[str, Any] = {
-            "status": state.status.value,
-            "source": source,
-        }
         if state.status == QueueBuildStatus.READY and state.queue:
-            result["queue_id"] = state.queue.queue_id
-            result["item_count"] = len(state.queue.items)
-            result["built_at"] = state.built_at
-            result["stale"] = self._is_stale(state)
-        elif state.status == QueueBuildStatus.ERROR:
-            result["error"] = state.error
-        return result
+            return DiscoverQueueStatusResponse(
+                status=state.status.value,
+                source=source,
+                queue_id=state.queue.queue_id,
+                item_count=len(state.queue.items),
+                built_at=state.built_at,
+                stale=self._is_stale(state),
+            )
+        if state.status == QueueBuildStatus.ERROR:
+            return DiscoverQueueStatusResponse(
+                status=state.status.value,
+                source=source,
+                error=state.error,
+            )
+        return DiscoverQueueStatusResponse(status=state.status.value, source=source)
+
+    @staticmethod
+    def _build_generate_response(action: str, status: DiscoverQueueStatusResponse) -> QueueGenerateResponse:
+        return QueueGenerateResponse(
+            action=action,
+            status=status.status,
+            source=status.source,
+            queue_id=status.queue_id,
+            item_count=status.item_count,
+            built_at=status.built_at,
+            stale=status.stale,
+            error=status.error,
+        )
 
     def get_queue(self, source: str) -> DiscoverQueueResponse | None:
         state = self._get_state(source)
@@ -75,15 +101,15 @@ class DiscoverQueueManager:
             return state.queue
         return None
 
-    async def start_build(self, source: str, *, force: bool = False) -> dict[str, Any]:
+    async def start_build(self, source: str, *, force: bool = False) -> QueueGenerateResponse:
         async with self._lock:
             state = self._get_state(source)
 
             if state.status == QueueBuildStatus.BUILDING:
-                return {"action": "already_building", **self.get_status(source)}
+                return self._build_generate_response("already_building", self.get_status(source))
 
             if not force and state.status == QueueBuildStatus.READY and not self._is_stale(state):
-                return {"action": "already_ready", **self.get_status(source)}
+                return self._build_generate_response("already_ready", self.get_status(source))
 
             if state.task and not state.task.done():
                 state.task.cancel()
@@ -92,7 +118,7 @@ class DiscoverQueueManager:
             state.error = None
             state.task = asyncio.create_task(self._do_build(source))
 
-        return {"action": "started", **self.get_status(source)}
+        return self._build_generate_response("started", self.get_status(source))
 
     async def build_hydrated_queue(self, source: str, count: int | None = None) -> DiscoverQueueResponse:
         queue = await self._discover.build_queue(count=count, source=source)
@@ -121,10 +147,13 @@ class DiscoverQueueManager:
                     exc,
                 )
                 enrichment = DiscoverQueueEnrichment()
-            return item.model_copy(update={"enrichment": enrichment})
+
+            item_data = msgspec.to_builtins(item)
+            item_data["enrichment"] = enrichment
+            return DiscoverQueueItemFull(**item_data)
 
         hydrated_items = await asyncio.gather(*(hydrate_item(item) for item in queue.items))
-        return queue.model_copy(update={"items": hydrated_items})
+        return clone_with_updates(queue, {"items": hydrated_items})
 
     async def _do_build(self, source: str) -> None:
         state = self._get_state(source)

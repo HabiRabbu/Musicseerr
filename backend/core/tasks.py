@@ -4,6 +4,7 @@ from time import time
 from typing import TYPE_CHECKING
 from infrastructure.cache.memory_cache import CacheInterface
 from infrastructure.cache.disk_cache import DiskMetadataCache
+from infrastructure.serialization import clone_with_updates
 from infrastructure.validators import is_unknown_mbid
 from services.library_service import LibraryService
 from services.preferences_service import PreferencesService
@@ -92,7 +93,7 @@ async def sync_library_periodically(
             
             finally:
                 lidarr_settings = preferences_service.get_lidarr_settings()
-                updated_settings = lidarr_settings.model_copy(update={
+                updated_settings = clone_with_updates(lidarr_settings, {
                     'last_sync': int(time()),
                     'last_sync_success': sync_success
                 })

@@ -1,5 +1,7 @@
 import logging
-from typing import Any, Optional
+from typing import Any
+
+import msgspec
 
 from api.v1.schemas.search import SearchResult
 from services.preferences_service import PreferencesService
@@ -18,6 +20,14 @@ from repositories.musicbrainz_base import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+class _ReleaseGroupSearchPayload(msgspec.Struct):
+    release_groups: list[dict[str, Any]] = msgspec.field(name="release-groups", default_factory=list)
+
+
+class _ReleaseLookupPayload(msgspec.Struct):
+    release_group: dict[str, Any] = msgspec.field(name="release-group", default_factory=dict)
 
 
 def _rg_priority(rg: dict) -> int:
@@ -56,8 +66,8 @@ class MusicBrainzAlbumMixin:
     def _map_release_group_to_result(
         self,
         rg: dict[str, Any],
-        included_secondary_types: Optional[set[str]] = None
-    ) -> Optional[SearchResult]:
+        included_secondary_types: set[str] | None = None
+    ) -> SearchResult | None:
         if not should_include_release(rg, included_secondary_types):
             return None
 
@@ -85,7 +95,7 @@ class MusicBrainzAlbumMixin:
         query: str,
         limit: int = 10,
         offset: int = 0,
-        included_secondary_types: Optional[set[str]] = None
+        included_secondary_types: set[str] | None = None
     ) -> list[SearchResult]:
         cache_key = mb_album_search_key(query, limit, offset, included_secondary_types)
 
@@ -104,8 +114,9 @@ class MusicBrainzAlbumMixin:
                     "offset": offset,
                 },
                 priority=RequestPriority.USER_INITIATED,
+                decode_type=_ReleaseGroupSearchPayload,
             )
-            release_groups = result.get("release-groups", [])
+            release_groups = result.release_groups
             release_groups = dedupe_by_id(release_groups)
 
             results = []
@@ -128,7 +139,7 @@ class MusicBrainzAlbumMixin:
         tag: str,
         limit: int = 50,
         offset: int = 0,
-        included_secondary_types: Optional[set[str]] = None
+        included_secondary_types: set[str] | None = None
     ) -> list[SearchResult]:
         cache_key = f"mb_rg_by_tag:{tag.lower()}:{limit}:{offset}"
 
@@ -147,8 +158,9 @@ class MusicBrainzAlbumMixin:
                     "offset": offset,
                 },
                 priority=RequestPriority.BACKGROUND_SYNC,
+                decode_type=_ReleaseGroupSearchPayload,
             )
-            release_groups = result.get("release-groups", [])
+            release_groups = result.release_groups
             release_groups = dedupe_by_id(release_groups)
 
             results = []
@@ -169,8 +181,8 @@ class MusicBrainzAlbumMixin:
     async def get_release_group_by_id(
         self,
         mbid: str,
-        includes: Optional[list[str]] = None
-    ) -> Optional[dict]:
+        includes: list[str] | None = None
+    ) -> dict | None:
         if includes is None:
             includes = ["artist-credits", "releases"]
 
@@ -189,7 +201,7 @@ class MusicBrainzAlbumMixin:
         mbid: str,
         includes: list[str],
         cache_key: str
-    ) -> Optional[dict]:
+    ) -> dict | None:
         try:
             inc_str = "+".join(sorted(includes))
             result = await mb_api_get(
@@ -208,8 +220,8 @@ class MusicBrainzAlbumMixin:
     async def get_release_by_id(
         self,
         release_id: str,
-        includes: Optional[list[str]] = None
-    ) -> Optional[dict]:
+        includes: list[str] | None = None
+    ) -> dict | None:
         if includes is None:
             includes = ["recordings", "labels"]
 
@@ -228,7 +240,7 @@ class MusicBrainzAlbumMixin:
         release_id: str,
         includes: list[str],
         cache_key: str
-    ) -> Optional[dict]:
+    ) -> dict | None:
         try:
             inc_str = "+".join(sorted(includes))
             result = await mb_api_get(
@@ -247,7 +259,7 @@ class MusicBrainzAlbumMixin:
     async def get_release_group_id_from_release(
         self,
         release_id: str
-    ) -> Optional[str]:
+    ) -> str | None:
         cache_key = f"mb:release_to_rg:{release_id}"
         cached = await self._cache.get(cache_key)
         if cached is not None:
@@ -264,15 +276,16 @@ class MusicBrainzAlbumMixin:
         self,
         release_id: str,
         cache_key: str,
-    ) -> Optional[str]:
+    ) -> str | None:
         try:
             logger.info(f"[MB] Fetching release group for release {release_id[:8]}")
             result = await mb_api_get(
                 f"/release/{release_id}",
                 params={"inc": "release-groups"},
                 priority=RequestPriority.BACKGROUND_SYNC,
+                decode_type=_ReleaseLookupPayload,
             )
-            rg = result.get("release-group", {})
+            rg = result.release_group
             rg_id = rg.get("id")
             logger.info(f"[MB] Resolved release {release_id[:8]} -> release_group {rg_id}")
             await self._cache.set(cache_key, rg_id or "", ttl_seconds=86400)

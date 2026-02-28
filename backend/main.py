@@ -21,6 +21,7 @@ from core.exception_handlers import (
     general_exception_handler
 )
 from infrastructure.resilience.retry import CircuitOpenError
+from infrastructure.msgspec_fastapi import MsgSpecJSONResponse
 from middleware import PerformanceMiddleware
 from static_server import mount_frontend
 from api.v1.routes import (
@@ -194,6 +195,7 @@ app = FastAPI(
     docs_url="/api/docs",
     redoc_url="/api/redoc",
     lifespan=lifespan,
+    default_response_class=MsgSpecJSONResponse,
 )
 
 app.add_exception_handler(ResourceNotFoundError, resource_not_found_handler)

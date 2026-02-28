@@ -1,11 +1,14 @@
 import asyncio
 import httpx
 import logging
+import msgspec
 import time
 from typing import Any, Optional
 from core.config import Settings
 from core.exceptions import ExternalServiceError
+from infrastructure.cache.cache_keys import lidarr_raw_albums_key, lidarr_requested_mbids_key
 from infrastructure.cache.memory_cache import CacheInterface
+from infrastructure.http.deduplication import get_deduplicator
 from infrastructure.resilience.retry import with_retry, CircuitBreaker
 
 logger = logging.getLogger(__name__)
@@ -17,9 +20,20 @@ _lidarr_circuit_breaker = CircuitBreaker(
     name="lidarr"
 )
 
+LidarrJsonObject = dict[str, Any]
+LidarrJsonArray = list[LidarrJsonObject]
+LidarrJson = LidarrJsonObject | LidarrJsonArray
+
 
 def reset_lidarr_circuit_breaker():
     _lidarr_circuit_breaker.reset()
+
+
+def _decode_json_response(response: httpx.Response) -> LidarrJson:
+    content = getattr(response, "content", None)
+    if isinstance(content, (bytes, bytearray, memoryview)):
+        return msgspec.json.decode(content, type=LidarrJson)
+    return response.json()
 
 
 class LidarrBase:
@@ -86,8 +100,8 @@ class LidarrBase:
                 )
 
             try:
-                return response.json()
-            except ValueError:
+                return _decode_json_response(response)
+            except (msgspec.DecodeError, ValueError, TypeError):
                 return None
 
         except httpx.HTTPError as e:
@@ -95,6 +109,25 @@ class LidarrBase:
 
     async def _get(self, endpoint: str, params: Optional[dict[str, Any]] = None) -> Any:
         return await self._request("GET", endpoint, params=params)
+
+    async def _get_all_albums_raw(self) -> list[dict[str, Any]]:
+        cache_key = lidarr_raw_albums_key()
+        cached = await self._cache.get(cache_key)
+        if cached is not None:
+            return cached if isinstance(cached, list) else []
+
+        deduplicator = get_deduplicator()
+        data = await deduplicator.dedupe(cache_key, lambda: self._get("/api/v1/album"))
+        if not isinstance(data, list):
+            return []
+
+        await self._cache.set(cache_key, data, ttl_seconds=300)
+        return data
+
+    async def _invalidate_album_list_caches(self) -> None:
+        await self._cache.delete(lidarr_raw_albums_key())
+        await self._cache.clear_prefix("lidarr:library:")
+        await self._cache.delete(lidarr_requested_mbids_key())
 
     async def _post(self, endpoint: str, data: dict[str, Any]) -> Any:
         return await self._request("POST", endpoint, json_data=data)

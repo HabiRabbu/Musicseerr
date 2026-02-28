@@ -1,6 +1,8 @@
 import httpx
 import logging
 from typing import Any
+
+import msgspec
 from core.exceptions import ExternalServiceError, ResourceNotFoundError
 from infrastructure.cache.memory_cache import CacheInterface
 from infrastructure.cache.persistent_cache import LibraryCache
@@ -15,6 +17,17 @@ _jellyfin_circuit_breaker = CircuitBreaker(
     timeout=60.0,
     name="jellyfin"
 )
+
+JellyfinJsonObject = dict[str, Any]
+JellyfinJsonArray = list[JellyfinJsonObject]
+JellyfinJson = JellyfinJsonObject | JellyfinJsonArray
+
+
+def _decode_json_response(response: httpx.Response) -> JellyfinJson:
+    content = getattr(response, "content", None)
+    if isinstance(content, (bytes, bytearray, memoryview)):
+        return msgspec.json.decode(content, type=JellyfinJson)
+    return response.json()
 
 
 class JellyfinRepository:
@@ -98,8 +111,8 @@ class JellyfinRepository:
                 return None
             
             try:
-                return response.json()
-            except ValueError:
+                return _decode_json_response(response)
+            except (msgspec.DecodeError, ValueError, TypeError):
                 return None
         
         except httpx.HTTPError as e:
@@ -131,7 +144,7 @@ class JellyfinRepository:
             if response.status_code != 200:
                 return False, f"Connection failed (HTTP {response.status_code})"
             
-            result = response.json()
+            result = _decode_json_response(response)
             server_name = result.get("ServerName", "Unknown")
             version = result.get("Version", "Unknown")
             return True, f"Connected to {server_name} (v{version})"
@@ -168,7 +181,7 @@ class JellyfinRepository:
             if response.status_code != 200:
                 return []
             
-            result = response.json()
+            result = _decode_json_response(response)
             if not result:
                 return []
             return [parse_user(user) for user in result if user.get("Id")]

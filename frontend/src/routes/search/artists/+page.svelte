@@ -8,6 +8,7 @@
 	import { colors } from '$lib/colors';
 	import { searchStore } from '$lib/stores/search';
 	import { fetchEnrichmentBatch, applyArtistEnrichment } from '$lib/utils/enrichment';
+	import { isAbortError } from '$lib/utils/errorHandling';
 
 	export let data: { query: string };
 
@@ -20,7 +21,6 @@
 	let abortController: AbortController | null = null;
 	let enrichmentController: AbortController | null = null;
 	let observer: IntersectionObserver | null = null;
-	let initializedFromCache = false;
 	let enrichmentSource: EnrichmentSource = 'none';
 
 	function navigateBack() {
@@ -54,8 +54,9 @@
 
 			enrichmentSource = enrichment.source;
 			artists = applyArtistEnrichment(artists, enrichment);
+			searchStore.setEnrichmentSource(enrichmentSource);
 		} catch (error) {
-			if (error instanceof Error && error.name === 'AbortError') {
+			if (isAbortError(error)) {
 				return;
 			}
 		}
@@ -105,7 +106,7 @@
 				hasMore = false;
 			}
 		} catch (error) {
-			if (error instanceof Error && error.name === 'AbortError') {
+			if (isAbortError(error)) {
 				return;
 			}
 			hasMore = false;
@@ -129,20 +130,28 @@
 			observer = null;
 		}
 
-		const cache = searchStore.getCache(data.query);
+		const cache = searchStore.getCache(data.query, { allowStale: true });
 		if (cache && cache.artists.length > 0) {
 			artists = cache.artists;
-			offset = 0;
-			hasMore = true;
-			initializedFromCache = true;
-			fetchEnrichment(artists);
-			loadMore();
+			enrichmentSource = cache.enrichmentSource;
+			offset = cache.artists.length;
+			hasMore = cache.artists.length >= limit;
+			const needsEnrichment = artists.filter((a) => a.release_group_count == null);
+			if (needsEnrichment.length > 0) {
+				void fetchEnrichment(needsEnrichment);
+			}
+
+			if (searchStore.isStale(cache.timestamp)) {
+				offset = 0;
+				hasMore = true;
+				void loadMore();
+			}
 		} else {
 			artists = [];
 			offset = 0;
 			hasMore = true;
-			initializedFromCache = false;
-			loadMore();
+			enrichmentSource = 'none';
+			void loadMore();
 		}
 	}
 

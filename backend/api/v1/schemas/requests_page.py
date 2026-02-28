@@ -1,52 +1,51 @@
 from datetime import datetime
-from typing import Optional
-from pydantic import BaseModel, Field
+from infrastructure.msgspec_fastapi import AppStruct
 
 
-class StatusMessage(BaseModel):
-    title: Optional[str] = None
-    messages: list[str] = Field(default_factory=list)
+class StatusMessage(AppStruct):
+    title: str | None = None
+    messages: list[str] = []
 
 
-class ActiveRequestItem(BaseModel):
+class ActiveRequestItem(AppStruct):
     musicbrainz_id: str
     artist_name: str
     album_title: str
-    artist_mbid: Optional[str] = None
-    year: Optional[int] = None
-    cover_url: Optional[str] = None
     requested_at: datetime
     status: str
-    progress: Optional[float] = None
-    eta: Optional[datetime] = None
-    size: Optional[float] = None
-    size_remaining: Optional[float] = None
-    download_status: Optional[str] = None
-    download_state: Optional[str] = None
-    status_messages: Optional[list[StatusMessage]] = None
-    error_message: Optional[str] = None
-    lidarr_queue_id: Optional[int] = None
+    artist_mbid: str | None = None
+    year: int | None = None
+    cover_url: str | None = None
+    progress: float | None = None
+    eta: datetime | None = None
+    size: float | None = None
+    size_remaining: float | None = None
+    download_status: str | None = None
+    download_state: str | None = None
+    status_messages: list[StatusMessage] | None = None
+    error_message: str | None = None
+    lidarr_queue_id: int | None = None
 
 
-class RequestHistoryItem(BaseModel):
+class RequestHistoryItem(AppStruct):
     musicbrainz_id: str
     artist_name: str
     album_title: str
-    artist_mbid: Optional[str] = None
-    year: Optional[int] = None
-    cover_url: Optional[str] = None
     requested_at: datetime
-    completed_at: Optional[datetime] = None
     status: str
+    artist_mbid: str | None = None
+    year: int | None = None
+    cover_url: str | None = None
+    completed_at: datetime | None = None
     in_library: bool = False
 
 
-class ActiveRequestsResponse(BaseModel):
+class ActiveRequestsResponse(AppStruct):
     items: list[ActiveRequestItem]
     count: int
 
 
-class RequestHistoryResponse(BaseModel):
+class RequestHistoryResponse(AppStruct):
     items: list[RequestHistoryItem]
     total: int
     page: int
@@ -54,19 +53,19 @@ class RequestHistoryResponse(BaseModel):
     total_pages: int
 
 
-class CancelRequestResponse(BaseModel):
+class CancelRequestResponse(AppStruct):
     success: bool
     message: str
 
 
-class RetryRequestResponse(BaseModel):
+class RetryRequestResponse(AppStruct):
     success: bool
     message: str
 
 
-class ClearHistoryResponse(BaseModel):
+class ClearHistoryResponse(AppStruct):
     success: bool
 
 
-class ActiveCountResponse(BaseModel):
+class ActiveCountResponse(AppStruct):
     count: int

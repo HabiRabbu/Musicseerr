@@ -2,6 +2,7 @@
 	import { Search } from 'lucide-svelte';
 	import type { SuggestResult } from '$lib/types';
 	import { API } from '$lib/constants';
+	import { isAbortError } from '$lib/utils/errorHandling';
 
 	interface Props {
 		query: string;
@@ -72,7 +73,7 @@
 					showDropdown = false;
 				}
 			} catch (e) {
-				if (e instanceof DOMException && e.name === 'AbortError') return;
+				if (isAbortError(e)) return;
 				if (generation !== fetchGeneration) return;
 				suggestions = [];
 				showDropdown = false;

@@ -3,6 +3,7 @@ import logging
 from typing import Any
 
 import httpx
+import msgspec
 
 from core.exceptions import (
     ConfigurationError,
@@ -67,6 +68,17 @@ LASTFM_ERROR_MAP: dict[int, tuple[type[Exception], str]] = {
 LASTFM_USER_CACHE_TTL = 300
 LASTFM_ENTITY_CACHE_TTL = 3600
 LASTFM_GLOBAL_CACHE_TTL = 3600
+
+LastFmJsonObject = dict[str, Any]
+LastFmJsonArray = list[LastFmJsonObject]
+LastFmJson = LastFmJsonObject | LastFmJsonArray
+
+
+def _decode_json_response(response: httpx.Response) -> LastFmJson:
+    content = getattr(response, "content", None)
+    if isinstance(content, (bytes, bytearray, memoryview)):
+        return msgspec.json.decode(content, type=LastFmJson)
+    return response.json()
 
 
 class LastFmRepository:
@@ -169,8 +181,8 @@ class LastFmRepository:
                 )
 
             try:
-                data = response.json()
-            except ValueError:
+                data = _decode_json_response(response)
+            except (msgspec.DecodeError, ValueError, TypeError):
                 raise ExternalServiceError("Last.fm returned invalid JSON")
 
             self._handle_error_response(data)

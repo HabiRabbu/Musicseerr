@@ -1,11 +1,38 @@
+export const CACHE_KEY_GROUPS = {
+	core: {
+		LIBRARY_MBIDS: 'musicseerr_library_mbids',
+		RECENTLY_ADDED: 'musicseerr_recently_added',
+		HOME_CACHE: 'musicseerr_home_cache',
+		DISCOVER_CACHE: 'musicseerr_discover_cache',
+		DISCOVER_QUEUE: 'musicseerr_discover_queue',
+		SEARCH: 'musicseerr_search_cache'
+	},
+	library: {
+		LOCAL_FILES_SIDEBAR: 'musicseerr_local_files_sidebar',
+		JELLYFIN_SIDEBAR: 'musicseerr_jellyfin_sidebar',
+		JELLYFIN_ALBUMS_LIST: 'musicseerr_jellyfin_albums_list',
+		LOCAL_FILES_ALBUMS_LIST: 'musicseerr_local_files_albums_list'
+	},
+	detail: {
+		ALBUM_BASIC_CACHE: 'musicseerr_album_basic_cache',
+		ALBUM_TRACKS_CACHE: 'musicseerr_album_tracks_cache',
+		ALBUM_DISCOVERY_CACHE: 'musicseerr_album_discovery_cache',
+		ALBUM_LASTFM_CACHE: 'musicseerr_album_lastfm_cache',
+		ARTIST_BASIC_CACHE: 'musicseerr_artist_basic_cache',
+		ARTIST_EXTENDED_CACHE: 'musicseerr_artist_extended_cache',
+		ARTIST_LASTFM_CACHE: 'musicseerr_artist_lastfm_cache'
+	},
+	charts: {
+		TIME_RANGE_OVERVIEW_CACHE: 'musicseerr_time_range_overview_cache',
+		GENRE_DETAIL_CACHE: 'musicseerr_genre_detail_cache'
+	}
+} as const;
+
 export const CACHE_KEYS = {
-	LIBRARY_MBIDS: 'musicseerr_library_mbids',
-	RECENTLY_ADDED: 'musicseerr_recently_added',
-	LOCAL_FILES_SIDEBAR: 'musicseerr_local_files_sidebar',
-	JELLYFIN_SIDEBAR: 'musicseerr_jellyfin_sidebar',
-	HOME_CACHE: 'musicseerr_home_cache',
-	DISCOVER_CACHE: 'musicseerr_discover_cache',
-	DISCOVER_QUEUE: 'musicseerr_discover_queue'
+	...CACHE_KEY_GROUPS.core,
+	...CACHE_KEY_GROUPS.library,
+	...CACHE_KEY_GROUPS.detail,
+	...CACHE_KEY_GROUPS.charts
 } as const;
 
 export const PAGE_SOURCE_KEYS = {
@@ -17,16 +44,42 @@ export const PAGE_SOURCE_KEYS = {
 	yourTop: 'musicseerr_source_your_top'
 } as const;
 
+export const CACHE_TTL_GROUPS = {
+	core: {
+		DEFAULT: 5 * 60 * 1000,
+		LIBRARY: 5 * 60 * 1000,
+		RECENTLY_ADDED: 5 * 60 * 1000,
+		HOME: 5 * 60 * 1000,
+		DISCOVER: 30 * 60 * 1000,
+		DISCOVER_QUEUE: 24 * 60 * 60 * 1000,
+		SEARCH: 5 * 60 * 1000
+	},
+	library: {
+		LOCAL_FILES_SIDEBAR: 2 * 60 * 1000,
+		JELLYFIN_SIDEBAR: 2 * 60 * 1000,
+		JELLYFIN_ALBUMS_LIST: 2 * 60 * 1000,
+		LOCAL_FILES_ALBUMS_LIST: 2 * 60 * 1000
+	},
+	detail: {
+		ALBUM_DETAIL_BASIC: 5 * 60 * 1000,
+		ALBUM_DETAIL_TRACKS: 15 * 60 * 1000,
+		ALBUM_DETAIL_DISCOVERY: 30 * 60 * 1000,
+		ALBUM_DETAIL_LASTFM: 30 * 60 * 1000,
+		ARTIST_DETAIL_BASIC: 5 * 60 * 1000,
+		ARTIST_DETAIL_EXTENDED: 30 * 60 * 1000,
+		ARTIST_DETAIL_LASTFM: 30 * 60 * 1000
+	},
+	charts: {
+		TIME_RANGE_OVERVIEW: 2 * 60 * 1000,
+		GENRE_DETAIL: 5 * 60 * 1000
+	}
+} as const;
+
 export const CACHE_TTL = {
-	DEFAULT: 5 * 60 * 1000,
-	LIBRARY: 5 * 60 * 1000,
-	RECENTLY_ADDED: 5 * 60 * 1000,
-	LOCAL_FILES_SIDEBAR: 2 * 60 * 1000,
-	JELLYFIN_SIDEBAR: 2 * 60 * 1000,
-	HOME: 5 * 60 * 1000,
-	DISCOVER: 30 * 60 * 1000,
-	DISCOVER_QUEUE: 24 * 60 * 60 * 1000,
-	SEARCH: 5 * 60 * 1000
+	...CACHE_TTL_GROUPS.core,
+	...CACHE_TTL_GROUPS.library,
+	...CACHE_TTL_GROUPS.detail,
+	...CACHE_TTL_GROUPS.charts
 } as const;
 
 export const API_SIZES = {

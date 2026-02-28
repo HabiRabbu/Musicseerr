@@ -1,682 +1,273 @@
-from pydantic import BaseModel, Field, field_validator
+import msgspec
+
+from infrastructure.msgspec_fastapi import AppStruct
 
 
-class AdvancedSettings(BaseModel):
-    
-    cache_ttl_album_library: int = Field(
-        default=86400,
-        ge=3600,
-        le=604800,
-        description="TTL for library albums in seconds"
-    )
-    cache_ttl_album_non_library: int = Field(
-        default=21600,
-        ge=60,
-        le=86400,
-        description="TTL for non-library albums in seconds"
-    )
-    cache_ttl_artist_library: int = Field(
-        default=21600,
-        ge=3600,
-        le=604800,
-        description="TTL for library artist data in seconds"
-    )
-    cache_ttl_artist_non_library: int = Field(
-        default=21600,
-        ge=3600,
-        le=604800,
-        description="TTL for non-library artist data in seconds"
-    )
-    cache_ttl_artist_discovery_library: int = Field(
-        default=21600,
-        ge=3600,
-        le=604800,
-        description="TTL for library artist discovery data in seconds"
-    )
-    cache_ttl_artist_discovery_non_library: int = Field(
-        default=3600,
-        ge=3600,
-        le=604800,
-        description="TTL for non-library artist discovery data in seconds"
-    )
-    cache_ttl_search: int = Field(
-        default=3600,
-        ge=60,
-        le=86400,
-        description="TTL for search results in seconds"
-    )
-    cache_ttl_local_files_recently_added: int = Field(
-        default=120,
-        ge=60,
-        le=3600,
-        description="TTL for local files recently added in seconds"
-    )
-    cache_ttl_local_files_storage_stats: int = Field(
-        default=300,
-        ge=60,
-        le=3600,
-        description="TTL for local files storage stats in seconds"
-    )
-    cache_ttl_jellyfin_recently_played: int = Field(
-        default=300,
-        ge=60,
-        le=3600,
-        description="TTL for Jellyfin recently played in seconds"
-    )
-    cache_ttl_jellyfin_favorites: int = Field(
-        default=300,
-        ge=60,
-        le=3600,
-        description="TTL for Jellyfin favorites in seconds"
-    )
-    cache_ttl_jellyfin_genres: int = Field(
-        default=3600,
-        ge=60,
-        le=86400,
-        description="TTL for Jellyfin genres in seconds"
-    )
-    cache_ttl_jellyfin_library_stats: int = Field(
-        default=600,
-        ge=60,
-        le=3600,
-        description="TTL for Jellyfin library stats in seconds"
-    )
-    
-    http_timeout: int = Field(
-        default=10,
-        ge=5,
-        le=60,
-        description="HTTP request timeout in seconds"
-    )
-    http_connect_timeout: int = Field(
-        default=5,
-        ge=1,
-        le=30,
-        description="HTTP connect timeout in seconds"
-    )
-    http_max_connections: int = Field(
-        default=200,
-        ge=50,
-        le=500,
-        description="Maximum HTTP connection pool size"
-    )
-    
-    batch_artist_images: int = Field(
-        default=5,
-        ge=1,
-        le=20,
-        description="Concurrent artist image fetches during sync"
-    )
-    batch_albums: int = Field(
-        default=3,
-        ge=1,
-        le=20,
-        description="Concurrent album data fetches during sync"
-    )
-    delay_artist: float = Field(
-        default=0.5,
-        ge=0.0,
-        le=5.0,
-        description="Delay between artist batch operations in seconds"
-    )
-    delay_albums: float = Field(
-        default=1.0,
-        ge=0.0,
-        le=5.0,
-        description="Delay between album batch operations in seconds"
-    )
-    artist_discovery_warm_interval: int = Field(
-        default=14400,
-        ge=300,
-        le=604800,
-        description="Interval for periodic artist discovery cache warming in seconds"
-    )
-    artist_discovery_warm_delay: float = Field(
-        default=0.5,
-        ge=0.0,
-        le=5.0,
-        description="Delay between artists during periodic discovery warming in seconds"
-    )
-    artist_discovery_precache_delay: float = Field(
-        default=0.3,
-        ge=0.0,
-        le=5.0,
-        description="Delay between artists during library-sync discovery precache in seconds"
-    )
-    
-    memory_cache_max_entries: int = Field(
-        default=10000,
-        ge=1000,
-        le=100000,
-        description="Maximum entries in memory cache"
-    )
-    memory_cache_cleanup_interval: int = Field(
-        default=300,
-        ge=60,
-        le=3600,
-        description="Interval for expired entry cleanup in seconds"
-    )
-
-    cover_memory_cache_max_entries: int = Field(
-        default=128,
-        ge=16,
-        le=2048,
-        description="Maximum entries in cover in-memory LRU cache"
-    )
-
-    cover_memory_cache_max_size_mb: int = Field(
-        default=16,
-        ge=1,
-        le=1024,
-        description="Maximum total size for cover in-memory LRU cache in MB"
-    )
-    
-    disk_cache_cleanup_interval: int = Field(
-        default=600,
-        ge=60,
-        le=3600,
-        description="Interval for disk cache cleanup in seconds"
-    )
-    
-    recent_metadata_max_size_mb: int = Field(
-        default=500,
-        ge=100,
-        le=5000,
-        description="Maximum size for recent metadata cache in MB"
-    )
-    
-    recent_covers_max_size_mb: int = Field(
-        default=1024,
-        ge=100,
-        le=10000,
-        description="Maximum size for recent cover cache in MB"
-    )
-    
-    persistent_metadata_ttl_hours: int = Field(
-        default=24,
-        ge=1,
-        le=168,
-        description="TTL for persistent metadata cache in hours (primarily for covers)"
-    )
-    
-    musicbrainz_concurrent_searches: int = Field(
-        default=3,
-        ge=2,
-        le=5,
-        description="Max concurrent MusicBrainz API requests for parallel search"
-    )
-
-    discover_queue_size: int = Field(
-        default=10,
-        ge=1,
-        le=20,
-        description="Number of albums in a generated discover queue"
-    )
-    discover_queue_ttl: int = Field(
-        default=86400,
-        ge=3600,
-        le=604800,
-        description="How long a pre-built queue stays fresh in seconds"
-    )
-    discover_queue_auto_generate: bool = Field(
-        default=True,
-        description="Automatically generate a queue when visiting the Discover page"
-    )
-    discover_queue_polling_interval: int = Field(
-        default=4000,
-        ge=1000,
-        le=30000,
-        description="Frontend polling interval for queue build status in milliseconds"
-    )
-    discover_queue_warm_cycle_build: bool = Field(
-        default=True,
-        description="Pre-build discover queue during periodic warm cycle"
-    )
-    discover_queue_seed_artists: int = Field(
-        default=3,
-        ge=1,
-        le=10,
-        description="Number of seed artists used for queue generation"
-    )
-    discover_queue_wildcard_slots: int = Field(
-        default=2,
-        ge=0,
-        le=10,
-        description="Number of wildcard album slots in the queue"
-    )
-    discover_queue_similar_artists_limit: int = Field(
-        default=15,
-        ge=5,
-        le=50,
-        description="Max similar artists fetched per seed"
-    )
-    discover_queue_albums_per_similar: int = Field(
-        default=5,
-        ge=1,
-        le=20,
-        description="Max top albums fetched per similar artist"
-    )
-    discover_queue_enrich_ttl: int = Field(
-        default=86400,
-        ge=3600,
-        le=604800,
-        description="TTL for queue item enrichment data in seconds"
-    )
-    discover_queue_lastfm_mbid_max_lookups: int = Field(
-        default=10,
-        ge=1,
-        le=50,
-        description="Max MusicBrainz lookups for Last.fm release-to-release-group MBID resolution"
-    )
-
-    frontend_ttl_home: int = Field(
-        default=300000,
-        ge=60000,
-        le=3600000,
-        description="Frontend Home page cache TTL in milliseconds"
-    )
-    frontend_ttl_discover: int = Field(
-        default=1800000,
-        ge=60000,
-        le=86400000,
-        description="Frontend Discover page cache TTL in milliseconds"
-    )
-    frontend_ttl_library: int = Field(
-        default=300000,
-        ge=60000,
-        le=3600000,
-        description="Frontend Library cache TTL in milliseconds"
-    )
-    frontend_ttl_recently_added: int = Field(
-        default=300000,
-        ge=60000,
-        le=3600000,
-        description="Frontend Recently Added cache TTL in milliseconds"
-    )
-    frontend_ttl_discover_queue: int = Field(
-        default=86400000,
-        ge=3600000,
-        le=604800000,
-        description="Frontend Discover Queue cache TTL in milliseconds"
-    )
-    frontend_ttl_search: int = Field(
-        default=300000,
-        ge=60000,
-        le=3600000,
-        description="Frontend Search/Discovery cache TTL in milliseconds"
-    )
-    frontend_ttl_local_files_sidebar: int = Field(
-        default=120000,
-        ge=60000,
-        le=3600000,
-        description="Frontend Local Files sidebar cache TTL in milliseconds"
-    )
-    frontend_ttl_jellyfin_sidebar: int = Field(
-        default=120000,
-        ge=60000,
-        le=3600000,
-        description="Frontend Jellyfin sidebar cache TTL in milliseconds"
-    )
+def _validate_range(value: int | float, field_name: str, minimum: int | float, maximum: int | float) -> None:
+    if value < minimum or value > maximum:
+        raise msgspec.ValidationError(f"{field_name} must be between {minimum} and {maximum}")
 
 
-class FrontendCacheTTLs(BaseModel):
-    home: int = Field(default=300000, description="Home page cache TTL in ms")
-    discover: int = Field(default=1800000, description="Discover page cache TTL in ms")
-    library: int = Field(default=300000, description="Library cache TTL in ms")
-    recently_added: int = Field(default=300000, description="Recently Added cache TTL in ms")
-    discover_queue: int = Field(default=86400000, description="Discover Queue cache TTL in ms")
-    search: int = Field(default=300000, description="Search/Discovery cache TTL in ms")
-    local_files_sidebar: int = Field(default=120000, description="Local Files sidebar cache TTL in ms")
-    jellyfin_sidebar: int = Field(default=120000, description="Jellyfin sidebar cache TTL in ms")
-    discover_queue_polling_interval: int = Field(default=4000, description="Discover queue build status polling interval in ms")
-    discover_queue_auto_generate: bool = Field(default=True, description="Auto-generate queue on page visit")
+def _coerce_positive_int(value: object, field_name: str) -> int:
+    if value is None:
+        raise msgspec.ValidationError(f"{field_name} cannot be null")
+    try:
+        result = int(float(value))
+    except (TypeError, ValueError) as exc:
+        raise msgspec.ValidationError(f"Invalid integer value for {field_name}: {value}") from exc
+    if result <= 0:
+        raise msgspec.ValidationError(f"{field_name} must be positive")
+    return result
 
 
-class AdvancedSettingsFrontend(BaseModel):
-    
-    cache_ttl_album_library: int = Field(
-        default=24,
-        ge=1,
-        le=168,
-        description="TTL for library albums in hours"
-    )
-    cache_ttl_album_non_library: int = Field(
-        default=6,
-        ge=1,
-        le=24,
-        description="TTL for non-library albums in hours"
-    )
-    cache_ttl_artist_library: int = Field(
-        default=6,
-        ge=1,
-        le=168,
-        description="TTL for library artist data in hours"
-    )
-    cache_ttl_artist_non_library: int = Field(
-        default=6,
-        ge=1,
-        le=168,
-        description="TTL for non-library artist data in hours"
-    )
-    cache_ttl_artist_discovery_library: int = Field(
-        default=6,
-        ge=1,
-        le=168,
-        description="TTL for library artist discovery data in hours"
-    )
-    cache_ttl_artist_discovery_non_library: int = Field(
-        default=1,
-        ge=1,
-        le=168,
-        description="TTL for non-library artist discovery data in hours"
-    )
-    cache_ttl_search: int = Field(
-        default=60,
-        ge=1,
-        le=1440,
-        description="TTL for search results in minutes"
-    )
-    cache_ttl_local_files_recently_added: int = Field(
-        default=2,
-        ge=1,
-        le=60,
-        description="TTL for local files recently added in minutes"
-    )
-    cache_ttl_local_files_storage_stats: int = Field(
-        default=5,
-        ge=1,
-        le=60,
-        description="TTL for local files storage stats in minutes"
-    )
-    cache_ttl_jellyfin_recently_played: int = Field(
-        default=5,
-        ge=1,
-        le=60,
-        description="TTL for Jellyfin recently played in minutes"
-    )
-    cache_ttl_jellyfin_favorites: int = Field(
-        default=5,
-        ge=1,
-        le=60,
-        description="TTL for Jellyfin favorites in minutes"
-    )
-    cache_ttl_jellyfin_genres: int = Field(
-        default=60,
-        ge=1,
-        le=1440,
-        description="TTL for Jellyfin genres in minutes"
-    )
-    cache_ttl_jellyfin_library_stats: int = Field(
-        default=10,
-        ge=1,
-        le=60,
-        description="TTL for Jellyfin library stats in minutes"
-    )
-    
-    http_timeout: int = Field(
-        default=10,
-        ge=5,
-        le=60,
-        description="HTTP request timeout in seconds"
-    )
-    http_connect_timeout: int = Field(
-        default=5,
-        ge=1,
-        le=30,
-        description="HTTP connect timeout in seconds"
-    )
-    http_max_connections: int = Field(
-        default=200,
-        ge=50,
-        le=500,
-        description="Maximum HTTP connection pool size"
-    )
-    
-    batch_artist_images: int = Field(
-        default=5,
-        ge=1,
-        le=20,
-        description="Concurrent artist image fetches during sync"
-    )
-    batch_albums: int = Field(
-        default=3,
-        ge=1,
-        le=20,
-        description="Concurrent album data fetches during sync"
-    )
-    delay_artist: float = Field(
-        default=0.5,
-        ge=0.0,
-        le=5.0,
-        description="Delay between artist batch operations in seconds"
-    )
-    delay_albums: float = Field(
-        default=1.0,
-        ge=0.0,
-        le=5.0,
-        description="Delay between album batch operations in seconds"
-    )
-    artist_discovery_warm_interval: int = Field(
-        default=240,
-        ge=5,
-        le=10080,
-        description="Interval for periodic artist discovery cache warming in minutes"
-    )
-    artist_discovery_warm_delay: float = Field(
-        default=0.5,
-        ge=0.0,
-        le=5.0,
-        description="Delay between artists during periodic discovery warming in seconds"
-    )
-    artist_discovery_precache_delay: float = Field(
-        default=0.3,
-        ge=0.0,
-        le=5.0,
-        description="Delay between artists during library-sync discovery precache in seconds"
-    )
-    
-    memory_cache_max_entries: int = Field(
-        default=10000,
-        ge=1000,
-        le=100000,
-        description="Maximum entries in memory cache"
-    )
-    memory_cache_cleanup_interval: int = Field(
-        default=300,
-        ge=60,
-        le=3600,
-        description="Interval for expired entry cleanup in seconds"
-    )
+class AdvancedSettings(AppStruct):
+    cache_ttl_album_library: int = 86400
+    cache_ttl_album_non_library: int = 21600
+    cache_ttl_artist_library: int = 21600
+    cache_ttl_artist_non_library: int = 21600
+    cache_ttl_artist_discovery_library: int = 21600
+    cache_ttl_artist_discovery_non_library: int = 3600
+    cache_ttl_search: int = 3600
+    cache_ttl_local_files_recently_added: int = 120
+    cache_ttl_local_files_storage_stats: int = 300
+    cache_ttl_jellyfin_recently_played: int = 300
+    cache_ttl_jellyfin_favorites: int = 300
+    cache_ttl_jellyfin_genres: int = 3600
+    cache_ttl_jellyfin_library_stats: int = 600
+    http_timeout: int = 10
+    http_connect_timeout: int = 5
+    http_max_connections: int = 200
+    batch_artist_images: int = 5
+    batch_albums: int = 3
+    delay_artist: float = 0.5
+    delay_albums: float = 1.0
+    artist_discovery_warm_interval: int = 14400
+    artist_discovery_warm_delay: float = 0.5
+    artist_discovery_precache_delay: float = 0.3
+    memory_cache_max_entries: int = 10000
+    memory_cache_cleanup_interval: int = 300
+    cover_memory_cache_max_entries: int = 128
+    cover_memory_cache_max_size_mb: int = 16
+    disk_cache_cleanup_interval: int = 600
+    recent_metadata_max_size_mb: int = 500
+    recent_covers_max_size_mb: int = 1024
+    persistent_metadata_ttl_hours: int = 24
+    musicbrainz_concurrent_searches: int = 3
+    discover_queue_size: int = 10
+    discover_queue_ttl: int = 86400
+    discover_queue_auto_generate: bool = True
+    discover_queue_polling_interval: int = 4000
+    discover_queue_warm_cycle_build: bool = True
+    discover_queue_seed_artists: int = 3
+    discover_queue_wildcard_slots: int = 2
+    discover_queue_similar_artists_limit: int = 15
+    discover_queue_albums_per_similar: int = 5
+    discover_queue_enrich_ttl: int = 86400
+    discover_queue_lastfm_mbid_max_lookups: int = 10
+    frontend_ttl_home: int = 300000
+    frontend_ttl_discover: int = 1800000
+    frontend_ttl_library: int = 300000
+    frontend_ttl_recently_added: int = 300000
+    frontend_ttl_discover_queue: int = 86400000
+    frontend_ttl_search: int = 300000
+    frontend_ttl_local_files_sidebar: int = 120000
+    frontend_ttl_jellyfin_sidebar: int = 120000
 
-    cover_memory_cache_max_entries: int = Field(
-        default=128,
-        ge=16,
-        le=2048,
-        description="Maximum entries in cover in-memory LRU cache"
-    )
+    def __post_init__(self) -> None:
+        ranges: dict[str, tuple[int | float, int | float]] = {
+            "cache_ttl_album_library": (3600, 604800),
+            "cache_ttl_album_non_library": (60, 86400),
+            "cache_ttl_artist_library": (3600, 604800),
+            "cache_ttl_artist_non_library": (3600, 604800),
+            "cache_ttl_artist_discovery_library": (3600, 604800),
+            "cache_ttl_artist_discovery_non_library": (3600, 604800),
+            "cache_ttl_search": (60, 86400),
+            "cache_ttl_local_files_recently_added": (60, 3600),
+            "cache_ttl_local_files_storage_stats": (60, 3600),
+            "cache_ttl_jellyfin_recently_played": (60, 3600),
+            "cache_ttl_jellyfin_favorites": (60, 3600),
+            "cache_ttl_jellyfin_genres": (60, 86400),
+            "cache_ttl_jellyfin_library_stats": (60, 3600),
+            "http_timeout": (5, 60),
+            "http_connect_timeout": (1, 30),
+            "http_max_connections": (50, 500),
+            "batch_artist_images": (1, 20),
+            "batch_albums": (1, 20),
+            "delay_artist": (0.0, 5.0),
+            "delay_albums": (0.0, 5.0),
+            "artist_discovery_warm_interval": (300, 604800),
+            "artist_discovery_warm_delay": (0.0, 5.0),
+            "artist_discovery_precache_delay": (0.0, 5.0),
+            "memory_cache_max_entries": (1000, 100000),
+            "memory_cache_cleanup_interval": (60, 3600),
+            "cover_memory_cache_max_entries": (16, 2048),
+            "cover_memory_cache_max_size_mb": (1, 1024),
+            "disk_cache_cleanup_interval": (60, 3600),
+            "recent_metadata_max_size_mb": (100, 5000),
+            "recent_covers_max_size_mb": (100, 10000),
+            "persistent_metadata_ttl_hours": (1, 168),
+            "musicbrainz_concurrent_searches": (2, 5),
+            "discover_queue_size": (1, 20),
+            "discover_queue_ttl": (3600, 604800),
+            "discover_queue_polling_interval": (1000, 30000),
+            "discover_queue_seed_artists": (1, 10),
+            "discover_queue_wildcard_slots": (0, 10),
+            "discover_queue_similar_artists_limit": (5, 50),
+            "discover_queue_albums_per_similar": (1, 20),
+            "discover_queue_enrich_ttl": (3600, 604800),
+            "discover_queue_lastfm_mbid_max_lookups": (1, 50),
+            "frontend_ttl_home": (60000, 3600000),
+            "frontend_ttl_discover": (60000, 86400000),
+            "frontend_ttl_library": (60000, 3600000),
+            "frontend_ttl_recently_added": (60000, 3600000),
+            "frontend_ttl_discover_queue": (3600000, 604800000),
+            "frontend_ttl_search": (60000, 3600000),
+            "frontend_ttl_local_files_sidebar": (60000, 3600000),
+            "frontend_ttl_jellyfin_sidebar": (60000, 3600000),
+        }
+        for field_name, (minimum, maximum) in ranges.items():
+            _validate_range(getattr(self, field_name), field_name, minimum, maximum)
 
-    cover_memory_cache_max_size_mb: int = Field(
-        default=16,
-        ge=1,
-        le=1024,
-        description="Maximum total size for cover in-memory LRU cache in MB"
-    )
-    
-    disk_cache_cleanup_interval: int = Field(
-        default=10,
-        ge=1,
-        le=60,
-        description="Interval for disk cache cleanup in minutes"
-    )
-    
-    recent_metadata_max_size_mb: int = Field(
-        default=500,
-        ge=100,
-        le=5000,
-        description="Maximum size for recent metadata cache in MB"
-    )
-    
-    recent_covers_max_size_mb: int = Field(
-        default=1024,
-        ge=100,
-        le=10000,
-        description="Maximum size for recent cover cache in MB"
-    )
-    
-    persistent_metadata_ttl_hours: int = Field(
-        default=24,
-        ge=1,
-        le=168,
-        description="TTL for persistent metadata cache in hours (primarily for covers)"
-    )
-    
-    musicbrainz_concurrent_searches: int = Field(
-        default=3,
-        ge=2,
-        le=5,
-        description="Max concurrent MusicBrainz API requests for parallel search"
-    )
 
-    discover_queue_size: int = Field(
-        default=10,
-        ge=1,
-        le=20,
-        description="Number of albums in a generated discover queue"
-    )
-    discover_queue_ttl: int = Field(
-        default=24,
-        ge=1,
-        le=168,
-        description="How long a pre-built queue stays fresh in hours"
-    )
-    discover_queue_auto_generate: bool = Field(
-        default=True,
-        description="Automatically generate a queue when visiting the Discover page"
-    )
-    discover_queue_polling_interval: int = Field(
-        default=4,
-        ge=1,
-        le=30,
-        description="Frontend polling interval for queue build status in seconds"
-    )
-    discover_queue_warm_cycle_build: bool = Field(
-        default=True,
-        description="Pre-build discover queue during periodic warm cycle"
-    )
-    discover_queue_seed_artists: int = Field(
-        default=3,
-        ge=1,
-        le=10,
-        description="Number of seed artists used for queue generation"
-    )
-    discover_queue_wildcard_slots: int = Field(
-        default=2,
-        ge=0,
-        le=10,
-        description="Number of wildcard album slots in the queue"
-    )
-    discover_queue_similar_artists_limit: int = Field(
-        default=15,
-        ge=5,
-        le=50,
-        description="Max similar artists fetched per seed"
-    )
-    discover_queue_albums_per_similar: int = Field(
-        default=5,
-        ge=1,
-        le=20,
-        description="Max top albums fetched per similar artist"
-    )
-    discover_queue_enrich_ttl: int = Field(
-        default=24,
-        ge=1,
-        le=168,
-        description="TTL for queue item enrichment data in hours"
-    )
-    discover_queue_lastfm_mbid_max_lookups: int = Field(
-        default=10,
-        ge=1,
-        le=50,
-        description="Max MusicBrainz lookups for Last.fm MBID resolution"
-    )
+class FrontendCacheTTLs(AppStruct):
+    home: int = 300000
+    discover: int = 1800000
+    library: int = 300000
+    recently_added: int = 300000
+    discover_queue: int = 86400000
+    search: int = 300000
+    local_files_sidebar: int = 120000
+    jellyfin_sidebar: int = 120000
+    discover_queue_polling_interval: int = 4000
+    discover_queue_auto_generate: bool = True
 
-    frontend_ttl_home: int = Field(
-        default=5,
-        ge=1,
-        le=60,
-        description="Home page cache freshness in minutes"
-    )
-    frontend_ttl_discover: int = Field(
-        default=30,
-        ge=1,
-        le=1440,
-        description="Discover page cache freshness in minutes"
-    )
-    frontend_ttl_library: int = Field(
-        default=5,
-        ge=1,
-        le=60,
-        description="Library cache freshness in minutes"
-    )
-    frontend_ttl_recently_added: int = Field(
-        default=5,
-        ge=1,
-        le=60,
-        description="Recently Added cache freshness in minutes"
-    )
-    frontend_ttl_discover_queue: int = Field(
-        default=1440,
-        ge=60,
-        le=10080,
-        description="Discover Queue cache freshness in minutes"
-    )
-    frontend_ttl_search: int = Field(
-        default=5,
-        ge=1,
-        le=60,
-        description="Search/Discovery cache freshness in minutes"
-    )
-    frontend_ttl_local_files_sidebar: int = Field(
-        default=2,
-        ge=1,
-        le=60,
-        description="Local Files sidebar cache freshness in minutes"
-    )
-    frontend_ttl_jellyfin_sidebar: int = Field(
-        default=2,
-        ge=1,
-        le=60,
-        description="Jellyfin sidebar cache freshness in minutes"
-    )
 
-    @field_validator(
-        'cache_ttl_album_library', 
-        'cache_ttl_album_non_library', 
-        'cache_ttl_artist_library',
-        'cache_ttl_artist_non_library',
-        'cache_ttl_artist_discovery_library',
-        'cache_ttl_artist_discovery_non_library',
-        'cache_ttl_search',
-        'cache_ttl_local_files_recently_added',
-        'cache_ttl_local_files_storage_stats',
-        'cache_ttl_jellyfin_recently_played',
-        'cache_ttl_jellyfin_favorites',
-        'cache_ttl_jellyfin_genres',
-        'cache_ttl_jellyfin_library_stats',
-        mode='before'
-    )
-    @classmethod
-    def validate_positive_int(cls, v):
-        if v is None:
-            return v
-        try:
-            value = int(float(v))
-            if value <= 0:
-                raise ValueError(f"Value must be positive, got {value}")
-            return value
-        except (ValueError, TypeError) as e:
-            raise ValueError(f"Invalid integer value: {v}") from e
-    
+class AdvancedSettingsFrontend(AppStruct):
+    cache_ttl_album_library: int = 24
+    cache_ttl_album_non_library: int = 6
+    cache_ttl_artist_library: int = 6
+    cache_ttl_artist_non_library: int = 6
+    cache_ttl_artist_discovery_library: int = 6
+    cache_ttl_artist_discovery_non_library: int = 1
+    cache_ttl_search: int = 60
+    cache_ttl_local_files_recently_added: int = 2
+    cache_ttl_local_files_storage_stats: int = 5
+    cache_ttl_jellyfin_recently_played: int = 5
+    cache_ttl_jellyfin_favorites: int = 5
+    cache_ttl_jellyfin_genres: int = 60
+    cache_ttl_jellyfin_library_stats: int = 10
+    http_timeout: int = 10
+    http_connect_timeout: int = 5
+    http_max_connections: int = 200
+    batch_artist_images: int = 5
+    batch_albums: int = 3
+    delay_artist: float = 0.5
+    delay_albums: float = 1.0
+    artist_discovery_warm_interval: int = 240
+    artist_discovery_warm_delay: float = 0.5
+    artist_discovery_precache_delay: float = 0.3
+    memory_cache_max_entries: int = 10000
+    memory_cache_cleanup_interval: int = 300
+    cover_memory_cache_max_entries: int = 128
+    cover_memory_cache_max_size_mb: int = 16
+    disk_cache_cleanup_interval: int = 10
+    recent_metadata_max_size_mb: int = 500
+    recent_covers_max_size_mb: int = 1024
+    persistent_metadata_ttl_hours: int = 24
+    musicbrainz_concurrent_searches: int = 3
+    discover_queue_size: int = 10
+    discover_queue_ttl: int = 24
+    discover_queue_auto_generate: bool = True
+    discover_queue_polling_interval: int = 4
+    discover_queue_warm_cycle_build: bool = True
+    discover_queue_seed_artists: int = 3
+    discover_queue_wildcard_slots: int = 2
+    discover_queue_similar_artists_limit: int = 15
+    discover_queue_albums_per_similar: int = 5
+    discover_queue_enrich_ttl: int = 24
+    discover_queue_lastfm_mbid_max_lookups: int = 10
+    frontend_ttl_home: int = 5
+    frontend_ttl_discover: int = 30
+    frontend_ttl_library: int = 5
+    frontend_ttl_recently_added: int = 5
+    frontend_ttl_discover_queue: int = 1440
+    frontend_ttl_search: int = 5
+    frontend_ttl_local_files_sidebar: int = 2
+    frontend_ttl_jellyfin_sidebar: int = 2
+
+    def __post_init__(self) -> None:
+        int_coerce_fields = [
+            "cache_ttl_album_library",
+            "cache_ttl_album_non_library",
+            "cache_ttl_artist_library",
+            "cache_ttl_artist_non_library",
+            "cache_ttl_artist_discovery_library",
+            "cache_ttl_artist_discovery_non_library",
+            "cache_ttl_search",
+            "cache_ttl_local_files_recently_added",
+            "cache_ttl_local_files_storage_stats",
+            "cache_ttl_jellyfin_recently_played",
+            "cache_ttl_jellyfin_favorites",
+            "cache_ttl_jellyfin_genres",
+            "cache_ttl_jellyfin_library_stats",
+        ]
+        for field_name in int_coerce_fields:
+            setattr(self, field_name, _coerce_positive_int(getattr(self, field_name), field_name))
+
+        ranges: dict[str, tuple[int | float, int | float]] = {
+            "cache_ttl_album_library": (1, 168),
+            "cache_ttl_album_non_library": (1, 24),
+            "cache_ttl_artist_library": (1, 168),
+            "cache_ttl_artist_non_library": (1, 168),
+            "cache_ttl_artist_discovery_library": (1, 168),
+            "cache_ttl_artist_discovery_non_library": (1, 168),
+            "cache_ttl_search": (1, 1440),
+            "cache_ttl_local_files_recently_added": (1, 60),
+            "cache_ttl_local_files_storage_stats": (1, 60),
+            "cache_ttl_jellyfin_recently_played": (1, 60),
+            "cache_ttl_jellyfin_favorites": (1, 60),
+            "cache_ttl_jellyfin_genres": (1, 1440),
+            "cache_ttl_jellyfin_library_stats": (1, 60),
+            "http_timeout": (5, 60),
+            "http_connect_timeout": (1, 30),
+            "http_max_connections": (50, 500),
+            "batch_artist_images": (1, 20),
+            "batch_albums": (1, 20),
+            "delay_artist": (0.0, 5.0),
+            "delay_albums": (0.0, 5.0),
+            "artist_discovery_warm_interval": (5, 10080),
+            "artist_discovery_warm_delay": (0.0, 5.0),
+            "artist_discovery_precache_delay": (0.0, 5.0),
+            "memory_cache_max_entries": (1000, 100000),
+            "memory_cache_cleanup_interval": (60, 3600),
+            "cover_memory_cache_max_entries": (16, 2048),
+            "cover_memory_cache_max_size_mb": (1, 1024),
+            "disk_cache_cleanup_interval": (1, 60),
+            "recent_metadata_max_size_mb": (100, 5000),
+            "recent_covers_max_size_mb": (100, 10000),
+            "persistent_metadata_ttl_hours": (1, 168),
+            "musicbrainz_concurrent_searches": (2, 5),
+            "discover_queue_size": (1, 20),
+            "discover_queue_ttl": (1, 168),
+            "discover_queue_polling_interval": (1, 30),
+            "discover_queue_seed_artists": (1, 10),
+            "discover_queue_wildcard_slots": (0, 10),
+            "discover_queue_similar_artists_limit": (5, 50),
+            "discover_queue_albums_per_similar": (1, 20),
+            "discover_queue_enrich_ttl": (1, 168),
+            "discover_queue_lastfm_mbid_max_lookups": (1, 50),
+            "frontend_ttl_home": (1, 60),
+            "frontend_ttl_discover": (1, 1440),
+            "frontend_ttl_library": (1, 60),
+            "frontend_ttl_recently_added": (1, 60),
+            "frontend_ttl_discover_queue": (60, 10080),
+            "frontend_ttl_search": (1, 60),
+            "frontend_ttl_local_files_sidebar": (1, 60),
+            "frontend_ttl_jellyfin_sidebar": (1, 60),
+        }
+        for field_name, (minimum, maximum) in ranges.items():
+            _validate_range(getattr(self, field_name), field_name, minimum, maximum)
+
     @staticmethod
     def from_backend(settings: AdvancedSettings) -> "AdvancedSettingsFrontend":
         return AdvancedSettingsFrontend(
@@ -732,7 +323,7 @@ class AdvancedSettingsFrontend(BaseModel):
             frontend_ttl_local_files_sidebar=settings.frontend_ttl_local_files_sidebar // 60000,
             frontend_ttl_jellyfin_sidebar=settings.frontend_ttl_jellyfin_sidebar // 60000,
         )
-    
+
     def to_backend(self) -> AdvancedSettings:
         return AdvancedSettings(
             cache_ttl_album_library=self.cache_ttl_album_library * 3600,

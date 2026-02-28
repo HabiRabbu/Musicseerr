@@ -1,11 +1,12 @@
 from typing import Protocol, Any
+import msgspec
 from api.v1.schemas.search import SearchResult
 from api.v1.schemas.artist import ArtistInfo
 from api.v1.schemas.album import AlbumInfo
 from api.v1.schemas.library import LibraryAlbum
 from api.v1.schemas.request import QueueItem
 from api.v1.schemas.common import ServiceStatus
-from dataclasses import dataclass
+from api.v1.schemas.discover import YouTubeQuotaResponse
 from repositories.jellyfin_models import JellyfinItem as JellyfinItem
 from repositories.jellyfin_models import JellyfinUser as JellyfinUser
 from repositories.lastfm_models import (
@@ -22,15 +23,13 @@ from repositories.lastfm_models import (
 )
 
 
-@dataclass
-class ListenBrainzArtist:
+class ListenBrainzArtist(msgspec.Struct):
     artist_name: str
     listen_count: int
     artist_mbids: list[str] | None = None
 
 
-@dataclass
-class ListenBrainzReleaseGroup:
+class ListenBrainzReleaseGroup(msgspec.Struct):
     release_group_name: str
     artist_name: str
     listen_count: int
@@ -40,8 +39,7 @@ class ListenBrainzReleaseGroup:
     caa_release_mbid: str | None = None
 
 
-@dataclass
-class ListenBrainzFeedbackRecording:
+class ListenBrainzFeedbackRecording(msgspec.Struct):
     track_name: str
     artist_name: str
     release_name: str | None = None
@@ -546,5 +544,5 @@ class YouTubeRepositoryProtocol(Protocol):
     async def search_video(self, artist: str, album: str) -> str | None:
         ...
 
-    def get_quota_status(self) -> dict:
+    def get_quota_status(self) -> YouTubeQuotaResponse:
         ...

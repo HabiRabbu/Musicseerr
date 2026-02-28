@@ -21,8 +21,8 @@ export function notifyRequestCountChanged(count?: number): void {
 	window.dispatchEvent(new CustomEvent('request-count-changed'));
 }
 
-export async function fetchActiveRequests(): Promise<ActiveRequestsResponse> {
-	const res = await fetch('/api/requests/active');
+export async function fetchActiveRequests(signal?: AbortSignal): Promise<ActiveRequestsResponse> {
+	const res = await fetch('/api/requests/active', { signal });
 	if (!res.ok) throw new Error('Failed to fetch active requests');
 	return res.json();
 }
@@ -30,11 +30,12 @@ export async function fetchActiveRequests(): Promise<ActiveRequestsResponse> {
 export async function fetchRequestHistory(
 	page: number = 1,
 	pageSize: number = 20,
-	status?: string
+	status?: string,
+	signal?: AbortSignal
 ): Promise<RequestHistoryResponse> {
 	const params = new URLSearchParams({ page: String(page), page_size: String(pageSize) });
 	if (status) params.set('status', status);
-	const res = await fetch(`/api/requests/history?${params}`);
+	const res = await fetch(`/api/requests/history?${params}`, { signal });
 	if (!res.ok) throw new Error('Failed to fetch request history');
 	return res.json();
 }

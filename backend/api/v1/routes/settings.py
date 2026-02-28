@@ -5,6 +5,8 @@ from api.v1.schemas.settings import (
     LidarrSettings, 
     LidarrConnectionSettings,
     JellyfinConnectionSettings,
+    JellyfinVerifyResponse,
+    JellyfinUserInfo,
     ListenBrainzConnectionSettings,
     YouTubeConnectionSettings,
     HomeSettings,
@@ -20,6 +22,7 @@ from api.v1.schemas.settings import (
     PrimaryMusicSourceSettings,
     LASTFM_SECRET_MASK,
 )
+from api.v1.schemas.common import VerifyConnectionResponse
 from api.v1.schemas.advanced_settings import AdvancedSettingsFrontend, FrontendCacheTTLs
 from core.dependencies import (
     get_preferences_service,
@@ -39,6 +42,7 @@ from core.dependencies import (
     clear_lastfm_dependent_caches,
 )
 from core.exceptions import ConfigurationError, ExternalServiceError
+from infrastructure.msgspec_fastapi import MsgSpecBody, MsgSpecRoute
 from repositories.jellyfin_repository import JellyfinRepository
 from repositories.listenbrainz_repository import ListenBrainzRepository
 from repositories.youtube import YouTubeRepository
@@ -49,7 +53,7 @@ from services.settings_service import SettingsService
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/settings", tags=["settings"])
+router = APIRouter(route_class=MsgSpecRoute, prefix="/api/settings", tags=["settings"])
 
 
 @router.get("/preferences", response_model=UserPreferences)
@@ -63,7 +67,7 @@ async def get_preferences():
 
 
 @router.put("/preferences", response_model=UserPreferences)
-async def update_preferences(preferences: UserPreferences):
+async def update_preferences(preferences: UserPreferences = MsgSpecBody(UserPreferences)):
     try:
         preferences_service = get_preferences_service()
         preferences_service.save_preferences(preferences)
@@ -92,7 +96,7 @@ async def get_lidarr_settings():
 
 
 @router.put("/lidarr", response_model=LidarrSettings)
-async def update_lidarr_settings(lidarr_settings: LidarrSettings):
+async def update_lidarr_settings(lidarr_settings: LidarrSettings = MsgSpecBody(LidarrSettings)):
     try:
         preferences_service = get_preferences_service()
         preferences_service.save_lidarr_settings(lidarr_settings)
@@ -140,7 +144,9 @@ async def get_advanced_settings():
 
 
 @router.put("/advanced", response_model=AdvancedSettingsFrontend)
-async def update_advanced_settings(settings: AdvancedSettingsFrontend):
+async def update_advanced_settings(
+    settings: AdvancedSettingsFrontend = MsgSpecBody(AdvancedSettingsFrontend),
+):
     try:
         preferences_service = get_preferences_service()
         backend_settings = settings.to_backend()
@@ -170,7 +176,9 @@ async def get_lidarr_connection():
 
 
 @router.put("/lidarr/connection", response_model=LidarrConnectionSettings)
-async def update_lidarr_connection(settings: LidarrConnectionSettings):
+async def update_lidarr_connection(
+    settings: LidarrConnectionSettings = MsgSpecBody(LidarrConnectionSettings),
+):
     try:
         from repositories.lidarr.base import reset_lidarr_circuit_breaker
         
@@ -190,7 +198,9 @@ async def update_lidarr_connection(settings: LidarrConnectionSettings):
 
 
 @router.post("/lidarr/verify", response_model=LidarrVerifyResponse)
-async def verify_lidarr_connection(settings: LidarrConnectionSettings):
+async def verify_lidarr_connection(
+    settings: LidarrConnectionSettings = MsgSpecBody(LidarrConnectionSettings),
+):
     settings_service = get_settings_service()
     return await settings_service.verify_lidarr(settings)
 
@@ -242,7 +252,7 @@ async def get_lidarr_metadata_profile_preferences(
     response_model=LidarrMetadataProfilePreferences,
 )
 async def update_lidarr_metadata_profile_preferences(
-    preferences: UserPreferences,
+    preferences: UserPreferences = MsgSpecBody(UserPreferences),
     profile_id: int | None = None,
 ):
     try:
@@ -272,7 +282,9 @@ async def get_jellyfin_settings():
 
 
 @router.put("/jellyfin", response_model=JellyfinConnectionSettings)
-async def update_jellyfin_settings(settings: JellyfinConnectionSettings):
+async def update_jellyfin_settings(
+    settings: JellyfinConnectionSettings = MsgSpecBody(JellyfinConnectionSettings),
+):
     try:
         preferences_service = get_preferences_service()
         preferences_service.save_jellyfin_connection(settings)
@@ -300,15 +312,14 @@ async def update_jellyfin_settings(settings: JellyfinConnectionSettings):
         raise HTTPException(status_code=500, detail="Failed to save Jellyfin settings")
 
 
-@router.post("/jellyfin/verify")
-async def verify_jellyfin_connection(settings: JellyfinConnectionSettings):
+@router.post("/jellyfin/verify", response_model=JellyfinVerifyResponse)
+async def verify_jellyfin_connection(
+    settings: JellyfinConnectionSettings = MsgSpecBody(JellyfinConnectionSettings),
+):
     settings_service = get_settings_service()
     result = await settings_service.verify_jellyfin(settings)
-    return {
-        "success": result.success,
-        "message": result.message,
-        "users": result.users if result.success else []
-    }
+    users = [JellyfinUserInfo(id=user.id, name=user.name) for user in (result.users or [])] if result.success else []
+    return JellyfinVerifyResponse(success=result.success, message=result.message, users=users)
 
 
 @router.get("/listenbrainz", response_model=ListenBrainzConnectionSettings)
@@ -322,7 +333,9 @@ async def get_listenbrainz_settings():
 
 
 @router.put("/listenbrainz", response_model=ListenBrainzConnectionSettings)
-async def update_listenbrainz_settings(settings: ListenBrainzConnectionSettings):
+async def update_listenbrainz_settings(
+    settings: ListenBrainzConnectionSettings = MsgSpecBody(ListenBrainzConnectionSettings),
+):
     try:
         preferences_service = get_preferences_service()
         preferences_service.save_listenbrainz_connection(settings)
@@ -339,11 +352,13 @@ async def update_listenbrainz_settings(settings: ListenBrainzConnectionSettings)
         raise HTTPException(status_code=500, detail="Failed to save ListenBrainz settings")
 
 
-@router.post("/listenbrainz/verify")
-async def verify_listenbrainz_connection(settings: ListenBrainzConnectionSettings):
+@router.post("/listenbrainz/verify", response_model=VerifyConnectionResponse)
+async def verify_listenbrainz_connection(
+    settings: ListenBrainzConnectionSettings = MsgSpecBody(ListenBrainzConnectionSettings),
+):
     settings_service = get_settings_service()
     result = await settings_service.verify_listenbrainz(settings)
-    return {"valid": result.valid, "message": result.message}
+    return VerifyConnectionResponse(valid=result.valid, message=result.message)
 
 
 @router.get("/youtube", response_model=YouTubeConnectionSettings)
@@ -359,7 +374,7 @@ async def get_youtube_settings(
 
 @router.put("/youtube", response_model=YouTubeConnectionSettings)
 async def update_youtube_settings(
-    settings: YouTubeConnectionSettings,
+    settings: YouTubeConnectionSettings = MsgSpecBody(YouTubeConnectionSettings),
     preferences_service: PreferencesService = Depends(get_preferences_service),
 ):
     try:
@@ -375,8 +390,10 @@ async def update_youtube_settings(
         raise HTTPException(status_code=500, detail="Failed to save YouTube settings")
 
 
-@router.post("/youtube/verify")
-async def verify_youtube_connection(settings: YouTubeConnectionSettings):
+@router.post("/youtube/verify", response_model=VerifyConnectionResponse)
+async def verify_youtube_connection(
+    settings: YouTubeConnectionSettings = MsgSpecBody(YouTubeConnectionSettings),
+):
     from infrastructure.http.client import get_http_client
     from core.config import get_settings as get_app_settings
 
@@ -388,7 +405,7 @@ async def verify_youtube_connection(settings: YouTubeConnectionSettings):
         daily_quota_limit=settings.daily_quota_limit,
     )
     valid, message = await temp_repo.verify_api_key(settings.api_key)
-    return {"valid": valid, "message": message}
+    return VerifyConnectionResponse(valid=valid, message=message)
 
 
 @router.get("/home", response_model=HomeSettings)
@@ -402,7 +419,7 @@ async def get_home_settings():
 
 
 @router.put("/home", response_model=HomeSettings)
-async def update_home_settings(settings: HomeSettings):
+async def update_home_settings(settings: HomeSettings = MsgSpecBody(HomeSettings)):
     try:
         preferences_service = get_preferences_service()
         preferences_service.save_home_settings(settings)
@@ -429,7 +446,7 @@ async def get_local_files_settings(
 
 @router.put("/local-files", response_model=LocalFilesConnectionSettings)
 async def update_local_files_settings(
-    settings: LocalFilesConnectionSettings,
+    settings: LocalFilesConnectionSettings = MsgSpecBody(LocalFilesConnectionSettings),
     preferences_service: PreferencesService = Depends(get_preferences_service),
     settings_service: SettingsService = Depends(get_settings_service),
 ):
@@ -448,7 +465,7 @@ async def update_local_files_settings(
 
 @router.post("/local-files/verify", response_model=LocalFilesVerifyResponse)
 async def verify_local_files_connection(
-    settings: LocalFilesConnectionSettings,
+    settings: LocalFilesConnectionSettings = MsgSpecBody(LocalFilesConnectionSettings),
     local_service: LocalFilesService = Depends(get_local_files_service),
 ) -> LocalFilesVerifyResponse:
     return await local_service.verify_path(settings.music_path)
@@ -466,7 +483,9 @@ async def get_lastfm_settings():
 
 
 @router.put("/lastfm", response_model=LastFmConnectionSettingsResponse)
-async def update_lastfm_settings(settings: LastFmConnectionSettings):
+async def update_lastfm_settings(
+    settings: LastFmConnectionSettings = MsgSpecBody(LastFmConnectionSettings),
+):
     try:
         preferences_service = get_preferences_service()
         preferences_service.save_lastfm_connection(settings)
@@ -488,7 +507,9 @@ async def update_lastfm_settings(settings: LastFmConnectionSettings):
 
 
 @router.post("/lastfm/verify", response_model=LastFmVerifyResponse)
-async def verify_lastfm_connection(settings: LastFmConnectionSettings):
+async def verify_lastfm_connection(
+    settings: LastFmConnectionSettings = MsgSpecBody(LastFmConnectionSettings),
+):
     from infrastructure.http.client import get_http_client
     from core.config import get_settings as get_app_settings
     from infrastructure.cache.memory_cache import InMemoryCache
@@ -544,7 +565,9 @@ async def get_scrobble_settings():
 
 
 @router.put("/scrobble", response_model=ScrobbleSettings)
-async def update_scrobble_settings(settings: ScrobbleSettings):
+async def update_scrobble_settings(
+    settings: ScrobbleSettings = MsgSpecBody(ScrobbleSettings),
+):
     try:
         preferences_service = get_preferences_service()
         preferences_service.save_scrobble_settings(settings)
@@ -569,7 +592,9 @@ async def get_primary_music_source():
 
 
 @router.put("/primary-source", response_model=PrimaryMusicSourceSettings)
-async def update_primary_music_source(settings: PrimaryMusicSourceSettings):
+async def update_primary_music_source(
+    settings: PrimaryMusicSourceSettings = MsgSpecBody(PrimaryMusicSourceSettings),
+):
     try:
         preferences_service = get_preferences_service()
         preferences_service.save_primary_music_source(settings)

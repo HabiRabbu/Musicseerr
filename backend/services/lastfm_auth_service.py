@@ -1,6 +1,7 @@
 import logging
 import time
-from dataclasses import dataclass
+
+import msgspec
 
 from core.exceptions import ConfigurationError
 from repositories.lastfm_repository import LastFmRepository
@@ -13,8 +14,7 @@ TOKEN_TTL_SECONDS = 600
 LASTFM_AUTH_URL = "https://www.last.fm/api/auth/"
 
 
-@dataclass
-class TokenEntry:
+class TokenEntry(msgspec.Struct):
     token: str
     created_at: float
 

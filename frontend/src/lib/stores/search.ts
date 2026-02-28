@@ -1,17 +1,68 @@
 import { writable, get } from 'svelte/store';
 import type { Artist, Album } from '$lib/types';
+import type { EnrichmentSource } from '$lib/types';
+import { CACHE_KEYS, CACHE_TTL } from '$lib/constants';
+import { createLocalStorageCache } from '$lib/utils/localStorageCache';
 
 interface SearchCache {
 	query: string;
 	artists: Artist[];
 	albums: Album[];
 	timestamp: number;
+	enrichmentSource: EnrichmentSource;
 }
 
-let CACHE_TTL = 5 * 60 * 1000;
+let searchCacheTTL = 5 * 60 * 1000;
+
+const persistentSearchCache = createLocalStorageCache<Omit<SearchCache, 'timestamp'>>(
+	CACHE_KEYS.SEARCH,
+	CACHE_TTL.SEARCH,
+	{ maxEntries: 60 }
+);
+
+function normalizeQuery(query: string): string {
+	return query.trim().toLowerCase();
+}
+
+function getCacheSuffix(query: string): string {
+	return encodeURIComponent(normalizeQuery(query));
+}
+
+function isCacheStale(timestamp: number): boolean {
+	return Date.now() - timestamp > searchCacheTTL;
+}
+
+function hydratePersistentCache(query: string): SearchCache | null {
+	const normalizedQuery = normalizeQuery(query);
+	if (!normalizedQuery) return null;
+
+	const stored = persistentSearchCache.get(getCacheSuffix(normalizedQuery));
+	if (!stored) return null;
+
+	return {
+		query: stored.data.query,
+		artists: stored.data.artists,
+		albums: stored.data.albums,
+		enrichmentSource: stored.data.enrichmentSource,
+		timestamp: stored.timestamp
+	};
+}
+
+function persistCache(cache: SearchCache): void {
+	persistentSearchCache.set(
+		{
+			query: cache.query,
+			artists: cache.artists,
+			albums: cache.albums,
+			enrichmentSource: cache.enrichmentSource
+		},
+		getCacheSuffix(cache.query)
+	);
+}
 
 export function updateSearchCacheTTL(ttlMs: number): void {
-	CACHE_TTL = ttlMs;
+	searchCacheTTL = ttlMs;
+	persistentSearchCache.updateTTL(ttlMs);
 }
 
 function createSearchStore() {
@@ -19,18 +70,28 @@ function createSearchStore() {
 
 	return {
 		subscribe,
-		setResults(query: string, artists: Artist[], albums: Album[]) {
-			set({
-				query,
+		setResults(query: string, artists: Artist[], albums: Album[], enrichmentSource: EnrichmentSource = 'none') {
+			const normalizedQuery = normalizeQuery(query);
+			const cache: SearchCache = {
+				query: normalizedQuery,
 				artists,
 				albums,
-				timestamp: Date.now()
-			});
+				timestamp: Date.now(),
+				enrichmentSource
+			};
+			set(cache);
+			persistCache(cache);
 		},
 		updateArtists(artists: Artist[]) {
 			update((cache) => {
 				if (cache) {
-					return { ...cache, artists };
+					const updatedCache: SearchCache = {
+						...cache,
+						artists,
+						timestamp: Date.now()
+					};
+					persistCache(updatedCache);
+					return updatedCache;
 				}
 				return cache;
 			});
@@ -38,17 +99,56 @@ function createSearchStore() {
 		updateAlbums(albums: Album[]) {
 			update((cache) => {
 				if (cache) {
-					return { ...cache, albums };
+					const updatedCache: SearchCache = {
+						...cache,
+						albums,
+						timestamp: Date.now()
+					};
+					persistCache(updatedCache);
+					return updatedCache;
 				}
 				return cache;
 			});
 		},
-		getCache(query: string): SearchCache | null {
+		setEnrichmentSource(enrichmentSource: EnrichmentSource) {
+			update((cache) => {
+				if (cache) {
+					const updatedCache: SearchCache = {
+						...cache,
+						enrichmentSource,
+						timestamp: Date.now()
+					};
+					persistCache(updatedCache);
+					return updatedCache;
+				}
+				return cache;
+			});
+		},
+		getCache(query: string, options: { allowStale?: boolean } = {}): SearchCache | null {
+			const normalizedQuery = normalizeQuery(query);
+			const allowStale = options.allowStale ?? false;
 			const cache = get({ subscribe });
-			if (cache && cache.query === query && Date.now() - cache.timestamp < CACHE_TTL) {
+			if (cache && cache.query === normalizedQuery) {
+				if (!allowStale && isCacheStale(cache.timestamp)) {
+					return null;
+				}
 				return cache;
 			}
-			return null;
+
+			const persistentCache = hydratePersistentCache(normalizedQuery);
+			if (!persistentCache) {
+				return null;
+			}
+
+			if (!allowStale && isCacheStale(persistentCache.timestamp)) {
+				return null;
+			}
+
+			set(persistentCache);
+			return persistentCache;
+		},
+		isStale(timestamp: number): boolean {
+			return isCacheStale(timestamp);
 		},
 		clear() {
 			set(null);

@@ -1,5 +1,4 @@
 import asyncio
-import json
 import logging
 import threading
 from pathlib import Path
@@ -7,6 +6,7 @@ from typing import Any
 
 import aiofiles
 import aiofiles.os
+import msgspec
 
 logger = logging.getLogger(__name__)
 
@@ -38,8 +38,9 @@ def atomic_write_json(file_path: Path, data: Any, indent: int = 2) -> None:
         tmp_path = file_path.with_suffix(file_path.suffix + '.tmp')
         
         try:
-            with open(tmp_path, 'w', encoding='utf-8') as f:
-                json.dump(data, f, indent=indent, ensure_ascii=False)
+            _ = indent
+            with open(tmp_path, 'wb') as f:
+                f.write(msgspec.json.encode(data))
                 f.flush()
             
             tmp_path.replace(file_path)
@@ -63,8 +64,9 @@ async def atomic_write_json_async(file_path: Path, data: Any, indent: int = 2) -
         tmp_path = file_path.with_suffix(file_path.suffix + '.tmp')
         
         try:
-            content = json.dumps(data, indent=indent, ensure_ascii=False)
-            async with aiofiles.open(tmp_path, 'w', encoding='utf-8') as f:
+            _ = indent
+            content = msgspec.json.encode(data)
+            async with aiofiles.open(tmp_path, 'wb') as f:
                 await f.write(content)
             
             await asyncio.to_thread(tmp_path.replace, file_path)
@@ -87,8 +89,8 @@ def read_json(file_path: Path, default: Any = None) -> Any:
         if not file_path.exists():
             return default
         
-        with open(file_path, 'r', encoding='utf-8') as f:
-            return json.load(f)
+        with open(file_path, 'rb') as f:
+            return msgspec.json.decode(f.read())
 
 
 async def read_json_async(file_path: Path, default: Any = None) -> Any:
@@ -98,6 +100,6 @@ async def read_json_async(file_path: Path, default: Any = None) -> Any:
         if not file_path.exists():
             return default
         
-        async with aiofiles.open(file_path, 'r', encoding='utf-8') as f:
+        async with aiofiles.open(file_path, 'rb') as f:
             content = await f.read()
-            return json.loads(content)
+            return msgspec.json.decode(content)

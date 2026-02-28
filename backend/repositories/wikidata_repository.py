@@ -1,7 +1,8 @@
 import httpx
 import logging
+import msgspec
 import re
-from typing import Optional
+from typing import TypeVar
 from urllib.parse import quote
 from infrastructure.cache.memory_cache import CacheInterface
 from infrastructure.cache.cache_keys import (
@@ -11,6 +12,68 @@ from infrastructure.cache.cache_keys import (
 from infrastructure.resilience.retry import with_retry, CircuitBreaker
 
 logger = logging.getLogger(__name__)
+T = TypeVar("T")
+
+
+class _WikidataSiteLink(msgspec.Struct):
+    title: str | None = None
+
+
+class _WikidataValue(msgspec.Struct):
+    value: str | None = None
+
+
+class _WikidataSnak(msgspec.Struct):
+    datavalue: _WikidataValue | None = None
+
+
+class _WikidataClaim(msgspec.Struct):
+    mainsnak: _WikidataSnak | None = None
+
+
+class _WikidataEntity(msgspec.Struct):
+    sitelinks: dict[str, _WikidataSiteLink] = {}
+    claims: dict[str, list[_WikidataClaim]] = {}
+
+
+class _WikidataEntityResponse(msgspec.Struct):
+    entities: dict[str, _WikidataEntity] = {}
+
+
+class _WikipediaPage(msgspec.Struct):
+    pageid: int | None = None
+    extract: str | None = None
+
+
+class _WikipediaQuery(msgspec.Struct):
+    pages: dict[str, _WikipediaPage] = {}
+
+
+class _WikipediaQueryResponse(msgspec.Struct):
+    query: _WikipediaQuery | None = None
+
+
+class _CommonsImageInfo(msgspec.Struct):
+    url: str | None = None
+
+
+class _CommonsPage(msgspec.Struct):
+    imageinfo: list[_CommonsImageInfo] = []
+
+
+class _CommonsQuery(msgspec.Struct):
+    pages: dict[str, _CommonsPage] = {}
+
+
+class _CommonsQueryResponse(msgspec.Struct):
+    query: _CommonsQuery | None = None
+
+
+def _decode_json_response(response: httpx.Response, decode_type: type[T]) -> T:
+    content = getattr(response, "content", None)
+    if isinstance(content, (bytes, bytearray, memoryview)):
+        return msgspec.json.decode(content, type=decode_type)
+    return msgspec.convert(response.json(), type=decode_type)
 
 _wikidata_circuit_breaker = CircuitBreaker(
     failure_threshold=5,
@@ -26,12 +89,12 @@ class WikidataRepository:
         self._cache = cache
     
     @staticmethod
-    def _extract_wikidata_id(url: str) -> Optional[str]:
+    def _extract_wikidata_id(url: str) -> str | None:
         match = re.search(r'/wiki/(Q\d+)', url)
         return match.group(1) if match else None
     
     @staticmethod
-    def _extract_wikipedia_title(url: str) -> Optional[str]:
+    def _extract_wikipedia_title(url: str) -> str | None:
         match = re.search(r'/wiki/(.+)$', url)
         return match.group(1) if match else None
     
@@ -46,7 +109,7 @@ class WikidataRepository:
         self,
         wikidata_id: str,
         lang: str = "en"
-    ) -> Optional[str]:
+    ) -> str | None:
         try:
             api_url = f"https://www.wikidata.org/wiki/Special:EntityData/{wikidata_id}.json"
             response = await self._client.get(api_url)
@@ -54,12 +117,12 @@ class WikidataRepository:
             if response.status_code != 200:
                 return None
             
-            data = response.json()
-            entity = data.get("entities", {}).get(wikidata_id, {})
-            sitelinks = entity.get("sitelinks", {})
-            wiki_data = sitelinks.get(f"{lang}wiki", {})
-            
-            return wiki_data.get("title")
+            data = _decode_json_response(response, _WikidataEntityResponse)
+            entity = data.entities.get(wikidata_id)
+            if entity is None:
+                return None
+            wiki_data = entity.sitelinks.get(f"{lang}wiki")
+            return wiki_data.title if wiki_data else None
         
         except Exception as e:
             logger.error(f"Failed to get Wikipedia title for {wikidata_id}: {e}")
@@ -72,7 +135,7 @@ class WikidataRepository:
         circuit_breaker=_wikidata_circuit_breaker,
         retriable_exceptions=(httpx.HTTPError,)
     )
-    async def _fetch_wikipedia_extract(self, page_title: str, lang: str = "en") -> Optional[str]:
+    async def _fetch_wikipedia_extract(self, page_title: str, lang: str = "en") -> str | None:
         try:
             api_url = (
                 f"https://{lang}.wikipedia.org/w/api.php"
@@ -84,14 +147,14 @@ class WikidataRepository:
             if response.status_code != 200:
                 return None
             
-            data = response.json()
-            pages = data.get("query", {}).get("pages", {})
-            
+            data = _decode_json_response(response, _WikipediaQueryResponse)
+            pages = data.query.pages if data.query else {}
+
             for page_data in pages.values():
-                if page_data.get("pageid", -1) < 0:
+                if (page_data.pageid or -1) < 0:
                     return None
-                
-                if extract := page_data.get("extract"):
+
+                if extract := page_data.extract:
                     return extract
             
             return None
@@ -100,7 +163,7 @@ class WikidataRepository:
             logger.error(f"Failed to fetch Wikipedia extract: {e}")
             return None
     
-    async def get_wikipedia_extract(self, wikipedia_url: str, lang: str = "en") -> Optional[str]:
+    async def get_wikipedia_extract(self, wikipedia_url: str, lang: str = "en") -> str | None:
         cache_key = wikipedia_extract_key(wikipedia_url)
         
         cached = await self._cache.get(cache_key)
@@ -130,10 +193,10 @@ class WikidataRepository:
             logger.error(f"Failed to get Wikipedia extract from {wikipedia_url}: {e}")
             return None
     
-    def get_wikidata_id_from_url(self, wikidata_url: str) -> Optional[str]:
+    def get_wikidata_id_from_url(self, wikidata_url: str) -> str | None:
         return self._extract_wikidata_id(wikidata_url)
     
-    async def get_artist_image_from_wikidata(self, wikidata_id: str) -> Optional[str]:
+    async def get_artist_image_from_wikidata(self, wikidata_id: str) -> str | None:
         cache_key = wikidata_artist_image_key(wikidata_id)
         
         cached = await self._cache.get(cache_key)
@@ -147,14 +210,23 @@ class WikidataRepository:
             if response.status_code != 200:
                 return None
             
-            data = response.json()
-            entity = data.get("entities", {}).get(wikidata_id, {})
-            
-            image_claims = entity.get("claims", {}).get("P18", [])
+            data = _decode_json_response(response, _WikidataEntityResponse)
+            entity = data.entities.get(wikidata_id)
+            if entity is None:
+                return None
+
+            image_claims = entity.claims.get("P18", [])
             if not image_claims:
                 return None
-            
-            image_filename = image_claims[0]["mainsnak"]["datavalue"]["value"]
+
+            first_claim = image_claims[0]
+            image_filename = (
+                first_claim.mainsnak.datavalue.value
+                if first_claim.mainsnak and first_claim.mainsnak.datavalue
+                else None
+            )
+            if not image_filename:
+                return None
             
             commons_url = (
                 f"https://commons.wikimedia.org/w/api.php"
@@ -166,16 +238,15 @@ class WikidataRepository:
             if response.status_code != 200:
                 return None
             
-            commons_data = response.json()
-            pages = commons_data.get("query", {}).get("pages", {})
-            
+            commons_data = _decode_json_response(response, _CommonsQueryResponse)
+            pages = commons_data.query.pages if commons_data.query else {}
+
             for page_data in pages.values():
-                if imageinfo := page_data.get("imageinfo"):
-                    if isinstance(imageinfo, list) and imageinfo:
-                        image_url = imageinfo[0].get("url")
-                        if image_url:
-                            await self._cache.set(cache_key, image_url, ttl_seconds=86400)
-                        return image_url
+                if page_data.imageinfo:
+                    image_url = page_data.imageinfo[0].url
+                    if image_url:
+                        await self._cache.set(cache_key, image_url, ttl_seconds=86400)
+                    return image_url
             
             return None
         

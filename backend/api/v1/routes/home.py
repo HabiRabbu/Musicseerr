@@ -3,19 +3,23 @@ from typing import Literal
 from fastapi import APIRouter, Depends, Query, HTTPException
 from api.v1.schemas.home import (
     HomeResponse,
+    HomeIntegrationStatus,
     GenreDetailResponse,
+    GenreArtistResponse,
+    GenreArtistsBatchResponse,
     TrendingArtistsResponse,
     TrendingArtistsRangeResponse,
     PopularAlbumsResponse,
     PopularAlbumsRangeResponse,
 )
 from core.dependencies import get_home_service, get_home_charts_service
+from infrastructure.msgspec_fastapi import MsgSpecRoute
 from services.home_service import HomeService
 from services.home_charts_service import HomeChartsService
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/home", tags=["home"])
+router = APIRouter(route_class=MsgSpecRoute, prefix="/api/home", tags=["home"])
 
 
 @router.get("", response_model=HomeResponse)
@@ -30,7 +34,7 @@ async def get_home_data(
         raise HTTPException(status_code=500, detail="Failed to load home page")
 
 
-@router.get("/integration-status", response_model=dict[str, bool])
+@router.get("/integration-status", response_model=HomeIntegrationStatus)
 async def get_integration_status(
     home_service: HomeService = Depends(get_home_service)
 ):
@@ -151,27 +155,27 @@ async def get_your_top_albums_by_range(
         raise HTTPException(status_code=500, detail="Failed to load your top albums")
 
 
-@router.get("/genre-artist/{genre_name}")
+@router.get("/genre-artist/{genre_name}", response_model=GenreArtistResponse)
 async def get_genre_artist(
     genre_name: str,
     home_service: HomeService = Depends(get_home_service)
 ):
     try:
         artist_mbid = await home_service.get_genre_artist(genre_name)
-        return {"artist_mbid": artist_mbid}
+        return GenreArtistResponse(artist_mbid=artist_mbid)
     except Exception as e:
         logger.error(f"Failed to get genre artist for {genre_name}: {e}")
         raise HTTPException(status_code=500, detail="Failed to load genre artist")
 
 
-@router.post("/genre-artists")
+@router.post("/genre-artists", response_model=GenreArtistsBatchResponse)
 async def get_genre_artists_batch(
     genres: list[str],
     home_service: HomeService = Depends(get_home_service)
 ):
     try:
         results = await home_service.get_genre_artists_batch(genres)
-        return {"genre_artists": results}
+        return GenreArtistsBatchResponse(genre_artists=results)
     except Exception as e:
         logger.error(f"Failed to get genre artists batch: {e}")
         raise HTTPException(status_code=500, detail="Failed to load genre artists")

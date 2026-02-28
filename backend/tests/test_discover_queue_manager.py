@@ -52,8 +52,8 @@ async def test_initial_status_is_idle():
     expect_assertions = True
     mgr = _make_manager()
     status = mgr.get_status("listenbrainz")
-    assert status["status"] == "idle"
-    assert status["source"] == "listenbrainz"
+    assert status.status == "idle"
+    assert status.source == "listenbrainz"
 
 
 @pytest.mark.asyncio
@@ -61,8 +61,8 @@ async def test_start_build_changes_status():
     expect_assertions = True
     mgr = _make_manager()
     result = await mgr.start_build("listenbrainz")
-    assert result["action"] == "started"
-    assert result["status"] in ("building", "ready")
+    assert result.action == "started"
+    assert result.status in ("building", "ready")
 
 
 @pytest.mark.asyncio
@@ -74,8 +74,8 @@ async def test_build_produces_ready_queue():
     await asyncio.sleep(0.1)
 
     status = mgr.get_status("listenbrainz")
-    assert status["status"] == "ready"
-    assert status["item_count"] == 5
+    assert status.status == "ready"
+    assert status.item_count == 5
     built_queue = mgr.get_queue("listenbrainz")
     assert built_queue is not None
     assert all(item.enrichment is not None for item in built_queue.items)
@@ -121,7 +121,7 @@ async def test_consume_queue_returns_and_clears():
     assert len(consumed.items) == 3
 
     assert mgr.get_queue("listenbrainz") is None
-    assert mgr.get_status("listenbrainz")["status"] == "idle"
+    assert mgr.get_status("listenbrainz").status == "idle"
 
 
 @pytest.mark.asyncio
@@ -132,8 +132,8 @@ async def test_build_error_sets_error_status():
     await asyncio.sleep(0.1)
 
     status = mgr.get_status("listenbrainz")
-    assert status["status"] == "error"
-    assert "test fail" in status["error"]
+    assert status.status == "error"
+    assert "test fail" in (status.error or "")
 
 
 @pytest.mark.asyncio
@@ -155,7 +155,7 @@ async def test_already_building_is_no_op():
     mgr = DiscoverQueueManager(slow_discover, prefs)
     await mgr.start_build("listenbrainz")
     result = await mgr.start_build("listenbrainz")
-    assert result["action"] == "already_building"
+    assert result.action == "already_building"
 
     mgr.invalidate("listenbrainz")
 
@@ -168,7 +168,7 @@ async def test_force_rebuild_when_ready():
     await asyncio.sleep(0.1)
 
     result = await mgr.start_build("listenbrainz", force=True)
-    assert result["action"] == "started"
+    assert result.action == "started"
 
 
 @pytest.mark.asyncio
@@ -180,7 +180,7 @@ async def test_invalidate_resets_state():
 
     mgr.invalidate("listenbrainz")
     status = mgr.get_status("listenbrainz")
-    assert status["status"] == "idle"
+    assert status.status == "idle"
 
 
 @pytest.mark.asyncio
@@ -192,8 +192,8 @@ async def test_separate_sources_are_independent():
 
     lb_status = mgr.get_status("listenbrainz")
     lfm_status = mgr.get_status("lastfm")
-    assert lb_status["status"] == "ready"
-    assert lfm_status["status"] == "idle"
+    assert lb_status.status == "ready"
+    assert lfm_status.status == "idle"
 
 
 @pytest.mark.asyncio
@@ -203,13 +203,13 @@ async def test_consume_queue_rejects_stale():
     await mgr.start_build("listenbrainz")
     await asyncio.sleep(0.1)
 
-    assert mgr.get_status("listenbrainz")["status"] == "ready"
+    assert mgr.get_status("listenbrainz").status == "ready"
 
     mgr._get_state("listenbrainz").built_at = time.time() - 10
 
     consumed = await mgr.consume_queue("listenbrainz")
     assert consumed is None
-    assert mgr.get_status("listenbrainz")["status"] == "idle"
+    assert mgr.get_status("listenbrainz").status == "idle"
 
 
 @pytest.mark.asyncio
@@ -234,9 +234,9 @@ async def test_stale_flag_in_status():
     await asyncio.sleep(0.1)
 
     status = mgr.get_status("listenbrainz")
-    assert status["stale"] is False
+    assert status.stale is False
 
     mgr._get_state("listenbrainz").built_at = time.time() - 10
 
     status = mgr.get_status("listenbrainz")
-    assert status["stale"] is True
+    assert status.stale is True

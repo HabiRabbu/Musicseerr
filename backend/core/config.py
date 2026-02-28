@@ -2,9 +2,9 @@ from pathlib import Path
 from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import Self
-import json
 import logging
-from infrastructure.file_utils import atomic_write_json
+import msgspec
+from infrastructure.file_utils import atomic_write_json, read_json
 
 logger = logging.getLogger(__name__)
 
@@ -93,15 +93,16 @@ class Settings(BaseSettings):
             return
         
         try:
-            with open(self.config_file_path, encoding='utf-8') as f:
-                config_data = json.load(f)
+            config_data = read_json(self.config_file_path, default={})
+            if not isinstance(config_data, dict):
+                raise ValueError("Config file JSON root must be an object")
             
             for key, value in config_data.items():
                 if hasattr(self, key):
                     setattr(self, key, value)
             
             logger.info(f"Loaded configuration from {self.config_file_path}")
-        except json.JSONDecodeError as e:
+        except msgspec.DecodeError as e:
             logger.error(f"Invalid JSON in config file: {e}")
             raise ValueError(f"Config file is not valid JSON: {e}")
         except Exception as e:
@@ -134,8 +135,8 @@ class Settings(BaseSettings):
             
             config_data = {}
             if self.config_file_path.exists():
-                with open(self.config_file_path, encoding='utf-8') as f:
-                    config_data = json.load(f)
+                loaded = read_json(self.config_file_path, default={})
+                config_data = loaded if isinstance(loaded, dict) else {}
             
             config_data.update({
                 "lidarr_url": self.lidarr_url,

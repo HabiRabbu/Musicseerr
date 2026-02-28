@@ -11,9 +11,10 @@ from api.v1.schemas.requests_page import (
 )
 from core.dependencies import get_requests_page_service
 from infrastructure.validators import validate_mbid
+from infrastructure.msgspec_fastapi import MsgSpecRoute
 from services.requests_page_service import RequestsPageService
 
-router = APIRouter(prefix="/api/requests", tags=["requests-page"])
+router = APIRouter(route_class=MsgSpecRoute, prefix="/api/requests", tags=["requests-page"])
 
 
 @router.get("/active", response_model=ActiveRequestsResponse)

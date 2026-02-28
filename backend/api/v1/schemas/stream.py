@@ -1,17 +1,17 @@
-from pydantic import BaseModel
+from infrastructure.msgspec_fastapi import AppStruct
 
 
-class PlaybackSessionResponse(BaseModel):
+class PlaybackSessionResponse(AppStruct):
     play_session_id: str
     item_id: str
 
 
-class ProgressReportRequest(BaseModel):
+class ProgressReportRequest(AppStruct):
     play_session_id: str
     position_seconds: float
     is_paused: bool = False
 
 
-class StopReportRequest(BaseModel):
+class StopReportRequest(AppStruct):
     play_session_id: str
     position_seconds: float
