@@ -25,7 +25,7 @@ from infrastructure.msgspec_fastapi import MsgSpecJSONResponse
 from middleware import PerformanceMiddleware
 from static_server import mount_frontend
 from api.v1.routes import (
-    search, requests, library, status, queue, covers, artists, albums, settings, home, discover
+    search, requests, library, status, queue, covers, artists, albums, settings, home, discover, profile
 )
 from api.v1.routes import cache as cache_routes
 from api.v1.routes import cache_status as cache_status_routes
@@ -233,5 +233,6 @@ app.include_router(jellyfin_library_routes.router)
 app.include_router(local_library_routes.router)
 app.include_router(lastfm_routes.router)
 app.include_router(scrobble_routes.router)
+app.include_router(profile.router)
 
 mount_frontend(app)

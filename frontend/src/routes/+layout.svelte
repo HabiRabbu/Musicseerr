@@ -20,7 +20,7 @@
 	import { fetchActiveRequestCount, type RequestCountChangedDetail } from '$lib/utils/requestsApi';
 	import { createNavigationProgressController } from '$lib/utils/navigationProgress';
 	import { fromStore } from 'svelte/store';
-	import { Settings, Search, House, Compass, Menu, Tv, Headphones, Download, PanelLeft, TriangleAlert, Info, X } from 'lucide-svelte';
+	import { Settings, Search, House, Compass, Menu, Tv, Headphones, Download, PanelLeft, TriangleAlert, Info, X, UserRound } from 'lucide-svelte';
 	import type { Snippet } from 'svelte';
 
 	let { children }: { children: Snippet } = $props();
@@ -218,7 +218,10 @@
 						</div>
 					{/if}
 				</div>
-				<div class="navbar-end w-auto">
+				<div class="navbar-end w-auto pr-2">
+				<a href="/profile" class="btn btn-ghost btn-circle btn-md" aria-label="Profile">
+					<UserRound class="h-6 w-6" />
+				</a>
 				</div>
 			</div>
 

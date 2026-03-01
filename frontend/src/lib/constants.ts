@@ -180,6 +180,12 @@ export const API = {
 	settings: () => '/api/settings',
 	settingsLocalFiles: () => '/api/settings/local-files',
 	settingsLocalFilesVerify: () => '/api/settings/local-files/verify',
+	profile: {
+		get: () => '/api/profile',
+		update: () => '/api/profile',
+		avatarUpload: () => '/api/profile/avatar',
+		avatar: () => '/api/profile/avatar'
+	},
 	stream: {
 		jellyfin: (itemId: string, format = 'aac', bitrate = 128000) =>
 			`/api/stream/jellyfin/${itemId}?format=${format}&bitrate=${bitrate}`,

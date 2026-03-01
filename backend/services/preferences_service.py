@@ -18,6 +18,7 @@ from api.v1.schemas.settings import (
     PrimaryMusicSourceSettings,
     LASTFM_SECRET_MASK,
 )
+from api.v1.schemas.profile import ProfileSettings
 from api.v1.schemas.advanced_settings import AdvancedSettings
 from core.config import Settings
 from core.exceptions import ConfigurationError
@@ -308,3 +309,14 @@ class PreferencesService:
         except Exception as e:
             logger.error("Failed to save primary music source: %s", e)
             raise ConfigurationError(f"Failed to save primary music source: {e}")
+
+    def get_profile_settings(self) -> ProfileSettings:
+        return self._get_section("profile_settings", ProfileSettings)
+
+    def save_profile_settings(self, settings: ProfileSettings) -> None:
+        try:
+            self._save_section("profile_settings", settings)
+            logger.info("Saved profile settings to %s", self._config_path)
+        except Exception as e:
+            logger.error("Failed to save profile settings: %s", e)
+            raise ConfigurationError(f"Failed to save profile settings: {e}")
