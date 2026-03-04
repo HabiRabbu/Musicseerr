@@ -60,7 +60,7 @@ describe('JellyfinPlaybackSource', () => {
 		});
 
 		await source.load({
-			videoId: 'jf-item-42',
+			trackSourceId: 'jf-item-42',
 			url: '/api/stream/jellyfin/jf-item-42?format=aac&bitrate=128000',
 			format: 'aac'
 		});
@@ -80,7 +80,7 @@ describe('JellyfinPlaybackSource', () => {
 		});
 
 		const loadPromise = source.load({
-			videoId: 'jf-item-42',
+			trackSourceId: 'jf-item-42',
 			url: '/api/stream/jellyfin/jf-item-42',
 			format: 'aac'
 		});
@@ -102,7 +102,7 @@ describe('JellyfinPlaybackSource', () => {
 		});
 
 		const loadPromise = source.load({
-			videoId: 'jf-item-42',
+			trackSourceId: 'jf-item-42',
 			url: '/api/stream/jellyfin/jf-item-42',
 			format: 'aac'
 		});
@@ -123,7 +123,7 @@ describe('JellyfinPlaybackSource', () => {
 		});
 
 		const loadPromise = source.load({
-			videoId: 'jf-item-42',
+			trackSourceId: 'jf-item-42',
 			url: '/api/stream/jellyfin/jf-item-42',
 			format: 'aac'
 		});
@@ -149,7 +149,7 @@ describe('JellyfinPlaybackSource', () => {
 		});
 
 		const loadPromise = source.load({
-			videoId: 'jf-item-42',
+			trackSourceId: 'jf-item-42',
 			url: '/api/stream/jellyfin/jf-item-42',
 			format: 'aac'
 		});
@@ -171,7 +171,7 @@ describe('JellyfinPlaybackSource', () => {
 		});
 
 		const loadPromise = source.load({
-			videoId: 'jf-item-42',
+			trackSourceId: 'jf-item-42',
 			url: '/api/stream/jellyfin/jf-item-42',
 			format: 'aac'
 		});
@@ -183,7 +183,7 @@ describe('JellyfinPlaybackSource', () => {
 		expect(mockReportStop).not.toHaveBeenCalled();
 	});
 
-	it('extracts item ID from URL when videoId is not provided', async () => {
+	it('extracts item ID from URL when trackSourceId is not provided', async () => {
 		mockHowlInstance.on.mockImplementation((event: string, cb: () => void) => {
 			if (event === 'load') setTimeout(cb, 0);
 			return mockHowlInstance;
@@ -206,7 +206,7 @@ describe('JellyfinPlaybackSource', () => {
 		});
 
 		const loadPromise = source.load({
-			videoId: 'jf-item-42',
+			trackSourceId: 'jf-item-42',
 			url: '/api/stream/jellyfin/jf-item-42',
 			format: 'aac',
 		});

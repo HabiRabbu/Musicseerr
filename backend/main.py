@@ -12,11 +12,12 @@ from core.dependencies import (
     cleanup_app_state
 )
 from core.tasks import start_cache_cleanup_task, start_library_sync_task, start_disk_cache_cleanup_task, start_home_cache_warming_task, start_discover_cache_warming_task, start_artist_discovery_cache_warming_task
-from core.exceptions import ResourceNotFoundError, ExternalServiceError, ValidationError
+from core.exceptions import ResourceNotFoundError, ExternalServiceError, SourceResolutionError, ValidationError
 from core.exception_handlers import (
     resource_not_found_handler,
     external_service_error_handler,
     circuit_open_error_handler,
+    source_resolution_error_handler,
     validation_error_handler,
     general_exception_handler
 )
@@ -25,7 +26,7 @@ from infrastructure.msgspec_fastapi import MsgSpecJSONResponse
 from middleware import PerformanceMiddleware
 from static_server import mount_frontend
 from api.v1.routes import (
-    search, requests, library, status, queue, covers, artists, albums, settings, home, discover, profile
+    search, requests, library, status, queue, covers, artists, albums, settings, home, discover, profile, playlists
 )
 from api.v1.routes import cache as cache_routes
 from api.v1.routes import cache_status as cache_status_routes
@@ -200,6 +201,7 @@ app = FastAPI(
 
 app.add_exception_handler(ResourceNotFoundError, resource_not_found_handler)
 app.add_exception_handler(ExternalServiceError, external_service_error_handler)
+app.add_exception_handler(SourceResolutionError, source_resolution_error_handler)
 app.add_exception_handler(ValidationError, validation_error_handler)
 app.add_exception_handler(CircuitOpenError, circuit_open_error_handler)
 app.add_exception_handler(Exception, general_exception_handler)
@@ -234,5 +236,6 @@ app.include_router(local_library_routes.router)
 app.include_router(lastfm_routes.router)
 app.include_router(scrobble_routes.router)
 app.include_router(profile.router)
+app.include_router(playlists.router)
 
 mount_frontend(app)

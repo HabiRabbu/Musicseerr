@@ -186,9 +186,28 @@ export const API = {
 		avatarUpload: () => '/api/profile/avatar',
 		avatar: () => '/api/profile/avatar'
 	},
+	playlists: {
+		list: () => '/api/v1/playlists',
+		create: () => '/api/v1/playlists',
+		detail: (id: string) => `/api/v1/playlists/${id}`,
+		update: (id: string) => `/api/v1/playlists/${id}`,
+		delete: (id: string) => `/api/v1/playlists/${id}`,
+		addTracks: (id: string) => `/api/v1/playlists/${id}/tracks`,
+		removeTrack: (id: string, trackId: string) => `/api/v1/playlists/${id}/tracks/${trackId}`,
+		updateTrack: (id: string, trackId: string) => `/api/v1/playlists/${id}/tracks/${trackId}`,
+		reorderTrack: (id: string) => `/api/v1/playlists/${id}/tracks/reorder`,
+		uploadCover: (id: string) => `/api/v1/playlists/${id}/cover`,
+		getCover: (id: string) => `/api/v1/playlists/${id}/cover`,
+		deleteCover: (id: string) => `/api/v1/playlists/${id}/cover`,
+		checkTracks: () => '/api/v1/playlists/check-tracks',
+		resolveSources: (id: string) => `/api/v1/playlists/${id}/resolve-sources`
+	},
 	stream: {
-		jellyfin: (itemId: string, format = 'aac', bitrate = 128000) =>
-			`/api/stream/jellyfin/${itemId}?format=${format}&bitrate=${bitrate}`,
+		jellyfin: (itemId: string, format = 'aac', bitrate = 128000, startSeconds?: number) => {
+			let url = `/api/stream/jellyfin/${itemId}?format=${format}&bitrate=${bitrate}`;
+			if (startSeconds !== undefined && startSeconds > 0) url += `&start_seconds=${startSeconds}`;
+			return url;
+		},
 		jellyfinStart: (itemId: string) => `/api/stream/jellyfin/${itemId}/start`,
 		jellyfinProgress: (itemId: string) => `/api/stream/jellyfin/${itemId}/progress`,
 		jellyfinStop: (itemId: string) => `/api/stream/jellyfin/${itemId}/stop`,

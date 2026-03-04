@@ -111,8 +111,8 @@ export class YouTubePlaybackSource implements PlaybackSource {
 		this.elementId = elementId;
 	}
 
-	async load(info: { videoId?: string; url?: string; token?: string; format?: string }): Promise<void> {
-		if (!info.videoId) throw new Error('videoId is required for YouTube source');
+	async load(info: { trackSourceId?: string; url?: string; token?: string; format?: string }): Promise<void> {
+		if (!info.trackSourceId) throw new Error('trackSourceId is required for YouTube source');
 
 		await loadYouTubeAPI();
 		if (this.destroyed) return;
@@ -125,7 +125,7 @@ export class YouTubePlaybackSource implements PlaybackSource {
 				this.player = new window.YT.Player(this.elementId, {
 					height: '68',
 					width: '120',
-					videoId: info.videoId,
+					videoId: info.trackSourceId,
 					playerVars: {
 						controls: 0,
 						modestbranding: 1,

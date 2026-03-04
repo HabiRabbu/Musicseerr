@@ -32,7 +32,7 @@ export async function launchYouTubePlayback(
 		artistName: payload.artistName,
 		coverUrl: normalizedCoverUrl,
 		sourceType: 'youtube',
-		videoId: payload.videoId,
+		trackSourceId: payload.videoId,
 		embedUrl: payload.embedUrl ?? `https://www.youtube.com/embed/${payload.videoId}`,
 		artistId: payload.artistId
 	});
@@ -40,7 +40,7 @@ export async function launchYouTubePlayback(
 	await tick();
 
 	try {
-		await source.load({ videoId: payload.videoId });
+		await source.load({ trackSourceId: payload.videoId });
 	} catch (error) {
 		if (stopOnError) {
 			playerStore.stop();

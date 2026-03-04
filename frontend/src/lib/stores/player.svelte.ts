@@ -1,4 +1,4 @@
-import type { PlaybackSource, PlaybackState, NowPlaying, QueueItem } from '$lib/player/types';
+import type { PlaybackSource, PlaybackState, NowPlaying, QueueItem, SourceType } from '$lib/player/types';
 import { createPlaybackSource } from '$lib/player/createSource';
 import { playbackToast } from '$lib/stores/playbackToast.svelte';
 
@@ -81,7 +81,7 @@ function createPlayerStore() {
 
 	const isPlaying = $derived(playbackState === 'playing');
 	const isBuffering = $derived(playbackState === 'buffering' || playbackState === 'loading');
-	const hasQueue = $derived(queue.length > 1);
+	const hasQueue = $derived(queue.length > 0);
 
 	const hasNext = $derived.by(() => {
 		if (queue.length <= 1) return false;
@@ -152,7 +152,7 @@ function createPlayerStore() {
 			artistName: item.artistName,
 			coverUrl: item.coverUrl,
 			sourceType: item.sourceType,
-			videoId: item.videoId,
+			trackSourceId: item.trackSourceId,
 			trackName: item.trackName,
 			artistId: item.artistId,
 			streamUrl: item.streamUrl,
@@ -165,7 +165,7 @@ function createPlayerStore() {
 
 		try {
 			await source.load({
-				videoId: item.videoId,
+				trackSourceId: item.trackSourceId,
 				url: item.streamUrl,
 				format: item.format,
 			});
@@ -283,6 +283,21 @@ function createPlayerStore() {
 		});
 	}
 
+	function showQueueMutationToast(action: 'queue' | 'next', count: number): void {
+		const label = count === 1 ? 'track' : 'tracks';
+		if (action === 'queue') {
+			playbackToast.show(
+				count === 1 ? 'Added track to queue' : `Added ${count} ${label} to queue`,
+				'info'
+			);
+			return;
+		}
+		playbackToast.show(
+			count === 1 ? 'Queued track to play next' : `Queued ${count} ${label} to play next`,
+			'info'
+		);
+	}
+
 	return {
 		get currentSource() {
 			return currentSource;
@@ -335,8 +350,20 @@ function createPlayerStore() {
 		get queueLength() {
 			return queueLength;
 		},
+		get upcomingQueueLength() {
+			if (queue.length === 0) return 0;
+			if (shuffleEnabled) {
+				const shuffleIdx = shuffleOrder.indexOf(currentIndex);
+				if (shuffleIdx < 0) return Math.max(0, queue.length - 1);
+				return Math.max(0, shuffleOrder.length - shuffleIdx - 1);
+			}
+			return Math.max(0, queue.length - currentIndex - 1);
+		},
 		get currentTrackNumber() {
 			return currentTrackNumber;
+		},
+		get shuffleOrder() {
+			return shuffleOrder;
 		},
 
 		playAlbum(source: PlaybackSource, metadata: NowPlaying): void {
@@ -399,6 +426,188 @@ function createPlayerStore() {
 			} else {
 				shuffleOrder = [];
 			}
+		},
+
+		jumpToTrack(index: number): void {
+			if (index < 0 || index >= queue.length) return;
+			void loadQueueItem(index);
+		},
+
+		addToQueue(item: QueueItem): void {
+			if (queue.length === 0) {
+				this.playQueue([item], 0, false);
+				showQueueMutationToast('queue', 1);
+				return;
+			}
+
+			queue = [...queue, item];
+			if (shuffleEnabled) {
+				shuffleOrder = [...shuffleOrder, queue.length - 1];
+			}
+			persistSession();
+			showQueueMutationToast('queue', 1);
+		},
+
+		addMultipleToQueue(items: QueueItem[]): void {
+			if (items.length === 0) return;
+
+			if (queue.length === 0) {
+				this.playQueue(items, 0, false);
+				showQueueMutationToast('queue', items.length);
+				return;
+			}
+
+			const startIdx = queue.length;
+			queue = [...queue, ...items];
+			if (shuffleEnabled) {
+				const newIndices = items.map((_, i) => startIdx + i);
+				shuffleOrder = [...shuffleOrder, ...newIndices];
+			}
+			persistSession();
+			showQueueMutationToast('queue', items.length);
+		},
+
+		playNext(item: QueueItem): void {
+			if (queue.length === 0) {
+				this.playQueue([item], 0, false);
+				showQueueMutationToast('next', 1);
+				return;
+			}
+
+			const insertAt = currentIndex + 1;
+			const newQueue = [...queue];
+			newQueue.splice(insertAt, 0, item);
+			queue = newQueue;
+			if (shuffleEnabled) {
+				const updated = shuffleOrder.map((i) => (i >= insertAt ? i + 1 : i));
+				const shuffleIdx = updated.indexOf(currentIndex);
+				updated.splice(shuffleIdx + 1, 0, insertAt);
+				shuffleOrder = updated;
+			}
+			persistSession();
+			showQueueMutationToast('next', 1);
+		},
+
+		playMultipleNext(items: QueueItem[]): void {
+			if (items.length === 0) return;
+
+			if (queue.length === 0) {
+				this.playQueue(items, 0, false);
+				showQueueMutationToast('next', items.length);
+				return;
+			}
+
+			const insertAt = currentIndex + 1;
+			const newQueue = [...queue];
+			newQueue.splice(insertAt, 0, ...items);
+			queue = newQueue;
+			if (shuffleEnabled) {
+				const updated = shuffleOrder.map((i) => (i >= insertAt ? i + items.length : i));
+				const shuffleIdx = updated.indexOf(currentIndex);
+				const newIndices = items.map((_, i) => insertAt + i);
+				updated.splice(shuffleIdx + 1, 0, ...newIndices);
+				shuffleOrder = updated;
+			}
+			persistSession();
+			showQueueMutationToast('next', items.length);
+		},
+
+		removeFromQueue(index: number): void {
+			if (index < 0 || index >= queue.length) return;
+			if (queue.length <= 1) {
+				this.stop();
+				return;
+			}
+			const wasPlaying = index === currentIndex;
+			const newQueue = queue.filter((_, i) => i !== index);
+			if (shuffleEnabled) {
+				shuffleOrder = shuffleOrder
+					.filter((i) => i !== index)
+					.map((i) => (i > index ? i - 1 : i));
+			}
+			if (wasPlaying) {
+				const newIndex = Math.min(index, newQueue.length - 1);
+				queue = newQueue;
+				currentIndex = newIndex;
+				void loadQueueItem(newIndex);
+			} else {
+				const newCurrentIndex = currentIndex > index ? currentIndex - 1 : currentIndex;
+				queue = newQueue;
+				currentIndex = newCurrentIndex;
+				persistSession();
+			}
+		},
+
+		reorderQueue(fromIndex: number, toIndex: number): void {
+			if (fromIndex === toIndex) return;
+			if (fromIndex < 0 || fromIndex >= queue.length) return;
+			if (toIndex < 0 || toIndex >= queue.length) return;
+			const newQueue = [...queue];
+			const [moved] = newQueue.splice(fromIndex, 1);
+			newQueue.splice(toIndex, 0, moved);
+			let newCurrentIndex = currentIndex;
+			if (currentIndex === fromIndex) {
+				newCurrentIndex = toIndex;
+			} else if (fromIndex < currentIndex && toIndex >= currentIndex) {
+				newCurrentIndex = currentIndex - 1;
+			} else if (fromIndex > currentIndex && toIndex <= currentIndex) {
+				newCurrentIndex = currentIndex + 1;
+			}
+			queue = newQueue;
+			currentIndex = newCurrentIndex;
+			persistSession();
+		},
+
+		reorderShuffleOrder(fromPos: number, toPos: number): void {
+			if (fromPos === toPos) return;
+			const newOrder = [...shuffleOrder];
+			const [moved] = newOrder.splice(fromPos, 1);
+			newOrder.splice(toPos, 0, moved);
+			shuffleOrder = newOrder;
+			persistSession();
+		},
+
+		clearQueue(): void {
+			if (queue.length === 0) {
+				this.stop();
+				return;
+			}
+
+			const currentItem = queue[currentIndex];
+			if (!currentItem) {
+				this.stop();
+				return;
+			}
+
+			queue = [currentItem];
+			currentIndex = 0;
+			shuffleEnabled = false;
+			shuffleOrder = [];
+			persistSession();
+		},
+
+		changeTrackSource(index: number, newSourceType: SourceType): void {
+			if (index < 0 || index >= queue.length) return;
+			if (index === currentIndex) {
+				playbackToast.show('Cannot change source for the currently playing track', 'warning');
+				return;
+			}
+
+			const item = queue[index];
+			if (!item.availableSources?.includes(newSourceType)) return;
+
+			let streamUrl: string | undefined;
+			if (newSourceType === 'howler') {
+				streamUrl = `/api/stream/local/${item.trackSourceId}`;
+			} else if (newSourceType === 'jellyfin') {
+				const format = item.format ?? 'aac';
+				streamUrl = `/api/stream/jellyfin/${item.trackSourceId}?format=${format}&bitrate=128000`;
+			}
+
+			const newQueue = [...queue];
+			newQueue[index] = { ...item, sourceType: newSourceType, streamUrl };
+			queue = newQueue;
+			persistSession();
 		},
 
 		play(): void {
@@ -486,7 +695,7 @@ function createPlayerStore() {
 			source.setVolume(volume);
 
 			void source.load({
-				videoId: item.videoId,
+				trackSourceId: item.trackSourceId,
 				url: item.streamUrl,
 				format: item.format,
 			}).then(() => {

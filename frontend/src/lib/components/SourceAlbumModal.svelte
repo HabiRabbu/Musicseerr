@@ -1,11 +1,22 @@
 <script lang="ts">
-	import { Shuffle, Play, X } from 'lucide-svelte';
+	import { Shuffle, Play, X, ListPlus, ListStart, ListMusic } from 'lucide-svelte';
 	import { goto } from '$app/navigation';
 	import { API } from '$lib/constants';
 	import { playerStore } from '$lib/stores/player.svelte';
 	import { launchJellyfinPlayback } from '$lib/player/launchJellyfinPlayback';
 	import { launchLocalPlayback } from '$lib/player/launchLocalPlayback';
+	import ContextMenu from '$lib/components/ContextMenu.svelte';
+	import type { MenuItem } from '$lib/components/ContextMenu.svelte';
+	import AddToPlaylistModal from '$lib/components/AddToPlaylistModal.svelte';
 	import AlbumImage from '$lib/components/AlbumImage.svelte';
+	import {
+		buildQueueItem,
+		buildQueueItemsFromJellyfin,
+		buildQueueItemsFromLocal,
+		type TrackMeta,
+		type TrackSourceData
+	} from '$lib/player/queueHelpers';
+	import type { QueueItem } from '$lib/player/types';
 	import { getCoverUrl } from '$lib/utils/errorHandling';
 	import type { JellyfinTrackInfo, LocalTrackInfo, JellyfinAlbumSummary, LocalAlbumSummary } from '$lib/types';
 
@@ -25,6 +36,7 @@
 	let loadingTracks = $state(false);
 	let trackError = $state('');
 	let fetchId = 0;
+	let playlistModalRef = $state<{ open: (tracks: QueueItem[]) => void } | null>(null);
 
 	let albumName = $derived(album?.name ?? '');
 	let artistName = $derived(album?.artist_name ?? '');
@@ -157,6 +169,116 @@
 		}
 	}
 
+	function getTrackMeta(): TrackMeta {
+		return {
+			albumId: mbid ?? albumId,
+			albumName,
+			artistName,
+			coverUrl: getAlbumCoverUrl() || null,
+			artistId: artistMbid ?? undefined
+		};
+	}
+
+	function buildTrackQueueItem(index: number): QueueItem | null {
+		const meta = getTrackMeta();
+		if (sourceType === 'jellyfin') {
+			const track = jellyfinTracks[index];
+			if (!track) return null;
+			const sourceData: TrackSourceData = {
+				trackPosition: track.track_number,
+				trackTitle: track.title,
+				trackLength: track.duration_seconds,
+				jellyfinTrack: track
+			};
+			return buildQueueItem(meta, sourceData);
+		}
+
+		const track = localTracks[index];
+		if (!track) return null;
+		const sourceData: TrackSourceData = {
+			trackPosition: track.track_number,
+			trackTitle: track.title,
+			trackLength: track.duration_seconds ?? undefined,
+			localTrack: track
+		};
+		return buildQueueItem(meta, sourceData);
+	}
+
+	function buildAlbumQueueItems(): QueueItem[] {
+		const meta = getTrackMeta();
+		if (sourceType === 'jellyfin') {
+			return buildQueueItemsFromJellyfin(
+				[...jellyfinTracks].sort((a, b) => a.track_number - b.track_number),
+				meta
+			);
+		}
+		return buildQueueItemsFromLocal(
+			[...localTracks].sort((a, b) => a.track_number - b.track_number),
+			meta
+		);
+	}
+
+	function addAllToQueue(): void {
+		const queueItems = buildAlbumQueueItems();
+		if (queueItems.length === 0) return;
+		playerStore.addMultipleToQueue(queueItems);
+	}
+
+	function playAllNext(): void {
+		const queueItems = buildAlbumQueueItems();
+		if (queueItems.length === 0) return;
+		playerStore.playMultipleNext(queueItems);
+	}
+
+	function addAllToPlaylist(): void {
+		const queueItems = buildAlbumQueueItems();
+		if (queueItems.length === 0) return;
+		playlistModalRef?.open(queueItems);
+	}
+
+	function addTrackToPlaylist(index: number): void {
+		const queueItem = buildTrackQueueItem(index);
+		if (!queueItem) return;
+		playlistModalRef?.open([queueItem]);
+	}
+
+	function getBulkMenuItems(): MenuItem[] {
+		return [
+			{ label: 'Add All to Queue', icon: ListPlus, onclick: addAllToQueue },
+			{ label: 'Play All Next', icon: ListStart, onclick: playAllNext },
+			{ label: 'Add All to Playlist', icon: ListMusic, onclick: addAllToPlaylist }
+		];
+	}
+
+	function getTrackContextMenuItems(index: number): MenuItem[] {
+		const queueItem = buildTrackQueueItem(index);
+		const hasQueueItem = queueItem !== null;
+		return [
+			{
+				label: 'Add to Queue',
+				icon: ListPlus,
+				onclick: () => {
+					if (queueItem) playerStore.addToQueue(queueItem);
+				},
+				disabled: !hasQueueItem
+			},
+			{
+				label: 'Play Next',
+				icon: ListStart,
+				onclick: () => {
+					if (queueItem) playerStore.playNext(queueItem);
+				},
+				disabled: !hasQueueItem
+			},
+			{
+				label: 'Add to Playlist',
+				icon: ListMusic,
+				onclick: () => addTrackToPlaylist(index),
+				disabled: !hasQueueItem
+			}
+		];
+	}
+
 	function getTrackName(index: number): string {
 		if (sourceType === 'jellyfin') return jellyfinTracks[index]?.title ?? '';
 		return localTracks[index]?.title ?? '';
@@ -281,6 +403,7 @@
 						<Shuffle class="h-4 w-4" />
 						Shuffle
 					</button>
+					<ContextMenu items={getBulkMenuItems()} position="end" size="sm" />
 				{/if}
 			</div>
 
@@ -301,39 +424,44 @@
 						{#each { length: trackCount } as _, i}
 							{@const trackNum = getTrackNumber(i)}
 							{@const playing = isTrackPlaying(trackNum)}
-							<button
-								class="flex items-center gap-3 w-full py-2 px-2 rounded-lg transition-colors text-left group/track {playing
-									? 'bg-accent/10'
-									: 'hover:bg-base-200'}"
-								onclick={() => playTrack(i)}
-							>
-								<span
-									class="font-mono w-6 text-right text-sm flex-shrink-0 {playing ? 'text-accent' : 'opacity-40'}"
-									>{trackNum}</span
+							<div class="group/row flex items-center gap-2 w-full py-1 px-1 rounded-lg transition-colors {playing
+								? 'bg-accent/10'
+								: 'hover:bg-base-200'}">
+								<button
+									class="flex items-center gap-3 flex-1 py-1.5 px-1 rounded-lg text-left group/track"
+									onclick={() => playTrack(i)}
 								>
-								<span
-									class="text-sm truncate flex-1 {playing ? 'text-accent' : ''}"
-									>{getTrackName(i)}</span
-								>
-								{#if sourceType === 'jellyfin'}
-									{@const dur = jellyfinTracks[i]?.duration_seconds}
-									{#if dur}
-										<span class="text-xs opacity-40 flex-shrink-0">{formatDuration(dur)}</span>
+									<span
+										class="font-mono w-6 text-right text-sm flex-shrink-0 {playing ? 'text-accent' : 'opacity-40'}"
+										>{trackNum}</span
+									>
+									<span
+										class="text-sm truncate flex-1 {playing ? 'text-accent' : ''}"
+										>{getTrackName(i)}</span
+									>
+									{#if sourceType === 'jellyfin'}
+										{@const dur = jellyfinTracks[i]?.duration_seconds}
+										{#if dur}
+											<span class="text-xs opacity-40 flex-shrink-0">{formatDuration(dur)}</span>
+										{/if}
+									{:else}
+										{@const lt = localTracks[i]}
+										{#if lt?.duration_seconds}
+											<span class="text-xs opacity-40 flex-shrink-0"
+												>{formatDuration(lt.duration_seconds)}</span
+											>
+										{/if}
 									{/if}
-								{:else}
-									{@const lt = localTracks[i]}
-									{#if lt?.duration_seconds}
-										<span class="text-xs opacity-40 flex-shrink-0"
-											>{formatDuration(lt.duration_seconds)}</span
-										>
-									{/if}
-								{/if}
-							<span class={playing ? 'text-accent' : ''}>
-									<Play class="h-4 w-4 flex-shrink-0 transition-opacity {playing
-											? 'opacity-100'
-											: 'text-accent opacity-0 group-hover/track:opacity-100'} fill-current" />
-								</span>
-							</button>
+									<span class={playing ? 'text-accent' : ''}>
+										<Play class="h-4 w-4 flex-shrink-0 transition-opacity {playing
+												? 'opacity-100'
+												: 'text-accent opacity-0 group-hover/track:opacity-100'} fill-current" />
+									</span>
+								</button>
+								<div>
+									<ContextMenu items={getTrackContextMenuItems(i)} position="end" size="xs" />
+								</div>
+							</div>
 						{/each}
 					</div>
 				{:else}
@@ -347,3 +475,5 @@
 		</form>
 	</dialog>
 {/if}
+
+<AddToPlaylistModal bind:this={playlistModalRef} />

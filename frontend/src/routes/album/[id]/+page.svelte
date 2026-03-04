@@ -2,7 +2,7 @@
 	import { browser } from '$app/environment';
 	import { goto } from '$app/navigation';
 	import { onDestroy } from 'svelte';
-	import type { AlbumBasicInfo, AlbumTracksInfo, SimilarAlbumsResponse, MoreByArtistResponse, YouTubeTrackLink, YouTubeLink, YouTubeQuotaStatus, JellyfinAlbumMatch, LocalAlbumMatch, LastFmAlbumEnrichment } from '$lib/types';
+	import type { AlbumBasicInfo, AlbumTracksInfo, SimilarAlbumsResponse, MoreByArtistResponse, YouTubeTrackLink, YouTubeLink, YouTubeQuotaStatus, JellyfinAlbumMatch, JellyfinTrackInfo, LocalAlbumMatch, LocalTrackInfo, LastFmAlbumEnrichment } from '$lib/types';
 	import { colors } from '$lib/colors';
 	import { libraryStore } from '$lib/stores/library';
 	import { API } from '$lib/constants';
@@ -16,6 +16,9 @@
 	import { playerStore } from '$lib/stores/player.svelte';
 	import AlbumYouTubeBar from '$lib/components/AlbumYouTubeBar.svelte';
 	import AlbumSourceBar from '$lib/components/AlbumSourceBar.svelte';
+	import ContextMenu from '$lib/components/ContextMenu.svelte';
+	import type { MenuItem } from '$lib/components/ContextMenu.svelte';
+	import AddToPlaylistModal from '$lib/components/AddToPlaylistModal.svelte';
 	import BackButton from '$lib/components/BackButton.svelte';
 	import TrackPlayButton from '$lib/components/TrackPlayButton.svelte';
 	import TrackSourceButton from '$lib/components/TrackSourceButton.svelte';
@@ -33,8 +36,15 @@
 		albumTracksCache
 	} from '$lib/utils/albumDetailCache';
 	import { hydrateDetailCacheEntry } from '$lib/utils/detailCacheHydration';
-	import type { PlaybackMeta } from '$lib/player/types';
-	import { Check, Trash2, Clock, Plus } from 'lucide-svelte';
+	import {
+		buildQueueItem,
+		buildQueueItemsFromJellyfin,
+		buildQueueItemsFromLocal,
+		type TrackMeta,
+		type TrackSourceData
+	} from '$lib/player/queueHelpers';
+	import type { QueueItem, PlaybackMeta } from '$lib/player/types';
+	import { Check, Trash2, Clock, Plus, ListPlus, ListStart, ListMusic } from 'lucide-svelte';
 
 	export let data: { albumId: string };
 
@@ -66,17 +76,66 @@
 
 	let lastfmEnrichment: LastFmAlbumEnrichment | null = null;
 	let loadingLastfm = true;
+	let playlistModalRef: { open: (tracks: QueueItem[]) => void } | null = null;
 
 	$: trackLinkMap = new Map(trackLinks.map(tl => [tl.track_number, tl]));
-	$: jellyfinTrackMap = new Map(jellyfinMatch?.tracks.map(t => [t.track_number, t]) ?? []);
-	$: localTrackMap = new Map(localMatch?.tracks.map(t => [t.track_number, t]) ?? []);
+	$: jellyfinTracks = jellyfinMatch?.tracks ?? [];
+	$: localTracks = localMatch?.tracks ?? [];
+	$: jellyfinTrackMap = new Map(
+		jellyfinTracks
+			.map((t) => [Number(t.track_number), t] as const)
+			.filter(([trackNumber]) => Number.isFinite(trackNumber) && trackNumber > 0)
+	);
+	$: localTrackMap = new Map(
+		localTracks
+			.map((t) => [Number(t.track_number), t] as const)
+			.filter(([trackNumber]) => Number.isFinite(trackNumber) && trackNumber > 0)
+	);
+
+	function resolveJellyfinTrack(
+		position: number,
+		rowIndex: number,
+		trackMap: Map<number, JellyfinTrackInfo>,
+		tracks: JellyfinTrackInfo[]
+	): JellyfinTrackInfo | null {
+		const normalizedPosition = Number(position);
+		if (Number.isFinite(normalizedPosition) && normalizedPosition > 0) {
+			const byNumber = trackMap.get(normalizedPosition);
+			if (byNumber) return byNumber;
+		}
+
+		const numberingIsUnusable = tracks.length > 0 && trackMap.size < tracks.length;
+		if (numberingIsUnusable && rowIndex >= 0 && rowIndex < tracks.length) {
+			return tracks[rowIndex] ?? null;
+		}
+
+		return null;
+	}
+
+	function resolveLocalTrack(
+		position: number,
+		rowIndex: number,
+		trackMap: Map<number, LocalTrackInfo>,
+		tracks: LocalTrackInfo[]
+	): LocalTrackInfo | null {
+		const normalizedPosition = Number(position);
+		if (Number.isFinite(normalizedPosition) && normalizedPosition > 0) {
+			const byNumber = trackMap.get(normalizedPosition);
+			if (byNumber) return byNumber;
+		}
+
+		const numberingIsUnusable = tracks.length > 0 && trackMap.size < tracks.length;
+		if (numberingIsUnusable && rowIndex >= 0 && rowIndex < tracks.length) {
+			return tracks[rowIndex] ?? null;
+		}
+
+		return null;
+	}
 
 	let currentAlbumId: string | null = null;
 	let abortController: AbortController | null = null;
 
-	$: inLibrary = $libraryStore.initialized
-		? libraryStore.isInLibrary(album?.musicbrainz_id)
-		: (album?.in_library ?? false);
+	$: inLibrary = album?.in_library ?? libraryStore.isInLibrary(album?.musicbrainz_id);
 	$: isRequested = album && !inLibrary && (album.requested || libraryStore.isRequested(album.musicbrainz_id));
 
 	$: if (browser && data.albumId && data.albumId !== currentAlbumId) {
@@ -167,6 +226,8 @@
 
 		if (refreshBasic) {
 			await fetchBasicInfo(signal);
+		} else {
+			void fetchBasicInfo(signal);
 		}
 		if (signal.aborted || !album) {
 			return;
@@ -445,18 +506,127 @@
 		};
 	}
 
-	function playSource<T extends { track_number: number }>(
+	function playSource<T extends { track_number: number; title: string }>(
 		match: { tracks: T[] } | null,
 		launcher: (tracks: T[], startIndex: number, shuffle: boolean, meta: PlaybackMeta) => void,
-		opts: { startTrack?: number; shuffle?: boolean } = {}
+		opts: { startTrack?: number; startTitle?: string; shuffle?: boolean } = {}
 	): void {
 		if (!match?.tracks.length) return;
 		let idx = 0;
 		if (opts.startTrack !== undefined) {
 			idx = match.tracks.findIndex((t) => t.track_number === opts.startTrack);
+			if (idx === -1 && opts.startTitle) {
+				const lower = opts.startTitle.toLowerCase();
+				idx = match.tracks.findIndex((t) => {
+					const tLower = t.title.toLowerCase();
+					return tLower === lower || tLower.includes(lower) || lower.includes(tLower);
+				});
+			}
 			if (idx === -1) return;
 		}
 		launcher(match.tracks, idx, opts.shuffle ?? false, getPlaybackMeta());
+	}
+
+	function getTrackMeta(): TrackMeta {
+		return {
+			albumId: album!.musicbrainz_id,
+			albumName: album!.title,
+			artistName: album!.artist_name,
+			coverUrl: album!.cover_url ?? null,
+			artistId: album!.artist_id
+		};
+	}
+
+	function buildTrackQueueItem(
+		track: { position: number; title: string },
+		resolvedLocal: LocalTrackInfo | null,
+		resolvedJellyfin: JellyfinTrackInfo | null
+	): QueueItem | null {
+		if (!album) return null;
+		const sourceData: TrackSourceData = {
+			trackPosition: track.position,
+			trackTitle: track.title,
+			trackLength: resolvedLocal?.duration_seconds ?? resolvedJellyfin?.duration_seconds ?? undefined,
+			localTrack: resolvedLocal,
+			jellyfinTrack: resolvedJellyfin
+		};
+
+		return buildQueueItem(getTrackMeta(), sourceData);
+	}
+
+	function openAddTrackToPlaylist(
+		track: { position: number; title: string },
+		resolvedLocal: LocalTrackInfo | null,
+		resolvedJellyfin: JellyfinTrackInfo | null
+	): void {
+		const queueItem = buildTrackQueueItem(track, resolvedLocal, resolvedJellyfin);
+		if (!queueItem) return;
+		playlistModalRef?.open([queueItem]);
+	}
+
+	function getTrackContextMenuItems(
+		track: { position: number; title: string },
+		resolvedLocal: LocalTrackInfo | null,
+		resolvedJellyfin: JellyfinTrackInfo | null
+	): MenuItem[] {
+		const queueItem = buildTrackQueueItem(track, resolvedLocal, resolvedJellyfin);
+		const hasSource = queueItem !== null;
+
+		return [
+			{
+				label: 'Add to Queue',
+				icon: ListPlus,
+				onclick: () => {
+					if (queueItem) playerStore.addToQueue(queueItem);
+				},
+				disabled: !hasSource
+			},
+			{
+				label: 'Play Next',
+				icon: ListStart,
+				onclick: () => {
+					if (queueItem) playerStore.playNext(queueItem);
+				},
+				disabled: !hasSource
+			},
+			{
+				label: 'Add to Playlist',
+				icon: ListMusic,
+				onclick: () => openAddTrackToPlaylist(track, resolvedLocal, resolvedJellyfin),
+				disabled: !hasSource
+			}
+		];
+	}
+
+	function addAllSourceTracksToPlaylist(source: 'jellyfin' | 'local'): void {
+		if (!album) return;
+		const meta = getTrackMeta();
+		const queueItems = source === 'jellyfin'
+			? buildQueueItemsFromJellyfin([...jellyfinTracks].sort((a, b) => Number(a.track_number) - Number(b.track_number)), meta)
+			: buildQueueItemsFromLocal([...localTracks].sort((a, b) => Number(a.track_number) - Number(b.track_number)), meta);
+
+		if (queueItems.length === 0) return;
+		playlistModalRef?.open(queueItems);
+	}
+
+	function addAllSourceTracksToQueue(source: 'jellyfin' | 'local'): void {
+		if (!album) return;
+		const meta = getTrackMeta();
+		const queueItems = source === 'jellyfin'
+			? buildQueueItemsFromJellyfin([...jellyfinTracks].sort((a, b) => Number(a.track_number) - Number(b.track_number)), meta)
+			: buildQueueItemsFromLocal([...localTracks].sort((a, b) => Number(a.track_number) - Number(b.track_number)), meta);
+		if (queueItems.length === 0) return;
+		playerStore.addMultipleToQueue(queueItems);
+	}
+
+	function playAllSourceTracksNext(source: 'jellyfin' | 'local'): void {
+		if (!album) return;
+		const meta = getTrackMeta();
+		const queueItems = source === 'jellyfin'
+			? buildQueueItemsFromJellyfin([...jellyfinTracks].sort((a, b) => Number(a.track_number) - Number(b.track_number)), meta)
+			: buildQueueItemsFromLocal([...localTracks].sort((a, b) => Number(a.track_number) - Number(b.track_number)), meta);
+		if (queueItems.length === 0) return;
+		playerStore.playMultipleNext(queueItems);
 	}
 </script>
 
@@ -665,8 +835,11 @@
 								sourceColor="rgb(var(--brand-jellyfin))"
 								trackCount={jellyfinMatch.tracks.length}
 								totalTracks={tracksInfo.tracks.length}
-							onPlayAll={() => playSource(jellyfinMatch, launchJellyfinPlayback)}
-							onShuffle={() => playSource(jellyfinMatch, launchJellyfinPlayback, { shuffle: true })}
+								onPlayAll={() => playSource(jellyfinMatch, launchJellyfinPlayback)}
+								onShuffle={() => playSource(jellyfinMatch, launchJellyfinPlayback, { shuffle: true })}
+								onAddAllToQueue={() => addAllSourceTracksToQueue('jellyfin')}
+								onPlayAllNext={() => playAllSourceTracksNext('jellyfin')}
+								onAddAllToPlaylist={() => addAllSourceTracksToPlaylist('jellyfin')}
 							>
 								{#snippet icon()}
 									<JellyfinIcon class="h-5 w-5" />
@@ -685,8 +858,11 @@
 								trackCount={localMatch.tracks.length}
 								totalTracks={tracksInfo.tracks.length}
 								extraBadge={localMatch.primary_format?.toUpperCase() ?? null}
-							onPlayAll={() => playSource(localMatch, launchLocalPlayback)}
-							onShuffle={() => playSource(localMatch, launchLocalPlayback, { shuffle: true })}
+								onPlayAll={() => playSource(localMatch, launchLocalPlayback)}
+								onShuffle={() => playSource(localMatch, launchLocalPlayback, { shuffle: true })}
+								onAddAllToQueue={() => addAllSourceTracksToQueue('local')}
+								onPlayAllNext={() => playAllSourceTracksNext('local')}
+								onAddAllToPlaylist={() => addAllSourceTracksToPlaylist('local')}
 							>
 								{#snippet icon()}
 									<LocalFilesIcon class="h-5 w-5" />
@@ -695,17 +871,17 @@
 						{/if}
 					{/if}
 					
-					<div class="bg-base-200 rounded-box overflow-hidden">
+					<div class="bg-base-200 rounded-box overflow-visible">
 						<ul class="list">
 							{#each tracksInfo.tracks as track, index}
 								{@const tl = trackLinkMap.get(track.position) ?? null}
-								{@const jellyfinTrack = jellyfinTrackMap.get(track.position) ?? null}
-								{@const localTrack = localTrackMap.get(track.position) ?? null}
+								{@const jellyfinTrack = resolveJellyfinTrack(track.position, index, jellyfinTrackMap, jellyfinTracks)}
+								{@const localTrack = resolveLocalTrack(track.position, index, localTrackMap, localTracks)}
 								{@const isCurrentlyPlaying = playerStore.nowPlaying?.albumId === album.musicbrainz_id && playerStore.currentQueueItem?.trackNumber === track.position && playerStore.isPlaying}
 								{@const showJellyfinBtn = $integrationStore.jellyfin && jellyfinMatch?.found}
 								{@const showLocalBtn = $integrationStore.localfiles && localMatch?.found}
 								<li
-									class="hover:bg-base-300/50 transition-colors p-3 sm:p-4"
+									class="group hover:bg-base-300/50 transition-colors p-3 sm:p-4"
 									style={isCurrentlyPlaying ? `background-color: ${colors.accent}20;` : ''}
 								>
 									<div class="flex items-center gap-4 w-full">
@@ -745,7 +921,7 @@
 													<TrackSourceButton
 														available={jellyfinTrack !== null}
 														sourceColor="rgb(var(--brand-jellyfin))"
-												onclick={() => playSource(jellyfinMatch, launchJellyfinPlayback, { startTrack: track.position })}
+												onclick={() => playSource(jellyfinMatch, launchJellyfinPlayback, { startTrack: track.position, startTitle: track.title })}
 														ariaLabel={jellyfinTrack ? 'Play on Jellyfin' : 'Not available on Jellyfin'}
 													>
 														{#snippet icon()}
@@ -758,7 +934,7 @@
 													<TrackSourceButton
 														available={localTrack !== null}
 														sourceColor="rgb(var(--brand-localfiles))"
-												onclick={() => playSource(localMatch, launchLocalPlayback, { startTrack: track.position })}
+												onclick={() => playSource(localMatch, launchLocalPlayback, { startTrack: track.position, startTitle: track.title })}
 														ariaLabel={localTrack ? 'Play local file' : 'Not available locally'}
 													>
 														{#snippet icon()}
@@ -766,6 +942,10 @@
 														{/snippet}
 													</TrackSourceButton>
 												{/if}
+
+												<div>
+													<ContextMenu items={getTrackContextMenuItems(track, localTrack, jellyfinTrack)} position="end" size="xs" />
+												</div>
 											</div>
 										{/if}
 									</div>
@@ -773,6 +953,8 @@
 							{/each}
 						</ul>
 					</div>
+
+					<AddToPlaylistModal bind:this={playlistModalRef} />
 				</div>
 			{/if}
 

@@ -1,0 +1,358 @@
+import { describe, it, expect, vi } from 'vitest';
+
+vi.mock('$lib/constants', () => ({
+	API: {
+		stream: {
+			local: (id: number | string) => `/api/stream/local/${id}`,
+			jellyfin: (id: string, format = 'aac', bitrate = 128000) =>
+				`/api/stream/jellyfin/${id}?format=${format}&bitrate=${bitrate}`
+		}
+	}
+}));
+
+vi.mock('$lib/utils/errorHandling', () => ({
+	getCoverUrl: (url: string | null, albumId: string) => url ?? `/cover/${albumId}`
+}));
+
+import type { JellyfinTrackInfo, LocalTrackInfo } from '$lib/types';
+import type { PlaylistTrack } from '$lib/api/playlists';
+import type { TrackMeta, TrackSourceData } from './queueHelpers';
+import {
+	selectBestSource,
+	getAvailableSources,
+	buildQueueItem,
+	buildQueueItemsFromJellyfin,
+	buildQueueItemsFromLocal,
+	playlistTrackToQueueItem
+} from './queueHelpers';
+
+const baseMeta: TrackMeta = {
+	albumId: 'album-1',
+	albumName: 'Test Album',
+	artistName: 'Artist A',
+	coverUrl: '/cover.jpg',
+	artistId: 'artist-1'
+};
+
+const localTrack: LocalTrackInfo = {
+	track_file_id: 42,
+	title: 'Local Song',
+	track_number: 1,
+	format: 'FLAC',
+	size_bytes: 30_000_000,
+	duration_seconds: 240
+};
+
+const jellyfinTrack: JellyfinTrackInfo = {
+	jellyfin_id: 'jf-123',
+	title: 'JF Song',
+	track_number: 2,
+	duration_seconds: 180,
+	album_name: 'Test Album',
+	artist_name: 'Artist A',
+	codec: 'opus'
+};
+
+describe('selectBestSource', () => {
+	it('returns local source when localTrack is available', () => {
+		expect.assertions(3);
+		const data: TrackSourceData = {
+			trackPosition: 1,
+			trackTitle: 'Track',
+			localTrack,
+			jellyfinTrack
+		};
+		const result = selectBestSource(data);
+		expect(result).not.toBeNull();
+		expect(result!.sourceType).toBe('howler');
+		expect(result!.streamUrl).toBe('/api/stream/local/42');
+	});
+
+	it('returns jellyfin source when only jellyfinTrack is available', () => {
+		expect.assertions(3);
+		const data: TrackSourceData = {
+			trackPosition: 2,
+			trackTitle: 'Track',
+			jellyfinTrack
+		};
+		const result = selectBestSource(data);
+		expect(result).not.toBeNull();
+		expect(result!.sourceType).toBe('jellyfin');
+		expect(result!.trackSourceId).toBe('jf-123');
+	});
+
+	it('returns null when no source is available', () => {
+		expect.assertions(1);
+		const data: TrackSourceData = {
+			trackPosition: 1,
+			trackTitle: 'Track'
+		};
+		expect(selectBestSource(data)).toBeNull();
+	});
+
+	it('prefers local over jellyfin (Local > Jellyfin priority)', () => {
+		expect.assertions(1);
+		const data: TrackSourceData = {
+			trackPosition: 1,
+			trackTitle: 'Track',
+			localTrack,
+			jellyfinTrack
+		};
+		expect(selectBestSource(data)!.sourceType).toBe('howler');
+	});
+});
+
+describe('getAvailableSources', () => {
+	it('returns both sources when both are available', () => {
+		expect.assertions(2);
+		const sources = getAvailableSources({
+			trackPosition: 1,
+			trackTitle: 'Track',
+			localTrack,
+			jellyfinTrack
+		});
+		expect(sources).toContain('howler');
+		expect(sources).toContain('jellyfin');
+	});
+
+	it('returns only howler when only local is available', () => {
+		expect.assertions(1);
+		const sources = getAvailableSources({
+			trackPosition: 1,
+			trackTitle: 'Track',
+			localTrack
+		});
+		expect(sources).toEqual(['howler']);
+	});
+
+	it('returns only jellyfin when only jellyfin is available', () => {
+		expect.assertions(1);
+		const sources = getAvailableSources({
+			trackPosition: 1,
+			trackTitle: 'Track',
+			jellyfinTrack
+		});
+		expect(sources).toEqual(['jellyfin']);
+	});
+
+	it('returns empty array when no sources are available', () => {
+		expect.assertions(1);
+		const sources = getAvailableSources({
+			trackPosition: 1,
+			trackTitle: 'Track'
+		});
+		expect(sources).toEqual([]);
+	});
+});
+
+describe('buildQueueItem', () => {
+	it('builds a queue item from local track data', () => {
+		expect.assertions(6);
+		const data: TrackSourceData = {
+			trackPosition: 1,
+			trackTitle: 'Local Song',
+			trackLength: 240,
+			localTrack
+		};
+		const item = buildQueueItem(baseMeta, data);
+		expect(item).not.toBeNull();
+		expect(item!.trackName).toBe('Local Song');
+		expect(item!.sourceType).toBe('howler');
+		expect(item!.albumId).toBe('album-1');
+		expect(item!.availableSources).toEqual(['howler']);
+		expect(item!.duration).toBe(240);
+	});
+
+	it('returns null when no source is available', () => {
+		expect.assertions(1);
+		const data: TrackSourceData = {
+			trackPosition: 1,
+			trackTitle: 'No Source'
+		};
+		expect(buildQueueItem(baseMeta, data)).toBeNull();
+	});
+
+	it('populates availableSources with both when both exist', () => {
+		expect.assertions(2);
+		const data: TrackSourceData = {
+			trackPosition: 1,
+			trackTitle: 'Dual Source',
+			localTrack,
+			jellyfinTrack
+		};
+		const item = buildQueueItem(baseMeta, data);
+		expect(item!.availableSources).toContain('howler');
+		expect(item!.availableSources).toContain('jellyfin');
+	});
+
+	it('uses getCoverUrl to normalize cover URL', () => {
+		expect.assertions(1);
+		const meta: TrackMeta = { ...baseMeta, coverUrl: null };
+		const data: TrackSourceData = {
+			trackPosition: 1,
+			trackTitle: 'Track',
+			localTrack
+		};
+		const item = buildQueueItem(meta, data);
+		expect(item!.coverUrl).toBe('/cover/album-1');
+	});
+});
+
+describe('buildQueueItemsFromJellyfin', () => {
+	it('maps JellyfinTrackInfo array to QueueItem array', () => {
+		expect.assertions(5);
+		const tracks: JellyfinTrackInfo[] = [jellyfinTrack];
+		const items = buildQueueItemsFromJellyfin(tracks, baseMeta);
+		expect(items).toHaveLength(1);
+		expect(items[0].sourceType).toBe('jellyfin');
+		expect(items[0].trackName).toBe('JF Song');
+		expect(items[0].availableSources).toEqual(['jellyfin']);
+		expect(items[0].duration).toBe(180);
+	});
+
+	it('normalizes codec for stream URL', () => {
+		expect.assertions(1);
+		const track: JellyfinTrackInfo = { ...jellyfinTrack, codec: 'ALAC' };
+		const items = buildQueueItemsFromJellyfin([track], baseMeta);
+		expect(items[0].streamUrl).toContain('format=flac');
+	});
+
+	it('defaults to aac for unknown codecs', () => {
+		expect.assertions(1);
+		const track: JellyfinTrackInfo = { ...jellyfinTrack, codec: 'unknown_codec' };
+		const items = buildQueueItemsFromJellyfin([track], baseMeta);
+		expect(items[0].streamUrl).toContain('format=aac');
+	});
+
+	it('defaults to aac for null codec', () => {
+		expect.assertions(1);
+		const track: JellyfinTrackInfo = { ...jellyfinTrack, codec: null };
+		const items = buildQueueItemsFromJellyfin([track], baseMeta);
+		expect(items[0].streamUrl).toContain('format=aac');
+	});
+});
+
+describe('buildQueueItemsFromLocal', () => {
+	it('maps LocalTrackInfo array to QueueItem array', () => {
+		expect.assertions(5);
+		const items = buildQueueItemsFromLocal([localTrack], baseMeta);
+		expect(items).toHaveLength(1);
+		expect(items[0].sourceType).toBe('howler');
+		expect(items[0].trackName).toBe('Local Song');
+		expect(items[0].availableSources).toEqual(['howler']);
+		expect(items[0].streamUrl).toBe('/api/stream/local/42');
+	});
+
+	it('lowercases format', () => {
+		expect.assertions(1);
+		const items = buildQueueItemsFromLocal([localTrack], baseMeta);
+		expect(items[0].format).toBe('flac');
+	});
+
+	it('handles undefined duration_seconds', () => {
+		expect.assertions(1);
+		const track: LocalTrackInfo = { ...localTrack, duration_seconds: undefined };
+		const items = buildQueueItemsFromLocal([track], baseMeta);
+		expect(items[0].duration).toBeUndefined();
+	});
+
+	it('handles null duration_seconds', () => {
+		expect.assertions(1);
+		const track: LocalTrackInfo = { ...localTrack, duration_seconds: null };
+		const items = buildQueueItemsFromLocal([track], baseMeta);
+		expect(items[0].duration).toBeUndefined();
+	});
+});
+
+describe('playlistTrackToQueueItem', () => {
+	const basePlaylistTrack: PlaylistTrack = {
+		id: 'pt-1',
+		position: 0,
+		track_name: 'Test Track',
+		artist_name: 'Test Artist',
+		album_name: 'Test Album',
+		album_id: 'album-1',
+		artist_id: 'artist-1',
+		track_source_id: '42',
+		cover_url: '/cover.jpg',
+		source_type: 'howler',
+		available_sources: ['howler', 'jellyfin'],
+		format: 'flac',
+		track_number: 1,
+		duration: 240,
+		created_at: '2026-01-01T00:00:00Z'
+	};
+
+	it('maps local track to QueueItem with correct streamUrl', () => {
+		expect.assertions(4);
+		const item = playlistTrackToQueueItem(basePlaylistTrack)!;
+		expect(item).not.toBeNull();
+		expect(item.sourceType).toBe('howler');
+		expect(item.streamUrl).toBe('/api/stream/local/42');
+		expect(item.trackName).toBe('Test Track');
+	});
+
+	it('maps jellyfin track to QueueItem with correct streamUrl', () => {
+		expect.assertions(3);
+		const track: PlaylistTrack = { ...basePlaylistTrack, source_type: 'jellyfin', track_source_id: 'jf-123', format: 'opus' };
+		const item = playlistTrackToQueueItem(track)!;
+		expect(item.sourceType).toBe('jellyfin');
+		expect(item.streamUrl).toBe('/api/stream/jellyfin/jf-123?format=opus&bitrate=128000');
+		expect(item.format).toBe('opus');
+	});
+
+	it('maps youtube track with undefined streamUrl', () => {
+		expect.assertions(2);
+		const track: PlaylistTrack = { ...basePlaylistTrack, source_type: 'youtube', track_source_id: 'yt-abc' };
+		const item = playlistTrackToQueueItem(track)!;
+		expect(item.sourceType).toBe('youtube');
+		expect(item.streamUrl).toBeUndefined();
+	});
+
+	it('returns null for tracks with null track_source_id', () => {
+		expect.assertions(1);
+		const track: PlaylistTrack = { ...basePlaylistTrack, track_source_id: null };
+		expect(playlistTrackToQueueItem(track)).toBeNull();
+	});
+
+	it('defaults available_sources to [sourceType] when null', () => {
+		expect.assertions(1);
+		const track: PlaylistTrack = { ...basePlaylistTrack, available_sources: null };
+		const item = playlistTrackToQueueItem(track)!;
+		expect(item.availableSources).toEqual(['howler']);
+	});
+
+	it('maps all fields correctly', () => {
+		expect.assertions(8);
+		const item = playlistTrackToQueueItem(basePlaylistTrack)!;
+		expect(item.trackSourceId).toBe('42');
+		expect(item.artistName).toBe('Test Artist');
+		expect(item.trackNumber).toBe(1);
+		expect(item.albumId).toBe('album-1');
+		expect(item.albumName).toBe('Test Album');
+		expect(item.coverUrl).toBe('/cover.jpg');
+		expect(item.artistId).toBe('artist-1');
+		expect(item.availableSources).toEqual(['howler', 'jellyfin']);
+	});
+
+	it('handles null album_id by defaulting to empty string', () => {
+		expect.assertions(1);
+		const track: PlaylistTrack = { ...basePlaylistTrack, album_id: null };
+		const item = playlistTrackToQueueItem(track)!;
+		expect(item.albumId).toBe('');
+	});
+
+	it('falls back to position when track_number is null', () => {
+		expect.assertions(1);
+		const track: PlaylistTrack = { ...basePlaylistTrack, track_number: null, position: 5 };
+		const item = playlistTrackToQueueItem(track)!;
+		expect(item.trackNumber).toBe(5);
+	});
+
+	it('uses aac as default format for jellyfin when format is null', () => {
+		expect.assertions(1);
+		const track: PlaylistTrack = { ...basePlaylistTrack, source_type: 'jellyfin', track_source_id: 'jf-1', format: null };
+		const item = playlistTrackToQueueItem(track)!;
+		expect(item.streamUrl).toBe('/api/stream/jellyfin/jf-1?format=aac&bitrate=128000');
+	});
+});

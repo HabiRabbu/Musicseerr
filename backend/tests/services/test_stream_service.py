@@ -138,6 +138,7 @@ async def test_stream_handles_range_request(service):
         headers={
             "Content-Length": "512",
             "Content-Range": "bytes 0-511/1024",
+            "Accept-Ranges": "bytes",
         },
     )
     client.send = AsyncMock(return_value=mock_resp)

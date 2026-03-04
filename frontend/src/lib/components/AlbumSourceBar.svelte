@@ -1,6 +1,8 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
-	import { Shuffle , Play} from 'lucide-svelte';
+	import { Shuffle, Play, ListPlus, ListStart, ListMusic } from 'lucide-svelte';
+	import ContextMenu from '$lib/components/ContextMenu.svelte';
+	import type { MenuItem } from '$lib/components/ContextMenu.svelte';
 
 	interface Props {
 		sourceLabel: string;
@@ -10,6 +12,9 @@
 		extraBadge?: string | null;
 		onPlayAll: () => void;
 		onShuffle: () => void;
+		onAddAllToQueue?: () => void;
+		onPlayAllNext?: () => void;
+		onAddAllToPlaylist?: () => void;
 		icon: Snippet;
 	}
 
@@ -21,10 +26,28 @@
 		extraBadge = null,
 		onPlayAll,
 		onShuffle,
+		onAddAllToQueue,
+		onPlayAllNext,
+		onAddAllToPlaylist,
 		icon
 	}: Props = $props();
 
 	const hasAnyTracks = $derived(trackCount > 0);
+	const hasBulkActions = $derived(Boolean(onAddAllToQueue || onPlayAllNext || onAddAllToPlaylist));
+
+	const menuItems = $derived.by<MenuItem[]>(() => {
+		const items: MenuItem[] = [];
+		if (onAddAllToQueue) {
+			items.push({ label: 'Add All to Queue', icon: ListPlus, onclick: onAddAllToQueue });
+		}
+		if (onPlayAllNext) {
+			items.push({ label: 'Play All Next', icon: ListStart, onclick: onPlayAllNext });
+		}
+		if (onAddAllToPlaylist) {
+			items.push({ label: 'Add All to Playlist', icon: ListMusic, onclick: onAddAllToPlaylist });
+		}
+		return items;
+	});
 </script>
 
 <div class="bg-base-200/80 rounded-box p-4 shadow-md border border-base-content/5">
@@ -42,8 +65,8 @@
 			{/if}
 		</div>
 
-		<div class="flex gap-2 flex-wrap">
-			{#if hasAnyTracks}
+		{#if hasAnyTracks}
+			<div class="flex items-center gap-2 flex-wrap ml-auto">
 				<button class="btn btn-sm btn-accent gap-1.5 shadow-sm" onclick={onPlayAll}>
 					<Play class="h-4 w-4 fill-current" />
 					Play All
@@ -53,7 +76,13 @@
 					<Shuffle class="h-4 w-4" />
 					Shuffle
 				</button>
-			{/if}
-		</div>
+
+				{#if hasBulkActions}
+					<div class="ml-auto">
+						<ContextMenu items={menuItems} position="end" size="sm" />
+					</div>
+				{/if}
+			</div>
+		{/if}
 	</div>
 </div>

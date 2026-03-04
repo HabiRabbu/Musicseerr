@@ -2,7 +2,14 @@
 	import { onMount, onDestroy } from 'svelte';
 	import { API } from '$lib/constants';
 	import AlbumImage from '$lib/components/AlbumImage.svelte';
+	import ContextMenu from '$lib/components/ContextMenu.svelte';
+	import type { MenuItem } from '$lib/components/ContextMenu.svelte';
+	import AddToPlaylistModal from '$lib/components/AddToPlaylistModal.svelte';
 	import SourceAlbumModal from '$lib/components/SourceAlbumModal.svelte';
+	import { toastStore } from '$lib/stores/toast';
+	import { playerStore } from '$lib/stores/player.svelte';
+	import { buildQueueItemsFromJellyfin, type TrackMeta } from '$lib/player/queueHelpers';
+	import type { QueueItem } from '$lib/player/types';
 	import {
 		getJellyfinSidebarCachedData,
 		getJellyfinAlbumsListCachedData,
@@ -19,7 +26,7 @@
 		JellyfinLibraryStats,
 		JellyfinTrackInfo
 	} from '$lib/types';
-	import { Tv, ArrowDown, CircleX, Play } from 'lucide-svelte';
+	import { Tv, ArrowDown, CircleX, Play, ListPlus, ListStart, ListMusic } from 'lucide-svelte';
 
 	let albums = $state<JellyfinAlbumSummary[]>([]);
 	let recentAlbums = $state<JellyfinAlbumSummary[]>([]);
@@ -43,6 +50,8 @@
 
 	let detailModalOpen = $state(false);
 	let selectedAlbum = $state<JellyfinAlbumSummary | null>(null);
+	let menuLoadingAlbumId = $state<string | null>(null);
+	let playlistModalRef = $state<{ open: (tracks: QueueItem[]) => void } | null>(null);
 
 	const PAGE_SIZE = 48;
 
@@ -271,6 +280,99 @@
 		}
 	}
 
+	function getTrackMetaForAlbum(album: JellyfinAlbumSummary): TrackMeta {
+		return {
+			albumId: album.musicbrainz_id || album.jellyfin_id,
+			albumName: album.name,
+			artistName: album.artist_name,
+			coverUrl: album.image_url ?? null,
+			artistId: album.artist_musicbrainz_id ?? undefined
+		};
+	}
+
+	async function fetchAlbumQueueItems(album: JellyfinAlbumSummary): Promise<QueueItem[]> {
+		const res = await fetch(API.jellyfinLibrary.albumTracks(album.jellyfin_id));
+		if (!res.ok) {
+			throw new Error(`Failed to load tracks (${res.status})`);
+		}
+		const tracks: JellyfinTrackInfo[] = await res.json();
+		if (tracks.length === 0) return [];
+		const sortedTracks = [...tracks].sort((a, b) => a.track_number - b.track_number);
+		return buildQueueItemsFromJellyfin(sortedTracks, getTrackMetaForAlbum(album));
+	}
+
+	async function addAlbumToQueue(album: JellyfinAlbumSummary): Promise<void> {
+		menuLoadingAlbumId = album.jellyfin_id;
+		try {
+			const queueItems = await fetchAlbumQueueItems(album);
+			if (queueItems.length === 0) {
+				toastStore.show({ message: 'No tracks found for this album', type: 'info' });
+				return;
+			}
+			playerStore.addMultipleToQueue(queueItems);
+		} catch {
+			toastStore.show({ message: 'Failed to load album tracks', type: 'error' });
+		} finally {
+			menuLoadingAlbumId = null;
+		}
+	}
+
+	async function playAlbumNext(album: JellyfinAlbumSummary): Promise<void> {
+		menuLoadingAlbumId = album.jellyfin_id;
+		try {
+			const queueItems = await fetchAlbumQueueItems(album);
+			if (queueItems.length === 0) {
+				toastStore.show({ message: 'No tracks found for this album', type: 'info' });
+				return;
+			}
+			playerStore.playMultipleNext(queueItems);
+		} catch {
+			toastStore.show({ message: 'Failed to load album tracks', type: 'error' });
+		} finally {
+			menuLoadingAlbumId = null;
+		}
+	}
+
+	async function addAlbumToPlaylist(album: JellyfinAlbumSummary): Promise<void> {
+		menuLoadingAlbumId = album.jellyfin_id;
+		try {
+			const queueItems = await fetchAlbumQueueItems(album);
+			if (queueItems.length === 0) {
+				toastStore.show({ message: 'No tracks found for this album', type: 'info' });
+				return;
+			}
+			playlistModalRef?.open(queueItems);
+		} catch {
+			toastStore.show({ message: 'Failed to load album tracks', type: 'error' });
+		} finally {
+			menuLoadingAlbumId = null;
+		}
+	}
+
+	function getAlbumMenuItems(album: JellyfinAlbumSummary): MenuItem[] {
+		const loadingMenu = menuLoadingAlbumId === album.jellyfin_id;
+		return [
+			{
+				label: 'Add to Queue',
+				icon: ListPlus,
+				onclick: () => void addAlbumToQueue(album),
+				disabled: loadingMenu
+			},
+			{
+				label: 'Play Next',
+				icon: ListStart,
+				onclick: () => void playAlbumNext(album),
+				disabled: loadingMenu
+			},
+			{
+				label: 'Add to Playlist',
+				icon: ListMusic,
+				onclick: () => void addAlbumToPlaylist(album),
+				disabled: loadingMenu
+			}
+		];
+	}
+
 	onMount(() => {
 		fetchAlbums(true);
 		fetchSidebar();
@@ -440,11 +542,14 @@
 								<Tv class="h-3 w-3" />
 							</div>
 						</div>
-						{#if album.year}
-							<div class="absolute top-2 right-2">
+						<div class="absolute top-2 right-2 flex items-start gap-1">
+							{#if album.year}
 								<div class="badge badge-sm badge-ghost">{album.year}</div>
+							{/if}
+							<div>
+								<ContextMenu items={getAlbumMenuItems(album)} position="end" size="xs" />
 							</div>
-						{/if}
+						</div>
 						<div class="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
 							<button
 								class="btn btn-circle btn-sm btn-primary shadow-md"
@@ -492,6 +597,8 @@
 		{/if}
 	{/if}
 </div>
+
+<AddToPlaylistModal bind:this={playlistModalRef} />
 
 <SourceAlbumModal
 	bind:open={detailModalOpen}

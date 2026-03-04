@@ -13,7 +13,7 @@ export function launchLocalPlayback(
 	const normalizedCoverUrl = getCoverUrl(meta.coverUrl, meta.albumId);
 
 	const items: QueueItem[] = tracks.map((t) => ({
-		videoId: String(t.track_file_id),
+		trackSourceId: String(t.track_file_id),
 		trackName: t.title,
 		artistName: meta.artistName,
 		trackNumber: t.track_number,

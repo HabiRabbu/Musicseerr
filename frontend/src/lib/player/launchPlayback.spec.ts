@@ -50,7 +50,7 @@ describe('launchLocalPlayback', () => {
 		expect(items).toHaveLength(1);
 		expect(items[0]).toEqual(
 			expect.objectContaining({
-				videoId: '42',
+				trackSourceId: '42',
 				trackName: 'Song A',
 				sourceType: 'howler',
 				streamUrl: '/api/stream/local/42',
@@ -120,7 +120,7 @@ describe('launchJellyfinPlayback', () => {
 		expect(items).toHaveLength(1);
 		expect(items[0]).toEqual(
 			expect.objectContaining({
-				videoId: 'jf-abc',
+				trackSourceId: 'jf-abc',
 				trackName: 'Jelly Song',
 				sourceType: 'jellyfin',
 				format: 'flac'

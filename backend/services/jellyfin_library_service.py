@@ -89,6 +89,29 @@ class JellyfinLibraryService:
             bitrate=item.bitrate,
         )
 
+    @staticmethod
+    def _fix_missing_track_numbers(tracks: list[JellyfinTrackInfo]) -> list[JellyfinTrackInfo]:
+        """When all tracks share the same track_number (e.g. Jellyfin returns 0
+        for every track), assign 1-based indices so downstream Map lookups work."""
+        if len(tracks) <= 1:
+            return tracks
+        numbers = {t.track_number for t in tracks}
+        if len(numbers) > 1:
+            return tracks
+        fixed: list[JellyfinTrackInfo] = []
+        for i, t in enumerate(tracks, start=1):
+            fixed.append(JellyfinTrackInfo(
+                jellyfin_id=t.jellyfin_id,
+                title=t.title,
+                track_number=i,
+                duration_seconds=t.duration_seconds,
+                album_name=t.album_name,
+                artist_name=t.artist_name,
+                codec=t.codec,
+                bitrate=t.bitrate,
+            ))
+        return fixed
+
     async def get_albums(
         self,
         limit: int = 50,
@@ -108,7 +131,9 @@ class JellyfinLibraryService:
             return None
 
         tracks_items = await self._jellyfin.get_album_tracks(album_id)
-        tracks = [self._item_to_track_info(t) for t in tracks_items]
+        tracks = self._fix_missing_track_numbers(
+            [self._item_to_track_info(t) for t in tracks_items]
+        )
         pids = item.provider_ids or {}
         mbid = pids.get("MusicBrainzReleaseGroup") or pids.get("MusicBrainzAlbum")
         artist_mbid = pids.get("MusicBrainzAlbumArtist") or pids.get("MusicBrainzArtist")
@@ -132,7 +157,9 @@ class JellyfinLibraryService:
 
     async def get_album_tracks(self, album_id: str) -> list[JellyfinTrackInfo]:
         items = await self._jellyfin.get_album_tracks(album_id)
-        return [self._item_to_track_info(i) for i in items]
+        return self._fix_missing_track_numbers(
+            [self._item_to_track_info(i) for i in items]
+        )
 
     async def match_album_by_mbid(self, musicbrainz_id: str) -> JellyfinAlbumMatch:
         item = await self._jellyfin.get_album_by_mbid(musicbrainz_id)
@@ -140,7 +167,9 @@ class JellyfinLibraryService:
             return JellyfinAlbumMatch(found=False)
 
         tracks_items = await self._jellyfin.get_album_tracks(item.id)
-        tracks = [self._item_to_track_info(t) for t in tracks_items]
+        tracks = self._fix_missing_track_numbers(
+            [self._item_to_track_info(t) for t in tracks_items]
+        )
 
         return JellyfinAlbumMatch(
             found=True,

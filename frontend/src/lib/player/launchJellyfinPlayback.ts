@@ -28,7 +28,7 @@ export function launchJellyfinPlayback(
 	const items: QueueItem[] = tracks.map((t) => {
 		const format = normalizeCodec(t.codec);
 		return {
-			videoId: t.jellyfin_id,
+			trackSourceId: t.jellyfin_id,
 			trackName: t.title,
 			artistName: meta.artistName,
 			trackNumber: t.track_number,

@@ -1,6 +1,6 @@
 import logging
 from fastapi import Request, status
-from core.exceptions import ResourceNotFoundError, ExternalServiceError, ValidationError
+from core.exceptions import ResourceNotFoundError, ExternalServiceError, SourceResolutionError, ValidationError
 from infrastructure.msgspec_fastapi import MsgSpecJSONResponse
 from infrastructure.resilience.retry import CircuitOpenError
 
@@ -35,6 +35,14 @@ async def validation_error_handler(request: Request, exc: ValidationError) -> Ms
     logger.warning("Validation error: %s - %s %s", exc, request.method, request.url.path)
     return MsgSpecJSONResponse(
         status_code=status.HTTP_400_BAD_REQUEST,
+        content={"detail": str(exc)},
+    )
+
+
+async def source_resolution_error_handler(request: Request, exc: SourceResolutionError) -> MsgSpecJSONResponse:
+    logger.warning("Source resolution error: %s - %s %s", exc, request.method, request.url.path)
+    return MsgSpecJSONResponse(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         content={"detail": str(exc)},
     )
 

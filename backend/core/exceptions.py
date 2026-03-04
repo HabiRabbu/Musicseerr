@@ -36,6 +36,18 @@ class ValidationError(MusicseerrException):
     pass
 
 
+class PlaylistNotFoundError(ResourceNotFoundError):
+    pass
+
+
+class InvalidPlaylistDataError(ValidationError):
+    pass
+
+
+class SourceResolutionError(ValidationError):
+    pass
+
+
 class ConfigurationError(MusicseerrException):
     pass
 

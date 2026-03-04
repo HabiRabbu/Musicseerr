@@ -17,6 +17,7 @@ from repositories.wikidata_repository import WikidataRepository
 from repositories.coverart_repository import CoverArtRepository
 from repositories.listenbrainz_repository import ListenBrainzRepository
 from repositories.jellyfin_repository import JellyfinRepository
+from repositories.playlist_repository import PlaylistRepository
 from repositories.youtube import YouTubeRepository
 from repositories.lastfm_repository import LastFmRepository
 from services.preferences_service import PreferencesService
@@ -41,6 +42,7 @@ from services.stream_service import StreamService
 from services.jellyfin_playback_service import JellyfinPlaybackService
 from services.local_files_service import LocalFilesService
 from services.jellyfin_library_service import JellyfinLibraryService
+from services.playlist_service import PlaylistService
 from services.lastfm_auth_service import LastFmAuthService
 from services.scrobble_service import ScrobbleService
 from services.artist_enrichment_service import ArtistEnrichmentService
@@ -272,6 +274,23 @@ def get_requests_page_service() -> RequestsPageService:
         lidarr_repo=lidarr_repo,
         request_history=request_history,
         library_mbids_fn=lidarr_repo.get_library_mbids,
+    )
+
+
+@lru_cache(maxsize=1)
+def get_playlist_repository() -> PlaylistRepository:
+    settings = get_settings()
+    return PlaylistRepository(db_path=settings.library_db_path)
+
+
+@lru_cache(maxsize=1)
+def get_playlist_service() -> PlaylistService:
+    settings = get_settings()
+    playlist_repo = get_playlist_repository()
+    return PlaylistService(
+        repo=playlist_repo,
+        cache_dir=settings.cache_dir,
+        cache=get_cache(),
     )
 
 
@@ -558,6 +577,8 @@ JellyfinLibraryServiceDep = Annotated[JellyfinLibraryService, Depends(get_jellyf
 LastFmRepositoryDep = Annotated[LastFmRepository, Depends(get_lastfm_repository)]
 LastFmAuthServiceDep = Annotated[LastFmAuthService, Depends(get_lastfm_auth_service)]
 ScrobbleServiceDep = Annotated[ScrobbleService, Depends(get_scrobble_service)]
+PlaylistRepositoryDep = Annotated[PlaylistRepository, Depends(get_playlist_repository)]
+PlaylistServiceDep = Annotated[PlaylistService, Depends(get_playlist_service)]
 
 
 def clear_lastfm_dependent_caches() -> None:
@@ -603,6 +624,8 @@ async def cleanup_app_state() -> None:
     get_album_service.cache_clear()
     get_request_queue.cache_clear()
     get_request_service.cache_clear()
+    get_playlist_repository.cache_clear()
+    get_playlist_service.cache_clear()
     get_library_service.cache_clear()
     get_status_service.cache_clear()
     get_cache_service.cache_clear()

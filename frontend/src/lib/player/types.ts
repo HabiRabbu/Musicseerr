@@ -5,7 +5,13 @@ export type SourceType = 'youtube' | 'howler' | 'jellyfin';
 export interface PlaybackSource {
 	readonly type: SourceType;
 
-	load(info: { videoId?: string; url?: string; token?: string; format?: string }): Promise<void>;
+	load(info: {
+		trackSourceId?: string;
+		url?: string;
+		token?: string;
+		format?: string;
+		duration?: number;
+	}): Promise<void>;
 	play(): void;
 	pause(): void;
 	seekTo(seconds: number): void;
@@ -26,7 +32,7 @@ export interface NowPlaying {
 	artistName: string;
 	coverUrl: string | null;
 	sourceType: SourceType;
-	videoId?: string;
+	trackSourceId?: string;
 	embedUrl?: string;
 	trackName?: string;
 	artistId?: string;
@@ -43,8 +49,8 @@ export type PlaybackMeta = {
 };
 
 export interface QueueItem {
-	/** Source-specific item identifier (YouTube video ID / Jellyfin item ID / Lidarr track file ID) */
-	videoId: string;
+	/** Source-specific item identifier (Jellyfin item ID / local file ID / YouTube video ID) */
+	trackSourceId: string;
 	trackName: string;
 	artistName: string;
 	trackNumber: number;
@@ -55,4 +61,6 @@ export interface QueueItem {
 	artistId?: string;
 	streamUrl?: string;
 	format?: string;
+	availableSources?: SourceType[];
+	duration?: number;
 }

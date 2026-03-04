@@ -27,15 +27,18 @@ async def stream_jellyfin_audio(
     request: Request,
     codec: Literal["aac", "mp3", "opus", "flac", "vorbis", "alac", "wav", "wma"] = Query(default="aac", alias="format"),
     bitrate: int = Query(default=128000, ge=32000, le=320000),
+    start_seconds: float | None = Query(default=None),
     stream_service: StreamService = Depends(get_stream_service),
 ) -> StreamingResponse:
     try:
         range_header = request.headers.get("Range")
+        start_time_ticks = int(start_seconds * 10_000_000) if start_seconds is not None else None
         chunks, headers, status_code = await stream_service.stream_jellyfin_audio(
             item_id=item_id,
             audio_codec=codec,
             bitrate=bitrate,
             range_header=range_header,
+            start_time_ticks=start_time_ticks,
         )
         return StreamingResponse(
             content=chunks,
@@ -48,6 +51,34 @@ async def stream_jellyfin_audio(
     except ExternalServiceError as e:
         logger.error("Jellyfin stream error for %s: %s", item_id, e)
         raise HTTPException(status_code=502, detail="Failed to stream from Jellyfin")
+
+
+@router.head("/jellyfin/{item_id}")
+async def head_jellyfin_audio(
+    item_id: str,
+    codec: Literal["aac", "mp3", "opus", "flac", "vorbis", "alac", "wav", "wma"] = Query(default="aac", alias="format"),
+    bitrate: int = Query(default=128000, ge=32000, le=320000),
+) -> Response:
+    content_type = {
+        "aac": "audio/aac",
+        "mp3": "audio/mpeg",
+        "opus": "audio/opus",
+        "flac": "audio/flac",
+        "wav": "audio/wav",
+        "vorbis": "audio/ogg",
+        "alac": "audio/flac",
+        "wma": "audio/aac",
+    }.get(codec, "audio/aac")
+
+    return Response(
+        status_code=200,
+        headers={
+            "Accept-Ranges": "bytes",
+            "Content-Type": content_type,
+            "X-Stream-Bitrate": str(bitrate),
+            "X-Stream-Item": item_id,
+        },
+    )
 
 
 @router.post("/jellyfin/{item_id}/start", response_model=PlaybackSessionResponse)

@@ -3,11 +3,13 @@
 	import { scrobbleManager } from '$lib/stores/scrobble.svelte';
 	import YouTubePlayer from '$lib/components/YouTubePlayer.svelte';
 	import JellyfinIcon from '$lib/components/JellyfinIcon.svelte';
+	import QueueDrawer from '$lib/components/QueueDrawer.svelte';
 	import { getCoverUrl } from '$lib/utils/errorHandling';
-	import { X, Music, Shuffle, SkipBack, AlertCircle, Pause, Play, SkipForward, Volume2, ExternalLink, Check, CircleX } from 'lucide-svelte';
+	import { X, Music, Shuffle, SkipBack, AlertCircle, Pause, Play, SkipForward, Volume2, ExternalLink, Check, CircleX, ListMusic } from 'lucide-svelte';
 
 	let coverImgError = $state(false);
 	let lastCoverKey = '';
+	let queueDrawerOpen = $state(false);
 
 	function formatTime(seconds: number): string {
 		if (!seconds || isNaN(seconds)) return '0:00';
@@ -33,9 +35,9 @@
 	}
 
 	function openInYouTube(): void {
-		const videoId = playerStore.nowPlaying?.videoId;
-		if (videoId) {
-			window.open(`https://www.youtube.com/watch?v=${videoId}`, '_blank');
+		const trackSourceId = playerStore.nowPlaying?.trackSourceId;
+		if (trackSourceId) {
+			window.open(`https://www.youtube.com/watch?v=${trackSourceId}`, '_blank');
 		}
 	}
 
@@ -200,8 +202,23 @@
 				</div>
 			</div>
 
-			<!-- Right: Volume + YouTube + Open Link -->
+			<!-- Right: Queue + Volume + YouTube + Open Link -->
 			<div class="flex items-center gap-3 lg:gap-7 w-1/4 justify-end">
+				<!-- Queue Toggle -->
+				<div class="tooltip tooltip-left" data-tip="Queue">
+					<button
+						class="btn btn-ghost btn-sm btn-circle relative"
+						class:text-accent={queueDrawerOpen}
+						onclick={() => (queueDrawerOpen = !queueDrawerOpen)}
+						aria-label="Toggle queue"
+					>
+						<ListMusic class="h-4 w-4" />
+						{#if playerStore.upcomingQueueLength > 0}
+							<span class="badge badge-xs badge-accent absolute -top-1 -right-1">{playerStore.upcomingQueueLength}</span>
+						{/if}
+					</button>
+				</div>
+
 				<!-- Volume -->
 				<div class="hidden sm:flex items-center gap-1.5">
 					<Volume2 class="h-4 w-4 opacity-60 flex-shrink-0" />
@@ -257,4 +274,6 @@
 			</div>
 		</div>
 	</div>
+
+	<QueueDrawer bind:open={queueDrawerOpen} onclose={() => (queueDrawerOpen = false)} />
 {/if}

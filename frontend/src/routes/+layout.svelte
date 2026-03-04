@@ -20,7 +20,7 @@
 	import { fetchActiveRequestCount, type RequestCountChangedDetail } from '$lib/utils/requestsApi';
 	import { createNavigationProgressController } from '$lib/utils/navigationProgress';
 	import { fromStore } from 'svelte/store';
-	import { Settings, Search, House, Compass, Menu, Tv, Headphones, Download, PanelLeft, TriangleAlert, Info, X, UserRound } from 'lucide-svelte';
+	import { Settings, Search, House, Compass, Menu, Tv, Headphones, Download, PanelLeft, TriangleAlert, Info, X, UserRound, Check, ListMusic } from 'lucide-svelte';
 	import type { Snippet } from 'svelte';
 
 	let { children }: { children: Snippet } = $props();
@@ -31,6 +31,7 @@
 	let requestsPageActive = false;
 	let modalQuery = $state('');
 	let showNavigationProgress = $state(false);
+	let currentPath = $state('/');
 
 	const NAV_PROGRESS_DELAY_MS = 120;
 	const NAV_PROGRESS_MIN_VISIBLE_MS = 220;
@@ -48,6 +49,9 @@
 	});
 
 	afterNavigate(() => {
+		if (browser) {
+			currentPath = window.location.pathname;
+		}
 		navigationProgress.finish();
 	});
 
@@ -87,6 +91,9 @@
 	}
 
 	onMount(() => {
+		if (browser) {
+			currentPath = window.location.pathname;
+		}
 		initCacheTTLs();
 		libraryStore.initialize();
 		void integrationStore.ensureLoaded();
@@ -144,13 +151,13 @@
 
 		try {
 			if (session.nowPlaying.sourceType === 'youtube') {
-				if (!session.nowPlaying.videoId) return;
+				if (!session.nowPlaying.trackSourceId) return;
 				await launchYouTubePlayback({
 					albumId: session.nowPlaying.albumId,
 					albumName: session.nowPlaying.albumName,
 					artistName: session.nowPlaying.artistName,
 					coverUrl: session.nowPlaying.coverUrl,
-					videoId: session.nowPlaying.videoId,
+					videoId: session.nowPlaying.trackSourceId,
 					embedUrl: session.nowPlaying.embedUrl
 				});
 			} else {
@@ -183,6 +190,10 @@
 		(document.getElementById('search_modal') as HTMLDialogElement)?.close();
 		const routeId = result.type === 'artist' ? '/artist/[id]' : '/album/[id]';
 		goto(resolve(routeId, { id: result.musicbrainz_id }));
+	}
+
+	function isNavActive(path: string): boolean {
+		return currentPath === path || currentPath.startsWith(`${path}/`);
 	}
 
 	const integrations = fromStore(integrationStore);
@@ -286,6 +297,19 @@
 							</a>
 						</li>
 					{/if}
+
+					<li>
+						<a
+							href="/playlists"
+							class="is-drawer-close:tooltip is-drawer-close:tooltip-right"
+							class:menu-active={isNavActive('/playlists')}
+							aria-current={isNavActive('/playlists') ? 'page' : undefined}
+							data-tip="Playlists"
+						>
+							<ListMusic class="h-6 w-6" />
+							<span class="is-drawer-close:hidden">Playlists</span>
+						</a>
+					</li>
 
 					{#if integrations.current.youtube || integrations.current.jellyfin || integrations.current.localfiles}
 						<div class="divider my-0"></div>

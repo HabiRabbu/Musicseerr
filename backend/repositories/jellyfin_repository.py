@@ -604,7 +604,8 @@ class JellyfinRepository:
         return stats
 
     def get_stream_url(
-        self, item_id: str, audio_codec: str = "aac", bitrate: int = 128000
+        self, item_id: str, audio_codec: str = "aac", bitrate: int = 128000,
+        start_time_ticks: int | None = None,
     ) -> str:
         container = audio_codec if audio_codec != "vorbis" else "ogg"
         parts = [
@@ -618,6 +619,8 @@ class JellyfinRepository:
         ]
         if self._user_id:
             parts.append(f"&userId={self._user_id}")
+        if start_time_ticks is not None:
+            parts.append(f"&StartTimeTicks={start_time_ticks}")
         return "".join(parts)
 
     async def get_playback_info(self, item_id: str) -> dict[str, Any]:

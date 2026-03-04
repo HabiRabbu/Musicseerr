@@ -43,10 +43,11 @@ export abstract class HowlerPlaybackBase implements PlaybackSource {
 	private isPlaying = false;
 
 	protected onBeforeLoad(_info: {
-		videoId?: string;
+		trackSourceId?: string;
 		url?: string;
 		token?: string;
 		format?: string;
+		duration?: number;
 	}): Promise<void> | void {}
 
 	protected onAfterLoad(): void {}
@@ -54,14 +55,17 @@ export abstract class HowlerPlaybackBase implements PlaybackSource {
 	protected onDestroy(): void {}
 
 	async load(info: {
-		videoId?: string;
+		trackSourceId?: string;
 		url?: string;
 		token?: string;
 		format?: string;
+		duration?: number;
 	}): Promise<void> {
 		if (!info.url) throw new Error('url is required for Howler-based playback source');
 
-		this.stateCallbacks.forEach((cb) => cb('loading'));
+		this.resetForReload();
+
+		this.emitStateChange('loading');
 
 		await this.onBeforeLoad(info);
 		if (this.destroyed) return;
@@ -131,31 +135,31 @@ export abstract class HowlerPlaybackBase implements PlaybackSource {
 					code: 'PLAY_ERROR',
 					message: typeof error === 'string' ? error : 'Failed to play audio'
 				};
-				this.errorCallbacks.forEach((cb) => cb(err));
+				this.emitError(err);
 			});
 
 			this.howl.on('play', () => {
 				if (this.destroyed) return;
 				this.isPlaying = true;
-				this.stateCallbacks.forEach((cb) => cb('playing'));
+				this.emitStateChange('playing');
 			});
 
 			this.howl.on('pause', () => {
 				if (this.destroyed) return;
 				this.isPlaying = false;
-				this.stateCallbacks.forEach((cb) => cb('paused'));
+				this.emitStateChange('paused');
 			});
 
 			this.howl.on('end', () => {
 				if (this.destroyed) return;
 				this.isPlaying = false;
-				this.stateCallbacks.forEach((cb) => cb('ended'));
+				this.emitStateChange('ended');
 			});
 
 			this.howl.on('seek', () => {
 				if (this.destroyed) return;
 				const state = this.isPlaying ? 'playing' : 'paused';
-				this.stateCallbacks.forEach((cb) => cb(state));
+				this.emitStateChange(state);
 			});
 
 			this.attachNativeAudioListeners();
@@ -192,6 +196,14 @@ export abstract class HowlerPlaybackBase implements PlaybackSource {
 	destroy(): void {
 		this.destroyed = true;
 		this.onDestroy();
+		this.resetForReload();
+		this.stateCallbacks = [];
+		this.readyCallbacks = [];
+		this.errorCallbacks = [];
+		this.progressCallbacks = [];
+	}
+
+	protected resetForReload(): void {
 		this.stopProgressPolling();
 		this.removeNativeAudioListeners();
 		if (this.loadTimeoutHandle) {
@@ -202,14 +214,11 @@ export abstract class HowlerPlaybackBase implements PlaybackSource {
 			clearTimeout(this.stallTimeoutHandle);
 			this.stallTimeoutHandle = null;
 		}
+		this.isPlaying = false;
 		if (this.howl) {
 			this.howl.unload();
 			this.howl = null;
 		}
-		this.stateCallbacks = [];
-		this.readyCallbacks = [];
-		this.errorCallbacks = [];
-		this.progressCallbacks = [];
 	}
 
 	onStateChange(callback: (state: PlaybackState) => void): void {
@@ -228,7 +237,7 @@ export abstract class HowlerPlaybackBase implements PlaybackSource {
 		this.progressCallbacks.push(callback);
 	}
 
-	private getAudioNode(): HTMLAudioElement | null {
+	protected getAudioNode(): HTMLAudioElement | null {
 		try {
 			const sounds = (this.howl as unknown as { _sounds: { _node: HTMLAudioElement }[] })
 				?._sounds;
@@ -245,12 +254,12 @@ export abstract class HowlerPlaybackBase implements PlaybackSource {
 		const onStallStart = () => {
 			if (this.destroyed || !this.isPlaying) return;
 			if (this.stallTimeoutHandle) return;
-			this.stateCallbacks.forEach((cb) => cb('loading'));
+			this.emitStateChange('loading');
 			this.stallTimeoutHandle = setTimeout(() => {
 				this.stallTimeoutHandle = null;
 				if (this.destroyed) return;
 				const err = { code: 'NETWORK_STALL', message: 'Audio stream stalled — network issue' };
-				this.errorCallbacks.forEach((cb) => cb(err));
+				this.emitError(err);
 			}, STALL_TIMEOUT_MS);
 		};
 
@@ -260,7 +269,7 @@ export abstract class HowlerPlaybackBase implements PlaybackSource {
 				this.stallTimeoutHandle = null;
 			}
 			if (!this.destroyed && this.isPlaying) {
-				this.stateCallbacks.forEach((cb) => cb('playing'));
+				this.emitStateChange('playing');
 			}
 		};
 
@@ -269,7 +278,7 @@ export abstract class HowlerPlaybackBase implements PlaybackSource {
 			const mediaErr = node.error;
 			const msg = MEDIA_ERROR_MESSAGES[mediaErr?.code ?? 0] ?? 'Unknown playback error';
 			const err = { code: `MEDIA_ERROR_${mediaErr?.code ?? 0}`, message: msg };
-			this.errorCallbacks.forEach((cb) => cb(err));
+			this.emitError(err);
 		};
 
 		node.addEventListener('waiting', onStallStart);
@@ -306,10 +315,18 @@ export abstract class HowlerPlaybackBase implements PlaybackSource {
 		}, 500);
 	}
 
-	private stopProgressPolling(): void {
+	protected stopProgressPolling(): void {
 		if (this.progressInterval) {
 			clearInterval(this.progressInterval);
 			this.progressInterval = null;
 		}
+	}
+
+	protected emitStateChange(state: PlaybackState): void {
+		this.stateCallbacks.forEach((cb) => cb(state));
+	}
+
+	protected emitError(error: { code: string; message: string }): void {
+		this.errorCallbacks.forEach((cb) => cb(error));
 	}
 }

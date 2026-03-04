@@ -1,0 +1,384 @@
+<script lang="ts">
+	import { tick } from 'svelte';
+	import { fly, fade } from 'svelte/transition';
+	import { playerStore } from '$lib/stores/player.svelte';
+	import { playbackToast } from '$lib/stores/playbackToast.svelte';
+	import { getCoverUrl } from '$lib/utils/errorHandling';
+	import { X, GripVertical, ListMusic, Music, Trash2 } from 'lucide-svelte';
+	import JellyfinIcon from '$lib/components/JellyfinIcon.svelte';
+	import LocalFilesIcon from '$lib/components/LocalFilesIcon.svelte';
+	import type { SourceType } from '$lib/player/types';
+
+	interface Props {
+		open: boolean;
+		onclose: () => void;
+	}
+
+	let { open = $bindable(), onclose }: Props = $props();
+
+	let dragOverIndex = $state<number | null>(null);
+	let dragSourceIndex = $state<number | null>(null);
+	let currentTrackEl: HTMLElement | null = null;
+
+	function trackCurrentEl(node: HTMLElement, isCurrent: boolean) {
+		if (isCurrent) currentTrackEl = node;
+		return {
+			update(isCurrent: boolean) {
+				if (isCurrent) currentTrackEl = node;
+			},
+			destroy() {
+				if (currentTrackEl === node) currentTrackEl = null;
+			}
+		};
+	}
+
+	function handleClose() {
+		open = false;
+		onclose();
+	}
+
+	function handleKeydown(e: KeyboardEvent) {
+		if (!open) return;
+		if (e.key === 'Escape') handleClose();
+	}
+
+	function jumpToTrack(index: number) {
+		playerStore.jumpToTrack(index);
+	}
+
+	function removeTrack(index: number, e: Event) {
+		e.stopPropagation();
+		const trackName = queue[index]?.trackName ?? 'Track';
+		playerStore.removeFromQueue(index);
+		playbackToast.show(`Removed "${trackName}" from queue`, 'info');
+	}
+
+	function handleClearQueue() {
+		playerStore.clearQueue();
+		playbackToast.show('Upcoming queue cleared', 'info');
+		handleClose();
+	}
+
+	function handleDragStart(e: DragEvent, displayPos: number) {
+		if (displayPos <= currentDisplayPosition) {
+			e.preventDefault();
+			return;
+		}
+		dragSourceIndex = displayPos;
+		if (e.dataTransfer) {
+			e.dataTransfer.effectAllowed = 'move';
+			e.dataTransfer.setData('text/plain', String(displayPos));
+		}
+	}
+
+	function handleDragOver(e: DragEvent, displayPos: number) {
+		if (displayPos <= currentDisplayPosition || dragSourceIndex === null || dragSourceIndex <= currentDisplayPosition) {
+			return;
+		}
+		e.preventDefault();
+		if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+		dragOverIndex = displayPos;
+	}
+
+	function handleDragLeave() {
+		dragOverIndex = null;
+	}
+
+	function handleDrop(e: DragEvent, toDisplayPos: number) {
+		e.preventDefault();
+		const fromDisplayPos = dragSourceIndex;
+		dragOverIndex = null;
+		dragSourceIndex = null;
+		if (toDisplayPos <= currentDisplayPosition || fromDisplayPos === null || fromDisplayPos <= currentDisplayPosition) {
+			return;
+		}
+		if (fromDisplayPos !== null && fromDisplayPos !== toDisplayPos) {
+			if (playerStore.shuffleEnabled) {
+				playerStore.reorderShuffleOrder(fromDisplayPos, toDisplayPos);
+			} else {
+				playerStore.reorderQueue(displayOrder[fromDisplayPos], displayOrder[toDisplayPos]);
+			}
+		}
+	}
+
+	function handleDragEnd() {
+		dragOverIndex = null;
+		dragSourceIndex = null;
+	}
+
+	function handleItemKeydown(e: KeyboardEvent, displayPosition: number) {
+		if (displayPosition <= currentDisplayPosition) return;
+		let newPos: number | null = null;
+		if (e.key === 'ArrowUp' && displayPosition > currentDisplayPosition + 1) {
+			e.preventDefault();
+			e.stopPropagation();
+			newPos = displayPosition - 1;
+		} else if (e.key === 'ArrowDown' && displayPosition < displayOrder.length - 1) {
+			e.preventDefault();
+			e.stopPropagation();
+			newPos = displayPosition + 1;
+		}
+		if (newPos === null) return;
+		if (playerStore.shuffleEnabled) {
+			playerStore.reorderShuffleOrder(displayPosition, newPos);
+		} else {
+			playerStore.reorderQueue(displayOrder[displayPosition], displayOrder[newPos]);
+		}
+		tick().then(() => {
+			const handles = document.querySelectorAll<HTMLElement>('[aria-label="Drag to reorder"]');
+			handles[newPos!]?.focus();
+		});
+		playbackToast.show(`Track moved to position ${newPos + 1}`, 'info');
+	}
+
+	function handleSourceChange(queueIndex: number, newSource: SourceType) {
+		playerStore.changeTrackSource(queueIndex, newSource);
+		playbackToast.show(`Source changed to ${newSource === 'howler' ? 'Local' : newSource === 'jellyfin' ? 'Jellyfin' : 'YouTube'}`, 'info');
+	}
+
+	function formatDuration(seconds?: number): string {
+		if (!seconds || isNaN(seconds)) return '';
+		const m = Math.floor(seconds / 60);
+		const s = Math.floor(seconds % 60);
+		return `${m}:${s.toString().padStart(2, '0')}`;
+	}
+
+	function scrollToCurrentTrack() {
+		if (currentTrackEl) {
+			currentTrackEl.scrollIntoView({ block: 'center', behavior: 'smooth' });
+		}
+	}
+
+	$effect(() => {
+		if (open) {
+			document.body.classList.add('overflow-hidden');
+			queueMicrotask(scrollToCurrentTrack);
+		} else {
+			document.body.classList.remove('overflow-hidden');
+		}
+		return () => {
+			document.body.classList.remove('overflow-hidden');
+		};
+	});
+
+	const queue = $derived(playerStore.queue);
+	const currentIndex = $derived(playerStore.currentIndex);
+	const upcomingCount = $derived(playerStore.upcomingQueueLength);
+	const displayOrder = $derived(playerStore.shuffleEnabled ? playerStore.shuffleOrder : queue.map((_, i) => i));
+	const currentDisplayPosition = $derived.by(() => {
+		if (playerStore.shuffleEnabled) {
+			const pos = playerStore.shuffleOrder.indexOf(currentIndex);
+			return pos >= 0 ? pos : currentIndex;
+		}
+		return currentIndex;
+	});
+</script>
+
+<svelte:window onkeydown={handleKeydown} />
+
+{#if open}
+	<!-- Backdrop -->
+	<button
+		class="fixed inset-0 z-[60] bg-black/40 backdrop-blur-sm"
+		onclick={handleClose}
+		aria-label="Close queue"
+		transition:fade={{ duration: 200 }}
+	></button>
+
+	<!-- Drawer -->
+	<div
+		class="fixed right-0 top-0 bottom-0 z-[61] w-full max-w-md bg-base-200 shadow-2xl flex flex-col"
+		transition:fly={{ x: 400, duration: 200 }}
+	>
+		<!-- Header -->
+		<div class="flex items-center justify-between p-4 border-b border-base-content/10">
+			<div class="flex items-center gap-2">
+				<ListMusic class="h-5 w-5" />
+				<h2 class="text-lg font-bold">Queue</h2>
+				{#if queue.length > 0}
+					<span class="badge badge-sm badge-neutral">{upcomingCount}</span>
+				{/if}
+			</div>
+			<div class="flex items-center gap-1">
+				{#if queue.length > 0}
+					<button
+						class="btn btn-ghost btn-sm gap-1 text-error"
+						onclick={handleClearQueue}
+					>
+						<Trash2 class="h-3.5 w-3.5" />
+						Clear
+					</button>
+				{/if}
+				<button
+					class="btn btn-ghost btn-sm btn-circle"
+					onclick={handleClose}
+					aria-label="Close queue"
+				>
+					<X class="h-4 w-4" />
+				</button>
+			</div>
+		</div>
+
+		<!-- Queue List -->
+		<div class="flex-1 overflow-y-auto">
+			{#if queue.length === 0}
+				<div class="flex flex-col items-center justify-center h-full gap-3 p-8">
+					<ListMusic class="h-12 w-12 opacity-20" />
+					<p class="text-sm opacity-50">Queue is empty</p>
+					<p class="text-xs opacity-30 text-center">
+						Add tracks from album pages or your library
+					</p>
+				</div>
+			{:else}
+				<div class="flex flex-col" role="group" aria-label="Queue tracks">
+					{#each displayOrder as queueIndex, displayPosition (queueIndex)}
+						{@const item = queue[queueIndex]}
+						{@const isCurrent = queueIndex === currentIndex}
+						{@const isReorderable = displayPosition > currentDisplayPosition}
+						{@const coverUrl = getCoverUrl(item.coverUrl, item.albumId)}
+						{@const multipleSources = (item.availableSources?.length ?? 0) > 1}
+						<div
+							use:trackCurrentEl={isCurrent}
+							class="flex items-center gap-2 px-3 py-2 transition-colors cursor-pointer group/item
+								{isCurrent ? 'bg-accent/10 border-l-2 border-accent' : 'hover:bg-base-300/50 border-l-2 border-transparent'}
+								{dragOverIndex === displayPosition ? 'border-t-2 border-t-accent' : ''}"
+							draggable={isReorderable}
+							ondragstart={(e) => handleDragStart(e, displayPosition)}
+							ondragover={(e) => handleDragOver(e, displayPosition)}
+							ondragleave={handleDragLeave}
+							ondrop={(e) => handleDrop(e, displayPosition)}
+							ondragend={handleDragEnd}
+							onclick={() => jumpToTrack(queueIndex)}
+							onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); jumpToTrack(queueIndex); } }}
+							role="button"
+							tabindex="0"
+						>
+							<!-- Drag Handle -->
+							<button
+								class="flex-shrink-0 opacity-0 group-hover/item:opacity-40 focus:opacity-60 cursor-grab active:cursor-grabbing transition-opacity bg-transparent border-none p-0 disabled:opacity-20 disabled:cursor-not-allowed"
+								aria-label="Drag to reorder"
+								onkeydown={(e) => handleItemKeydown(e, displayPosition)}
+								onclick={(e) => e.stopPropagation()}
+								disabled={!isReorderable}
+								tabindex="0"
+							>
+								<GripVertical class="h-4 w-4" />
+							</button>
+
+							<!-- Cover Art -->
+							<div class="flex-shrink-0 w-10 h-10 rounded overflow-hidden">
+								{#if coverUrl}
+									<img
+										src={coverUrl}
+										alt={item.albumName}
+										class="w-full h-full object-cover"
+									/>
+								{:else}
+									<div class="w-full h-full bg-base-300 flex items-center justify-center">
+										<Music class="h-4 w-4 opacity-30" />
+									</div>
+								{/if}
+							</div>
+
+							<!-- Track Info -->
+							<div class="flex-1 min-w-0">
+								<p class="text-sm font-medium truncate {isCurrent ? 'text-accent' : ''}">
+									{item.trackName || item.albumName}
+								</p>
+								<p class="text-xs opacity-60 truncate">{item.artistName}</p>
+							</div>
+
+							<!-- Duration -->
+							{#if item.duration}
+								<span class="text-xs opacity-40 flex-shrink-0">{formatDuration(item.duration)}</span>
+							{/if}
+
+							<!-- Source Badge / Dropdown -->
+							<div class="flex-shrink-0">
+								{#if multipleSources && !isCurrent}
+									<select
+										class="select select-xs w-20 bg-base-300/60 text-xs"
+										value={item.sourceType}
+										onchange={(e) => { handleSourceChange(queueIndex, e.currentTarget.value as SourceType); }}
+										onclick={(e) => e.stopPropagation()}
+									>
+										{#each item.availableSources ?? [] as src}
+											<option value={src}>
+												{src === 'howler' ? 'Local' : src === 'jellyfin' ? 'Jellyfin' : 'YouTube'}
+											</option>
+										{/each}
+									</select>
+								{:else if item.sourceType === 'jellyfin'}
+									<div class="tooltip tooltip-left" data-tip="Jellyfin">
+										<span style="color: rgb(var(--brand-jellyfin));">
+											<JellyfinIcon class="h-3.5 w-3.5" />
+										</span>
+									</div>
+								{:else if item.sourceType === 'howler'}
+									<div class="tooltip tooltip-left" data-tip="Local">
+										<span style="color: rgb(var(--brand-localfiles));">
+											<LocalFilesIcon class="h-3.5 w-3.5" />
+										</span>
+									</div>
+								{:else if item.sourceType === 'youtube'}
+									<span class="badge badge-xs badge-ghost">YT</span>
+								{/if}
+							</div>
+
+							<!-- Playing Indicator / Remove Button -->
+							<div class="flex-shrink-0 w-6">
+								{#if isCurrent && playerStore.isPlaying}
+									<div class="flex items-end gap-0.5 h-4 justify-center" aria-label="Now playing">
+										<span class="w-0.5 bg-accent animate-equalizer-1 rounded-full"></span>
+										<span class="w-0.5 bg-accent animate-equalizer-2 rounded-full"></span>
+										<span class="w-0.5 bg-accent animate-equalizer-3 rounded-full"></span>
+									</div>
+								{:else}
+									<button
+										class="btn btn-ghost btn-xs btn-circle opacity-0 group-hover/item:opacity-60 transition-opacity"
+										onclick={(e) => removeTrack(queueIndex, e)}
+										aria-label="Remove from queue"
+									>
+										<X class="h-3.5 w-3.5" />
+									</button>
+								{/if}
+							</div>
+						</div>
+					{/each}
+				</div>
+			{/if}
+		</div>
+
+		<!-- Footer -->
+		{#if queue.length > 0}
+			<div class="p-3 border-t border-base-content/10 text-xs opacity-50 text-center">
+				{upcomingCount} track{upcomingCount === 1 ? '' : 's'} upcoming
+			</div>
+		{/if}
+	</div>
+{/if}
+
+<style>
+	@keyframes equalizer-1 {
+		0%, 100% { height: 4px; }
+		50% { height: 14px; }
+	}
+	@keyframes equalizer-2 {
+		0%, 100% { height: 10px; }
+		50% { height: 4px; }
+	}
+	@keyframes equalizer-3 {
+		0%, 100% { height: 6px; }
+		50% { height: 16px; }
+	}
+
+	.animate-equalizer-1 {
+		animation: equalizer-1 0.8s ease-in-out infinite;
+	}
+	.animate-equalizer-2 {
+		animation: equalizer-2 0.6s ease-in-out infinite;
+	}
+	.animate-equalizer-3 {
+		animation: equalizer-3 0.7s ease-in-out infinite;
+	}
+</style>

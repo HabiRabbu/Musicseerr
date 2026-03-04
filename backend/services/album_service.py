@@ -73,9 +73,12 @@ class AlbumService:
         if now - last < _REVALIDATION_COOLDOWN:
             return album_info
 
-        library_mbids = await self._lidarr_repo.get_library_mbids(include_release_ids=True)
+        lidarr_album = await self._lidarr_repo.get_album_details(release_group_id)
+        if lidarr_album is None:
+            return album_info
+
         self._revalidation_timestamps[release_group_id] = time.monotonic()
-        current_in_library = release_group_id.lower() in library_mbids
+        current_in_library = self._check_lidarr_in_library(lidarr_album)
         if current_in_library != album_info.in_library:
             logger.info(
                 f"Library status changed for album {release_group_id[:8]}...: "
@@ -162,8 +165,9 @@ class AlbumService:
                 return AlbumBasicInfo(**lidarr_to_basic_info(lidarr_album, release_group_id, in_library))
             logger.info(f"[BASIC] Using MusicBrainz for album {release_group_id[:8]}")
             release_group = await self._fetch_release_group(release_group_id)
-            cached_album = await self._library_cache.get_album_by_mbid(release_group_id)
-            in_library = cached_album is not None
+            if lidarr_album is None:
+                cached_album = await self._library_cache.get_album_by_mbid(release_group_id)
+                in_library = cached_album is not None
             return AlbumBasicInfo(**mb_to_basic_info(release_group, release_group_id, in_library, is_requested))
         
         except ValueError:

@@ -2,7 +2,14 @@
 	import { onMount, onDestroy } from 'svelte';
 	import { API } from '$lib/constants';
 	import AlbumImage from '$lib/components/AlbumImage.svelte';
+	import ContextMenu from '$lib/components/ContextMenu.svelte';
+	import type { MenuItem } from '$lib/components/ContextMenu.svelte';
+	import AddToPlaylistModal from '$lib/components/AddToPlaylistModal.svelte';
 	import SourceAlbumModal from '$lib/components/SourceAlbumModal.svelte';
+	import { toastStore } from '$lib/stores/toast';
+	import { playerStore } from '$lib/stores/player.svelte';
+	import { buildQueueItemsFromLocal, type TrackMeta } from '$lib/player/queueHelpers';
+	import type { QueueItem } from '$lib/player/types';
 	import {
 		getLocalFilesSidebarCachedData,
 		getLocalFilesAlbumsListCachedData,
@@ -19,7 +26,7 @@
 		LocalStorageStats,
 		LocalTrackInfo
 	} from '$lib/types';
-	import { Headphones, ArrowDown, CircleX, Play } from 'lucide-svelte';
+	import { Headphones, ArrowDown, CircleX, Play, ListPlus, ListStart, ListMusic } from 'lucide-svelte';
 
 	let albums = $state<LocalAlbumSummary[]>([]);
 	let recentAlbums = $state<LocalAlbumSummary[]>([]);
@@ -40,6 +47,8 @@
 
 	let detailModalOpen = $state(false);
 	let selectedAlbum = $state<LocalAlbumSummary | null>(null);
+	let menuLoadingAlbumId = $state<number | null>(null);
+	let playlistModalRef = $state<{ open: (tracks: QueueItem[]) => void } | null>(null);
 
 	const PAGE_SIZE = 48;
 
@@ -236,6 +245,99 @@
 		}
 	}
 
+	function getTrackMetaForAlbum(album: LocalAlbumSummary): TrackMeta {
+		return {
+			albumId: album.musicbrainz_id || String(album.lidarr_album_id),
+			albumName: album.name,
+			artistName: album.artist_name,
+			coverUrl: album.cover_url ?? null,
+			artistId: album.artist_mbid ?? undefined
+		};
+	}
+
+	async function fetchAlbumQueueItems(album: LocalAlbumSummary): Promise<QueueItem[]> {
+		const res = await fetch(API.local.albumTracks(album.lidarr_album_id));
+		if (!res.ok) {
+			throw new Error(`Failed to load tracks (${res.status})`);
+		}
+		const tracks: LocalTrackInfo[] = await res.json();
+		if (tracks.length === 0) return [];
+		const sortedTracks = [...tracks].sort((a, b) => a.track_number - b.track_number);
+		return buildQueueItemsFromLocal(sortedTracks, getTrackMetaForAlbum(album));
+	}
+
+	async function addAlbumToQueue(album: LocalAlbumSummary): Promise<void> {
+		menuLoadingAlbumId = album.lidarr_album_id;
+		try {
+			const queueItems = await fetchAlbumQueueItems(album);
+			if (queueItems.length === 0) {
+				toastStore.show({ message: 'No tracks found for this album', type: 'info' });
+				return;
+			}
+			playerStore.addMultipleToQueue(queueItems);
+		} catch {
+			toastStore.show({ message: 'Failed to load album tracks', type: 'error' });
+		} finally {
+			menuLoadingAlbumId = null;
+		}
+	}
+
+	async function playAlbumNext(album: LocalAlbumSummary): Promise<void> {
+		menuLoadingAlbumId = album.lidarr_album_id;
+		try {
+			const queueItems = await fetchAlbumQueueItems(album);
+			if (queueItems.length === 0) {
+				toastStore.show({ message: 'No tracks found for this album', type: 'info' });
+				return;
+			}
+			playerStore.playMultipleNext(queueItems);
+		} catch {
+			toastStore.show({ message: 'Failed to load album tracks', type: 'error' });
+		} finally {
+			menuLoadingAlbumId = null;
+		}
+	}
+
+	async function addAlbumToPlaylist(album: LocalAlbumSummary): Promise<void> {
+		menuLoadingAlbumId = album.lidarr_album_id;
+		try {
+			const queueItems = await fetchAlbumQueueItems(album);
+			if (queueItems.length === 0) {
+				toastStore.show({ message: 'No tracks found for this album', type: 'info' });
+				return;
+			}
+			playlistModalRef?.open(queueItems);
+		} catch {
+			toastStore.show({ message: 'Failed to load album tracks', type: 'error' });
+		} finally {
+			menuLoadingAlbumId = null;
+		}
+	}
+
+	function getAlbumMenuItems(album: LocalAlbumSummary): MenuItem[] {
+		const loadingMenu = menuLoadingAlbumId === album.lidarr_album_id;
+		return [
+			{
+				label: 'Add to Queue',
+				icon: ListPlus,
+				onclick: () => void addAlbumToQueue(album),
+				disabled: loadingMenu
+			},
+			{
+				label: 'Play Next',
+				icon: ListStart,
+				onclick: () => void playAlbumNext(album),
+				disabled: loadingMenu
+			},
+			{
+				label: 'Add to Playlist',
+				icon: ListMusic,
+				onclick: () => void addAlbumToPlaylist(album),
+				disabled: loadingMenu
+			}
+		];
+	}
+
 	onMount(() => {
 		fetchAlbums(true);
 		fetchSidebar();
@@ -406,11 +508,14 @@
 								<Headphones class="h-3 w-3" />
 							</div>
 						</div>
-						{#if album.primary_format}
-							<div class="absolute top-2 right-2">
+						<div class="absolute top-2 right-2 flex items-start gap-1">
+							{#if album.primary_format}
 								<div class="badge badge-sm badge-ghost">{album.primary_format}</div>
+							{/if}
+							<div>
+								<ContextMenu items={getAlbumMenuItems(album)} position="end" size="xs" />
 							</div>
-						{/if}
+						</div>
 						{#if album.year}
 							<div class="absolute bottom-2 left-2">
 								<div class="badge badge-sm badge-ghost">{album.year}</div>
@@ -470,6 +575,8 @@
 		{/if}
 	{/if}
 </div>
+
+<AddToPlaylistModal bind:this={playlistModalRef} />
 
 <SourceAlbumModal
 	bind:open={detailModalOpen}

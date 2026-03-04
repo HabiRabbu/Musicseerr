@@ -31,11 +31,29 @@ export function formatDuration(ms?: number | null): string {
 	return `${minutes}:${seconds.toString().padStart(2, '0')}`;
 }
 
+export function formatDurationSec(sec?: number | null): string {
+	if (!sec && sec !== 0) return '--:--';
+	const minutes = Math.floor(sec / 60);
+	const seconds = sec % 60;
+	return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+}
+
 export function formatTotalDuration(ms?: number | null): string {
 	if (!ms) return '';
 	const totalSeconds = Math.floor(ms / 1000);
 	const hours = Math.floor(totalSeconds / 3600);
 	const minutes = Math.floor((totalSeconds % 3600) / 60);
+
+	if (hours > 0) {
+		return `${hours} hr ${minutes} min`;
+	}
+	return `${minutes} min`;
+}
+
+export function formatTotalDurationSec(sec?: number | null): string {
+	if (!sec) return '';
+	const hours = Math.floor(sec / 3600);
+	const minutes = Math.floor((sec % 3600) / 60);
 
 	if (hours > 0) {
 		return `${hours} hr ${minutes} min`;

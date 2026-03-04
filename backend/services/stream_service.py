@@ -46,6 +46,7 @@ class StreamService:
         audio_codec: str = "aac",
         bitrate: int = 128000,
         range_header: str | None = None,
+        start_time_ticks: int | None = None,
     ) -> tuple[AsyncIterator[bytes], dict[str, str], int]:
         """Proxy audio stream from Jellyfin with retry and circuit breaker."""
         if not self._jellyfin.is_configured():
@@ -56,10 +57,18 @@ class StreamService:
                 "Jellyfin streaming temporarily unavailable (circuit open)"
             )
 
-        stream_url = self._jellyfin.get_stream_url(item_id, audio_codec, bitrate)
+        effective_range_header = range_header
+
+        if start_time_ticks is not None:
+            # Explicit seek offset (from start_seconds query param) is the
+            # single source of truth for transcoded-stream seeking.
+            # Drop any browser Range header to avoid double-offsetting.
+            effective_range_header = None
+
+        stream_url = self._jellyfin.get_stream_url(item_id, audio_codec, bitrate, start_time_ticks)
         headers = self._jellyfin.get_auth_headers()
-        if range_header:
-            headers["Range"] = range_header
+        if effective_range_header:
+            headers["Range"] = effective_range_header
 
         response = await self._connect_with_retry(stream_url, headers, item_id)
 
@@ -69,7 +78,8 @@ class StreamService:
             resp_headers["Content-Length"] = cl
         if cr := response.headers.get("Content-Range"):
             resp_headers["Content-Range"] = cr
-        resp_headers["Accept-Ranges"] = "bytes"
+        if ar := response.headers.get("Accept-Ranges"):
+            resp_headers["Accept-Ranges"] = ar
 
         async def _iter_chunks() -> AsyncIterator[bytes]:
             try:

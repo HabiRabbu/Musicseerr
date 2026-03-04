@@ -20,7 +20,7 @@ export function launchTrackPlayback(
 	const normalizedCoverUrl = getCoverUrl(options.coverUrl, options.albumId);
 
 	const items: QueueItem[] = trackLinks.map((tl) => ({
-		videoId: tl.video_id,
+		trackSourceId: tl.video_id,
 		trackName: tl.track_name,
 		artistName: options.artistName,
 		trackNumber: tl.track_number,
