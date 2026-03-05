@@ -322,7 +322,7 @@ def _local_match(tracks):
     )
 
 
-def _make_track_with_album(id="t-1", track_name="Track", track_number=1, album_id="mb-album-1", source_type="howler"):
+def _make_track_with_album(id="t-1", track_name="Track", track_number=1, album_id="mb-album-1", source_type="local"):
     return PlaylistTrackRecord(
         id=id, playlist_id="p-1", position=0,
         track_name=track_name, artist_name="Artist", album_name="Album",
@@ -348,7 +348,7 @@ class TestResolveTrackSources:
         result = await service.resolve_track_sources("p-1", jf_service=jf_svc, local_service=local_svc)
         assert "t-1" in result
         assert "jellyfin" in result["t-1"]
-        assert "howler" in result["t-1"]
+        assert "local" in result["t-1"]
 
     @pytest.mark.asyncio
     async def test_no_album_id_returns_current_source(self, tmp_path):
@@ -394,7 +394,7 @@ class TestResolveNewSourceId:
     @pytest.mark.asyncio
     async def test_switch_to_jellyfin(self, tmp_path):
         service, repo = _make_service(tmp_path)
-        track = _make_track_with_album(track_name="Track Title", source_type="howler")
+        track = _make_track_with_album(track_name="Track Title", source_type="local")
         repo.get_track = MagicMock(return_value=track)
         repo.update_track_source = MagicMock(return_value=PlaylistTrackRecord(
             id="t-1", playlist_id="p-1", position=0,
@@ -422,7 +422,7 @@ class TestResolveNewSourceId:
             id="t-1", playlist_id="p-1", position=0,
             track_name="Song", artist_name="Artist", album_name="Album",
             album_id=None, artist_id=None, track_source_id=None,
-            cover_url=None, source_type="howler", available_sources=None,
+            cover_url=None, source_type="local", available_sources=None,
             format=None, track_number=None, duration=None,
             created_at="2025-01-01T00:00:00+00:00",
         )
@@ -437,7 +437,7 @@ class TestResolveNewSourceId:
     @pytest.mark.asyncio
     async def test_track_not_found_in_source_raises(self, tmp_path):
         service, repo = _make_service(tmp_path)
-        track = _make_track_with_album(track_name="My Song", source_type="howler")
+        track = _make_track_with_album(track_name="My Song", source_type="local")
         repo.get_track = MagicMock(return_value=track)
 
         jf_svc = AsyncMock()

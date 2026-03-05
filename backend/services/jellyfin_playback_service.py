@@ -13,37 +13,40 @@ class JellyfinPlaybackService:
     def __init__(self, jellyfin_repo: JellyfinRepository):
         self._jellyfin = jellyfin_repo
 
-    async def start_playback(self, item_id: str) -> str:
+    async def start_playback(self, item_id: str, play_session_id: str | None = None) -> str:
         """Report playback start to Jellyfin. Returns play_session_id.
 
         Handles nullable PlaySessionId and checks for ErrorCode in the
         PlaybackInfoResponse (NotAllowed, NoCompatibleStream, RateLimitExceeded).
         """
-        info = await self._jellyfin.get_playback_info(item_id)
+        resolved_play_session_id = play_session_id
 
-        error_code = info.get("ErrorCode")
-        if error_code:
-            raise PlaybackNotAllowedError(
-                f"Jellyfin playback not allowed: {error_code}"
-            )
+        if not resolved_play_session_id:
+            info = await self._jellyfin.get_playback_info(item_id)
 
-        play_session_id: str | None = info.get("PlaySessionId")
-        if not play_session_id:
-            logger.warning(
-                "Jellyfin returned null PlaySessionId for item %s — "
-                "streaming without session reporting",
-                item_id,
-            )
-            return ""
+            error_code = info.get("ErrorCode")
+            if error_code:
+                raise PlaybackNotAllowedError(
+                    f"Jellyfin playback not allowed: {error_code}"
+                )
+
+            resolved_play_session_id = info.get("PlaySessionId")
+            if not resolved_play_session_id:
+                logger.warning(
+                    "Jellyfin returned null PlaySessionId for item %s — "
+                    "streaming without session reporting",
+                    item_id,
+                )
+                return ""
 
         try:
-            await self._jellyfin.report_playback_start(item_id, play_session_id)
+            await self._jellyfin.report_playback_start(item_id, resolved_play_session_id)
         except (httpx.HTTPError, ExternalServiceError) as e:
             logger.error(
                 "Failed to report playback start for %s: %s", item_id, e
             )
 
-        return play_session_id
+        return resolved_play_session_id
 
     async def report_progress(
         self,

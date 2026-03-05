@@ -26,8 +26,8 @@ VALID_SOURCE_TYPES = {"local", "jellyfin", "youtube", ""}
 MAX_NAME_LENGTH = 100
 
 _SOURCE_TYPE_ALIASES = {
-    "local": "howler",
-    "howler": "howler",
+    "local": "local",
+    "howler": "local",
     "jellyfin": "jellyfin",
     "youtube": "youtube",
     "": "",
@@ -153,6 +153,15 @@ class PlaylistService:
             raise PlaylistNotFoundError(f"Track {track_id} not found in playlist {playlist_id}")
         logger.info("Removed track %s from playlist %s", track_id, playlist_id)
 
+    async def remove_tracks(self, playlist_id: str, track_ids: list[str]) -> int:
+        if not track_ids:
+            raise InvalidPlaylistDataError("No track IDs provided")
+        removed = await self._repo.remove_tracks(playlist_id, track_ids)
+        if not removed:
+            raise PlaylistNotFoundError(f"No matching tracks found in playlist {playlist_id}")
+        logger.info("Removed %d tracks from playlist %s", removed, playlist_id)
+        return removed
+
     async def reorder_track(
         self, playlist_id: str, track_id: str, new_position: int,
     ) -> int:
@@ -253,7 +262,7 @@ class PlaylistService:
 
                 local_track = local_by_num.get(t.track_number)
                 if local_track and _fuzzy_name_match(t.track_name, local_track[0]):
-                    sources.add("howler")
+                    sources.add("local")
 
                 result[t.id] = sorted(sources)
 
@@ -324,7 +333,7 @@ class PlaylistService:
                 f"Track '{track.track_name}' not found in Jellyfin for album {track.album_id}"
             )
 
-        if new_source_type == "howler":
+        if new_source_type == "local":
             match_info = local_by_num.get(track.track_number)
             if match_info and _fuzzy_name_match(track.track_name, match_info[0]):
                 return match_info[1]

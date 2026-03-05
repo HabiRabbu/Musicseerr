@@ -389,6 +389,41 @@ class PlaylistRepository:
             conn.commit()
             return True
 
+    def remove_tracks(self, playlist_id: str, track_ids: list[str]) -> int:
+        if not track_ids:
+            return 0
+        with self._write_lock:
+            conn = self._get_connection()
+            placeholders = ",".join("?" for _ in track_ids)
+            existing = conn.execute(
+                f"SELECT id FROM playlist_tracks WHERE playlist_id = ? AND id IN ({placeholders})",
+                [playlist_id, *track_ids],
+            ).fetchall()
+            if not existing:
+                return 0
+            ids_to_remove = [r["id"] for r in existing]
+            rm_placeholders = ",".join("?" for _ in ids_to_remove)
+            conn.execute(
+                f"DELETE FROM playlist_tracks WHERE playlist_id = ? AND id IN ({rm_placeholders})",
+                [playlist_id, *ids_to_remove],
+            )
+            remaining = conn.execute(
+                "SELECT id FROM playlist_tracks WHERE playlist_id = ? ORDER BY position ASC",
+                (playlist_id,),
+            ).fetchall()
+            for new_pos, row in enumerate(remaining):
+                conn.execute(
+                    "UPDATE playlist_tracks SET position = ? WHERE id = ?",
+                    (new_pos, row["id"]),
+                )
+            now = datetime.now(timezone.utc).isoformat()
+            conn.execute(
+                "UPDATE playlists SET updated_at = ? WHERE id = ?",
+                (now, playlist_id),
+            )
+            conn.commit()
+            return len(ids_to_remove)
+
     def reorder_track(self, playlist_id: str, track_id: str, new_position: int) -> Optional[int]:
         with self._write_lock:
             conn = self._get_connection()

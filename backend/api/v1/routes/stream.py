@@ -1,18 +1,23 @@
 import logging
-from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from fastapi.responses import StreamingResponse, Response
+from fastapi import APIRouter, Body, Depends, HTTPException, Request
+from fastapi.responses import RedirectResponse, Response, StreamingResponse
 
-from api.v1.schemas.stream import PlaybackSessionResponse, ProgressReportRequest, StopReportRequest
+from api.v1.schemas.stream import (
+    JellyfinPlaybackUrlResponse,
+    PlaybackSessionResponse,
+    ProgressReportRequest,
+    StartPlaybackRequest,
+    StopReportRequest,
+)
 from core.dependencies import (
-    get_stream_service,
+    get_jellyfin_repository,
     get_jellyfin_playback_service,
     get_local_files_service,
 )
 from core.exceptions import ExternalServiceError, PlaybackNotAllowedError, ResourceNotFoundError
 from infrastructure.msgspec_fastapi import MsgSpecBody, MsgSpecRoute
-from services.stream_service import StreamService
+from repositories.jellyfin_repository import JellyfinRepository
 from services.jellyfin_playback_service import JellyfinPlaybackService
 from services.local_files_service import LocalFilesService
 
@@ -24,30 +29,28 @@ router = APIRouter(route_class=MsgSpecRoute, prefix="/api/stream", tags=["stream
 @router.get("/jellyfin/{item_id}")
 async def stream_jellyfin_audio(
     item_id: str,
-    request: Request,
-    codec: Literal["aac", "mp3", "opus", "flac", "vorbis", "alac", "wav", "wma"] = Query(default="aac", alias="format"),
-    bitrate: int = Query(default=128000, ge=32000, le=320000),
-    start_seconds: float | None = Query(default=None),
-    stream_service: StreamService = Depends(get_stream_service),
-) -> StreamingResponse:
+    jellyfin_repo: JellyfinRepository = Depends(get_jellyfin_repository),
+) -> JellyfinPlaybackUrlResponse:
     try:
-        range_header = request.headers.get("Range")
-        start_time_ticks = int(start_seconds * 10_000_000) if start_seconds is not None else None
-        chunks, headers, status_code = await stream_service.stream_jellyfin_audio(
-            item_id=item_id,
-            audio_codec=codec,
-            bitrate=bitrate,
-            range_header=range_header,
-            start_time_ticks=start_time_ticks,
+        playback = await jellyfin_repo.get_playback_url(item_id)
+        logger.info(
+            "Resolved Jellyfin playback metadata",
+            extra={
+                "item_id": item_id,
+                "play_method": playback.play_method,
+                "seekable": playback.seekable,
+            },
         )
-        return StreamingResponse(
-            content=chunks,
-            status_code=status_code,
-            headers=headers,
-            media_type=headers.get("Content-Type", "audio/aac"),
+        return JellyfinPlaybackUrlResponse(
+            url=playback.url,
+            seekable=playback.seekable,
+            playSessionId=playback.play_session_id,
         )
     except ResourceNotFoundError:
         raise HTTPException(status_code=404, detail="Audio item not found")
+    except PlaybackNotAllowedError as e:
+        logger.warning("Playback not allowed for %s: %s", item_id, e)
+        raise HTTPException(status_code=403, detail=str(e))
     except ExternalServiceError as e:
         logger.error("Jellyfin stream error for %s: %s", item_id, e)
         raise HTTPException(status_code=502, detail="Failed to stream from Jellyfin")
@@ -56,38 +59,44 @@ async def stream_jellyfin_audio(
 @router.head("/jellyfin/{item_id}")
 async def head_jellyfin_audio(
     item_id: str,
-    codec: Literal["aac", "mp3", "opus", "flac", "vorbis", "alac", "wav", "wma"] = Query(default="aac", alias="format"),
-    bitrate: int = Query(default=128000, ge=32000, le=320000),
+    jellyfin_repo: JellyfinRepository = Depends(get_jellyfin_repository),
 ) -> Response:
-    content_type = {
-        "aac": "audio/aac",
-        "mp3": "audio/mpeg",
-        "opus": "audio/opus",
-        "flac": "audio/flac",
-        "wav": "audio/wav",
-        "vorbis": "audio/ogg",
-        "alac": "audio/flac",
-        "wma": "audio/aac",
-    }.get(codec, "audio/aac")
-
-    return Response(
-        status_code=200,
-        headers={
-            "Accept-Ranges": "bytes",
-            "Content-Type": content_type,
-            "X-Stream-Bitrate": str(bitrate),
-            "X-Stream-Item": item_id,
-        },
-    )
+    try:
+        playback = await jellyfin_repo.get_playback_url(item_id)
+        logger.info(
+            "Resolved Jellyfin playback prefetch redirect",
+            extra={
+                "item_id": item_id,
+                "play_method": playback.play_method,
+                "seekable": playback.seekable,
+            },
+        )
+        return RedirectResponse(
+            url=playback.url,
+            status_code=302,
+            headers={"Referrer-Policy": "no-referrer"},
+        )
+    except ResourceNotFoundError:
+        raise HTTPException(status_code=404, detail="Audio item not found")
+    except PlaybackNotAllowedError as e:
+        logger.warning("Playback not allowed for %s: %s", item_id, e)
+        raise HTTPException(status_code=403, detail=str(e))
+    except ExternalServiceError as e:
+        logger.error("Jellyfin head stream error for %s: %s", item_id, e)
+        raise HTTPException(status_code=502, detail="Failed to resolve Jellyfin stream")
 
 
 @router.post("/jellyfin/{item_id}/start", response_model=PlaybackSessionResponse)
 async def start_jellyfin_playback(
     item_id: str,
+    body: StartPlaybackRequest | None = Body(default=None),
     playback_service: JellyfinPlaybackService = Depends(get_jellyfin_playback_service),
 ) -> PlaybackSessionResponse:
     try:
-        play_session_id = await playback_service.start_playback(item_id)
+        play_session_id = await playback_service.start_playback(
+            item_id,
+            play_session_id=body.play_session_id if body else None,
+        )
         return PlaybackSessionResponse(play_session_id=play_session_id, item_id=item_id)
     except ResourceNotFoundError:
         raise HTTPException(status_code=404, detail="Item not found")

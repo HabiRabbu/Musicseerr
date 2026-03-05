@@ -1,10 +1,11 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { onDestroy, untrack } from 'svelte';
-	import { deletePlaylist, fetchPlaylist, type PlaylistDetail } from '$lib/api/playlists';
+	import { deletePlaylist, fetchPlaylist, resolvePlaylistSources, type PlaylistDetail } from '$lib/api/playlists';
 	import { playlistTrackToQueueItem } from '$lib/player/queueHelpers';
 	import { playerStore } from '$lib/stores/player.svelte';
 	import { toastStore } from '$lib/stores/toast';
+	import { getCacheTTL } from '$lib/stores/cacheTtl';
 	import { extractDominantColor, DEFAULT_GRADIENT } from '$lib/utils/colors';
 	import { Music } from 'lucide-svelte';
 	import BackButton from '$lib/components/BackButton.svelte';
@@ -25,6 +26,66 @@
 	let trackList = $state<ReturnType<typeof PlaylistTrackList> | null>(null);
 	let header = $state<ReturnType<typeof PlaylistHeader> | null>(null);
 
+	const SOURCES_CACHE_PREFIX = 'musicseerr_playlist_sources_';
+
+	function getSourcesFromCache(playlistId: string): Record<string, string[]> | null {
+		try {
+			const raw = localStorage.getItem(SOURCES_CACHE_PREFIX + playlistId);
+			if (!raw) return null;
+			const cached = JSON.parse(raw) as { ts: number; data: Record<string, string[]> };
+			const ttl = getCacheTTL('playlistSources');
+			if (Date.now() - cached.ts > ttl) {
+				localStorage.removeItem(SOURCES_CACHE_PREFIX + playlistId);
+				return null;
+			}
+			return cached.data;
+		} catch {
+			return null;
+		}
+	}
+
+	function setSourcesCache(playlistId: string, data: Record<string, string[]>) {
+		try {
+			localStorage.setItem(
+				SOURCES_CACHE_PREFIX + playlistId,
+				JSON.stringify({ ts: Date.now(), data })
+			);
+		} catch { /* storage full — non-critical */ }
+	}
+
+	function invalidateSourcesCache(playlistId: string) {
+		try {
+			localStorage.removeItem(SOURCES_CACHE_PREFIX + playlistId);
+		} catch { /* ignore */ }
+	}
+
+	function applySourcesMap(sources: Record<string, string[]>) {
+		if (!playlist) return;
+		for (const track of playlist.tracks) {
+			const resolved = sources[track.id];
+			if (resolved && resolved.length > 0) {
+				track.available_sources = resolved;
+			}
+		}
+	}
+
+	async function resolveAndCacheSources(playlistId: string) {
+		const cached = getSourcesFromCache(playlistId);
+		if (cached) {
+			applySourcesMap(cached);
+			return;
+		}
+		try {
+			const sources = await resolvePlaylistSources(playlistId);
+			if (playlist && playlist.id === playlistId) {
+				applySourcesMap(sources);
+				setSourcesCache(playlistId, sources);
+			}
+		} catch {
+			// non-critical — tracks keep their stored available_sources
+		}
+	}
+
 	async function loadPlaylist(playlistId: string) {
 		const token = ++activeLoadToken;
 		loading = true;
@@ -39,6 +100,8 @@
 			playlist = loaded ?? null;
 			if (!playlist) {
 				loadError = 'Failed to load playlist';
+			} else {
+				void resolveAndCacheSources(playlistId);
 			}
 		} catch (e) {
 			if (token !== activeLoadToken) return;
@@ -83,6 +146,23 @@
 			return;
 		}
 		playerStore.playQueue(items, 0, true);
+	}
+
+	function playFromTrack(index: number) {
+		if (!playlist || playlist.tracks.length === 0) return;
+		const items = playlist.tracks
+			.map(playlistTrackToQueueItem)
+			.filter((item): item is NonNullable<typeof item> => item !== null);
+		if (items.length === 0) {
+			toastStore.show({ message: 'No playable tracks', type: 'info' });
+			return;
+		}
+		const startIndex = Math.min(index, items.length - 1);
+		playerStore.playQueue(items, startIndex, false);
+	}
+
+	function handleSourceChange() {
+		if (playlist) invalidateSourcesCache(playlist.id);
 	}
 
 	async function confirmDelete() {
@@ -174,10 +254,10 @@
 {:else}
 	<div class="space-y-6 sm:space-y-8">
 		<!-- Header with subtle gradient background -->
-		<div class="relative overflow-hidden rounded-box">
-			<div class="absolute inset-0 bg-gradient-to-b {heroGradient} transition-all duration-1000"></div>
+		<div class="relative rounded-box">
+			<div class="absolute inset-0 bg-gradient-to-b {heroGradient} transition-all duration-1000 rounded-box"></div>
 			{#if heroBgUrl}
-				<div class="absolute inset-0 overflow-hidden">
+				<div class="absolute inset-0 overflow-hidden rounded-box">
 					<img
 						src={heroBgUrl}
 						alt=""
@@ -205,7 +285,13 @@
 			</div>
 		</div>
 
-		<PlaylistTrackList bind:this={trackList} {playlist} ontrackchange={() => {}} />
+		<PlaylistTrackList
+			bind:this={trackList}
+			{playlist}
+			ontrackchange={() => {}}
+			onsourcechange={handleSourceChange}
+			onplaytrack={playFromTrack}
+		/>
 	</div>
 
 	<DeletePlaylistModal

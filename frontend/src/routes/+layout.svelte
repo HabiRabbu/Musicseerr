@@ -11,6 +11,7 @@
 	import { launchYouTubePlayback } from '$lib/player/launchYouTubePlayback';
 	import { playbackToast } from '$lib/stores/playbackToast.svelte';
 	import { scrobbleManager } from '$lib/stores/scrobble.svelte';
+	import { setAudioElement } from '$lib/player/audioElement';
 	import Player from '$lib/components/Player.svelte';
 	import YouTubeIcon from '$lib/components/YouTubeIcon.svelte';
 	import SearchSuggestions from '$lib/components/SearchSuggestions.svelte';
@@ -26,6 +27,7 @@
 	let { children }: { children: Snippet } = $props();
 
 	let query = $state('');
+	let audioElement = $state<HTMLAudioElement | undefined>(undefined);
 	let activeRequestCount = $state(0);
 	let requestCountInterval: ReturnType<typeof setInterval> | null = null;
 	let requestsPageActive = false;
@@ -91,6 +93,9 @@
 	}
 
 	onMount(() => {
+		if (audioElement) {
+			setAudioElement(audioElement);
+		}
 		if (browser) {
 			currentPath = window.location.pathname;
 		}
@@ -498,6 +503,10 @@
 				</button>
 			</div>
 		</div>
+	{/if}
+
+	{#if browser}
+		<audio bind:this={audioElement}></audio>
 	{/if}
 
 	<Player />

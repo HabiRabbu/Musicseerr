@@ -1,0 +1,258 @@
+import type { PlaybackSource, PlaybackState } from './types';
+import { getAudioElement } from './audioElement';
+
+const LOAD_TIMEOUT_MS = 15_000;
+const STALL_TIMEOUT_MS = 15_000;
+
+type NativeSourceType = 'jellyfin' | 'local';
+
+export class NativeAudioSource implements PlaybackSource {
+	readonly type: NativeSourceType;
+
+	private readonly audio: HTMLAudioElement;
+	private readonly url: string;
+	private readonly seekable: boolean;
+
+	private stateCallbacks: ((state: PlaybackState) => void)[] = [];
+	private readyCallbacks: (() => void)[] = [];
+	private errorCallbacks: ((error: { code: string; message: string }) => void)[] = [];
+	private progressCallbacks: ((currentTime: number, duration: number) => void)[] = [];
+
+	private listeners: Array<{ event: string; handler: EventListener }> = [];
+	private stallTimeoutHandle: ReturnType<typeof setTimeout> | null = null;
+	private pendingVolume = 75;
+	private destroyed = false;
+	private currentState: PlaybackState = 'idle';
+
+	constructor(type: NativeSourceType, opts: { url: string; seekable: boolean }) {
+		this.type = type;
+		this.url = opts.url;
+		this.seekable = opts.seekable;
+		this.audio = getAudioElement();
+	}
+
+	async load(_info?: unknown): Promise<void> {
+		this.destroyed = false;
+		this.cleanupListeners();
+		this.clearStallTimeout();
+		this.emitStateChange('loading');
+
+		await new Promise<void>((resolve, reject) => {
+			let settled = false;
+
+			const finalize = (action: () => void): void => {
+				if (settled || this.destroyed) return;
+				settled = true;
+				action();
+			};
+
+			const onCanPlay = () => {
+				finalize(() => {
+					this.readyCallbacks.forEach((cb) => cb());
+					resolve();
+				});
+			};
+
+			const onPlay = () => {
+				this.clearStallTimeout();
+				this.emitStateChange('playing');
+			};
+
+			const onPlaying = () => {
+				this.clearStallTimeout();
+				if (this.currentState !== 'playing') {
+					this.emitStateChange('playing');
+				}
+			};
+
+			const onPause = () => {
+				if (this.audio.ended) return;
+				this.emitStateChange('paused');
+			};
+
+			const onEnded = () => {
+				this.emitStateChange('ended');
+			};
+
+			const onWaiting = () => {
+				this.emitStateChange('buffering');
+				this.startStallTimeout();
+			};
+
+			const onTimeUpdate = () => {
+				this.clearStallTimeout();
+				if (this.currentState === 'buffering') {
+					this.emitStateChange('playing');
+				}
+				const currentTime = this.getCurrentTime();
+				const duration = this.getDuration();
+				this.progressCallbacks.forEach((cb) => cb(currentTime, duration));
+			};
+
+			const onError = () => {
+				const code = this.audio.error?.code ?? 0;
+				const message = this.getMediaErrorMessage(code);
+				this.emitStateChange('error');
+				this.emitError('LOAD_ERROR', message);
+				finalize(() => reject(new Error(message)));
+			};
+
+			const onStalled = () => {
+				this.startStallTimeout();
+			};
+
+			const timeoutHandle = setTimeout(() => {
+				if (settled || this.destroyed) return;
+				settled = true;
+				const message = `Native audio source load timed out after ${LOAD_TIMEOUT_MS}ms`;
+				this.audio.src = '';
+				this.cleanupListeners();
+				this.clearStallTimeout();
+				this.emitError('LOAD_TIMEOUT', message);
+				reject(new Error(message));
+			}, LOAD_TIMEOUT_MS);
+
+			this.registerListener('canplay', () => {
+				clearTimeout(timeoutHandle);
+				onCanPlay();
+			});
+			this.registerListener('play', onPlay);
+			this.registerListener('playing', onPlaying);
+			this.registerListener('pause', onPause);
+			this.registerListener('ended', onEnded);
+			this.registerListener('waiting', onWaiting);
+			this.registerListener('timeupdate', onTimeUpdate);
+			this.registerListener('error', () => {
+				clearTimeout(timeoutHandle);
+				onError();
+			});
+			this.registerListener('stalled', onStalled);
+
+			this.audio.src = this.url;
+			this.audio.volume = this.pendingVolume / 100;
+			this.audio.load();
+		});
+	}
+
+	play(): void {
+		void this.audio.play().catch(() => {
+			this.emitError('AUTOPLAY_BLOCKED', 'Playback failed. Browser may be blocking autoplay.');
+			this.emitStateChange('error');
+		});
+	}
+
+	pause(): void {
+		this.audio.pause();
+	}
+
+	seekTo(seconds: number): void {
+		if (!this.seekable) {
+			console.warn('[NativeAudio] seekTo ignored: stream is not seekable');
+			return;
+		}
+		const clamped = Math.max(0, seconds);
+		const dur = this.getDuration();
+		this.audio.currentTime = dur > 0 ? Math.min(clamped, dur) : clamped;
+	}
+
+	setVolume(level: number): void {
+		const clamped = Math.max(0, Math.min(100, level));
+		this.pendingVolume = clamped;
+		if (this.audio.src) {
+			this.audio.volume = clamped / 100;
+		}
+	}
+
+	getCurrentTime(): number {
+		const current = this.audio.currentTime;
+		return Number.isFinite(current) ? current : 0;
+	}
+
+	getDuration(): number {
+		const total = this.audio.duration;
+		return Number.isFinite(total) ? total : 0;
+	}
+
+	destroy(): void {
+		this.destroyed = true;
+		this.clearStallTimeout();
+		this.cleanupListeners();
+		this.audio.src = '';
+		this.audio.load();
+		this.stateCallbacks = [];
+		this.readyCallbacks = [];
+		this.errorCallbacks = [];
+		this.progressCallbacks = [];
+	}
+
+	onStateChange(callback: (state: PlaybackState) => void): void {
+		this.stateCallbacks.push(callback);
+	}
+
+	onReady(callback: () => void): void {
+		this.readyCallbacks.push(callback);
+	}
+
+	onError(callback: (error: { code: string; message: string }) => void): void {
+		this.errorCallbacks.push(callback);
+	}
+
+	onProgress(callback: (currentTime: number, duration: number) => void): void {
+		this.progressCallbacks.push(callback);
+	}
+
+	isSeekable(): boolean {
+		return this.seekable;
+	}
+
+	private registerListener(event: string, handler: EventListener): void {
+		this.audio.addEventListener(event, handler);
+		this.listeners.push({ event, handler });
+	}
+
+	private cleanupListeners(): void {
+		for (const { event, handler } of this.listeners) {
+			this.audio.removeEventListener(event, handler);
+		}
+		this.listeners = [];
+	}
+
+	private startStallTimeout(): void {
+		this.clearStallTimeout();
+		this.stallTimeoutHandle = setTimeout(() => {
+			if (this.destroyed) return;
+			this.emitError('NETWORK_STALL', `Playback stalled for ${STALL_TIMEOUT_MS}ms`);
+			this.emitStateChange('error');
+		}, STALL_TIMEOUT_MS);
+	}
+
+	private clearStallTimeout(): void {
+		if (!this.stallTimeoutHandle) return;
+		clearTimeout(this.stallTimeoutHandle);
+		this.stallTimeoutHandle = null;
+	}
+
+	private emitStateChange(state: PlaybackState): void {
+		this.currentState = state;
+		this.stateCallbacks.forEach((cb) => cb(state));
+	}
+
+	private emitError(code: string, message: string): void {
+		this.errorCallbacks.forEach((cb) => cb({ code, message }));
+	}
+
+	private getMediaErrorMessage(code: number): string {
+		switch (code) {
+			case 1:
+				return 'MEDIA_ERR_ABORTED: Playback was aborted';
+			case 2:
+				return 'MEDIA_ERR_NETWORK: A network error occurred';
+			case 3:
+				return 'MEDIA_ERR_DECODE: Decoding failed due to corruption or unsupported features';
+			case 4:
+				return 'MEDIA_ERR_SRC_NOT_SUPPORTED: Audio source is not supported';
+			default:
+				return 'Unknown media error';
+		}
+	}
+}

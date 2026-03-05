@@ -37,7 +37,7 @@ export function launchJellyfinPlayback(
 			coverUrl: normalizedCoverUrl,
 			sourceType: 'jellyfin' as const,
 			artistId: meta.artistId,
-			streamUrl: API.stream.jellyfin(t.jellyfin_id, format),
+			streamUrl: API.stream.jellyfin(t.jellyfin_id),
 			format
 		};
 	});

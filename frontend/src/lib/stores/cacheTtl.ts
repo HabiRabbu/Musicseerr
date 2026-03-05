@@ -19,6 +19,7 @@ export interface CacheTTLs {
 	search: number;
 	localFilesSidebar: number;
 	jellyfinSidebar: number;
+	playlistSources: number;
 	discoverQueuePollingInterval: number;
 	discoverQueueAutoGenerate: boolean;
 }
@@ -32,6 +33,7 @@ const DEFAULTS: CacheTTLs = {
 	search: CACHE_TTL.SEARCH,
 	localFilesSidebar: CACHE_TTL.LOCAL_FILES_SIDEBAR,
 	jellyfinSidebar: CACHE_TTL.JELLYFIN_SIDEBAR,
+	playlistSources: CACHE_TTL.PLAYLIST_SOURCES,
 	discoverQueuePollingInterval: 4000,
 	discoverQueueAutoGenerate: true
 };
@@ -68,6 +70,7 @@ export async function initCacheTTLs(): Promise<void> {
 				search: data.search ?? DEFAULTS.search,
 				localFilesSidebar: data.local_files_sidebar ?? DEFAULTS.localFilesSidebar,
 				jellyfinSidebar: data.jellyfin_sidebar ?? DEFAULTS.jellyfinSidebar,
+				playlistSources: data.playlist_sources ?? DEFAULTS.playlistSources,
 				discoverQueuePollingInterval:
 					data.discover_queue_polling_interval ?? DEFAULTS.discoverQueuePollingInterval,
 				discoverQueueAutoGenerate:

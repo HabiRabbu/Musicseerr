@@ -58,7 +58,8 @@ export const CACHE_TTL_GROUPS = {
 		LOCAL_FILES_SIDEBAR: 2 * 60 * 1000,
 		JELLYFIN_SIDEBAR: 2 * 60 * 1000,
 		JELLYFIN_ALBUMS_LIST: 2 * 60 * 1000,
-		LOCAL_FILES_ALBUMS_LIST: 2 * 60 * 1000
+		LOCAL_FILES_ALBUMS_LIST: 2 * 60 * 1000,
+		PLAYLIST_SOURCES: 15 * 60 * 1000
 	},
 	detail: {
 		ALBUM_DETAIL_BASIC: 5 * 60 * 1000,
@@ -193,6 +194,7 @@ export const API = {
 		update: (id: string) => `/api/v1/playlists/${id}`,
 		delete: (id: string) => `/api/v1/playlists/${id}`,
 		addTracks: (id: string) => `/api/v1/playlists/${id}/tracks`,
+		removeTracks: (id: string) => `/api/v1/playlists/${id}/tracks/remove`,
 		removeTrack: (id: string, trackId: string) => `/api/v1/playlists/${id}/tracks/${trackId}`,
 		updateTrack: (id: string, trackId: string) => `/api/v1/playlists/${id}/tracks/${trackId}`,
 		reorderTrack: (id: string) => `/api/v1/playlists/${id}/tracks/reorder`,
@@ -203,11 +205,7 @@ export const API = {
 		resolveSources: (id: string) => `/api/v1/playlists/${id}/resolve-sources`
 	},
 	stream: {
-		jellyfin: (itemId: string, format = 'aac', bitrate = 128000, startSeconds?: number) => {
-			let url = `/api/stream/jellyfin/${itemId}?format=${format}&bitrate=${bitrate}`;
-			if (startSeconds !== undefined && startSeconds > 0) url += `&start_seconds=${startSeconds}`;
-			return url;
-		},
+		jellyfin: (itemId: string) => `/api/stream/jellyfin/${itemId}`,
 		jellyfinStart: (itemId: string) => `/api/stream/jellyfin/${itemId}/start`,
 		jellyfinProgress: (itemId: string) => `/api/stream/jellyfin/${itemId}/progress`,
 		jellyfinStop: (itemId: string) => `/api/stream/jellyfin/${itemId}/stop`,

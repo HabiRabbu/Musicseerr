@@ -31,7 +31,6 @@ from core.dependencies import (
     get_youtube_repo,
     get_local_files_service,
     get_jellyfin_repository,
-    get_stream_service,
     get_jellyfin_playback_service,
     get_jellyfin_library_service,
     get_home_service,
@@ -124,6 +123,7 @@ async def get_frontend_cache_ttls():
             search=backend_settings.frontend_ttl_search,
             local_files_sidebar=backend_settings.frontend_ttl_local_files_sidebar,
             jellyfin_sidebar=backend_settings.frontend_ttl_jellyfin_sidebar,
+            playlist_sources=backend_settings.frontend_ttl_playlist_sources,
             discover_queue_polling_interval=backend_settings.discover_queue_polling_interval,
             discover_queue_auto_generate=backend_settings.discover_queue_auto_generate,
         )
@@ -291,7 +291,6 @@ async def update_jellyfin_settings(
         JellyfinRepository.reset_circuit_breaker()
 
         get_jellyfin_repository.cache_clear()
-        get_stream_service.cache_clear()
         get_jellyfin_playback_service.cache_clear()
         get_jellyfin_library_service.cache_clear()
         get_home_service.cache_clear()

@@ -1,17 +1,23 @@
 import type { PlaybackSource, SourceType } from './types';
 import { YouTubePlaybackSource } from './YouTubePlaybackSource';
-import { JellyfinPlaybackSource } from './JellyfinPlaybackSource';
-import { LocalPlaybackSource } from './LocalPlaybackSource';
+import { NativeAudioSource } from './NativeAudioSource';
 import { YOUTUBE_PLAYER_ELEMENT_ID } from '$lib/constants';
 
-export function createPlaybackSource(type: SourceType): PlaybackSource {
+export type NativeSourceOptions = {
+	url: string;
+	seekable: boolean;
+};
+
+export function createPlaybackSource(type: SourceType, opts?: NativeSourceOptions): PlaybackSource {
 	switch (type) {
 		case 'youtube':
 			return new YouTubePlaybackSource(YOUTUBE_PLAYER_ELEMENT_ID);
 		case 'jellyfin':
-			return new JellyfinPlaybackSource();
-		case 'howler':
-			return new LocalPlaybackSource();
+			if (!opts) throw new Error('Jellyfin playback source requires url and seekable options');
+			return new NativeAudioSource('jellyfin', opts);
+		case 'local':
+			if (!opts) throw new Error('Local playback source requires url and seekable options');
+			return new NativeAudioSource('local', opts);
 		default: {
 			const _exhaustive: never = type;
 			throw new Error(`Unknown source type: ${_exhaustive}`);

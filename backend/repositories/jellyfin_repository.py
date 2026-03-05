@@ -3,11 +3,18 @@ import logging
 from typing import Any
 
 import msgspec
-from core.exceptions import ExternalServiceError, ResourceNotFoundError
+from core.exceptions import ExternalServiceError, PlaybackNotAllowedError, ResourceNotFoundError
 from infrastructure.cache.memory_cache import CacheInterface
 from infrastructure.cache.persistent_cache import LibraryCache
+from infrastructure.constants import BROWSER_AUDIO_DEVICE_PROFILE
 from infrastructure.resilience.retry import with_retry, CircuitBreaker
-from repositories.jellyfin_models import JellyfinItem, JellyfinUser, parse_item, parse_user
+from repositories.jellyfin_models import (
+    JellyfinItem,
+    JellyfinUser,
+    PlaybackUrlResult,
+    parse_item,
+    parse_user,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -603,26 +610,6 @@ class JellyfinRepository:
 
         return stats
 
-    def get_stream_url(
-        self, item_id: str, audio_codec: str = "aac", bitrate: int = 128000,
-        start_time_ticks: int | None = None,
-    ) -> str:
-        container = audio_codec if audio_codec != "vorbis" else "ogg"
-        parts = [
-            f"{self._base_url}/Audio/{item_id}/universal",
-            f"?container={container}",
-            f"&audioCodec={audio_codec}",
-            f"&audioBitRate={bitrate}",
-            f"&maxAudioChannels=2",
-            f"&transcodingContainer={container}",
-            f"&transcodingProtocol=http",
-        ]
-        if self._user_id:
-            parts.append(f"&userId={self._user_id}")
-        if start_time_ticks is not None:
-            parts.append(f"&StartTimeTicks={start_time_ticks}")
-        return "".join(parts)
-
     async def get_playback_info(self, item_id: str) -> dict[str, Any]:
         params: dict[str, Any] = {}
         if self._user_id:
@@ -632,14 +619,70 @@ class JellyfinRepository:
             raise ResourceNotFoundError(f"Playback info not found for {item_id}")
         return result
 
+    async def get_playback_url(self, item_id: str) -> PlaybackUrlResult:
+        params: dict[str, Any] = {}
+        if self._user_id:
+            params["userId"] = self._user_id
+
+        result = await self._request(
+            "POST",
+            f"/Items/{item_id}/PlaybackInfo",
+            params=params,
+            json_data={"DeviceProfile": BROWSER_AUDIO_DEVICE_PROFILE},
+        )
+
+        if not result:
+            raise ResourceNotFoundError(f"Playback info not found for {item_id}")
+
+        error_code = result.get("ErrorCode")
+        if error_code:
+            raise PlaybackNotAllowedError(f"Jellyfin playback not allowed: {error_code}")
+
+        raw_play_session_id = result.get("PlaySessionId")
+        if not raw_play_session_id:
+            logger.warning(
+                "PlaybackInfo returned null PlaySessionId",
+                extra={"item_id": item_id},
+            )
+        play_session_id = raw_play_session_id or ""
+        media_sources = result.get("MediaSources") or []
+        if not media_sources:
+            raise ExternalServiceError(f"Playback info missing media sources for {item_id}")
+
+        primary_source = media_sources[0]
+        supports_direct_play = bool(primary_source.get("SupportsDirectPlay"))
+        supports_direct_stream = bool(primary_source.get("SupportsDirectStream"))
+        transcoding_url = primary_source.get("TranscodingUrl")
+
+        if supports_direct_play or supports_direct_stream:
+            playback_url = f"{self._base_url}/Audio/{item_id}/stream?static=true&api_key={self._api_key}"
+            play_method = "DirectPlay" if supports_direct_play else "DirectStream"
+            seekable = True
+        elif isinstance(transcoding_url, str) and transcoding_url:
+            playback_url = (
+                transcoding_url
+                if transcoding_url.startswith(("http://", "https://"))
+                else f"{self._base_url}{transcoding_url}"
+            )
+            play_method = "Transcode"
+            seekable = False
+        else:
+            raise ExternalServiceError(f"Playback info has no playable stream for {item_id}")
+        return PlaybackUrlResult(
+            url=playback_url,
+            seekable=seekable,
+            play_session_id=play_session_id,
+            play_method=play_method,
+        )
+
     async def report_playback_start(
-        self, item_id: str, play_session_id: str
+        self, item_id: str, play_session_id: str, play_method: str = "Transcode"
     ) -> None:
         body: dict[str, Any] = {
             "ItemId": item_id,
             "PlaySessionId": play_session_id,
             "CanSeek": True,
-            "PlayMethod": "Transcode",
+            "PlayMethod": play_method,
         }
         await self._post("/Sessions/Playing", json_data=body)
 

@@ -32,7 +32,7 @@ function makeTrack(overrides: Partial<QueueItem> = {}): QueueItem {
 		albumId: 'a1',
 		albumName: 'Test Album',
 		coverUrl: null,
-		sourceType: 'howler',
+		sourceType: 'local',
 		...overrides
 	};
 }

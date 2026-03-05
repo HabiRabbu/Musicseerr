@@ -1,0 +1,245 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const hoisted = vi.hoisted(() => {
+	const listeners = new Map<string, Set<EventListener>>();
+	const audio = {
+		src: '',
+		volume: 1,
+		currentTime: 0,
+		duration: 180,
+		ended: false,
+		error: null as MediaError | null,
+		play: vi.fn(() => Promise.resolve()),
+		pause: vi.fn(),
+		load: vi.fn(),
+		addEventListener: vi.fn((event: string, handler: EventListener) => {
+			const set = listeners.get(event) ?? new Set<EventListener>();
+			set.add(handler);
+			listeners.set(event, set);
+		}),
+		removeEventListener: vi.fn((event: string, handler: EventListener) => {
+			listeners.get(event)?.delete(handler);
+		}),
+	};
+
+	const dispatch = (event: string): void => {
+		for (const handler of listeners.get(event) ?? []) {
+			handler(new Event(event));
+		}
+	};
+
+	const reset = (): void => {
+		listeners.clear();
+		audio.src = '';
+		audio.volume = 1;
+		audio.currentTime = 0;
+		audio.duration = 180;
+		audio.ended = false;
+		audio.error = null;
+		audio.play.mockReset();
+		audio.play.mockImplementation(() => Promise.resolve());
+		audio.pause.mockReset();
+		audio.load.mockReset();
+		audio.addEventListener.mockClear();
+		audio.removeEventListener.mockClear();
+	};
+
+	return {
+		audio,
+		dispatch,
+		reset,
+		getAudioElement: vi.fn(() => audio as unknown as HTMLAudioElement),
+	};
+});
+
+vi.mock('./audioElement', () => ({
+	getAudioElement: hoisted.getAudioElement,
+}));
+
+import { NativeAudioSource } from './NativeAudioSource';
+
+describe('NativeAudioSource', () => {
+	beforeEach(() => {
+		hoisted.reset();
+		hoisted.getAudioElement.mockImplementation(() => hoisted.audio as unknown as HTMLAudioElement);
+		vi.useRealTimers();
+	});
+
+	it('loads successfully on canplay', async () => {
+		const source = new NativeAudioSource('local', { url: '/audio.mp3', seekable: true });
+		const loadPromise = source.load();
+
+		expect(hoisted.audio.src).toBe('/audio.mp3');
+		hoisted.dispatch('canplay');
+
+		await expect(loadPromise).resolves.toBeUndefined();
+	});
+
+	it('fails load when timeout is reached', async () => {
+		vi.useFakeTimers();
+		const source = new NativeAudioSource('local', { url: '/timeout.mp3', seekable: true });
+		const loadPromise = source.load();
+
+		vi.advanceTimersByTime(15_000);
+
+		await expect(loadPromise).rejects.toThrow('load timed out');
+	});
+
+	it('emits network stall error after stalled timeout', async () => {
+		vi.useFakeTimers();
+		const source = new NativeAudioSource('local', { url: '/stall.mp3', seekable: true });
+		const onError = vi.fn();
+		source.onError(onError);
+
+		const loadPromise = source.load();
+		hoisted.dispatch('canplay');
+		await loadPromise;
+
+		hoisted.dispatch('stalled');
+		vi.advanceTimersByTime(15_000);
+
+		expect(onError).toHaveBeenCalledWith(
+			expect.objectContaining({ code: 'NETWORK_STALL' })
+		);
+	});
+
+	it('reports autoplay blocked when play promise rejects', async () => {
+		const source = new NativeAudioSource('local', { url: '/blocked.mp3', seekable: true });
+		const onError = vi.fn();
+		source.onError(onError);
+
+		hoisted.audio.play.mockImplementationOnce(() => Promise.reject(new Error('blocked')));
+		source.play();
+		await Promise.resolve();
+
+		expect(onError).toHaveBeenCalledWith(
+			expect.objectContaining({ code: 'AUTOPLAY_BLOCKED' })
+		);
+	});
+
+	it('seekTo updates currentTime when stream is seekable', () => {
+		const source = new NativeAudioSource('local', { url: '/seek.mp3', seekable: true });
+
+		source.seekTo(42);
+
+		expect(hoisted.audio.currentTime).toBe(42);
+	});
+
+	it('seekTo is no-op when stream is not seekable', () => {
+		const source = new NativeAudioSource('jellyfin', { url: '/transcode.opus', seekable: false });
+		hoisted.audio.currentTime = 5;
+
+		source.seekTo(60);
+
+		expect(hoisted.audio.currentTime).toBe(5);
+	});
+
+	it('destroy clears src and removes listeners', async () => {
+		const source = new NativeAudioSource('local', { url: '/destroy.mp3', seekable: true });
+		const loadPromise = source.load();
+		hoisted.dispatch('canplay');
+		await loadPromise;
+
+		source.destroy();
+
+		expect(hoisted.audio.src).toBe('');
+		expect(hoisted.audio.removeEventListener).toHaveBeenCalled();
+	});
+
+	it('throws when audio element is unavailable', () => {
+		hoisted.getAudioElement.mockImplementationOnce(() => {
+			throw new Error('Audio element not mounted');
+		});
+
+		expect(() => new NativeAudioSource('local', { url: '/missing.mp3', seekable: true })).toThrow(
+			'Audio element not mounted'
+		);
+	});
+
+	it('fires onProgress callback on timeupdate events', async () => {
+		const source = new NativeAudioSource('local', { url: '/progress.mp3', seekable: true });
+		const onProgress = vi.fn();
+		source.onProgress(onProgress);
+
+		const loadPromise = source.load();
+		hoisted.dispatch('canplay');
+		await loadPromise;
+
+		hoisted.audio.currentTime = 42;
+		hoisted.audio.duration = 180;
+		hoisted.dispatch('timeupdate');
+
+		expect(onProgress).toHaveBeenCalledWith(42, 180);
+	});
+
+	it('rejects load promise on media error event', async () => {
+		const source = new NativeAudioSource('local', { url: '/bad.mp3', seekable: true });
+		const onError = vi.fn();
+		source.onError(onError);
+
+		const loadPromise = source.load();
+
+		hoisted.audio.error = { code: 4 } as MediaError;
+		hoisted.dispatch('error');
+
+		await expect(loadPromise).rejects.toThrow('MEDIA_ERR_SRC_NOT_SUPPORTED');
+		expect(onError).toHaveBeenCalledWith(
+			expect.objectContaining({ code: 'LOAD_ERROR' })
+		);
+	});
+
+	it('transitions from buffering back to playing after seek via playing event', async () => {
+		const source = new NativeAudioSource('local', { url: '/seek.mp3', seekable: true });
+		const states: string[] = [];
+		source.onStateChange((s) => states.push(s));
+
+		const loadPromise = source.load();
+		hoisted.dispatch('canplay');
+		await loadPromise;
+
+		hoisted.dispatch('play');
+		expect(states).toContain('playing');
+
+		hoisted.dispatch('waiting');
+		expect(states.at(-1)).toBe('buffering');
+
+		hoisted.dispatch('playing');
+		expect(states.at(-1)).toBe('playing');
+	});
+
+	it('transitions from buffering back to playing via timeupdate fallback', async () => {
+		const source = new NativeAudioSource('local', { url: '/seek2.mp3', seekable: true });
+		const states: string[] = [];
+		source.onStateChange((s) => states.push(s));
+
+		const loadPromise = source.load();
+		hoisted.dispatch('canplay');
+		await loadPromise;
+
+		hoisted.dispatch('play');
+		hoisted.dispatch('waiting');
+		expect(states.at(-1)).toBe('buffering');
+
+		hoisted.audio.currentTime = 30;
+		hoisted.dispatch('timeupdate');
+		expect(states.at(-1)).toBe('playing');
+	});
+
+	it('does not emit redundant playing state on timeupdate when already playing', async () => {
+		const source = new NativeAudioSource('local', { url: '/no-dup.mp3', seekable: true });
+		const states: string[] = [];
+		source.onStateChange((s) => states.push(s));
+
+		const loadPromise = source.load();
+		hoisted.dispatch('canplay');
+		await loadPromise;
+
+		hoisted.dispatch('play');
+		const countAfterPlay = states.filter((s) => s === 'playing').length;
+
+		hoisted.audio.currentTime = 10;
+		hoisted.dispatch('timeupdate');
+
+		expect(states.filter((s) => s === 'playing').length).toBe(countAfterPlay);
+	});
+});

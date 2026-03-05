@@ -5,8 +5,20 @@ type PlaybackSessionResult = {
 	item_id: string;
 };
 
-export async function startSession(itemId: string): Promise<string> {
-	const res = await fetch(API.stream.jellyfinStart(itemId), { method: 'POST' });
+type StartSessionPayload = {
+	play_session_id?: string;
+};
+
+export async function startSession(itemId: string, playSessionId?: string): Promise<string> {
+	const payload: StartSessionPayload | undefined = playSessionId
+		? { play_session_id: playSessionId }
+		: undefined;
+
+	const res = await fetch(API.stream.jellyfinStart(itemId), {
+		method: 'POST',
+		headers: payload ? { 'Content-Type': 'application/json' } : undefined,
+		body: payload ? JSON.stringify(payload) : undefined
+	});
 	if (!res.ok) {
 		const detail = await res.text().catch(() => 'Unknown error');
 		throw new Error(`Failed to start Jellyfin playback session: ${res.status} ${detail}`);
@@ -20,7 +32,7 @@ export async function reportProgress(
 	playSessionId: string,
 	positionSeconds: number,
 	isPaused: boolean
-): Promise<void> {
+): Promise<boolean> {
 	try {
 		const res = await fetch(API.stream.jellyfinProgress(itemId), {
 			method: 'POST',
@@ -33,9 +45,12 @@ export async function reportProgress(
 		});
 		if (!res.ok) {
 			console.warn(`[Jellyfin] progress report failed: ${res.status}`);
+			return false;
 		}
+		return true;
 	} catch {
 		console.warn('[Jellyfin] progress report failed: network error');
+		return false;
 	}
 }
 
@@ -43,7 +58,7 @@ export async function reportStop(
 	itemId: string,
 	playSessionId: string,
 	positionSeconds: number
-): Promise<void> {
+): Promise<boolean> {
 	try {
 		const res = await fetch(API.stream.jellyfinStop(itemId), {
 			method: 'POST',
@@ -55,8 +70,11 @@ export async function reportStop(
 		});
 		if (!res.ok) {
 			console.warn(`[Jellyfin] stop report failed: ${res.status}`);
+			return false;
 		}
+		return true;
 	} catch {
 		// Stop reporting is non-fatal — swallow network errors
+		return false;
 	}
 }

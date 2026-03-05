@@ -10,8 +10,7 @@ vi.mock('$lib/constants', () => ({
 	API: {
 		stream: {
 			local: (id: number | string) => `/api/stream/local/${id}`,
-			jellyfin: (id: string, format = 'aac', bitrate = 128000) =>
-				`/api/stream/jellyfin/${id}?format=${format}&bitrate=${bitrate}`
+			jellyfin: (id: string) => `/api/stream/jellyfin/${id}`
 		}
 	}
 }));
@@ -31,7 +30,7 @@ const meta: PlaybackMeta = {
 describe('launchLocalPlayback', () => {
 	beforeEach(() => vi.clearAllMocks());
 
-	it('maps LocalTrackInfo[] to QueueItem[] with sourceType howler', () => {
+	it('maps LocalTrackInfo[] to QueueItem[] with sourceType local', () => {
 		const tracks: LocalTrackInfo[] = [
 			{
 				track_file_id: 42,
@@ -52,7 +51,7 @@ describe('launchLocalPlayback', () => {
 			expect.objectContaining({
 				trackSourceId: '42',
 				trackName: 'Song A',
-				sourceType: 'howler',
+				sourceType: 'local',
 				streamUrl: '/api/stream/local/42',
 				format: 'flac'
 			})
@@ -167,7 +166,7 @@ describe('launchJellyfinPlayback', () => {
 		const call = vi.mocked(playerStore.playQueue).mock.calls[0];
 		const item: QueueItem = call[0][0];
 
-		expect(item.streamUrl).toBe('/api/stream/jellyfin/jf-abc?format=flac&bitrate=128000');
+		expect(item.streamUrl).toBe('/api/stream/jellyfin/jf-abc');
 		expect(item.format).toBe('flac');
 	});
 

@@ -14,6 +14,7 @@ from api.v1.schemas.playlists import (
     PlaylistListResponse,
     PlaylistSummaryResponse,
     PlaylistTrackResponse,
+    RemoveTracksRequest,
     ReorderTrackRequest,
     ReorderTrackResponse,
     ResolveSourcesResponse,
@@ -34,13 +35,13 @@ router = APIRouter(
 
 
 def _normalize_source_type(source_type: str) -> str:
-    return "howler" if source_type == "local" else source_type
+    return source_type
 
 
 def _normalize_available_sources(sources: list[str] | None) -> list[str] | None:
     if sources is None:
         return None
-    return ["howler" if source == "local" else source for source in sources]
+    return sources
 
 
 def _custom_cover_url(playlist_id: str, cover_image_path: str | None) -> str | None:
@@ -202,6 +203,19 @@ async def add_tracks(
     ]
     created = await service.add_tracks(playlist_id, track_dicts, body.position)
     return AddTracksResponse(tracks=[_track_to_response(t) for t in created])
+
+
+@router.post(
+    "/{playlist_id}/tracks/remove",
+    response_model=StatusMessageResponse,
+)
+async def remove_tracks(
+    playlist_id: str,
+    service: PlaylistServiceDep,
+    body: RemoveTracksRequest = MsgSpecBody(RemoveTracksRequest),
+) -> StatusMessageResponse:
+    removed = await service.remove_tracks(playlist_id, body.track_ids)
+    return StatusMessageResponse(status="ok", message=f"{removed} track(s) removed")
 
 
 @router.delete(

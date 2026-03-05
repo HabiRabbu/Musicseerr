@@ -6,6 +6,16 @@ class PlaybackSessionResponse(AppStruct):
     item_id: str
 
 
+class StartPlaybackRequest(AppStruct):
+    play_session_id: str | None = None
+
+
+class JellyfinPlaybackUrlResponse(AppStruct):
+    url: str
+    seekable: bool
+    playSessionId: str
+
+
 class ProgressReportRequest(AppStruct):
     play_session_id: str
     position_seconds: float

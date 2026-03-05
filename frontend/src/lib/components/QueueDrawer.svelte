@@ -4,10 +4,9 @@
 	import { playerStore } from '$lib/stores/player.svelte';
 	import { playbackToast } from '$lib/stores/playbackToast.svelte';
 	import { getCoverUrl } from '$lib/utils/errorHandling';
-	import { X, GripVertical, ListMusic, Music, Trash2 } from 'lucide-svelte';
+	import { X, GripVertical, ListMusic, Music, Shuffle, Trash2 } from 'lucide-svelte';
 	import JellyfinIcon from '$lib/components/JellyfinIcon.svelte';
 	import LocalFilesIcon from '$lib/components/LocalFilesIcon.svelte';
-	import type { SourceType } from '$lib/player/types';
 
 	interface Props {
 		open: boolean;
@@ -131,11 +130,6 @@
 		playbackToast.show(`Track moved to position ${newPos + 1}`, 'info');
 	}
 
-	function handleSourceChange(queueIndex: number, newSource: SourceType) {
-		playerStore.changeTrackSource(queueIndex, newSource);
-		playbackToast.show(`Source changed to ${newSource === 'howler' ? 'Local' : newSource === 'jellyfin' ? 'Jellyfin' : 'YouTube'}`, 'info');
-	}
-
 	function formatDuration(seconds?: number): string {
 		if (!seconds || isNaN(seconds)) return '';
 		const m = Math.floor(seconds / 60);
@@ -202,6 +196,15 @@
 			<div class="flex items-center gap-1">
 				{#if queue.length > 0}
 					<button
+						class="btn btn-ghost btn-sm btn-circle"
+						class:text-accent={playerStore.shuffleEnabled}
+						class:opacity-50={!playerStore.shuffleEnabled}
+						onclick={() => playerStore.toggleShuffle()}
+						aria-label="Toggle shuffle"
+					>
+						<Shuffle class="h-3.5 w-3.5" />
+					</button>
+					<button
 						class="btn btn-ghost btn-sm gap-1 text-error"
 						onclick={handleClearQueue}
 					>
@@ -234,13 +237,20 @@
 					{#each displayOrder as queueIndex, displayPosition (queueIndex)}
 						{@const item = queue[queueIndex]}
 						{@const isCurrent = queueIndex === currentIndex}
+						{@const isPlayed = displayPosition < currentDisplayPosition}
 						{@const isReorderable = displayPosition > currentDisplayPosition}
 						{@const coverUrl = getCoverUrl(item.coverUrl, item.albumId)}
-						{@const multipleSources = (item.availableSources?.length ?? 0) > 1}
+						{#if displayPosition === currentDisplayPosition + 1}
+							<div class="flex items-center gap-2 px-4 py-1.5">
+								<span class="text-[0.65rem] font-semibold uppercase tracking-wider opacity-40">Up next</span>
+								<div class="flex-1 border-t border-base-content/5"></div>
+							</div>
+						{/if}
 						<div
 							use:trackCurrentEl={isCurrent}
 							class="flex items-center gap-2 px-3 py-2 transition-colors cursor-pointer group/item
 								{isCurrent ? 'bg-accent/10 border-l-2 border-accent' : 'hover:bg-base-300/50 border-l-2 border-transparent'}
+								{isPlayed ? 'opacity-40' : ''}
 								{dragOverIndex === displayPosition ? 'border-t-2 border-t-accent' : ''}"
 							draggable={isReorderable}
 							ondragstart={(e) => handleDragStart(e, displayPosition)}
@@ -254,16 +264,19 @@
 							tabindex="0"
 						>
 							<!-- Drag Handle -->
-							<button
-								class="flex-shrink-0 opacity-0 group-hover/item:opacity-40 focus:opacity-60 cursor-grab active:cursor-grabbing transition-opacity bg-transparent border-none p-0 disabled:opacity-20 disabled:cursor-not-allowed"
-								aria-label="Drag to reorder"
-								onkeydown={(e) => handleItemKeydown(e, displayPosition)}
-								onclick={(e) => e.stopPropagation()}
-								disabled={!isReorderable}
-								tabindex="0"
-							>
-								<GripVertical class="h-4 w-4" />
-							</button>
+							{#if isReorderable}
+								<button
+									class="flex-shrink-0 opacity-40 group-hover/item:opacity-70 focus:opacity-80 cursor-grab active:cursor-grabbing transition-opacity bg-transparent border-none p-0"
+									aria-label="Drag to reorder"
+									onkeydown={(e) => handleItemKeydown(e, displayPosition)}
+									onclick={(e) => e.stopPropagation()}
+									tabindex="0"
+								>
+									<GripVertical class="h-4 w-4" />
+								</button>
+							{:else}
+								<div class="flex-shrink-0 w-4 h-4"></div>
+							{/if}
 
 							<!-- Cover Art -->
 							<div class="flex-shrink-0 w-10 h-10 rounded overflow-hidden">
@@ -293,28 +306,15 @@
 								<span class="text-xs opacity-40 flex-shrink-0">{formatDuration(item.duration)}</span>
 							{/if}
 
-							<!-- Source Badge / Dropdown -->
+							<!-- Source Badge -->
 							<div class="flex-shrink-0">
-								{#if multipleSources && !isCurrent}
-									<select
-										class="select select-xs w-20 bg-base-300/60 text-xs"
-										value={item.sourceType}
-										onchange={(e) => { handleSourceChange(queueIndex, e.currentTarget.value as SourceType); }}
-										onclick={(e) => e.stopPropagation()}
-									>
-										{#each item.availableSources ?? [] as src}
-											<option value={src}>
-												{src === 'howler' ? 'Local' : src === 'jellyfin' ? 'Jellyfin' : 'YouTube'}
-											</option>
-										{/each}
-									</select>
-								{:else if item.sourceType === 'jellyfin'}
+								{#if item.sourceType === 'jellyfin'}
 									<div class="tooltip tooltip-left" data-tip="Jellyfin">
 										<span style="color: rgb(var(--brand-jellyfin));">
 											<JellyfinIcon class="h-3.5 w-3.5" />
 										</span>
 									</div>
-								{:else if item.sourceType === 'howler'}
+								{:else if item.sourceType === 'local'}
 									<div class="tooltip tooltip-left" data-tip="Local">
 										<span style="color: rgb(var(--brand-localfiles));">
 											<LocalFilesIcon class="h-3.5 w-3.5" />

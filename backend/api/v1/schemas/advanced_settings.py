@@ -72,6 +72,7 @@ class AdvancedSettings(AppStruct):
     frontend_ttl_search: int = 300000
     frontend_ttl_local_files_sidebar: int = 120000
     frontend_ttl_jellyfin_sidebar: int = 120000
+    frontend_ttl_playlist_sources: int = 900000
 
     def __post_init__(self) -> None:
         ranges: dict[str, tuple[int | float, int | float]] = {
@@ -124,6 +125,7 @@ class AdvancedSettings(AppStruct):
             "frontend_ttl_search": (60000, 3600000),
             "frontend_ttl_local_files_sidebar": (60000, 3600000),
             "frontend_ttl_jellyfin_sidebar": (60000, 3600000),
+            "frontend_ttl_playlist_sources": (60000, 3600000),
         }
         for field_name, (minimum, maximum) in ranges.items():
             _validate_range(getattr(self, field_name), field_name, minimum, maximum)
@@ -138,6 +140,7 @@ class FrontendCacheTTLs(AppStruct):
     search: int = 300000
     local_files_sidebar: int = 120000
     jellyfin_sidebar: int = 120000
+    playlist_sources: int = 900000
     discover_queue_polling_interval: int = 4000
     discover_queue_auto_generate: bool = True
 
@@ -194,6 +197,7 @@ class AdvancedSettingsFrontend(AppStruct):
     frontend_ttl_search: int = 5
     frontend_ttl_local_files_sidebar: int = 2
     frontend_ttl_jellyfin_sidebar: int = 2
+    frontend_ttl_playlist_sources: int = 15
 
     def __post_init__(self) -> None:
         int_coerce_fields = [
@@ -264,6 +268,7 @@ class AdvancedSettingsFrontend(AppStruct):
             "frontend_ttl_search": (1, 60),
             "frontend_ttl_local_files_sidebar": (1, 60),
             "frontend_ttl_jellyfin_sidebar": (1, 60),
+            "frontend_ttl_playlist_sources": (1, 60),
         }
         for field_name, (minimum, maximum) in ranges.items():
             _validate_range(getattr(self, field_name), field_name, minimum, maximum)
@@ -322,6 +327,7 @@ class AdvancedSettingsFrontend(AppStruct):
             frontend_ttl_search=settings.frontend_ttl_search // 60000,
             frontend_ttl_local_files_sidebar=settings.frontend_ttl_local_files_sidebar // 60000,
             frontend_ttl_jellyfin_sidebar=settings.frontend_ttl_jellyfin_sidebar // 60000,
+            frontend_ttl_playlist_sources=settings.frontend_ttl_playlist_sources // 60000,
         )
 
     def to_backend(self) -> AdvancedSettings:
@@ -377,4 +383,5 @@ class AdvancedSettingsFrontend(AppStruct):
             frontend_ttl_search=self.frontend_ttl_search * 60000,
             frontend_ttl_local_files_sidebar=self.frontend_ttl_local_files_sidebar * 60000,
             frontend_ttl_jellyfin_sidebar=self.frontend_ttl_jellyfin_sidebar * 60000,
+            frontend_ttl_playlist_sources=self.frontend_ttl_playlist_sources * 60000,
         )

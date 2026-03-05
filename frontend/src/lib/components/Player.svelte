@@ -193,13 +193,19 @@
 					<input
 						type="range"
 						class="range range-xs range-accent flex-1"
+						class:opacity-50={!playerStore.isSeekable}
+						class:cursor-not-allowed={!playerStore.isSeekable}
 						min="0"
 						max={playerStore.duration || 1}
 						value={playerStore.progress}
+						disabled={!playerStore.isSeekable}
 						oninput={handleSeek}
 					/>
 					<span class="text-xs opacity-60 w-10 tabular-nums">{formatTime(playerStore.duration)}</span>
 				</div>
+				{#if !playerStore.isSeekable}
+					<p class="text-[10px] text-base-content/60">Seeking unavailable for this stream format</p>
+				{/if}
 			</div>
 
 			<!-- Right: Queue + Volume + YouTube + Open Link -->
@@ -265,7 +271,7 @@
 						<JellyfinIcon class="h-5 w-5" />
 						<span class="text-sm font-medium">Jellyfin</span>
 					</div>
-				{:else if playerStore.nowPlaying.sourceType === 'howler'}
+				{:else if playerStore.nowPlaying.sourceType === 'local'}
 					<div class="hidden sm:flex items-center gap-2" style="color: rgb(var(--brand-localfiles))">
 						<Music class="h-5 w-5" />
 						<span class="text-sm font-medium">Local{#if playerStore.currentQueueItem?.format}<span class="badge badge-xs badge-ghost ml-1 uppercase">{playerStore.currentQueueItem.format}</span>{/if}</span>

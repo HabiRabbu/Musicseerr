@@ -76,6 +76,10 @@ class AddTracksRequest(AppStruct):
     position: int | None = None
 
 
+class RemoveTracksRequest(AppStruct):
+    track_ids: list[str]
+
+
 class ReorderTrackRequest(AppStruct):
     track_id: str
     new_position: int

@@ -46,6 +46,10 @@ vi.mock('$app/navigation', () => ({
 	goto: (...args: unknown[]) => mockGoto(...args)
 }));
 
+vi.mock('$lib/stores/cacheTtl', () => ({
+	getCacheTTL: () => 15 * 60 * 1000
+}));
+
 import DetailPage from './+page.svelte';
 
 function renderDetail(playlistId = 'pl-1') {
@@ -65,8 +69,8 @@ function makeTrack(overrides: Partial<PlaylistTrack> = {}): PlaylistTrack {
 		artist_id: 'art-1',
 		track_source_id: 'vid-1',
 		cover_url: '/cover.jpg',
-		source_type: 'howler',
-		available_sources: ['howler'],
+		source_type: 'local',
+		available_sources: ['local'],
 		format: 'flac',
 		track_number: 1,
 		duration: 240,
@@ -110,6 +114,7 @@ describe('Playlist detail page', () => {
 		mockAddToQueue.mockReset();
 		mockPlayNext.mockReset();
 		mockGoto.mockReset();
+		try { localStorage.clear(); } catch { /* ignore in non-browser */ }
 	});
 
 	it('renders header with playlist name, track count, and duration', async () => {
@@ -261,5 +266,56 @@ describe('Playlist detail page', () => {
 		await expect.element(page.getByText('First Track')).toBeVisible();
 		await expect.element(page.getByText('Second Track')).toBeVisible();
 		expect(mockRemoveTrackFromPlaylist).not.toHaveBeenCalled();
+	});
+
+	it('calls resolvePlaylistSources after playlist loads', async () => {
+		mockFetchPlaylist.mockResolvedValue(makePlaylist());
+		mockResolvePlaylistSources.mockResolvedValue({});
+		renderDetail('pl-1');
+
+		await expect.element(page.getByRole('heading', { name: 'My Playlist', level: 1 })).toBeVisible();
+		await vi.waitFor(() => {
+			expect(mockResolvePlaylistSources).toHaveBeenCalledWith('pl-1');
+		});
+	});
+
+	it('merges resolved sources into track available_sources', async () => {
+		mockFetchPlaylist.mockResolvedValue(makePlaylist());
+		mockResolvePlaylistSources.mockResolvedValue({
+			'trk-1': ['local', 'jellyfin'],
+			'trk-2': ['local']
+		});
+		renderDetail('pl-1');
+
+		await expect.element(page.getByText('First Track')).toBeVisible();
+		await vi.waitFor(() => {
+			expect(mockResolvePlaylistSources).toHaveBeenCalledWith('pl-1');
+		});
+	});
+
+	it('shows play button on track hover with correct aria label', async () => {
+		mockFetchPlaylist.mockResolvedValue(makePlaylist());
+		renderDetail('pl-1');
+
+		await expect.element(page.getByText('First Track')).toBeVisible();
+
+		const playBtn = page.getByRole('button', { name: 'Play First Track' });
+		expect(playBtn.elements()).toHaveLength(1);
+	});
+
+	it('play button on track calls playQueue with correct start index', async () => {
+		mockFetchPlaylist.mockResolvedValue(makePlaylist());
+		renderDetail('pl-1');
+
+		await expect.element(page.getByText('Second Track')).toBeVisible();
+
+		const playSecond = page.getByRole('button', { name: 'Play Second Track' });
+		await playSecond.click();
+
+		expect(mockPlayQueue).toHaveBeenCalledOnce();
+		const [items, startIdx, shuffle] = mockPlayQueue.mock.calls[0];
+		expect(items).toHaveLength(2);
+		expect(startIdx).toBe(1);
+		expect(shuffle).toBe(false);
 	});
 });

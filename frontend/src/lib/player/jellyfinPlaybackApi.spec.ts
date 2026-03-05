@@ -24,6 +24,21 @@ describe('jellyfinPlaybackApi', () => {
 			});
 		});
 
+		it('sends existing play_session_id when provided', async () => {
+			mockFetch.mockResolvedValueOnce({
+				ok: true,
+				json: () => Promise.resolve({ play_session_id: 'sess-123', item_id: 'item-456' })
+			});
+
+			await api.startSession('item-456', 'sess-existing');
+
+			expect(mockFetch).toHaveBeenCalledWith('/api/stream/jellyfin/item-456/start', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ play_session_id: 'sess-existing' })
+			});
+		});
+
 		it('throws on non-ok response', async () => {
 			mockFetch.mockResolvedValueOnce({
 				ok: false,
@@ -38,11 +53,12 @@ describe('jellyfinPlaybackApi', () => {
 	});
 
 	describe('reportProgress', () => {
-		it('sends POST with correct body', async () => {
+		it('sends POST with correct body and returns true on success', async () => {
 			mockFetch.mockResolvedValueOnce({ ok: true });
 
-			await api.reportProgress('item-1', 'sess-1', 42.5, false);
+			const ok = await api.reportProgress('item-1', 'sess-1', 42.5, false);
 
+			expect(ok).toBe(true);
 			expect(mockFetch).toHaveBeenCalledWith('/api/stream/jellyfin/item-1/progress', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
@@ -58,7 +74,7 @@ describe('jellyfinPlaybackApi', () => {
 			const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 			mockFetch.mockRejectedValueOnce(new Error('Network down'));
 
-			await expect(api.reportProgress('item-1', 'sess-1', 10, false)).resolves.toBeUndefined();
+			await expect(api.reportProgress('item-1', 'sess-1', 10, false)).resolves.toBe(false);
 			expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('network error'));
 			warnSpy.mockRestore();
 		});
@@ -67,18 +83,19 @@ describe('jellyfinPlaybackApi', () => {
 			const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 			mockFetch.mockResolvedValueOnce({ ok: false, status: 500 });
 
-			await expect(api.reportProgress('item-1', 'sess-1', 10, false)).resolves.toBeUndefined();
+			await expect(api.reportProgress('item-1', 'sess-1', 10, false)).resolves.toBe(false);
 			expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('500'));
 			warnSpy.mockRestore();
 		});
 	});
 
 	describe('reportStop', () => {
-		it('sends POST with correct body', async () => {
+		it('sends POST with correct body and returns true on success', async () => {
 			mockFetch.mockResolvedValueOnce({ ok: true });
 
-			await api.reportStop('item-1', 'sess-1', 120.0);
+			const ok = await api.reportStop('item-1', 'sess-1', 120.0);
 
+			expect(ok).toBe(true);
 			expect(mockFetch).toHaveBeenCalledWith('/api/stream/jellyfin/item-1/stop', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
@@ -92,14 +109,14 @@ describe('jellyfinPlaybackApi', () => {
 		it('swallows errors silently', async () => {
 			mockFetch.mockRejectedValueOnce(new Error('Network down'));
 
-			await expect(api.reportStop('item-1', 'sess-1', 60)).resolves.toBeUndefined();
+			await expect(api.reportStop('item-1', 'sess-1', 60)).resolves.toBe(false);
 		});
 
 		it('warns on non-ok response without throwing', async () => {
 			const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 			mockFetch.mockResolvedValueOnce({ ok: false, status: 502 });
 
-			await expect(api.reportStop('item-1', 'sess-1', 60)).resolves.toBeUndefined();
+			await expect(api.reportStop('item-1', 'sess-1', 60)).resolves.toBe(false);
 			expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('502'));
 			warnSpy.mockRestore();
 		});

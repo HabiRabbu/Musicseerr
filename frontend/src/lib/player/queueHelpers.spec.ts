@@ -4,8 +4,7 @@ vi.mock('$lib/constants', () => ({
 	API: {
 		stream: {
 			local: (id: number | string) => `/api/stream/local/${id}`,
-			jellyfin: (id: string, format = 'aac', bitrate = 128000) =>
-				`/api/stream/jellyfin/${id}?format=${format}&bitrate=${bitrate}`
+			jellyfin: (id: string) => `/api/stream/jellyfin/${id}`
 		}
 	}
 }));
@@ -64,7 +63,7 @@ describe('selectBestSource', () => {
 		};
 		const result = selectBestSource(data);
 		expect(result).not.toBeNull();
-		expect(result!.sourceType).toBe('howler');
+		expect(result!.sourceType).toBe('local');
 		expect(result!.streamUrl).toBe('/api/stream/local/42');
 	});
 
@@ -98,7 +97,7 @@ describe('selectBestSource', () => {
 			localTrack,
 			jellyfinTrack
 		};
-		expect(selectBestSource(data)!.sourceType).toBe('howler');
+		expect(selectBestSource(data)!.sourceType).toBe('local');
 	});
 });
 
@@ -111,18 +110,18 @@ describe('getAvailableSources', () => {
 			localTrack,
 			jellyfinTrack
 		});
-		expect(sources).toContain('howler');
+		expect(sources).toContain('local');
 		expect(sources).toContain('jellyfin');
 	});
 
-	it('returns only howler when only local is available', () => {
+	it('returns only local when only local is available', () => {
 		expect.assertions(1);
 		const sources = getAvailableSources({
 			trackPosition: 1,
 			trackTitle: 'Track',
 			localTrack
 		});
-		expect(sources).toEqual(['howler']);
+		expect(sources).toEqual(['local']);
 	});
 
 	it('returns only jellyfin when only jellyfin is available', () => {
@@ -157,9 +156,9 @@ describe('buildQueueItem', () => {
 		const item = buildQueueItem(baseMeta, data);
 		expect(item).not.toBeNull();
 		expect(item!.trackName).toBe('Local Song');
-		expect(item!.sourceType).toBe('howler');
+		expect(item!.sourceType).toBe('local');
 		expect(item!.albumId).toBe('album-1');
-		expect(item!.availableSources).toEqual(['howler']);
+		expect(item!.availableSources).toEqual(['local']);
 		expect(item!.duration).toBe(240);
 	});
 
@@ -181,7 +180,7 @@ describe('buildQueueItem', () => {
 			jellyfinTrack
 		};
 		const item = buildQueueItem(baseMeta, data);
-		expect(item!.availableSources).toContain('howler');
+		expect(item!.availableSources).toContain('local');
 		expect(item!.availableSources).toContain('jellyfin');
 	});
 
@@ -214,21 +213,21 @@ describe('buildQueueItemsFromJellyfin', () => {
 		expect.assertions(1);
 		const track: JellyfinTrackInfo = { ...jellyfinTrack, codec: 'ALAC' };
 		const items = buildQueueItemsFromJellyfin([track], baseMeta);
-		expect(items[0].streamUrl).toContain('format=flac');
+		expect(items[0].streamUrl).toBe('/api/stream/jellyfin/jf-123');
 	});
 
 	it('defaults to aac for unknown codecs', () => {
 		expect.assertions(1);
 		const track: JellyfinTrackInfo = { ...jellyfinTrack, codec: 'unknown_codec' };
 		const items = buildQueueItemsFromJellyfin([track], baseMeta);
-		expect(items[0].streamUrl).toContain('format=aac');
+		expect(items[0].streamUrl).toBe('/api/stream/jellyfin/jf-123');
 	});
 
 	it('defaults to aac for null codec', () => {
 		expect.assertions(1);
 		const track: JellyfinTrackInfo = { ...jellyfinTrack, codec: null };
 		const items = buildQueueItemsFromJellyfin([track], baseMeta);
-		expect(items[0].streamUrl).toContain('format=aac');
+		expect(items[0].streamUrl).toBe('/api/stream/jellyfin/jf-123');
 	});
 });
 
@@ -237,9 +236,9 @@ describe('buildQueueItemsFromLocal', () => {
 		expect.assertions(5);
 		const items = buildQueueItemsFromLocal([localTrack], baseMeta);
 		expect(items).toHaveLength(1);
-		expect(items[0].sourceType).toBe('howler');
+		expect(items[0].sourceType).toBe('local');
 		expect(items[0].trackName).toBe('Local Song');
-		expect(items[0].availableSources).toEqual(['howler']);
+		expect(items[0].availableSources).toEqual(['local']);
 		expect(items[0].streamUrl).toBe('/api/stream/local/42');
 	});
 
@@ -275,8 +274,8 @@ describe('playlistTrackToQueueItem', () => {
 		artist_id: 'artist-1',
 		track_source_id: '42',
 		cover_url: '/cover.jpg',
-		source_type: 'howler',
-		available_sources: ['howler', 'jellyfin'],
+		source_type: 'local',
+		available_sources: ['local', 'jellyfin'],
 		format: 'flac',
 		track_number: 1,
 		duration: 240,
@@ -287,7 +286,7 @@ describe('playlistTrackToQueueItem', () => {
 		expect.assertions(4);
 		const item = playlistTrackToQueueItem(basePlaylistTrack)!;
 		expect(item).not.toBeNull();
-		expect(item.sourceType).toBe('howler');
+		expect(item.sourceType).toBe('local');
 		expect(item.streamUrl).toBe('/api/stream/local/42');
 		expect(item.trackName).toBe('Test Track');
 	});
@@ -297,7 +296,7 @@ describe('playlistTrackToQueueItem', () => {
 		const track: PlaylistTrack = { ...basePlaylistTrack, source_type: 'jellyfin', track_source_id: 'jf-123', format: 'opus' };
 		const item = playlistTrackToQueueItem(track)!;
 		expect(item.sourceType).toBe('jellyfin');
-		expect(item.streamUrl).toBe('/api/stream/jellyfin/jf-123?format=opus&bitrate=128000');
+		expect(item.streamUrl).toBe('/api/stream/jellyfin/jf-123');
 		expect(item.format).toBe('opus');
 	});
 
@@ -319,7 +318,7 @@ describe('playlistTrackToQueueItem', () => {
 		expect.assertions(1);
 		const track: PlaylistTrack = { ...basePlaylistTrack, available_sources: null };
 		const item = playlistTrackToQueueItem(track)!;
-		expect(item.availableSources).toEqual(['howler']);
+		expect(item.availableSources).toEqual(['local']);
 	});
 
 	it('maps all fields correctly', () => {
@@ -332,7 +331,7 @@ describe('playlistTrackToQueueItem', () => {
 		expect(item.albumName).toBe('Test Album');
 		expect(item.coverUrl).toBe('/cover.jpg');
 		expect(item.artistId).toBe('artist-1');
-		expect(item.availableSources).toEqual(['howler', 'jellyfin']);
+		expect(item.availableSources).toEqual(['local', 'jellyfin']);
 	});
 
 	it('handles null album_id by defaulting to empty string', () => {
@@ -353,6 +352,6 @@ describe('playlistTrackToQueueItem', () => {
 		expect.assertions(1);
 		const track: PlaylistTrack = { ...basePlaylistTrack, source_type: 'jellyfin', track_source_id: 'jf-1', format: null };
 		const item = playlistTrackToQueueItem(track)!;
-		expect(item.streamUrl).toBe('/api/stream/jellyfin/jf-1?format=aac&bitrate=128000');
+		expect(item.streamUrl).toBe('/api/stream/jellyfin/jf-1');
 	});
 });

@@ -167,7 +167,7 @@ function createScrobbleManager() {
 		}
 
 		const currentKey = makeTrackKey(np.artistName, np.trackName);
-		const durationMs = playerStore.duration * 1000;
+		const durationMs = Math.round(playerStore.duration * 1000);
 
 		if (!track || track.trackKey !== currentKey) {
 			track = {
@@ -190,7 +190,7 @@ function createScrobbleManager() {
 		progressInterval = setInterval(() => {
 			if (!track) return;
 			const progressS = playerStore.progress;
-			const currentDurationMs = playerStore.duration * 1000;
+			const currentDurationMs = Math.round(playerStore.duration * 1000);
 			const currentNp = playerStore.nowPlaying;
 
 			if (!currentNp || !currentNp.trackName || !playerStore.isPlaying) return;

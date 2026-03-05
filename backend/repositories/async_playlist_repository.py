@@ -53,6 +53,9 @@ class AsyncPlaylistRepository:
     async def remove_track(self, playlist_id: str, track_id: str) -> bool:
         return await asyncio.to_thread(self._repo.remove_track, playlist_id, track_id)
 
+    async def remove_tracks(self, playlist_id: str, track_ids: list[str]) -> int:
+        return await asyncio.to_thread(self._repo.remove_tracks, playlist_id, track_ids)
+
     async def reorder_track(
         self, playlist_id: str, track_id: str, new_position: int,
     ) -> Optional[int]:

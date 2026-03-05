@@ -20,7 +20,7 @@ export function launchLocalPlayback(
 		albumId: meta.albumId,
 		albumName: meta.albumName,
 		coverUrl: normalizedCoverUrl,
-		sourceType: 'howler',
+		sourceType: 'local',
 		artistId: meta.artistId,
 		streamUrl: API.stream.local(t.track_file_id),
 		format: t.format.toLowerCase()

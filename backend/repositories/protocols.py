@@ -8,6 +8,7 @@ from api.v1.schemas.request import QueueItem
 from api.v1.schemas.common import ServiceStatus
 from api.v1.schemas.discover import YouTubeQuotaResponse
 from repositories.jellyfin_models import JellyfinItem as JellyfinItem
+from repositories.jellyfin_models import PlaybackUrlResult as PlaybackUrlResult
 from repositories.jellyfin_models import JellyfinUser as JellyfinUser
 from repositories.lastfm_models import (
     LastFmAlbum,
@@ -389,16 +390,14 @@ class JellyfinRepositoryProtocol(Protocol):
 
     # --- Streaming & playback reporting ---
 
-    def get_stream_url(
-        self, item_id: str, audio_codec: str = "aac", bitrate: int = 128000
-    ) -> str:
+    async def get_playback_url(self, item_id: str) -> PlaybackUrlResult:
         ...
 
     async def get_playback_info(self, item_id: str) -> dict[str, Any]:
         ...
 
     async def report_playback_start(
-        self, item_id: str, play_session_id: str
+        self, item_id: str, play_session_id: str, play_method: str = "Transcode"
     ) -> None:
         ...
 

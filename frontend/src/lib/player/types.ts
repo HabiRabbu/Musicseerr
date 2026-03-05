@@ -1,6 +1,8 @@
 export type PlaybackState = 'idle' | 'loading' | 'playing' | 'paused' | 'ended' | 'buffering' | 'error';
 
-export type SourceType = 'youtube' | 'howler' | 'jellyfin';
+export type SourceType = 'youtube' | 'local' | 'jellyfin';
+
+export type QueueOrigin = 'context' | 'manual';
 
 export interface PlaybackSource {
 	readonly type: SourceType;
@@ -18,6 +20,7 @@ export interface PlaybackSource {
 	setVolume(level: number): void;
 	getCurrentTime(): number;
 	getDuration(): number;
+	isSeekable?(): boolean;
 	destroy(): void;
 
 	onStateChange(callback: (state: PlaybackState) => void): void;
@@ -63,4 +66,6 @@ export interface QueueItem {
 	format?: string;
 	availableSources?: SourceType[];
 	duration?: number;
+	playSessionId?: string;
+	queueOrigin?: QueueOrigin;
 }

@@ -202,15 +202,15 @@ describe('playlists API client', () => {
 
 	describe('updatePlaylistTrack', () => {
 		it('sends PATCH with data body', async () => {
-			const track = { id: 't1', source_type: 'howler' };
+			const track = { id: 't1', source_type: 'local' };
 			mockFetch.mockResolvedValue(jsonResponse(track));
 
-			await updatePlaylistTrack('p1', 't1', { source_type: 'howler' });
+			await updatePlaylistTrack('p1', 't1', { source_type: 'local' });
 
 			expect(mockFetch).toHaveBeenCalledWith('/api/v1/playlists/p1/tracks/t1', {
 				method: 'PATCH',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ source_type: 'howler' })
+				body: JSON.stringify({ source_type: 'local' })
 			});
 		});
 	});
@@ -273,7 +273,7 @@ describe('playlists API client', () => {
 				artistId: 'art-1',
 				streamUrl: '/stream/vid-1',
 				format: 'aac',
-				availableSources: ['jellyfin', 'howler'],
+				availableSources: ['jellyfin', 'local'],
 				duration: 240
 			};
 
@@ -288,7 +288,7 @@ describe('playlists API client', () => {
 				track_source_id: 'vid-1',
 				cover_url: '/cover.jpg',
 				source_type: 'jellyfin',
-				available_sources: ['jellyfin', 'howler'],
+				available_sources: ['jellyfin', 'local'],
 				format: 'aac',
 				track_number: 3,
 				duration: 240
@@ -304,7 +304,7 @@ describe('playlists API client', () => {
 				albumId: '',
 				albumName: 'Album',
 				coverUrl: null,
-				sourceType: 'howler'
+				sourceType: 'local'
 			};
 
 			const result = queueItemToTrackData(item);
@@ -328,7 +328,7 @@ describe('playlists API client', () => {
 				albumId: 'alb-1',
 				albumName: 'Album',
 				coverUrl: null,
-				sourceType: 'howler',
+				sourceType: 'local',
 				streamUrl: '/stream/should-not-appear'
 			};
 

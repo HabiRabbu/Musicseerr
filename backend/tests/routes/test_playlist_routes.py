@@ -365,7 +365,7 @@ class TestUpdateTrackSourceResolution:
         updated = _track()
         updated.source_type = "jellyfin"
         updated.track_source_id = "jf-resolved-id"
-        updated.available_sources = ["jellyfin", "howler"]
+        updated.available_sources = ["jellyfin", "local"]
         mock_playlist_service.update_track_source.return_value = updated
         resp = client.patch(
             "/api/v1/playlists/p-1/tracks/t-1",
@@ -376,4 +376,4 @@ class TestUpdateTrackSourceResolution:
         data = resp.json()
         assert data["source_type"] == "jellyfin"
         assert data["track_source_id"] == "jf-resolved-id"
-        assert data["available_sources"] == ["jellyfin", "howler"]
+        assert data["available_sources"] == ["jellyfin", "local"]

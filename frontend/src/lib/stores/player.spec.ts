@@ -1,25 +1,57 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { QueueItem, SourceType } from '$lib/player/types';
 
-vi.mock('howler', () => ({ Howl: vi.fn() }));
+type StateCallback = (state: import('$lib/player/types').PlaybackState) => void;
+type ProgressCallback = (currentTime: number, duration: number) => void;
+type ErrorCallback = (error: { code: string; message: string }) => void;
+
+let capturedStateCallbacks: StateCallback[] = [];
+let capturedProgressCallbacks: ProgressCallback[] = [];
+let capturedErrorCallbacks: ErrorCallback[] = [];
 
 vi.mock('$lib/player/createSource', () => ({
-	createPlaybackSource: vi.fn(() => ({
-		type: 'howler' as const,
-		load: vi.fn().mockResolvedValue(undefined),
-		play: vi.fn(),
-		pause: vi.fn(),
-		seekTo: vi.fn(),
-		setVolume: vi.fn(),
-		getCurrentTime: vi.fn(() => 0),
-		getDuration: vi.fn(() => 180),
-		destroy: vi.fn(),
-		onStateChange: vi.fn(),
-		onReady: vi.fn(),
-		onError: vi.fn(),
-		onProgress: vi.fn(),
-	})),
+	createPlaybackSource: vi.fn(() => {
+		capturedStateCallbacks = [];
+		capturedProgressCallbacks = [];
+		capturedErrorCallbacks = [];
+		return {
+			type: 'local' as const,
+			load: vi.fn().mockResolvedValue(undefined),
+			play: vi.fn(),
+			pause: vi.fn(),
+			seekTo: vi.fn(),
+			setVolume: vi.fn(),
+			getCurrentTime: vi.fn(() => 0),
+			getDuration: vi.fn(() => 180),
+			isSeekable: vi.fn(() => true),
+			destroy: vi.fn(),
+			onStateChange: vi.fn((cb: StateCallback) => { capturedStateCallbacks.push(cb); }),
+			onReady: vi.fn(),
+			onError: vi.fn((cb: ErrorCallback) => { capturedErrorCallbacks.push(cb); }),
+			onProgress: vi.fn((cb: ProgressCallback) => { capturedProgressCallbacks.push(cb); }),
+		};
+	}),
 }));
+
+vi.mock('$lib/player/jellyfinPlaybackApi', () => ({
+	startSession: vi.fn(async (_itemId: string, playSessionId?: string) => playSessionId ?? ''),
+	reportProgress: vi.fn(async () => true),
+	reportStop: vi.fn(async () => true),
+}));
+
+const storage = new Map<string, string>();
+vi.stubGlobal('localStorage', {
+	getItem: vi.fn((key: string) => (storage.has(key) ? storage.get(key)! : null)),
+	setItem: vi.fn((key: string, value: string) => {
+		storage.set(key, value);
+	}),
+	removeItem: vi.fn((key: string) => {
+		storage.delete(key);
+	}),
+	clear: vi.fn(() => {
+		storage.clear();
+	}),
+});
 
 vi.mock('$lib/stores/playbackToast.svelte', () => ({
 	playbackToast: {
@@ -43,9 +75,9 @@ function makeItem(overrides: Partial<QueueItem> = {}): QueueItem {
 		albumId: overrides.albumId ?? 'album-1',
 		albumName: overrides.albumName ?? 'Test Album',
 		coverUrl: overrides.coverUrl ?? null,
-		sourceType: overrides.sourceType ?? 'howler',
+		sourceType: overrides.sourceType ?? 'local',
 		streamUrl: overrides.streamUrl ?? 'http://localhost/test.mp3',
-		availableSources: overrides.availableSources ?? ['howler', 'jellyfin'],
+		availableSources: overrides.availableSources ?? ['local', 'jellyfin'],
 		duration: overrides.duration,
 		...overrides,
 	};
@@ -59,6 +91,7 @@ function makeItems(count: number): QueueItem[] {
 
 describe('playerStore queue methods', () => {
 	beforeEach(() => {
+		localStorage.clear();
 		playerStore.stop();
 		vi.clearAllMocks();
 	});
@@ -283,7 +316,47 @@ describe('playerStore queue methods', () => {
 		it('updates streamUrl for target source', () => {
 			playerStore.playQueue(makeItems(3));
 			playerStore.changeTrackSource(1, 'jellyfin');
-			expect(playerStore.queue[1].streamUrl).toBe('/api/stream/jellyfin/vid-1?format=aac&bitrate=128000');
+			expect(playerStore.queue[1].streamUrl).toBe('/api/stream/jellyfin/vid-1');
+		});
+	});
+
+	describe('session migration', () => {
+		it('maps legacy howler source type to local during resume', () => {
+			const legacySession = {
+				nowPlaying: {
+					albumId: 'album-1',
+					albumName: 'Album',
+					artistName: 'Artist',
+					coverUrl: null,
+					sourceType: 'howler',
+					trackSourceId: '1',
+					trackName: 'Track',
+				},
+				queue: [
+					{
+						trackSourceId: '1',
+						trackName: 'Track',
+						artistName: 'Artist',
+						trackNumber: 1,
+						albumId: 'album-1',
+						albumName: 'Album',
+						coverUrl: null,
+						sourceType: 'howler',
+						streamUrl: '/api/stream/local/1',
+						availableSources: ['howler', 'jellyfin'],
+					},
+				],
+				currentIndex: 0,
+				progress: 0,
+				shuffleEnabled: false,
+				shuffleOrder: [],
+			};
+
+			localStorage.setItem('musicseerr_player_session', JSON.stringify(legacySession));
+			playerStore.resumeSession();
+
+			expect(playerStore.queue[0].sourceType).toBe('local');
+			expect(playerStore.queue[0].availableSources).toEqual(['local', 'jellyfin']);
 		});
 	});
 
@@ -328,6 +401,207 @@ describe('playerStore queue methods', () => {
 			expect(playerStore.shuffleEnabled).toBe(false);
 			expect(playerStore.shuffleOrder).toHaveLength(0);
 		});
+
+		it('only shuffles upcoming tracks, not played ones', () => {
+			playerStore.playQueue(makeItems(6), 0);
+			playerStore.jumpToTrack(3);
+
+			playerStore.toggleShuffle();
+
+			expect(playerStore.shuffleOrder).toHaveLength(6);
+			expect(playerStore.shuffleOrder.slice(0, 3)).toEqual([0, 1, 2]);
+			expect(playerStore.shuffleOrder[3]).toBe(3);
+			const upcomingPart = playerStore.shuffleOrder.slice(4);
+			expect(upcomingPart.sort()).toEqual([4, 5]);
+		});
+
+		it('preserves played order when toggled at end of queue', () => {
+			playerStore.playQueue(makeItems(4), 0);
+			playerStore.jumpToTrack(3);
+
+			playerStore.toggleShuffle();
+			expect(playerStore.shuffleOrder.slice(0, 3)).toEqual([0, 1, 2]);
+			expect(playerStore.shuffleOrder[3]).toBe(3);
+		});
+
+		it('includes all indices when toggled at start', () => {
+			playerStore.playQueue(makeItems(5));
+			playerStore.toggleShuffle();
+
+			expect(playerStore.shuffleOrder).toHaveLength(5);
+			expect(playerStore.shuffleOrder[0]).toBe(0);
+			expect([...playerStore.shuffleOrder].sort()).toEqual([0, 1, 2, 3, 4]);
+		});
+	});
+
+	describe('queueOrigin tagging', () => {
+		it('playQueue stamps items as context', () => {
+			playerStore.playQueue(makeItems(3));
+			expect(playerStore.queue.every((i) => i.queueOrigin === 'context')).toBe(true);
+		});
+
+		it('addToQueue stamps item as manual', () => {
+			playerStore.playQueue(makeItems(2));
+			playerStore.addToQueue(makeItem({ trackName: 'Manual' }));
+			expect(playerStore.queue[2].queueOrigin).toBe('manual');
+		});
+
+		it('addMultipleToQueue stamps items as manual', () => {
+			playerStore.playQueue(makeItems(2));
+			playerStore.addMultipleToQueue(makeItems(2));
+			expect(playerStore.queue[2].queueOrigin).toBe('manual');
+			expect(playerStore.queue[3].queueOrigin).toBe('manual');
+		});
+
+		it('playNext stamps item as manual', () => {
+			playerStore.playQueue(makeItems(2));
+			playerStore.playNext(makeItem({ trackName: 'Next' }));
+			expect(playerStore.queue[1].queueOrigin).toBe('manual');
+		});
+
+		it('playMultipleNext stamps items as manual', () => {
+			playerStore.playQueue(makeItems(2));
+			playerStore.playMultipleNext(makeItems(2));
+			expect(playerStore.queue[1].queueOrigin).toBe('manual');
+			expect(playerStore.queue[2].queueOrigin).toBe('manual');
+		});
+
+		it('does not overwrite existing context origin on playQueue', () => {
+			const items = makeItems(2);
+			items[0].queueOrigin = 'manual';
+			playerStore.playQueue(items);
+			expect(playerStore.queue[0].queueOrigin).toBe('context');
+		});
+	});
+
+	describe('played track cleanup', () => {
+		it('removes manual tracks after advancing past them', async () => {
+			playerStore.playQueue(makeItems(2));
+			playerStore.playNext(makeItem({ trackName: 'Manual Next' }));
+			expect(playerStore.queue).toHaveLength(3);
+
+			playerStore.jumpToTrack(1);
+			playerStore.nextTrack();
+			await vi.waitFor(() => {
+				expect(playerStore.queue.find((i) => i.trackName === 'Manual Next')).toBeUndefined();
+			});
+		});
+
+		it('keeps context tracks up to history cap', async () => {
+			playerStore.playQueue(makeItems(6));
+
+			playerStore.nextTrack();
+			await vi.waitFor(() => { expect(playerStore.currentIndex).toBeGreaterThan(0); });
+			playerStore.nextTrack();
+			await vi.waitFor(() => { expect(playerStore.currentIndex).toBeGreaterThan(0); });
+			playerStore.nextTrack();
+			await vi.waitFor(() => { expect(playerStore.currentIndex).toBeGreaterThan(0); });
+			playerStore.nextTrack();
+			await vi.waitFor(() => { expect(playerStore.currentIndex).toBeGreaterThan(0); });
+			playerStore.nextTrack();
+			await vi.waitFor(() => {
+				const playedCount = playerStore.currentIndex;
+				expect(playedCount).toBeLessThanOrEqual(3);
+			});
+		});
+
+		it('trims oldest context tracks beyond history cap', async () => {
+			playerStore.playQueue(makeItems(8));
+
+			for (let i = 0; i < 6; i++) {
+				playerStore.nextTrack();
+				await vi.waitFor(() => { expect(playerStore.currentIndex).toBeGreaterThan(0); });
+			}
+
+			const historyBehind = playerStore.currentIndex;
+			expect(historyBehind).toBeLessThanOrEqual(3);
+		});
+
+		it('does not remove tracks when at start of queue', async () => {
+			playerStore.playQueue(makeItems(3));
+			playerStore.nextTrack();
+			await vi.waitFor(() => {
+				expect(playerStore.currentIndex).toBeGreaterThanOrEqual(0);
+			});
+			expect(playerStore.queue.length).toBeGreaterThanOrEqual(2);
+		});
+	});
+
+	describe('session migration with queueOrigin', () => {
+		it('defaults missing queueOrigin to context during resume', () => {
+			const session = {
+				nowPlaying: {
+					albumId: 'album-1',
+					albumName: 'Album',
+					artistName: 'Artist',
+					coverUrl: null,
+					sourceType: 'local',
+					trackSourceId: '1',
+					trackName: 'Track',
+				},
+				queue: [
+					{
+						trackSourceId: '1',
+						trackName: 'Track',
+						artistName: 'Artist',
+						trackNumber: 1,
+						albumId: 'album-1',
+						albumName: 'Album',
+						coverUrl: null,
+						sourceType: 'local',
+						streamUrl: '/api/stream/local/1',
+						availableSources: ['local'],
+					},
+				],
+				currentIndex: 0,
+				progress: 0,
+				shuffleEnabled: false,
+				shuffleOrder: [],
+			};
+
+			localStorage.setItem('musicseerr_player_session', JSON.stringify(session));
+			playerStore.resumeSession();
+
+			expect(playerStore.queue[0].queueOrigin).toBe('context');
+		});
+
+		it('preserves existing queueOrigin during resume', () => {
+			const session = {
+				nowPlaying: {
+					albumId: 'album-1',
+					albumName: 'Album',
+					artistName: 'Artist',
+					coverUrl: null,
+					sourceType: 'local',
+					trackSourceId: '1',
+					trackName: 'Track',
+				},
+				queue: [
+					{
+						trackSourceId: '1',
+						trackName: 'Track',
+						artistName: 'Artist',
+						trackNumber: 1,
+						albumId: 'album-1',
+						albumName: 'Album',
+						coverUrl: null,
+						sourceType: 'local',
+						streamUrl: '/api/stream/local/1',
+						availableSources: ['local'],
+						queueOrigin: 'manual',
+					},
+				],
+				currentIndex: 0,
+				progress: 0,
+				shuffleEnabled: false,
+				shuffleOrder: [],
+			};
+
+			localStorage.setItem('musicseerr_player_session', JSON.stringify(session));
+			playerStore.resumeSession();
+
+			expect(playerStore.queue[0].queueOrigin).toBe('manual');
+		});
 	});
 
 	describe('jumpToTrack', () => {
@@ -343,5 +617,215 @@ describe('playerStore queue methods', () => {
 			playerStore.jumpToTrack(10);
 			expect(playerStore.currentIndex).toBe(before);
 		});
+	});
+});
+
+describe('Jellyfin session lifecycle', () => {
+	let fetchMock: ReturnType<typeof vi.fn>;
+	let jellyfinApi: { startSession: ReturnType<typeof vi.fn>; reportProgress: ReturnType<typeof vi.fn>; reportStop: ReturnType<typeof vi.fn> };
+
+	beforeEach(async () => {
+		localStorage.clear();
+		playerStore.stop();
+		vi.clearAllMocks();
+		vi.useFakeTimers();
+
+		jellyfinApi = await import('$lib/player/jellyfinPlaybackApi') as unknown as typeof jellyfinApi;
+
+		fetchMock = vi.fn().mockResolvedValue({
+			ok: true,
+			json: async () => ({ url: 'http://jf/Audio/1/stream?static=true', seekable: true, playSessionId: 'ps-123' }),
+		});
+		vi.stubGlobal('fetch', fetchMock);
+	});
+
+	afterEach(() => {
+		vi.useRealTimers();
+		vi.unstubAllGlobals();
+		vi.stubGlobal('localStorage', {
+			getItem: vi.fn((key: string) => (storage.has(key) ? storage.get(key)! : null)),
+			setItem: vi.fn((key: string, value: string) => { storage.set(key, value); }),
+			removeItem: vi.fn((key: string) => { storage.delete(key); }),
+			clear: vi.fn(() => { storage.clear(); }),
+		});
+	});
+
+	function makeJellyfinItem(overrides: Partial<QueueItem> = {}): QueueItem {
+		return makeItem({ sourceType: 'jellyfin', trackSourceId: 'jf-1', streamUrl: undefined, ...overrides });
+	}
+
+	it('calls startSession when a Jellyfin track is loaded', async () => {
+		playerStore.playQueue([makeJellyfinItem()]);
+		await vi.advanceTimersByTimeAsync(0);
+
+		expect(jellyfinApi.startSession).toHaveBeenCalledWith('jf-1', 'ps-123');
+	});
+
+	it('calls reportStop when switching tracks', async () => {
+		playerStore.playQueue([makeJellyfinItem({ trackSourceId: 'jf-1' }), makeItem({ trackSourceId: 'loc-2' })]);
+		await vi.advanceTimersByTimeAsync(0);
+
+		capturedStateCallbacks.forEach((cb) => cb('playing'));
+		capturedProgressCallbacks.forEach((cb) => cb(30, 180));
+		await vi.advanceTimersByTimeAsync(0);
+
+		playerStore.nextTrack();
+		await vi.advanceTimersByTimeAsync(0);
+
+		expect(jellyfinApi.reportStop).toHaveBeenCalledWith('jf-1', 'ps-123', expect.any(Number));
+	});
+
+	it('calls reportStop when stop() is called', async () => {
+		playerStore.playQueue([makeJellyfinItem()]);
+		await vi.advanceTimersByTimeAsync(0);
+
+		playerStore.stop();
+		await vi.advanceTimersByTimeAsync(0);
+
+		expect(jellyfinApi.reportStop).toHaveBeenCalledWith('jf-1', 'ps-123', expect.any(Number));
+	});
+
+	it('calls reportProgress during the progress interval', async () => {
+		playerStore.playQueue([makeJellyfinItem()]);
+		await vi.advanceTimersByTimeAsync(0);
+
+		capturedStateCallbacks.forEach((cb) => cb('playing'));
+		capturedProgressCallbacks.forEach((cb) => cb(10, 180));
+		await vi.advanceTimersByTimeAsync(0);
+
+		vi.advanceTimersByTime(10_000);
+
+		expect(jellyfinApi.reportProgress).toHaveBeenCalledWith(
+			'jf-1', 'ps-123', expect.any(Number), false
+		);
+	});
+});
+
+describe('beforeunload beacon', () => {
+	let addEventListenerSpy: ReturnType<typeof vi.fn>;
+	let removeEventListenerSpy: ReturnType<typeof vi.fn>;
+	let sendBeaconMock: ReturnType<typeof vi.fn>;
+	let jellyfinApi: { startSession: ReturnType<typeof vi.fn>; reportProgress: ReturnType<typeof vi.fn>; reportStop: ReturnType<typeof vi.fn> };
+
+	beforeEach(async () => {
+		localStorage.clear();
+		playerStore.stop();
+		vi.clearAllMocks();
+		vi.useFakeTimers();
+
+		jellyfinApi = await import('$lib/player/jellyfinPlaybackApi') as unknown as typeof jellyfinApi;
+
+		vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+			ok: true,
+			json: async () => ({ url: 'http://jf/Audio/1/stream?static=true', seekable: true, playSessionId: 'ps-beacon' }),
+		}));
+
+		const listeners = new Map<string, Set<Function>>();
+		const windowStub = {
+			addEventListener: vi.fn((event: string, handler: Function) => {
+				const set = listeners.get(event) ?? new Set();
+				set.add(handler);
+				listeners.set(event, set);
+			}),
+			removeEventListener: vi.fn((event: string, handler: Function) => {
+				listeners.get(event)?.delete(handler);
+			}),
+		};
+		vi.stubGlobal('window', windowStub);
+		addEventListenerSpy = windowStub.addEventListener;
+		removeEventListenerSpy = windowStub.removeEventListener;
+
+		sendBeaconMock = vi.fn(() => true);
+		vi.stubGlobal('navigator', { sendBeacon: sendBeaconMock });
+	});
+
+	afterEach(() => {
+		vi.useRealTimers();
+		vi.unstubAllGlobals();
+		vi.stubGlobal('localStorage', {
+			getItem: vi.fn((key: string) => (storage.has(key) ? storage.get(key)! : null)),
+			setItem: vi.fn((key: string, value: string) => { storage.set(key, value); }),
+			removeItem: vi.fn((key: string) => { storage.delete(key); }),
+			clear: vi.fn(() => { storage.clear(); }),
+		});
+	});
+
+	function makeJellyfinItem(overrides: Partial<QueueItem> = {}): QueueItem {
+		return makeItem({ sourceType: 'jellyfin', trackSourceId: 'jf-beacon', streamUrl: undefined, ...overrides });
+	}
+
+	it('registers beforeunload listener when a Jellyfin track starts', async () => {
+		playerStore.playQueue([makeJellyfinItem()]);
+		await vi.advanceTimersByTimeAsync(0);
+
+		expect(addEventListenerSpy).toHaveBeenCalledWith('beforeunload', expect.any(Function));
+	});
+
+	it('sends beacon with correct payload on beforeunload', async () => {
+		playerStore.playQueue([makeJellyfinItem()]);
+		await vi.advanceTimersByTimeAsync(0);
+
+		capturedProgressCallbacks.forEach((cb) => cb(45, 180));
+
+		const beforeUnloadHandler = addEventListenerSpy.mock.calls.find(
+			(call) => call[0] === 'beforeunload'
+		)?.[1] as (() => void) | undefined;
+
+		expect(beforeUnloadHandler).toBeDefined();
+		beforeUnloadHandler!();
+
+		expect(sendBeaconMock).toHaveBeenCalledWith(
+			'/api/stream/jellyfin/jf-beacon/stop',
+			expect.any(Blob)
+		);
+
+		const sentBlob = sendBeaconMock.mock.calls[0][1] as Blob;
+		expect(sentBlob.type).toBe('application/json');
+		const text = await sentBlob.text();
+		const parsed = JSON.parse(text);
+		expect(parsed).toEqual({ play_session_id: 'ps-beacon', position_seconds: 45 });
+	});
+
+	it('removes beforeunload listener on destroy/stop', async () => {
+		playerStore.playQueue([makeJellyfinItem()]);
+		await vi.advanceTimersByTimeAsync(0);
+
+		playerStore.stop();
+		await vi.advanceTimersByTimeAsync(0);
+
+		expect(removeEventListenerSpy).toHaveBeenCalledWith('beforeunload', expect.any(Function));
+	});
+});
+
+describe('non-seekable state propagation', () => {
+	beforeEach(() => {
+		localStorage.clear();
+		playerStore.stop();
+		vi.clearAllMocks();
+		vi.useFakeTimers();
+
+		vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+			ok: true,
+			json: async () => ({ url: 'http://jf/Audio/1/universal?transcode', seekable: false, playSessionId: 'ps-ns' }),
+		}));
+	});
+
+	afterEach(() => {
+		vi.useRealTimers();
+		vi.unstubAllGlobals();
+		vi.stubGlobal('localStorage', {
+			getItem: vi.fn((key: string) => (storage.has(key) ? storage.get(key)! : null)),
+			setItem: vi.fn((key: string, value: string) => { storage.set(key, value); }),
+			removeItem: vi.fn((key: string) => { storage.delete(key); }),
+			clear: vi.fn(() => { storage.clear(); }),
+		});
+	});
+
+	it('sets isSeekable to false when Jellyfin returns seekable: false', async () => {
+		const item = makeItem({ sourceType: 'jellyfin', trackSourceId: 'jf-ns', streamUrl: undefined });
+		playerStore.playQueue([item]);
+		await vi.advanceTimersByTimeAsync(0);
+
+		expect(playerStore.isSeekable).toBe(false);
 	});
 });

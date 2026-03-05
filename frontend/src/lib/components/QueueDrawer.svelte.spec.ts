@@ -3,11 +3,9 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import QueueDrawer from './QueueDrawer.svelte';
 
-vi.mock('howler', () => ({ Howl: vi.fn() }));
-
 vi.mock('$lib/player/createSource', () => ({
 	createPlaybackSource: vi.fn(() => ({
-		type: 'howler' as const,
+		type: 'local' as const,
 		load: vi.fn().mockResolvedValue(undefined),
 		play: vi.fn(),
 		pause: vi.fn(),
@@ -15,6 +13,7 @@ vi.mock('$lib/player/createSource', () => ({
 		setVolume: vi.fn(),
 		getCurrentTime: vi.fn(() => 0),
 		getDuration: vi.fn(() => 180),
+		isSeekable: vi.fn(() => true),
 		destroy: vi.fn(),
 		onStateChange: vi.fn(),
 		onReady: vi.fn(),
@@ -47,12 +46,12 @@ describe('QueueDrawer.svelte', () => {
 			{
 				trackSourceId: 'v1', trackName: 'Track A', artistName: 'Artist',
 				trackNumber: 1, albumId: 'a1', albumName: 'Album',
-				coverUrl: null, sourceType: 'howler', streamUrl: 'http://test/1.mp3',
+				coverUrl: null, sourceType: 'local', streamUrl: 'http://test/1.mp3',
 			},
 			{
 				trackSourceId: 'v2', trackName: 'Track B', artistName: 'Artist',
 				trackNumber: 2, albumId: 'a1', albumName: 'Album',
-				coverUrl: null, sourceType: 'howler', streamUrl: 'http://test/2.mp3',
+				coverUrl: null, sourceType: 'local', streamUrl: 'http://test/2.mp3',
 			},
 		]);
 		const onclose = vi.fn();
@@ -74,12 +73,12 @@ describe('QueueDrawer.svelte', () => {
 			{
 				trackSourceId: 'v1', trackName: 'Track A', artistName: 'Artist',
 				trackNumber: 1, albumId: 'a1', albumName: 'Album',
-				coverUrl: null, sourceType: 'howler', streamUrl: 'http://test/1.mp3',
+				coverUrl: null, sourceType: 'local', streamUrl: 'http://test/1.mp3',
 			},
 			{
 				trackSourceId: 'v2', trackName: 'Track B', artistName: 'Artist',
 				trackNumber: 2, albumId: 'a1', albumName: 'Album',
-				coverUrl: null, sourceType: 'howler', streamUrl: 'http://test/2.mp3',
+				coverUrl: null, sourceType: 'local', streamUrl: 'http://test/2.mp3',
 			},
 		]);
 		const onclose = vi.fn();
@@ -98,12 +97,12 @@ describe('QueueDrawer.svelte', () => {
 			{
 				trackSourceId: 'v1', trackName: 'Track A', artistName: 'Artist',
 				trackNumber: 1, albumId: 'a1', albumName: 'Album',
-				coverUrl: null, sourceType: 'howler', streamUrl: 'http://test/1.mp3',
+				coverUrl: null, sourceType: 'local', streamUrl: 'http://test/1.mp3',
 			},
 			{
 				trackSourceId: 'v2', trackName: 'Track B', artistName: 'Artist',
 				trackNumber: 2, albumId: 'a1', albumName: 'Album',
-				coverUrl: null, sourceType: 'howler', streamUrl: 'http://test/2.mp3',
+				coverUrl: null, sourceType: 'local', streamUrl: 'http://test/2.mp3',
 			},
 		]);
 		const onclose = vi.fn();
@@ -117,17 +116,17 @@ describe('QueueDrawer.svelte', () => {
 			{
 				trackSourceId: 'v1', trackName: 'Track A', artistName: 'Artist',
 				trackNumber: 1, albumId: 'a1', albumName: 'Album',
-				coverUrl: null, sourceType: 'howler', streamUrl: 'http://test/1.mp3',
+				coverUrl: null, sourceType: 'local', streamUrl: 'http://test/1.mp3',
 			},
 			{
 				trackSourceId: 'v2', trackName: 'Track B', artistName: 'Artist',
 				trackNumber: 2, albumId: 'a1', albumName: 'Album',
-				coverUrl: null, sourceType: 'howler', streamUrl: 'http://test/2.mp3',
+				coverUrl: null, sourceType: 'local', streamUrl: 'http://test/2.mp3',
 			},
 			{
 				trackSourceId: 'v3', trackName: 'Track C', artistName: 'Artist',
 				trackNumber: 3, albumId: 'a1', albumName: 'Album',
-				coverUrl: null, sourceType: 'howler', streamUrl: 'http://test/3.mp3',
+				coverUrl: null, sourceType: 'local', streamUrl: 'http://test/3.mp3',
 			},
 		], 1);
 		const onclose = vi.fn();

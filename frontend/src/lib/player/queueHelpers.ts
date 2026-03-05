@@ -36,7 +36,7 @@ export function selectBestSource(
 	if (data.localTrack) {
 		const format = data.localTrack.format.toLowerCase();
 		return {
-			sourceType: 'howler',
+			sourceType: 'local',
 			trackSourceId: String(data.localTrack.track_file_id),
 			streamUrl: API.stream.local(data.localTrack.track_file_id),
 			format
@@ -47,7 +47,7 @@ export function selectBestSource(
 		return {
 			sourceType: 'jellyfin',
 			trackSourceId: data.jellyfinTrack.jellyfin_id,
-			streamUrl: API.stream.jellyfin(data.jellyfinTrack.jellyfin_id, format),
+			streamUrl: API.stream.jellyfin(data.jellyfinTrack.jellyfin_id),
 			format
 		};
 	}
@@ -56,7 +56,7 @@ export function selectBestSource(
 
 export function getAvailableSources(data: TrackSourceData): SourceType[] {
 	const sources: SourceType[] = [];
-	if (data.localTrack) sources.push('howler');
+	if (data.localTrack) sources.push('local');
 	if (data.jellyfinTrack) sources.push('jellyfin');
 	return sources;
 }
@@ -101,7 +101,7 @@ export function buildQueueItemsFromJellyfin(
 			coverUrl: normalizedCoverUrl,
 			sourceType: 'jellyfin' as const,
 			artistId: meta.artistId,
-			streamUrl: API.stream.jellyfin(t.jellyfin_id, format),
+			streamUrl: API.stream.jellyfin(t.jellyfin_id),
 			format,
 			availableSources: ['jellyfin'] as SourceType[],
 			duration: t.duration_seconds
@@ -122,11 +122,11 @@ export function buildQueueItemsFromLocal(
 		albumId: meta.albumId,
 		albumName: meta.albumName,
 		coverUrl: normalizedCoverUrl,
-		sourceType: 'howler' as const,
+		sourceType: 'local' as const,
 		artistId: meta.artistId,
 		streamUrl: API.stream.local(t.track_file_id),
 		format: t.format.toLowerCase(),
-		availableSources: ['howler'] as SourceType[],
+		availableSources: ['local'] as SourceType[],
 		duration: t.duration_seconds ?? undefined
 	}));
 }
@@ -136,8 +136,8 @@ function resolveStreamUrl(
 	trackSourceId: string,
 	format?: string | null
 ): string | undefined {
-	if (sourceType === 'howler') return API.stream.local(trackSourceId);
-	if (sourceType === 'jellyfin') return API.stream.jellyfin(trackSourceId, format ?? 'aac');
+	if (sourceType === 'local') return API.stream.local(trackSourceId);
+	if (sourceType === 'jellyfin') return API.stream.jellyfin(trackSourceId);
 	return undefined;
 }
 

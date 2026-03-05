@@ -34,6 +34,13 @@ class JellyfinUser(msgspec.Struct):
     name: str
 
 
+class PlaybackUrlResult(msgspec.Struct):
+    url: str
+    seekable: bool
+    play_session_id: str
+    play_method: str
+
+
 def parse_item(item: dict[str, Any]) -> JellyfinItem:
     user_data = item.get("UserData", {})
     provider_ids = item.get("ProviderIds", {})

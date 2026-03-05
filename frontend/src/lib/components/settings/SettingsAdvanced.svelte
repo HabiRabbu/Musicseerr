@@ -64,6 +64,7 @@
 		frontend_ttl_search: number;
 		frontend_ttl_local_files_sidebar: number;
 		frontend_ttl_jellyfin_sidebar: number;
+		frontend_ttl_playlist_sources: number;
 	}
 
 	let settings: AdvancedSettingsForm | null = $state(null);
@@ -291,6 +292,20 @@
 							<span class="label">min</span>
 						</label>
 						<p class="label text-base-content/50">Default: 2 minutes</p>
+					</fieldset>
+					<fieldset class="fieldset">
+						<legend class="fieldset-legend">Playlist Sources</legend>
+						<label class="input w-full">
+							<input
+								type="number"
+								bind:value={settings.frontend_ttl_playlist_sources}
+								min="1"
+								max="60"
+								class="grow"
+							/>
+							<span class="label">min</span>
+						</label>
+						<p class="label text-base-content/50">Default: 15 minutes</p>
 					</fieldset>
 				</div>
 			</div>

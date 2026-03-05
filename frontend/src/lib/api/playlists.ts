@@ -154,6 +154,18 @@ export async function removeTrackFromPlaylist(
 	await handleResponse(res);
 }
 
+export async function removeTracksFromPlaylist(
+	id: string,
+	trackIds: string[]
+): Promise<void> {
+	const res = await fetch(API.playlists.removeTracks(id), {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ track_ids: trackIds })
+	});
+	await handleResponse(res);
+}
+
 export async function updatePlaylistTrack(
 	id: string,
 	trackId: string,
