@@ -139,7 +139,7 @@
 		getDefaultSortOrder: (field) => (field === 'SortName' ? 'Ascending' : 'Descending'),
 		supportsGenres: true,
 		supportsFavorites: true,
-		supportsShuffle: false,
+		supportsShuffle: true,
 		errorMessage: "Couldn't reach Jellyfin"
 	};
 
