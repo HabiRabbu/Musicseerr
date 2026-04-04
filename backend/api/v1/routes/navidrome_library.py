@@ -15,6 +15,7 @@ from api.v1.schemas.navidrome import (
 from core.dependencies import get_navidrome_library_service, get_navidrome_repository
 from core.exceptions import ExternalServiceError
 from infrastructure.msgspec_fastapi import MsgSpecRoute
+from infrastructure.resilience.retry import CircuitOpenError
 from repositories.navidrome_repository import NavidromeRepository
 from services.navidrome_library_service import NavidromeLibraryService
 
@@ -50,7 +51,7 @@ async def get_navidrome_albums(
     try:
         stats = await service.get_stats()
         total = stats.total_albums if len(items) >= limit else offset + len(items)
-    except ExternalServiceError:
+    except (ExternalServiceError, CircuitOpenError):
         logger.warning("Navidrome stats unavailable, using heuristic pagination total")
         total = offset + len(items) + (1 if len(items) >= limit else 0)
 
