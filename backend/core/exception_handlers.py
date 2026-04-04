@@ -42,10 +42,11 @@ async def external_service_error_handler(request: Request, exc: ExternalServiceE
 
 async def circuit_open_error_handler(request: Request, exc: CircuitOpenError) -> MsgSpecJSONResponse:
     logger.error("Circuit breaker open: %s - %s %s", exc, request.method, request.url.path)
+    name = exc.breaker_name.replace("_", " ").title() if getattr(exc, "breaker_name", "") else "Service"
     return error_response(
         status.HTTP_503_SERVICE_UNAVAILABLE,
         CIRCUIT_BREAKER_OPEN,
-        "Service temporarily unavailable due to repeated connection failures. Check your settings or wait for the service to recover.",
+        f"{name} is temporarily unavailable due to repeated connection failures. Check your settings or wait for the service to recover.",
     )
 
 

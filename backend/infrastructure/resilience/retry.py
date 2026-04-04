@@ -160,7 +160,9 @@ class CircuitBreaker:
 
 
 class CircuitOpenError(Exception):
-    pass
+    def __init__(self, message: str, breaker_name: str = ""):
+        super().__init__(message)
+        self.breaker_name = breaker_name
 
 
 def _get_retry_after_seconds(exception: Exception) -> Optional[float]:
@@ -206,7 +208,8 @@ def with_retry(
                         extra={"service_name": service_name, "function": func_name}
                     )
                     raise CircuitOpenError(
-                        f"Circuit breaker '{circuit_breaker.name}' is OPEN"
+                        f"Circuit breaker '{circuit_breaker.name}' is OPEN",
+                        breaker_name=circuit_breaker.name,
                     )
             
             last_exception = None
@@ -293,7 +296,7 @@ def with_retry(
             
             if circuit_breaker and last_exception:
                 is_non_breaking = isinstance(last_exception, non_breaking_exceptions) if non_breaking_exceptions else False
-                if not is_non_breaking or circuit_breaker.state == CircuitState.HALF_OPEN:
+                if not is_non_breaking:
                     await circuit_breaker.arecord_failure()
 
             raise last_exception

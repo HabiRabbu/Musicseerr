@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import httpx
 import pytest
 
-from core.exceptions import ExternalServiceError, NavidromeApiError, NavidromeAuthError
+from core.exceptions import ExternalServiceError, NavidromeApiError, NavidromeAuthError, NavidromeSubsonicError
 from repositories.navidrome_repository import _navidrome_circuit_breaker
 from repositories.navidrome_models import (
     SubsonicAlbum,
@@ -86,14 +86,14 @@ class TestParseSubsonicResponse:
         resp = parse_subsonic_response(data)
         assert resp["status"] == "ok"
 
-    def test_error_status_raises_api_error(self):
+    def test_error_status_raises_subsonic_error(self):
         data = {
             "subsonic-response": {
                 "status": "failed",
                 "error": {"code": 70, "message": "Not found"},
             }
         }
-        with pytest.raises(NavidromeApiError, match="Not found"):
+        with pytest.raises(NavidromeSubsonicError, match="Not found"):
             parse_subsonic_response(data)
 
     def test_auth_error_code_40(self):
@@ -331,6 +331,63 @@ class TestErrorHandling:
         repo, _, _ = _make_repo(configured=False)
         with pytest.raises(ExternalServiceError, match="not configured"):
             await repo._request("/rest/ping")
+
+
+class TestCircuitBreakerNonBreaking:
+    """Verify NavidromeSubsonicError doesn't trip the circuit breaker."""
+
+    def setup_method(self):
+        _navidrome_circuit_breaker.reset()
+
+    @pytest.mark.asyncio
+    async def test_subsonic_error_does_not_open_circuit_breaker(self):
+        """Repeated SubsonicErrors (e.g. 'Library not found') should NOT open the CB."""
+        repo, client, _ = _make_repo()
+        error_envelope = {
+            "subsonic-response": {
+                "status": "failed",
+                "error": {"code": 70, "message": "Library not found or empty"},
+            }
+        }
+        client.get = AsyncMock(return_value=_mock_response(error_envelope))
+
+        with patch("infrastructure.resilience.retry.asyncio.sleep", new_callable=AsyncMock):
+            for _ in range(10):
+                with pytest.raises(NavidromeSubsonicError):
+                    await repo._request("/rest/getAlbumList2")
+
+        from infrastructure.resilience.retry import CircuitState
+        assert _navidrome_circuit_breaker.state == CircuitState.CLOSED
+
+    @pytest.mark.asyncio
+    async def test_auth_error_still_trips_circuit_breaker(self):
+        """Auth errors (NavidromeAuthError) should still record CB failures."""
+        from infrastructure.resilience.retry import CircuitOpenError, CircuitState
+
+        repo, client, _ = _make_repo()
+        client.get = AsyncMock(return_value=_mock_response({}, status_code=401))
+
+        with patch("infrastructure.resilience.retry.asyncio.sleep", new_callable=AsyncMock):
+            for _ in range(10):
+                with pytest.raises((NavidromeAuthError, ExternalServiceError, CircuitOpenError)):
+                    await repo._request("/rest/ping")
+
+        assert _navidrome_circuit_breaker.state == CircuitState.OPEN
+
+    @pytest.mark.asyncio
+    async def test_connection_error_still_trips_circuit_breaker(self):
+        """Transport-level errors should still record CB failures."""
+        from infrastructure.resilience.retry import CircuitOpenError, CircuitState
+
+        repo, client, _ = _make_repo()
+        client.get = AsyncMock(side_effect=httpx.ConnectError("refused"))
+
+        with patch("infrastructure.resilience.retry.asyncio.sleep", new_callable=AsyncMock):
+            for _ in range(10):
+                with pytest.raises((ExternalServiceError, CircuitOpenError)):
+                    await repo._request("/rest/ping")
+
+        assert _navidrome_circuit_breaker.state == CircuitState.OPEN
 
 
 class TestValidateConnection:

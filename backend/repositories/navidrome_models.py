@@ -6,7 +6,7 @@ from typing import Any
 
 import msgspec
 
-from core.exceptions import NavidromeApiError, NavidromeAuthError
+from core.exceptions import NavidromeApiError, NavidromeAuthError, NavidromeSubsonicError
 
 logger = logging.getLogger(__name__)
 
@@ -88,7 +88,7 @@ def parse_subsonic_response(data: dict[str, Any]) -> dict[str, Any]:
         message = error.get("message", "Unknown Subsonic API error")
         if code in (40, 41):
             raise NavidromeAuthError(message, code=code)
-        raise NavidromeApiError(message, code=code)
+        raise NavidromeSubsonicError(message, code=code)
     return resp
 
 

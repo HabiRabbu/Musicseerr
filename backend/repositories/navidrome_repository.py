@@ -9,7 +9,7 @@ from urllib.parse import urlencode
 import httpx
 import msgspec
 
-from core.exceptions import ExternalServiceError, NavidromeApiError, NavidromeAuthError
+from core.exceptions import ExternalServiceError, NavidromeApiError, NavidromeAuthError, NavidromeSubsonicError
 from infrastructure.cache.cache_keys import NAVIDROME_PREFIX
 from infrastructure.cache.memory_cache import CacheInterface
 from infrastructure.resilience.retry import with_retry, CircuitBreaker
@@ -210,6 +210,7 @@ class NavidromeRepository:
         max_delay=5.0,
         circuit_breaker=_navidrome_circuit_breaker,
         retriable_exceptions=(httpx.HTTPError, ExternalServiceError),
+        non_breaking_exceptions=(NavidromeSubsonicError,),
     )
     async def _request(
         self,

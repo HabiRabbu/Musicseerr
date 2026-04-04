@@ -79,5 +79,25 @@ class NavidromeAuthError(NavidromeApiError):
     pass
 
 
+class NavidromeSubsonicError(ExternalServiceError):
+    """Non-auth error from a valid Subsonic API envelope.
+
+    Raised when Navidrome returns a well-formed ``subsonic-response`` with
+    a non-OK status and an error code that is *not* an authentication
+    failure (codes 40/41).  These are potentially transient (e.g. "Library
+    not found or empty" during a rescan) and should be retried but must
+    **not** trip the circuit breaker.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        details: Any = None,
+        code: int | None = None,
+    ):
+        super().__init__(message, details)
+        self.code = code
+
+
 class ClientDisconnectedError(MusicseerrException):
     pass
