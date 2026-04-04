@@ -1,18 +1,25 @@
 #!/bin/sh
 set -e
+umask 027
 
 PUID=${PUID:-1000}
 PGID=${PGID:-1000}
+
+case "$PUID" in ''|*[!0-9]*) echo "[init] FATAL: PUID='$PUID' is not a valid numeric UID."; exit 1;; esac
+case "$PGID" in ''|*[!0-9]*) echo "[init] FATAL: PGID='$PGID' is not a valid numeric GID."; exit 1;; esac
 
 check_writable() {
     _dir="$1"
     _identity="$2"
     _probe="$_dir/.musicseerr_write_test_$$"
     if [ -n "$_identity" ]; then
-        gosu "$_identity" touch "$_probe" 2>/dev/null && gosu "$_identity" rm -f "$_probe" 2>/dev/null
+        gosu "$_identity" touch "$_probe" 2>/dev/null; _rc=$?
+        gosu "$_identity" rm -f "$_probe" 2>/dev/null
     else
-        touch "$_probe" 2>/dev/null && rm -f "$_probe" 2>/dev/null
+        touch "$_probe" 2>/dev/null; _rc=$?
+        rm -f "$_probe" 2>/dev/null
     fi
+    return "$_rc"
 }
 
 if [ "$(id -u)" -ne 0 ]; then
@@ -40,6 +47,13 @@ TARGET_UID=$(id -u musicseerr)
 TARGET_GID=$(id -g musicseerr)
 echo "[init] Runtime user: musicseerr (uid=$TARGET_UID gid=$TARGET_GID)"
 
+if [ "$TARGET_UID" != "$PUID" ]; then
+    echo "[init] WARNING: Requested PUID=$PUID but running as uid=$TARGET_UID (usermod may have failed)."
+fi
+if [ "$TARGET_GID" != "$PGID" ]; then
+    echo "[init] WARNING: Requested PGID=$PGID but running as gid=$TARGET_GID (groupmod may have failed)."
+fi
+
 for dir in /app/cache /app/config; do
     mkdir -p "$dir" 2>/dev/null || true
 
@@ -47,8 +61,8 @@ for dir in /app/cache /app/config; do
         continue
     fi
 
-    if chown -R musicseerr:musicseerr "$dir" 2>/dev/null; then
-        echo "[init] Fixed ownership of $dir"
+    if chown musicseerr:musicseerr "$dir" 2>/dev/null; then
+        echo "[init] Adjusted ownership of $dir - verifying write access."
     else
         echo "[init] WARNING: Could not chown $dir (mount may not support ownership changes)."
     fi
