@@ -19,7 +19,6 @@ const MAX_HISTORY_LENGTH = 3;
 const SESSION_PERSIST_INTERVAL_MS = 5000;
 const JELLYFIN_REPORT_INTERVAL_MS = 10_000;
 const MAX_JELLYFIN_REPORT_FAILURES = 3;
-type JellyfinPlaybackUrlResponse = { url: string; seekable: boolean; playSessionId: string };
 
 function createPlayerStore() {
 	let currentSource = $state<PlaybackSource | null>(null);
@@ -106,10 +105,8 @@ function createPlayerStore() {
 			void reportNavidromeNowPlaying(item.trackSourceId);
 			return { source: createPlaybackSource('navidrome', { url: url!, seekable: true }), loadUrl: url };
 		}
-		const payload = await api.global.get<JellyfinPlaybackUrlResponse>(API.stream.jellyfin(item.trackSourceId));
-		const uq = [...queue]; uq[index] = { ...item, playSessionId: payload.playSessionId }; queue = uq;
-		isSeekable = payload.seekable;
-		return { source: createPlaybackSource('jellyfin', { url: payload.url, seekable: payload.seekable }), loadUrl: payload.url };
+		isSeekable = true;
+		return { source: createPlaybackSource('jellyfin', { url: url!, seekable: true }), loadUrl: url };
 	}
 
 	async function startJellyfinPlayback(index: number): Promise<void> {

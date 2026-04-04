@@ -10,7 +10,7 @@ export function resolveSourceUrl(item: QueueItem): string | undefined {
 		case 'navidrome':
 			return item.streamUrl ?? API.stream.navidrome(item.trackSourceId);
 		case 'jellyfin':
-			return undefined;
+			return API.stream.jellyfin(item.trackSourceId);
 	}
 }
 

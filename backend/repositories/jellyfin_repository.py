@@ -1,6 +1,9 @@
 import httpx
 import logging
+import re
+from collections.abc import AsyncIterator
 from typing import Any
+from urllib.parse import urlparse
 
 import msgspec
 from core.exceptions import ExternalServiceError, PlaybackNotAllowedError, ResourceNotFoundError
@@ -16,6 +19,7 @@ from repositories.jellyfin_models import (
     parse_item,
     parse_user,
 )
+from repositories.navidrome_models import StreamProxyResult
 from infrastructure.degradation import try_get_degradation_context
 from infrastructure.integration_result import IntegrationResult
 
@@ -681,7 +685,7 @@ class JellyfinRepository:
         transcoding_url = primary_source.get("TranscodingUrl")
 
         if supports_direct_play or supports_direct_stream:
-            playback_url = f"{self._base_url}/Audio/{item_id}/stream?static=true&api_key={self._api_key}"
+            playback_url = f"{self._base_url}/Audio/{item_id}/stream?static=true"
             play_method = "DirectPlay" if supports_direct_play else "DirectStream"
             seekable = True
         elif isinstance(transcoding_url, str) and transcoding_url:
@@ -737,3 +741,118 @@ class JellyfinRepository:
             "PositionTicks": position_ticks,
         }
         await self._post("/Sessions/Playing/Stopped", json_data=body)
+
+    def _validate_stream_url(self, url: str) -> None:
+        expected = urlparse(self._base_url)
+        actual = urlparse(url)
+        if (actual.scheme, actual.hostname, actual.port) != (
+            expected.scheme, expected.hostname, expected.port
+        ):
+            raise ExternalServiceError(
+                "Resolved playback URL does not match configured Jellyfin origin"
+            )
+
+    def _get_stream_headers(self) -> dict[str, str]:
+        return {"X-Emby-Token": self._api_key}
+
+    async def proxy_head_stream(self, item_id: str) -> StreamProxyResult:
+        playback = await self.get_playback_url(item_id)
+        self._validate_stream_url(playback.url)
+
+        async with httpx.AsyncClient(
+            timeout=httpx.Timeout(connect=10, read=10, write=10, pool=10)
+        ) as client:
+            try:
+                resp = await client.head(
+                    playback.url, headers=self._get_stream_headers()
+                )
+            except httpx.HTTPError:
+                raise ExternalServiceError("Failed to reach Jellyfin for stream")
+
+        if resp.status_code >= 400:
+            raise ExternalServiceError(
+                f"Jellyfin HEAD returned {resp.status_code} for {item_id}"
+            )
+
+        headers: dict[str, str] = {}
+        for h in _PROXY_FORWARD_HEADERS:
+            v = resp.headers.get(h)
+            if v:
+                headers[h] = v
+        return StreamProxyResult(
+            status_code=resp.status_code,
+            headers=headers,
+            media_type=headers.get("Content-Type", "audio/mpeg"),
+        )
+
+    async def proxy_get_stream(
+        self, item_id: str, range_header: str | None = None
+    ) -> StreamProxyResult:
+        playback = await self.get_playback_url(item_id)
+        self._validate_stream_url(playback.url)
+
+        upstream_headers = self._get_stream_headers()
+        if range_header:
+            if not _RANGE_RE.match(range_header):
+                raise ExternalServiceError("416 Range not satisfiable")
+            upstream_headers["Range"] = range_header
+
+        client = httpx.AsyncClient(
+            timeout=httpx.Timeout(connect=10, read=120, write=30, pool=10)
+        )
+        upstream_resp = None
+        try:
+            try:
+                upstream_resp = await client.send(
+                    client.build_request("GET", playback.url, headers=upstream_headers),
+                    stream=True,
+                )
+            except httpx.HTTPError as exc:
+                raise ExternalServiceError(
+                    f"Failed to connect to Jellyfin for stream: {exc}"
+                )
+
+            if upstream_resp.status_code == 416:
+                raise ExternalServiceError("416 Range not satisfiable")
+
+            if upstream_resp.status_code >= 400:
+                logger.error(
+                    "Jellyfin upstream returned %d for %s",
+                    upstream_resp.status_code, item_id,
+                )
+                raise ExternalServiceError("Jellyfin returned an error")
+
+            resp_headers: dict[str, str] = {}
+            for header_name in _PROXY_FORWARD_HEADERS:
+                value = upstream_resp.headers.get(header_name)
+                if value:
+                    resp_headers[header_name] = value
+
+            status_code = 206 if upstream_resp.status_code == 206 else 200
+
+            async def _stream_body() -> AsyncIterator[bytes]:
+                try:
+                    async for chunk in upstream_resp.aiter_bytes(
+                        chunk_size=_STREAM_CHUNK_SIZE
+                    ):
+                        yield chunk
+                finally:
+                    await upstream_resp.aclose()
+                    await client.aclose()
+
+            return StreamProxyResult(
+                status_code=status_code,
+                headers=resp_headers,
+                media_type=resp_headers.get("Content-Type", "audio/mpeg"),
+                body_chunks=_stream_body(),
+            )
+        except Exception:
+            if upstream_resp:
+                await upstream_resp.aclose()
+            await client.aclose()
+            raise
+
+
+_PROXY_FORWARD_HEADERS = {"Content-Type", "Content-Length", "Content-Range", "Accept-Ranges"}
+_STREAM_CHUNK_SIZE = 64 * 1024
+_RANGE_RE = re.compile(r"^bytes=\d*-\d*(,\s*\d*-\d*)*$")

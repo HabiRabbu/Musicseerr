@@ -3,107 +3,121 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from fastapi.responses import Response, StreamingResponse
 
 from api.v1.routes.stream import router
-from core.dependencies import get_jellyfin_playback_service, get_jellyfin_repository
+from core.dependencies import get_jellyfin_playback_service
 from core.exceptions import ExternalServiceError, PlaybackNotAllowedError, ResourceNotFoundError
-from repositories.jellyfin_models import PlaybackUrlResult
 
 
-@pytest.fixture
-def mock_jellyfin_repo():
-    mock = MagicMock()
-    mock.get_playback_url = AsyncMock(
-        return_value=PlaybackUrlResult(
-            url="http://jellyfin:8096/Audio/item-1/stream?static=true&api_key=test-key",
-            seekable=True,
-            play_session_id="sess-1",
-            play_method="DirectPlay",
-        )
-    )
-    return mock
+async def _fake_body():
+    yield b"audio-data-chunk-1"
+    yield b"audio-data-chunk-2"
 
 
 @pytest.fixture
 def mock_playback_service():
     mock = MagicMock()
     mock.start_playback = AsyncMock(return_value="sess-start")
+    mock.proxy_head = AsyncMock(
+        return_value=Response(
+            status_code=200,
+            headers={
+                "Content-Type": "audio/flac",
+                "Content-Length": "12345678",
+                "Accept-Ranges": "bytes",
+            },
+        )
+    )
+    mock.proxy_stream = AsyncMock(
+        return_value=StreamingResponse(
+            content=_fake_body(),
+            status_code=200,
+            headers={"Content-Type": "audio/flac", "Content-Length": "12345678"},
+            media_type="audio/flac",
+        )
+    )
     return mock
 
 
 @pytest.fixture
-def client(mock_jellyfin_repo, mock_playback_service):
+def client(mock_playback_service):
     app = FastAPI()
     app.include_router(router)
-    app.dependency_overrides[get_jellyfin_repository] = lambda: mock_jellyfin_repo
     app.dependency_overrides[get_jellyfin_playback_service] = lambda: mock_playback_service
     return TestClient(app)
 
 
-def test_get_stream_returns_json_with_seekable_and_session(client):
+def test_get_stream_returns_proxied_audio(client, mock_playback_service):
     response = client.get("/stream/jellyfin/item-1")
 
     assert response.status_code == 200
-    assert response.json() == {
-        "url": "http://jellyfin:8096/Audio/item-1/stream?static=true&api_key=test-key",
-        "seekable": True,
-        "playSessionId": "sess-1",
-    }
+    assert b"audio-data-chunk" in response.content
+    mock_playback_service.proxy_stream.assert_awaited_once()
+    call_args = mock_playback_service.proxy_stream.call_args
+    assert call_args[0][0] == "item-1"
 
 
-def test_get_stream_transcode_returns_non_seekable(client, mock_jellyfin_repo):
-    mock_jellyfin_repo.get_playback_url = AsyncMock(
-        return_value=PlaybackUrlResult(
-            url="http://jellyfin:8096/Audio/item-2/universal?container=opus",
-            seekable=False,
-            play_session_id="sess-2",
-            play_method="Transcode",
-        )
-    )
+def test_get_stream_forwards_range_header(client, mock_playback_service):
+    client.get("/stream/jellyfin/item-1", headers={"Range": "bytes=1000-"})
 
-    response = client.get("/stream/jellyfin/item-2")
-
-    assert response.status_code == 200
-    assert response.json()["seekable"] is False
-    assert "/universal" in response.json()["url"]
+    call_args = mock_playback_service.proxy_stream.call_args
+    assert call_args[1]["range_header"] == "bytes=1000-"
 
 
-def test_get_stream_returns_404_when_item_missing(client, mock_jellyfin_repo):
-    mock_jellyfin_repo.get_playback_url.side_effect = ResourceNotFoundError("missing")
+def test_get_stream_returns_404_when_item_missing(client, mock_playback_service):
+    mock_playback_service.proxy_stream.side_effect = ResourceNotFoundError("missing")
 
     response = client.get("/stream/jellyfin/missing-item")
 
     assert response.status_code == 404
 
 
-def test_get_stream_returns_403_when_playback_not_allowed(client, mock_jellyfin_repo):
-    mock_jellyfin_repo.get_playback_url.side_effect = PlaybackNotAllowedError("NotAllowed")
+def test_get_stream_returns_403_when_playback_not_allowed(client, mock_playback_service):
+    mock_playback_service.proxy_stream.side_effect = PlaybackNotAllowedError("NotAllowed")
 
     response = client.get("/stream/jellyfin/item-denied")
 
     assert response.status_code == 403
 
 
-def test_get_stream_returns_502_on_external_error(client, mock_jellyfin_repo):
-    mock_jellyfin_repo.get_playback_url.side_effect = ExternalServiceError("jellyfin down")
+def test_get_stream_returns_502_on_external_error(client, mock_playback_service):
+    mock_playback_service.proxy_stream.side_effect = ExternalServiceError("jellyfin down")
 
     response = client.get("/stream/jellyfin/item-err")
 
     assert response.status_code == 502
 
 
-def test_head_stream_returns_redirect(client):
-    response = client.request("HEAD", "/stream/jellyfin/item-1", follow_redirects=False)
+def test_get_stream_returns_416_on_range_error(client, mock_playback_service):
+    mock_playback_service.proxy_stream.side_effect = ExternalServiceError("416 Range not satisfiable")
 
-    assert response.status_code == 302
-    assert response.headers["location"] == "http://jellyfin:8096/Audio/item-1/stream?static=true&api_key=test-key"
+    response = client.get("/stream/jellyfin/item-range", headers={"Range": "bytes=999999999-"})
+
+    assert response.status_code == 416
 
 
-def test_head_stream_sets_no_referrer_policy(client):
-    response = client.request("HEAD", "/stream/jellyfin/item-1", follow_redirects=False)
+def test_head_stream_returns_proxied_headers(client, mock_playback_service):
+    response = client.request("HEAD", "/stream/jellyfin/item-1")
 
-    assert response.status_code == 302
-    assert response.headers["referrer-policy"] == "no-referrer"
+    assert response.status_code == 200
+    mock_playback_service.proxy_head.assert_awaited_once_with("item-1")
+
+
+def test_head_stream_returns_404_when_missing(client, mock_playback_service):
+    mock_playback_service.proxy_head.side_effect = ResourceNotFoundError("missing")
+
+    response = client.request("HEAD", "/stream/jellyfin/missing-item")
+
+    assert response.status_code == 404
+
+
+def test_head_stream_returns_403_when_not_allowed(client, mock_playback_service):
+    mock_playback_service.proxy_head.side_effect = PlaybackNotAllowedError("not allowed")
+
+    response = client.request("HEAD", "/stream/jellyfin/item-denied")
+
+    assert response.status_code == 403
 
 
 def test_start_stream_uses_existing_play_session_id(client, mock_playback_service):

@@ -13,7 +13,10 @@ from services.jellyfin_playback_service import (
 def _make_repo() -> AsyncMock:
     repo = AsyncMock()
     repo.get_playback_info = AsyncMock(
-        return_value={"PlaySessionId": "sess-123"}
+        return_value={
+            "PlaySessionId": "sess-123",
+            "MediaSources": [{"SupportsDirectPlay": True, "SupportsDirectStream": True}],
+        }
     )
     repo.report_playback_start = AsyncMock()
     repo.report_playback_progress = AsyncMock()
@@ -33,7 +36,9 @@ async def test_start_playback_returns_session_id(service):
     svc, repo = service
     result = await svc.start_playback("item-1")
     assert result == "sess-123"
-    repo.report_playback_start.assert_called_once_with("item-1", "sess-123")
+    repo.report_playback_start.assert_called_once_with(
+        "item-1", "sess-123", play_method="DirectPlay"
+    )
 
 
 @pytest.mark.asyncio
@@ -107,3 +112,58 @@ async def test_stop_playback_handles_failure(service):
     svc, repo = service
     repo.report_playback_stopped.side_effect = httpx.ConnectError("timeout")
     await svc.stop_playback("item-1", "sess-123", 10.0)
+
+
+@pytest.mark.asyncio
+async def test_proxy_head_delegates_to_repo(service):
+    svc, repo = service
+    from fastapi.responses import Response
+    from repositories.navidrome_models import StreamProxyResult
+
+    repo.proxy_head_stream = AsyncMock(
+        return_value=StreamProxyResult(
+            status_code=200,
+            headers={"Content-Type": "audio/flac", "Content-Length": "999"},
+            media_type="audio/flac",
+        )
+    )
+    result = await svc.proxy_head("item-1")
+    assert isinstance(result, Response)
+    repo.proxy_head_stream.assert_awaited_once_with("item-1")
+
+
+@pytest.mark.asyncio
+async def test_proxy_stream_returns_streaming_response(service):
+    svc, repo = service
+    from fastapi.responses import StreamingResponse
+    from repositories.navidrome_models import StreamProxyResult
+
+    async def _chunks():
+        yield b"data"
+
+    repo.proxy_get_stream = AsyncMock(
+        return_value=StreamProxyResult(
+            status_code=200,
+            headers={"Content-Type": "audio/flac"},
+            media_type="audio/flac",
+            body_chunks=_chunks(),
+        )
+    )
+    result = await svc.proxy_stream("item-1", range_header="bytes=0-")
+    assert isinstance(result, StreamingResponse)
+    repo.proxy_get_stream.assert_awaited_once_with("item-1", range_header="bytes=0-")
+
+
+@pytest.mark.asyncio
+async def test_start_playback_propagates_play_method(service):
+    svc, repo = service
+    repo.get_playback_info.return_value = {
+        "PlaySessionId": "sess-123",
+        "MediaSources": [
+            {"SupportsDirectPlay": False, "SupportsDirectStream": False, "TranscodingUrl": "/transcode"}
+        ],
+    }
+    await svc.start_playback("item-1")
+    repo.report_playback_start.assert_called_once_with(
+        "item-1", "sess-123", play_method="Transcode"
+    )

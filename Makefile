@@ -100,6 +100,9 @@ backend-test-sync-coordinator: $(BACKEND_VENV_STAMP) ## Run sync coordinator tes
 backend-test-local-files-fallback: $(BACKEND_VENV_STAMP) ## Run local files stale-while-error fallback tests
 	cd "$(BACKEND_DIR)" && .venv/bin/python -m pytest tests/test_local_files_fallback.py -v
 
+backend-test-jellyfin-proxy: $(BACKEND_VENV_STAMP) ## Run Jellyfin stream proxy tests
+	cd "$(BACKEND_DIR)" && .venv/bin/python -m pytest tests/routes/test_stream_routes.py -v
+
 test-audiodb-all: backend-test-audiodb backend-test-audiodb-prewarm backend-test-audiodb-settings backend-test-coverart-audiodb backend-test-audiodb-phase8 backend-test-audiodb-phase9 frontend-test-audiodb-images ## Run every AudioDB test target
 
 frontend-install: ## Install frontend npm dependencies

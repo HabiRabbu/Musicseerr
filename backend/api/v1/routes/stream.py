@@ -1,24 +1,21 @@
 import logging
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Request
-from fastapi.responses import RedirectResponse, Response, StreamingResponse
+from fastapi.responses import Response, StreamingResponse
 
 from api.v1.schemas.stream import (
-    JellyfinPlaybackUrlResponse,
     PlaybackSessionResponse,
     ProgressReportRequest,
     StartPlaybackRequest,
     StopReportRequest,
 )
 from core.dependencies import (
-    get_jellyfin_repository,
     get_jellyfin_playback_service,
     get_local_files_service,
     get_navidrome_playback_service,
 )
 from core.exceptions import ExternalServiceError, PlaybackNotAllowedError, ResourceNotFoundError
 from infrastructure.msgspec_fastapi import MsgSpecBody, MsgSpecRoute
-from repositories.jellyfin_repository import JellyfinRepository
 from services.jellyfin_playback_service import JellyfinPlaybackService
 from services.local_files_service import LocalFilesService
 from services.navidrome_playback_service import NavidromePlaybackService
@@ -31,52 +28,30 @@ router = APIRouter(route_class=MsgSpecRoute, prefix="/stream", tags=["streaming"
 @router.get("/jellyfin/{item_id}")
 async def stream_jellyfin_audio(
     item_id: str,
-    jellyfin_repo: JellyfinRepository = Depends(get_jellyfin_repository),
-) -> JellyfinPlaybackUrlResponse:
+    request: Request,
+    playback_service: JellyfinPlaybackService = Depends(get_jellyfin_playback_service),
+) -> StreamingResponse:
     try:
-        playback = await jellyfin_repo.get_playback_url(item_id)
-        logger.info(
-            "Resolved Jellyfin playback metadata",
-            extra={
-                "item_id": item_id,
-                "play_method": playback.play_method,
-                "seekable": playback.seekable,
-            },
-        )
-        return JellyfinPlaybackUrlResponse(
-            url=playback.url,
-            seekable=playback.seekable,
-            playSessionId=playback.play_session_id,
-        )
+        range_header = request.headers.get("Range")
+        return await playback_service.proxy_stream(item_id, range_header=range_header)
     except ResourceNotFoundError:
         raise HTTPException(status_code=404, detail="Audio item not found")
     except PlaybackNotAllowedError as e:
         logger.warning("Playback not allowed for %s: %s", item_id, e)
         raise HTTPException(status_code=403, detail="Playback not allowed")
     except ExternalServiceError as e:
+        if "416" in str(e):
+            raise HTTPException(status_code=416, detail="Range not satisfiable")
         raise HTTPException(status_code=502, detail="Failed to stream from Jellyfin")
 
 
 @router.head("/jellyfin/{item_id}")
 async def head_jellyfin_audio(
     item_id: str,
-    jellyfin_repo: JellyfinRepository = Depends(get_jellyfin_repository),
+    playback_service: JellyfinPlaybackService = Depends(get_jellyfin_playback_service),
 ) -> Response:
     try:
-        playback = await jellyfin_repo.get_playback_url(item_id)
-        logger.info(
-            "Resolved Jellyfin playback prefetch redirect",
-            extra={
-                "item_id": item_id,
-                "play_method": playback.play_method,
-                "seekable": playback.seekable,
-            },
-        )
-        return RedirectResponse(
-            url=playback.url,
-            status_code=302,
-            headers={"Referrer-Policy": "no-referrer"},
-        )
+        return await playback_service.proxy_head(item_id)
     except ResourceNotFoundError:
         raise HTTPException(status_code=404, detail="Audio item not found")
     except PlaybackNotAllowedError as e:

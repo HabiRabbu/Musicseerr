@@ -1,6 +1,7 @@
 from typing import Any, Protocol
 
 from repositories.jellyfin_models import JellyfinItem, JellyfinUser, PlaybackUrlResult
+from repositories.navidrome_models import StreamProxyResult
 
 
 class JellyfinRepositoryProtocol(Protocol):
@@ -130,4 +131,12 @@ class JellyfinRepositoryProtocol(Protocol):
     async def report_playback_stopped(
         self, item_id: str, play_session_id: str, position_ticks: int
     ) -> None:
+        ...
+
+    async def proxy_head_stream(self, item_id: str) -> StreamProxyResult:
+        ...
+
+    async def proxy_get_stream(
+        self, item_id: str, range_header: str | None = None
+    ) -> StreamProxyResult:
         ...

@@ -34,7 +34,7 @@ async def test_get_playback_url_direct_play(repo: JellyfinRepository):
 
     result = await repo.get_playback_url("item-1")
 
-    assert result.url == "http://jellyfin:8096/Audio/item-1/stream?static=true&api_key=test-api-key"
+    assert result.url == "http://jellyfin:8096/Audio/item-1/stream?static=true"
     assert result.seekable is True
     assert result.play_session_id == "sess-1"
     assert result.play_method == "DirectPlay"
@@ -76,7 +76,7 @@ async def test_get_playback_url_direct_stream(repo: JellyfinRepository):
 
     result = await repo.get_playback_url("item-direct-stream")
 
-    assert result.url == "http://jellyfin:8096/Audio/item-direct-stream/stream?static=true&api_key=test-api-key"
+    assert result.url == "http://jellyfin:8096/Audio/item-direct-stream/stream?static=true"
     assert result.seekable is True
     assert result.play_method == "DirectStream"
 
@@ -117,6 +117,27 @@ async def test_get_playback_url_not_configured_raises():
 
     with pytest.raises(ExternalServiceError, match="not configured"):
         await unconfigured_repo.get_playback_url("item-4")
+
+
+@pytest.mark.asyncio
+async def test_proxy_get_stream_validates_url_origin(repo: JellyfinRepository):
+    from repositories.jellyfin_models import PlaybackUrlResult
+
+    repo._request = AsyncMock(
+        return_value={
+            "PlaySessionId": "sess-bad",
+            "MediaSources": [
+                {
+                    "SupportsDirectPlay": False,
+                    "SupportsDirectStream": False,
+                    "TranscodingUrl": "http://evil.example.com/Audio/item-1/stream",
+                }
+            ],
+        }
+    )
+
+    with pytest.raises(ExternalServiceError, match="does not match"):
+        await repo.proxy_get_stream("item-1")
 
 
 @pytest.mark.asyncio
