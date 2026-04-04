@@ -19,6 +19,7 @@ from api.v1.schemas.navidrome import (
 )
 from core.dependencies import get_navidrome_library_service, get_navidrome_playback_service
 from core.exceptions import ExternalServiceError
+from infrastructure.resilience.retry import CircuitOpenError
 
 
 def _album_summary(id: str = "a1", name: str = "Album") -> NavidromeAlbumSummary:
@@ -109,6 +110,18 @@ class TestLibraryAlbums:
         assert resp.status_code == 200
         data = resp.json()
         assert data["total"] == 5
+
+    def test_get_albums_stats_fallback_circuit_open(self, library_client, mock_library_service):
+        """When CB is open, stats raises CircuitOpenError — albums still work."""
+        mock_library_service.get_albums = AsyncMock(return_value=[_album_summary(id=f"a{i}") for i in range(48)])
+        mock_library_service.get_stats = AsyncMock(
+            side_effect=CircuitOpenError("Circuit breaker 'navidrome' is OPEN", breaker_name="navidrome"),
+        )
+        resp = library_client.get("/navidrome/albums?limit=48")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert len(data["items"]) == 48
+        assert data["total"] == 49
 
     def test_get_album_detail(self, library_client):
         resp = library_client.get("/navidrome/albums/a1")
