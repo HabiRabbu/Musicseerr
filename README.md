@@ -180,6 +180,8 @@ MusicSeerr stores its config in `config/config.json` inside the mapped config vo
 
 Run `id` on your host to find your PUID and PGID values.
 
+> **Unraid / NAS users:** Unraid defaults to `nobody:users` (PUID=99, PGID=100). If you see `chown: Operation not permitted` at startup, your volume mount is on a filesystem that rejects ownership changes (FUSE/shfs, NFS, CIFS). The container skips `chown` when the directories and their contents are already writable, so this is usually fine as long as the host paths are owned by the correct UID:GID.
+
 ### In-App Settings
 
 | Setting | Location |
