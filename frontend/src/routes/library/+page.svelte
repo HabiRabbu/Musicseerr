@@ -13,7 +13,7 @@
 	import { API } from '$lib/constants';
 	import { isAbortError } from '$lib/utils/errorHandling';
 	import type { Artist, Album } from '$lib/types';
-	import { CircleX, X, RefreshCw, ChevronRight, Search, Loader2 } from 'lucide-svelte';
+	import { CircleX, X, RefreshCw, ChevronRight, Search, Loader2, Settings2 } from 'lucide-svelte';
 
 	const CIRCUIT_BREAKER_CODE = 'CIRCUIT_BREAKER_OPEN';
 
@@ -71,6 +71,7 @@
 	let syncing = false;
 	let error: string | null = null;
 	let errorCode: string | null = null;
+	let syncFrequencyLabel: string | null = null;
 
 	let currentAlbumPage = 1;
 	let sortBy = 'date_added';
@@ -88,12 +89,35 @@
 	$: isConnectionError = errorCode === CIRCUIT_BREAKER_CODE ||
 		(error != null && /connection|DNS|not configured/i.test(error));
 
+	const FREQ_LABELS: Record<string, string> = {
+		manual: 'Manual sync only',
+		'5min': 'Auto-syncs every 5 minutes',
+		'10min': 'Auto-syncs every 10 minutes',
+		'30min': 'Auto-syncs every 30 minutes',
+		'1hr': 'Auto-syncs every hour',
+		'6hr': 'Auto-syncs every 6 hours',
+		'12hr': 'Auto-syncs every 12 hours',
+		'24hr': 'Auto-syncs every 24 hours',
+		'3d': 'Auto-syncs every 3 days',
+		'7d': 'Auto-syncs every 7 days'
+	};
+
 	onMount(() => {
 		recentlyAddedStore.initialize();
 		loadArtists();
 		fetchAlbums();
 		loadStats();
+		loadSyncFrequency();
 	});
+
+	async function loadSyncFrequency() {
+		try {
+			const data = await api.global.get<{ sync_frequency: string }>('/api/v1/settings/lidarr');
+			syncFrequencyLabel = FREQ_LABELS[data.sync_frequency] ?? null;
+		} catch {
+			// Silently omit frequency hint if settings can't be loaded
+		}
+	}
 
 	async function loadArtists() {
 		try {
@@ -266,6 +290,19 @@
 					{stats.artist_count} artists • {stats.album_count} albums • Last sync: {lastSyncText}
 				{/if}
 			</p>
+			{#if syncFrequencyLabel}
+				<p class="text-base-content/50 text-xs mt-0.5 flex items-center gap-1">
+					{syncFrequencyLabel}
+					<a
+						href="/settings?tab=lidarr"
+						class="inline-flex hover:text-base-content/70 transition-colors"
+						aria-label="Configure sync frequency"
+						title="Configure sync frequency"
+					>
+						<Settings2 class="h-3 w-3" />
+					</a>
+				</p>
+			{/if}
 		</div>
 		<button
 			class="btn btn-sm btn-primary gap-1"

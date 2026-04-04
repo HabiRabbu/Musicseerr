@@ -160,7 +160,7 @@ class LocalFilesVerifyResponse(AppStruct):
 
 
 class LidarrSettings(AppStruct):
-    sync_frequency: Literal["manual", "5min", "10min", "30min", "1hr"] = "10min"
+    sync_frequency: Literal["manual", "5min", "10min", "30min", "1hr", "6hr", "12hr", "24hr", "3d", "7d"] = "24hr"
     last_sync: int | None = None
     last_sync_success: bool = True
 
