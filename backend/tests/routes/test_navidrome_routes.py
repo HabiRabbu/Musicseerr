@@ -91,6 +91,25 @@ class TestLibraryAlbums:
         assert data["items"][0]["navidrome_id"] == "a1"
         assert data["total"] == 1
 
+    def test_get_albums_stats_fallback(self, library_client, mock_library_service):
+        """When stats fails, albums still returns with heuristic total."""
+        mock_library_service.get_albums = AsyncMock(return_value=[_album_summary(id=f"a{i}") for i in range(48)])
+        mock_library_service.get_stats = AsyncMock(side_effect=ExternalServiceError("Library not found"))
+        resp = library_client.get("/navidrome/albums?limit=48")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert len(data["items"]) == 48
+        assert data["total"] == 49  # offset(0) + 48 + 1 (full page heuristic)
+
+    def test_get_albums_stats_fallback_partial_page(self, library_client, mock_library_service):
+        """Partial page + stats failure → total = offset + len(items), no +1."""
+        mock_library_service.get_albums = AsyncMock(return_value=[_album_summary(id=f"a{i}") for i in range(5)])
+        mock_library_service.get_stats = AsyncMock(side_effect=ExternalServiceError("down"))
+        resp = library_client.get("/navidrome/albums?limit=48")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["total"] == 5
+
     def test_get_album_detail(self, library_client):
         resp = library_client.get("/navidrome/albums/a1")
         assert resp.status_code == 200

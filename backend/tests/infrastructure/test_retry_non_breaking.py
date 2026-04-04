@@ -144,8 +144,8 @@ async def test_circuit_still_opens_for_real_errors_amid_rate_limits():
 
 
 @pytest.mark.asyncio
-async def test_non_breaking_in_half_open_reopens_circuit():
-    """Non-breaking exceptions in HALF_OPEN must still reopen the circuit."""
+async def test_non_breaking_in_half_open_stays_half_open():
+    """Non-breaking exceptions in HALF_OPEN keep the circuit HALF_OPEN (service is reachable)."""
     cb = CircuitBreaker(failure_threshold=2, success_threshold=2, timeout=0.01, name="test-half-open")
 
     for _ in range(2):
@@ -170,7 +170,7 @@ async def test_non_breaking_in_half_open_reopens_circuit():
     with pytest.raises(_RateLimited):
         await rate_limited_in_half_open()
 
-    assert cb.state == CircuitState.OPEN
+    assert cb.state == CircuitState.HALF_OPEN
 
 
 @pytest.mark.asyncio

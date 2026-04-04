@@ -38,18 +38,23 @@ async def get_navidrome_albums(
     genre: str = Query(default=""),
     service: NavidromeLibraryService = Depends(get_navidrome_library_service),
 ) -> NavidromeAlbumPage:
+    subsonic_type = "byGenre" if genre else _SORT_MAP.get(sort_by, "alphabeticalByName")
     try:
-        if genre:
-            subsonic_type = "byGenre"
-        else:
-            subsonic_type = _SORT_MAP.get(sort_by, "alphabeticalByName")
-        items = await service.get_albums(type=subsonic_type, size=limit, offset=offset, genre=genre if genre else None)
-        stats = await service.get_stats()
-        total = stats.total_albums if len(items) >= limit else offset + len(items)
-        return NavidromeAlbumPage(items=items, total=total)
+        items = await service.get_albums(
+            type=subsonic_type, size=limit, offset=offset, genre=genre if genre else None,
+        )
     except ExternalServiceError as e:
         logger.error("Navidrome service error getting albums: %s", e)
         raise HTTPException(status_code=502, detail="Failed to communicate with Navidrome")
+
+    try:
+        stats = await service.get_stats()
+        total = stats.total_albums if len(items) >= limit else offset + len(items)
+    except ExternalServiceError:
+        logger.warning("Navidrome stats unavailable, using heuristic pagination total")
+        total = offset + len(items) + (1 if len(items) >= limit else 0)
+
+    return NavidromeAlbumPage(items=items, total=total)
 
 
 @router.get("/albums/{album_id}", response_model=NavidromeAlbumDetail)
