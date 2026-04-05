@@ -94,6 +94,7 @@ jobs:
       packages: write
       id-token: write
       attestations: write
+      artifact-metadata: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -120,9 +121,9 @@ jobs:
         run: echo "timestamp=$(git log -1 --pretty=%cI)" >> "$GITHUB_OUTPUT"
 
       - name: Set image name
-        env:
-          OWNER: ${{ github.repository_owner }}
-        run: echo "IMAGE=ghcr.io/$(echo "$OWNER" | tr '[:upper:]' '[:lower:]')/musicseerr" >> $GITHUB_ENV
+        run: |
+          echo "REGISTRY=ghcr.io" >> "$GITHUB_ENV"
+          echo "IMAGE_NAME=$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_ENV"
 
       - name: Build and push (multi-arch)
         id: push
@@ -131,7 +132,7 @@ jobs:
           context: .
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: ${{ env.IMAGE }}:${{ steps.version.outputs.tag }}
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.tag }}
           build-args: |
             COMMIT_TAG=${{ steps.version.outputs.tag }}
             BUILD_DATE=${{ steps.date.outputs.timestamp }}
@@ -140,10 +141,11 @@ jobs:
             type=gha,scope=linux/arm64
           provenance: false
 
-      - name: Attest image (SLSA provenance)
-        uses: actions/attest-build-provenance@v4
+      - name: Generate artifact attestation
+        id: attest
+        uses: actions/attest@v4
         with:
-          subject-name: ${{ env.IMAGE }}
+          subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           subject-digest: ${{ steps.push.outputs.digest }}
           push-to-registry: true
 
@@ -153,5 +155,5 @@ jobs:
           TAG: ${{ steps.version.outputs.tag }}
         run: |
           docker buildx imagetools create \
-            -t "${IMAGE}:latest" \
-            "${IMAGE}:${TAG}"
+            -t "${REGISTRY}/${IMAGE_NAME}:latest" \
+            "${REGISTRY}/${IMAGE_NAME}:${TAG}"
