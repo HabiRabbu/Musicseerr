@@ -22,6 +22,10 @@ class Settings(BaseSettings):
     
     lidarr_url: str = Field(default="http://lidarr:8686")
     lidarr_api_key: str = Field(default="")
+    lidarr_timeout: float = Field(
+        default=60.0,
+        description="HTTP read/write timeout in seconds for Lidarr API calls.",
+    )
     
     jellyfin_url: str = Field(default="http://jellyfin:8096")
     
@@ -192,6 +196,7 @@ class Settings(BaseSettings):
         config_data = {
             "lidarr_url": self.lidarr_url,
             "lidarr_api_key": self.lidarr_api_key,
+            "lidarr_timeout": self.lidarr_timeout,
             "jellyfin_url": self.jellyfin_url,
             "contact_email": self.contact_email,
             "quality_profile_id": self.quality_profile_id,
@@ -221,6 +226,7 @@ class Settings(BaseSettings):
             config_data.update({
                 "lidarr_url": self.lidarr_url,
                 "lidarr_api_key": self.lidarr_api_key,
+                "lidarr_timeout": self.lidarr_timeout,
                 "jellyfin_url": self.jellyfin_url,
                 "contact_email": self.contact_email,
                 "quality_profile_id": self.quality_profile_id,
