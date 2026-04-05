@@ -292,8 +292,6 @@ class LidarrAlbumRepository(LidarrHistoryRepository):
         artist = await artist_repo._ensure_artist_exists(artist_mbid, artist_name)
         artist_id = artist["id"]
 
-        await self._wait_for_artist_commands_to_complete(artist_id, timeout=600.0)
-
         album_obj = await self._get_album_by_foreign_id(musicbrainz_id)
         action = "exists"
 
@@ -302,6 +300,7 @@ class LidarrAlbumRepository(LidarrHistoryRepository):
                 a = await self._get_album_by_foreign_id(musicbrainz_id)
                 return a and a.get("id")
 
+            await self._wait_for_artist_commands_to_complete(artist_id, timeout=600.0)
             album_obj = await self._wait_for(album_is_indexed, timeout=60.0, poll=5.0)
 
             if not album_obj:
@@ -332,15 +331,18 @@ class LidarrAlbumRepository(LidarrHistoryRepository):
                     action = "added"
                     album_obj = await self._wait_for(album_is_indexed, timeout=120.0, poll=2.0)
                 except Exception as e:
-                    if "POST failed" in str(e) or "405" in str(e):
+                    err_str = str(e)
+                    if "POST failed" in err_str or "405" in err_str:
+                        logger.debug("Raw Lidarr rejection for %s: %s", album_title, err_str)
                         raise ExternalServiceError(
                             f"Cannot add this {album_type}. "
-                            f"Lidarr rejected adding '{album_title}': {e}. "
-                            f"If this is a metadata exclusion issue, check that '{album_type}' is enabled in "
-                            f"Lidarr -> Settings -> Profiles -> Metadata Profiles"
-                            f"{' (secondary types: ' + ', '.join(secondary_types) + ')' if secondary_types else ''}."
+                            f"Lidarr rejected adding '{album_title}'. This is likely because your Lidarr "
+                            f"Metadata Profile is configured to exclude {album_type}s{' (' + ', '.join(secondary_types) + ')' if secondary_types else ''}. "
+                            f"To fix this: Go to Lidarr -> Settings -> Profiles -> Metadata Profiles, "
+                            f"and enable '{album_type}' in your active profile."
                         )
                     else:
+                        logger.debug("Unexpected error adding '%s': %s", album_title, err_str)
                         raise
 
         if not album_obj or "id" not in album_obj:
@@ -354,6 +356,7 @@ class LidarrAlbumRepository(LidarrHistoryRepository):
 
         album_id = album_obj["id"]
 
+        await self._wait_for_artist_commands_to_complete(artist_id, timeout=600.0)
         await self._monitor_artist_and_album(artist_id, album_id, musicbrainz_id, album_title)
 
         try:
