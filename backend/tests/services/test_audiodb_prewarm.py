@@ -14,6 +14,8 @@ def _make_settings(audiodb_enabled: bool = True, name_search_fallback: bool = Fa
     s = MagicMock()
     s.audiodb_enabled = audiodb_enabled
     s.audiodb_name_search_fallback = name_search_fallback
+    s.audiodb_prewarm_concurrency = 4
+    s.audiodb_prewarm_delay = 0.0
     return s
 
 

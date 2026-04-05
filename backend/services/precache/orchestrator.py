@@ -1,9 +1,10 @@
-"""Pre-cache orchestrator — delegates to phase sub-services."""
+"""Pre-cache orchestrator: delegates to phase sub-services."""
 
 from __future__ import annotations
 
 import logging
 import asyncio
+import time
 from typing import Any, TYPE_CHECKING
 
 from repositories.protocols import LidarrRepositoryProtocol, CoverArtRepositoryProtocol
@@ -63,31 +64,80 @@ class LibraryPrecacheService:
     async def precache_library_resources(self, artists: list[dict], albums: list[Any], resume: bool = False) -> None:
         status_service = CacheStatusService(self._sync_state_store)
         task = None
+
+        advanced_settings = self._preferences_service.get_advanced_settings()
+        stall_timeout_s = advanced_settings.sync_stall_timeout_minutes * 60
+        max_timeout_s = advanced_settings.sync_max_timeout_hours * 3600
+
         try:
             task = asyncio.create_task(self._do_precache(artists, albums, status_service, resume))
             from core.task_registry import TaskRegistry
             TaskRegistry.get_instance().register("precache-library", task)
-            await asyncio.wait_for(task, timeout=1800.0)
-        except asyncio.TimeoutError:
-            logger.error("Library pre-cache operation timed out after 30 minutes")
-            if task and not task.done():
-                task.cancel()
+
+            watchdog = asyncio.create_task(
+                self._watchdog(task, status_service, stall_timeout_s, max_timeout_s)
+            )
+
+            done, _ = await asyncio.wait(
+                {task, watchdog}, return_when=asyncio.FIRST_COMPLETED
+            )
+
+            # Always prioritise the main task result; if it completed
+            # successfully we don't care about a simultaneous watchdog error.
+            if task in done:
+                watchdog.cancel()
                 try:
-                    await task
+                    await watchdog
                 except asyncio.CancelledError:
-                    logger.info("Pre-cache task successfully cancelled after timeout")
-                except Exception as e:  # noqa: BLE001
-                    logger.error(f"Error during task cancellation: {e}")
-            await status_service.complete_sync("Sync timed out after 30 minutes")
-            raise ExternalServiceError("Library sync timed out - too many items or slow network")
+                    pass
+                if task.exception():
+                    raise task.exception()
+            elif watchdog in done:
+                exc = watchdog.exception() if watchdog.done() and not watchdog.cancelled() else None
+                if exc:
+                    if not task.done():
+                        task.cancel()
+                        try:
+                            await task
+                        except (asyncio.CancelledError, Exception):
+                            pass
+                    await status_service.complete_sync(str(exc))
+                    raise ExternalServiceError(str(exc))
+
         except asyncio.CancelledError:
             logger.warning("Pre-cache was cancelled")
             await status_service.complete_sync()
+            raise
+        except ExternalServiceError:
             raise
         except Exception as e:
             logger.error(f"Pre-cache failed: {e}")
             await status_service.complete_sync(str(e))
             raise
+
+    async def _watchdog(
+        self,
+        task: asyncio.Task,
+        status_service: CacheStatusService,
+        stall_timeout_s: float,
+        max_timeout_s: float,
+    ) -> None:
+        start = time.time()
+        while not task.done():
+            await asyncio.sleep(30)
+            elapsed = time.time() - start
+            if elapsed > max_timeout_s:
+                msg = f"Sync exceeded maximum timeout ({max_timeout_s / 3600:.1f}h)"
+                logger.error(msg)
+                raise ExternalServiceError(msg)
+            stall_duration = time.time() - status_service.get_last_progress_at()
+            if stall_duration > stall_timeout_s:
+                msg = (
+                    f"Sync stalled: no progress for {stall_duration / 60:.0f} minutes "
+                    f"during {status_service.get_progress().phase or 'unknown'} phase"
+                )
+                logger.error(msg)
+                raise ExternalServiceError(msg)
 
     async def _do_precache(self, artists: list[dict], albums: list[Any], status_service: CacheStatusService, resume: bool = False) -> None:
         from core.dependencies import get_album_service
@@ -209,12 +259,23 @@ class LibraryPrecacheService:
                 await status_service.skip_phase('albums')
 
             if not status_service.is_cancelled():
-                try:
-                    await self._audiodb_phase.precache_audiodb_data(artists, albums, status_service)
-                except Exception as e:  # noqa: BLE001
-                    logger.error(f"AudioDB pre-warming failed (non-fatal): {e}")
+                await status_service.complete_sync()
+                logger.info("Library resource pre-caching complete (core phases done)")
 
-            logger.info("Library resource pre-caching complete")
+                try:
+                    audiodb_timeout = self._preferences_service.get_advanced_settings().sync_max_timeout_hours * 3600
+                    logger.info("Starting AudioDB image prewarm as background enhancement...")
+                    await asyncio.wait_for(
+                        self._audiodb_phase.precache_audiodb_data(artists, albums, status_service),
+                        timeout=audiodb_timeout,
+                    )
+                    logger.info("AudioDB image prewarm complete")
+                except asyncio.TimeoutError:
+                    logger.warning("AudioDB pre-warming timed out (non-fatal)")
+                except Exception as e:  # noqa: BLE001
+                    logger.warning(f"AudioDB pre-warming failed (non-fatal): {e}")
+            else:
+                logger.info("Library resource pre-caching complete (cancelled)")
         except Exception as e:
             logger.error(f"Error during pre-cache: {e}")
             raise

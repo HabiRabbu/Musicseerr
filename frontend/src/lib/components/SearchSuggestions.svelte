@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { getApiUrl } from '$lib/utils/api';
 	import { Search } from 'lucide-svelte';
 	import type { SuggestResult } from '$lib/types';
 	import { API } from '$lib/constants';
@@ -37,15 +38,13 @@
 	let fetchGeneration = 0;
 
 	const activeDescendant = $derived(
-		activeIndex >= 0 && activeIndex < suggestions.length
-			? `${id}-option-${activeIndex}`
-			: undefined
+		activeIndex >= 0 && activeIndex < suggestions.length ? `${id}-option-${activeIndex}` : undefined
 	);
 
 	function coverUrl(result: SuggestResult): string {
 		return result.type === 'artist'
-			? `/api/v1/covers/artist/${result.musicbrainz_id}?size=250`
-			: `/api/v1/covers/release-group/${result.musicbrainz_id}?size=250`;
+			? getApiUrl(`/api/v1/covers/artist/${result.musicbrainz_id}?size=250`)
+			: getApiUrl(`/api/v1/covers/release-group/${result.musicbrainz_id}?size=250`);
 	}
 
 	function handleInput() {
@@ -69,9 +68,12 @@
 			const generation = ++fetchGeneration;
 
 			try {
-				const data = await api.get<{ results?: SuggestResult[] }>(API.search.suggest(query.trim(), 5), {
-					signal: abortController.signal
-				});
+				const data = await api.get<{ results?: SuggestResult[] }>(
+					API.search.suggest(query.trim(), 5),
+					{
+						signal: abortController.signal
+					}
+				);
 				if (generation !== fetchGeneration) return;
 				suggestions = data.results ?? [];
 				showDropdown = suggestions.length > 0 || loading;
@@ -133,10 +135,16 @@
 				activeIndex = activeIndex > 0 ? activeIndex - 1 : suggestions.length - 1;
 				break;
 			case 'Home':
-				if (activeIndex >= 0) { e.preventDefault(); activeIndex = 0; }
+				if (activeIndex >= 0) {
+					e.preventDefault();
+					activeIndex = 0;
+				}
 				break;
 			case 'End':
-				if (activeIndex >= 0) { e.preventDefault(); activeIndex = suggestions.length - 1; }
+				if (activeIndex >= 0) {
+					e.preventDefault();
+					activeIndex = suggestions.length - 1;
+				}
 				break;
 			case 'Enter':
 				if (activeIndex >= 0 && activeIndex < suggestions.length) {
@@ -214,7 +222,10 @@
 					role="option"
 					id="{id}-option-{i}"
 					aria-selected={i === activeIndex}
-					class="flex items-center gap-3 p-3 cursor-pointer hover:bg-base-300 transition-colors {i === activeIndex ? 'bg-base-300' : ''}"
+					class="flex items-center gap-3 p-3 cursor-pointer hover:bg-base-300 transition-colors {i ===
+					activeIndex
+						? 'bg-base-300'
+						: ''}"
 					onclick={() => handleSelect(result)}
 					onkeydown={(e) => {
 						if (e.key === 'Enter' || e.key === ' ') handleSelect(result);

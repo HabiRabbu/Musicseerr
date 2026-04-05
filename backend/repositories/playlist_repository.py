@@ -9,7 +9,6 @@ from uuid import uuid4
 
 logger = logging.getLogger(__name__)
 
-CACHE_DB_PATH = Path("/app/cache/library.db")
 
 _UNSET = object()
 
@@ -105,9 +104,12 @@ class PlaylistTrackRecord:
         self.duration = duration
         self.created_at = created_at
 
+def get_cache_dir() -> Path:
+      from core.config import get_settings
+      return get_settings().library_db_path
 
 class PlaylistRepository:
-    def __init__(self, db_path: Path = CACHE_DB_PATH):
+    def __init__(self, db_path: Path = get_cache_dir()):
         self.db_path = db_path
         self._local = threading.local()
         self._write_lock = threading.Lock()

@@ -265,40 +265,7 @@ A health check endpoint is at `/health`.
 
 ## Development
 
-The backend is Python 3.13 with FastAPI. The frontend is SvelteKit with Svelte 5, Tailwind CSS, and DaisyUI.
-
-### Backend
-
-```bash
-cd backend
-pip install -r requirements-dev.txt
-uvicorn main:app --reload --port 8688
-```
-
-### Frontend
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-### Tests
-
-A root Makefile wraps the test commands:
-
-```bash
-make backend-test    # full backend suite
-make frontend-test   # full frontend suite
-make test            # both
-make ci              # tests + linting + type checks
-```
-
-Frontend browser tests use Playwright. Install the browser with:
-
-```bash
-make frontend-browser-install
-```
+See the [CONTRIBUTING](CONTRIBUTING.md) guide for instructions on setting up a development environment, running tests, and submitting contributions.
 
 ---
 

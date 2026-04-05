@@ -13,8 +13,9 @@ from api.v1.schemas.cache import CacheStats, CacheClearResponse
 
 logger = logging.getLogger(__name__)
 
-CACHE_DIR = Path("/app/cache/covers")
-
+def get_covers_cache_dir() -> Path:
+    from core.config import get_settings
+    return get_settings().cache_dir / "covers"
 
 class CacheService:
     
@@ -36,6 +37,7 @@ class CacheService:
             return 0
     
     async def get_stats(self) -> CacheStats:
+        covers_cache_dir = get_covers_cache_dir()
         async with self._stats_lock:
             now = time.time()
             if self._cached_stats and (now - self._stats_cache_time) < self._stats_cache_ttl:
@@ -53,13 +55,13 @@ class CacheService:
             disk_count = 0
             disk_bytes = 0
             
-            if CACHE_DIR.exists():
+            if covers_cache_dir.exists():
                 du_available = shutil.which('du') is not None
                 if du_available:
                     try:
                         result = await asyncio.to_thread(
                             subprocess.run,
-                            ['du', '-sb', str(CACHE_DIR)],
+                            ['du', '-sb', str(covers_cache_dir)],
                             capture_output=True,
                             text=True,
                             timeout=5.0,
@@ -68,7 +70,7 @@ class CacheService:
                             disk_bytes = int(result.stdout.split()[0])
                             result = await asyncio.to_thread(
                                 subprocess.run,
-                                ['find', str(CACHE_DIR), '-type', 'f'],
+                                ['find', str(covers_cache_dir), '-type', 'f'],
                                 capture_output=True,
                                 text=True,
                                 timeout=5.0,
@@ -87,7 +89,7 @@ class CacheService:
                     def _python_scan() -> tuple[int, int]:
                         count = 0
                         total = 0
-                        for file_path in CACHE_DIR.rglob("*"):
+                        for file_path in covers_cache_dir.rglob("*"):
                             if file_path.is_file():
                                 count += 1
                                 total += file_path.stat().st_size
@@ -154,14 +156,15 @@ class CacheService:
             )
     
     async def clear_disk_cache(self) -> CacheClearResponse:
+        covers_cache_dir = get_covers_cache_dir()
         try:
             metadata_stats = self._disk_cache.get_stats()
             metadata_count = metadata_stats['total_count']
             await self._disk_cache.clear_all()
             
             files_cleared = 0
-            if CACHE_DIR.exists():
-                for file_path in CACHE_DIR.rglob("*"):
+            if covers_cache_dir.exists():
+                for file_path in covers_cache_dir.rglob("*"):
                     if file_path.is_file():
                         file_path.unlink()
                         files_cleared += 1
@@ -187,6 +190,7 @@ class CacheService:
             )
     
     async def clear_all_cache(self) -> CacheClearResponse:
+        covers_cache_dir = get_covers_cache_dir()
         try:
             memory_entries = self._cache.size()
             await self._cache.clear()
@@ -196,8 +200,8 @@ class CacheService:
             await self._disk_cache.clear_all()
             
             disk_files = 0
-            if CACHE_DIR.exists():
-                for file_path in CACHE_DIR.rglob("*"):
+            if covers_cache_dir.exists():
+                for file_path in covers_cache_dir.rglob("*"):
                     if file_path.is_file():
                         file_path.unlink()
                         disk_files += 1
@@ -223,10 +227,11 @@ class CacheService:
             )
     
     async def clear_covers_cache(self) -> CacheClearResponse:
+        covers_cache_dir = get_covers_cache_dir()
         try:
             files_cleared = 0
-            if CACHE_DIR.exists():
-                for file_path in CACHE_DIR.rglob("*"):
+            if covers_cache_dir.exists():
+                for file_path in covers_cache_dir.rglob("*"):
                     if file_path.is_file():
                         file_path.unlink()
                         files_cleared += 1

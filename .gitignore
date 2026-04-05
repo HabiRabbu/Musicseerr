@@ -53,3 +53,6 @@ ehthumbs.db
 AGENTS.md
 AGENTS.md.bak
 Docs/
+
+# Local dev app directory
+backend/app-dev/

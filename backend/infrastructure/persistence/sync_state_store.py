@@ -1,4 +1,4 @@
-"""Domain 5 — Sync lifecycle persistence."""
+"""Domain 5: Sync lifecycle persistence."""
 
 import logging
 import sqlite3
@@ -87,13 +87,15 @@ class SyncStateStore(PersistenceBase):
         return await self._read(operation)
 
     async def mark_items_processed_batch(self, item_type: str, mbids: list[str]) -> None:
-        normalized = [mbid for mbid in mbids if isinstance(mbid, str) and mbid]
+        normalized = [(item_type, _normalize(mbid), mbid) for mbid in mbids if isinstance(mbid, str) and mbid]
 
         def operation(conn: sqlite3.Connection) -> None:
-            for mbid in normalized:
-                conn.execute(
-                    "INSERT OR REPLACE INTO processed_items (item_type, mbid_lower, mbid) VALUES (?, ?, ?)",
-                    (item_type, _normalize(mbid), mbid),
-                )
+            conn.executemany(
+                "INSERT OR REPLACE INTO processed_items (item_type, mbid_lower, mbid) VALUES (?, ?, ?)",
+                normalized,
+            )
 
         await self._write(operation)
+
+    async def clear_processed_items(self) -> None:
+        await self._write(lambda conn: conn.execute("DELETE FROM processed_items"))

@@ -50,6 +50,7 @@ class Settings(BaseSettings):
     cache_ttl_covers: int = Field(default=86400, description="Cover cache TTL in seconds (default: 24 hours)")
     cache_cleanup_interval: int = Field(default=300)
     
+    root_app_dir: Path = Field(default=Path("/app"), description="Root application directory")
     cache_dir: Path = Field(default=Path("/app/cache"), description="Root directory for all cache files")
     library_db_path: Path = Field(default=Path("/app/cache/library.db"), description="SQLite library database path")
     cover_cache_max_size_mb: int = Field(default=500, description="Maximum cover cache size in MB")
@@ -82,6 +83,16 @@ class Settings(BaseSettings):
 
     @model_validator(mode='after')
     def validate_config(self) -> Self:
+        # Dynamically resolve paths relative to root_app_dir
+        if self.cache_dir == Path("/app/cache"):
+            self.cache_dir = self.root_app_dir / "cache"
+        if self.library_db_path == Path("/app/cache/library.db"):
+            self.library_db_path = self.cache_dir / "library.db"
+        if self.queue_db_path == Path("/app/cache/queue.db"):
+            self.queue_db_path = self.cache_dir / "queue.db"
+        if self.config_file_path == Path("/app/config/config.json"):
+            self.config_file_path = self.root_app_dir / "config" / "config.json"
+
         errors = []
         warnings = []
 

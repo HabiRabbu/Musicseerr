@@ -10,7 +10,7 @@ BACKEND_VENV_PYTHON := $(BACKEND_VENV_DIR)/bin/python
 BACKEND_VENV_STAMP := $(BACKEND_VENV_DIR)/.deps-stamp
 BACKEND_VIRTUALENV_ZIPAPP := $(BACKEND_DIR)/.virtualenv.pyz
 PYTHON ?= python3
-NPM ?= npm
+NPM ?= pnpm
 
 .PHONY: help backend-venv backend-lint backend-test backend-test-audiodb backend-test-audiodb-prewarm backend-test-audiodb-settings backend-test-coverart-audiodb backend-test-audiodb-phase8 backend-test-audiodb-phase9 backend-test-exception-handling backend-test-playlist backend-test-multidisc backend-test-performance backend-test-security backend-test-config-validation backend-test-home backend-test-home-genre backend-test-infra-hardening backend-test-library-pagination backend-test-search-top-result test-audiodb-all frontend-install frontend-build frontend-check frontend-lint frontend-test frontend-test-queuehelpers frontend-test-album-page frontend-test-playlist-detail frontend-test-audiodb-images frontend-browser-install project-map rebuild test check lint ci
 
@@ -103,7 +103,18 @@ backend-test-local-files-fallback: $(BACKEND_VENV_STAMP) ## Run local files stal
 backend-test-jellyfin-proxy: $(BACKEND_VENV_STAMP) ## Run Jellyfin stream proxy tests
 	cd "$(BACKEND_DIR)" && .venv/bin/python -m pytest tests/routes/test_stream_routes.py -v
 
+backend-test-sync-watchdog: $(BACKEND_VENV_STAMP) ## Run adaptive watchdog timeout tests
+	cd "$(BACKEND_DIR)" && .venv/bin/python -m pytest tests/test_sync_watchdog.py -v
+
+backend-test-sync-resume: $(BACKEND_VENV_STAMP) ## Run sync resume-on-failure tests
+	cd "$(BACKEND_DIR)" && .venv/bin/python -m pytest tests/test_sync_resume.py -v
+
+backend-test-audiodb-parallel: $(BACKEND_VENV_STAMP) ## Run AudioDB parallel prewarm tests
+	cd "$(BACKEND_DIR)" && .venv/bin/python -m pytest tests/test_audiodb_parallel.py -v
+
 test-audiodb-all: backend-test-audiodb backend-test-audiodb-prewarm backend-test-audiodb-settings backend-test-coverart-audiodb backend-test-audiodb-phase8 backend-test-audiodb-phase9 frontend-test-audiodb-images ## Run every AudioDB test target
+
+test-sync-all: backend-test-sync-watchdog backend-test-sync-resume backend-test-audiodb-parallel ## Run all sync robustness tests
 
 frontend-install: ## Install frontend npm dependencies
 	cd "$(FRONTEND_DIR)" && $(NPM) install
@@ -121,20 +132,20 @@ frontend-test: ## Run the frontend vitest suite
 	cd "$(FRONTEND_DIR)" && $(NPM) run test
 
 frontend-test-queuehelpers: ## Run queue helper regressions
-	cd "$(FRONTEND_DIR)" && npx vitest run --project server src/lib/player/queueHelpers.spec.ts
+	cd "$(FRONTEND_DIR)" && $(NPM) exec vitest run --project server src/lib/player/queueHelpers.spec.ts
 
 frontend-test-album-page: ## Run the album page browser test
-	cd "$(FRONTEND_DIR)" && npx vitest run --project client src/routes/album/[id]/page.svelte.spec.ts
+	cd "$(FRONTEND_DIR)" && $(NPM) exec vitest run --project client src/routes/album/[id]/page.svelte.spec.ts
 
 frontend-test-playlist-detail: ## Run playlist page browser tests
-	cd "$(FRONTEND_DIR)" && npx vitest run --project client src/routes/playlists/[id]/page.svelte.spec.ts
+	cd "$(FRONTEND_DIR)" && $(NPM) exec vitest run --project client src/routes/playlists/[id]/page.svelte.spec.ts
 
 frontend-browser-install: ## Install Playwright Chromium for browser tests
-	cd "$(FRONTEND_DIR)" && npx playwright install chromium
+	cd "$(FRONTEND_DIR)" && $(NPM) exec playwright install chromium
 
 frontend-test-audiodb-images: ## Run AudioDB image tests
-	cd "$(FRONTEND_DIR)" && npx vitest run --project server src/lib/utils/imageSuffix.spec.ts
-	cd "$(FRONTEND_DIR)" && npx vitest run --project client src/lib/components/BaseImage.svelte.spec.ts
+	cd "$(FRONTEND_DIR)" && $(NPM) exec vitest run --project server src/lib/utils/imageSuffix.spec.ts
+	cd "$(FRONTEND_DIR)" && $(NPM) exec vitest run --project client src/lib/components/BaseImage.svelte.spec.ts
 
 project-map: ## Refresh the project map block
 	cd "$(ROOT_DIR)" && $(PYTHON) scripts/gen-project-map.py

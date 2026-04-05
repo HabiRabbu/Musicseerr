@@ -44,10 +44,14 @@ def _record_degradation(msg: str) -> None:
         ctx.record(IntegrationResult.error(source=_SOURCE, msg=msg))
 
 COVER_ART_ARCHIVE_BASE = "https://coverartarchive.org"
-DEFAULT_CACHE_DIR = Path("/app/cache/covers")
+from core.config import get_settings
 COVER_NEGATIVE_TTL_SECONDS = 4 * 3600
 COVER_MEMORY_MAX_ENTRIES = 128
 COVER_MEMORY_MAX_BYTES = 16 * 1024 * 1024
+
+def _default_cache_dir() -> Path:
+      from core.config import get_settings
+      return get_settings().cache_dir / "covers"
 
 _coverart_circuit_breaker = CircuitBreaker(
     failure_threshold=5,
@@ -175,7 +179,7 @@ class CoverArtRepository:
         lidarr_repo: Optional['LidarrRepository'] = None,
         jellyfin_repo: Optional['JellyfinRepository'] = None,
         audiodb_service: Optional['AudioDBImageService'] = None,
-        cache_dir: Path = DEFAULT_CACHE_DIR,
+        cache_dir: Path = _default_cache_dir(),
         cover_cache_max_size_mb: Optional[int] = None,
         cover_memory_cache_max_entries: int = COVER_MEMORY_MAX_ENTRIES,
         cover_memory_cache_max_bytes: int = COVER_MEMORY_MAX_BYTES,

@@ -13,8 +13,10 @@ YOUTUBE_SEARCH_URL = "https://www.googleapis.com/youtube/v3/search"
 DEFAULT_DAILY_QUOTA_LIMIT = 80
 SEARCH_COST = 100
 PREVIEW_CACHE_MAX = 100
-QUOTA_FILE = Path("/app/cache/youtube_quota.json")
 
+def get_quota_file_path() -> Path:
+    from core.config import get_settings
+    return get_settings().cache_dir / "youtube_quota.json"
 
 class YouTubeQuotaState(msgspec.Struct):
     date: str = ""
@@ -56,9 +58,10 @@ class YouTubeRepository:
         self._load_quota()
 
     def _load_quota(self) -> None:
+        quota_file = get_quota_file_path()
         try:
-            if QUOTA_FILE.exists():
-                data = msgspec.json.decode(QUOTA_FILE.read_bytes(), type=YouTubeQuotaState)
+            if quota_file.exists():
+                data = msgspec.json.decode(quota_file.read_bytes(), type=YouTubeQuotaState)
                 saved_date = data.date
                 today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
                 if saved_date == today:
@@ -72,9 +75,10 @@ class YouTubeRepository:
             logger.warning(f"Failed to load YouTube quota state: {e}")
 
     def _save_quota(self) -> None:
+        quota_file = get_quota_file_path()
         try:
-            QUOTA_FILE.parent.mkdir(parents=True, exist_ok=True)
-            QUOTA_FILE.write_bytes(msgspec.json.encode(YouTubeQuotaState(date=self._quota_date, count=self._daily_count)))
+            quota_file.parent.mkdir(parents=True, exist_ok=True)
+            quota_file.write_bytes(msgspec.json.encode(YouTubeQuotaState(date=self._quota_date, count=self._daily_count)))
         except Exception as e:  # noqa: BLE001
             logger.warning(f"Failed to save YouTube quota state: {e}")
 

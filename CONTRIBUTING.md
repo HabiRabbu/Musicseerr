@@ -27,6 +27,7 @@ Backend:
 ```bash
 cd backend
 pip install -r requirements-dev.txt
+cp env.dev.example .env
 uvicorn main:app --reload --port 8688
 ```
 
@@ -34,8 +35,9 @@ Frontend:
 
 ```bash
 cd frontend
-npm install
-npm run dev
+cp env.dev.example .env
+pnpm install
+pnpm run dev
 ```
 
 ### Running Tests
@@ -65,7 +67,7 @@ make frontend-browser-install
 - Backend: strong typing, async/await, no blocking I/O in async contexts.
 - Frontend: strict TypeScript, no `any`. Named exports. Async/await only.
 - Use existing design tokens (`primary`, `secondary`, etc.) for colours, not hardcoded values.
-- Run `npm run lint` and `npm run check` in the frontend before submitting.
+- Run `pnpm run lint` and `pnpm run check` in the frontend before submitting.
 
 ## AI-Assisted Contributions
 
