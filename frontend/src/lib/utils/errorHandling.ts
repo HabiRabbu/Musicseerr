@@ -1,4 +1,5 @@
 import { isValidMbid } from '$lib/utils/formatting';
+import { getApiUrl } from '$lib/utils/api';
 
 export function isAbortError(error: unknown): boolean {
 	return (
@@ -9,7 +10,7 @@ export function isAbortError(error: unknown): boolean {
 
 export function getCoverUrl(coverUrl: string | null | undefined, albumId: string): string {
 	if (isValidMbid(albumId)) {
-		return `/api/v1/covers/release-group/${albumId}?size=250`;
+		return getApiUrl(`/api/v1/covers/release-group/${albumId}?size=250`);
 	}
-	return coverUrl || `/api/v1/covers/release-group/${albumId}?size=250`;
+	return coverUrl || getApiUrl(`/api/v1/covers/release-group/${albumId}?size=250`);
 }

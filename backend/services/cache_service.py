@@ -13,7 +13,8 @@ from api.v1.schemas.cache import CacheStats, CacheClearResponse
 
 logger = logging.getLogger(__name__)
 
-CACHE_DIR = Path("/app/cache/covers")
+from core.config import get_settings
+CACHE_DIR = get_settings().cache_dir / "covers"
 
 
 class CacheService:

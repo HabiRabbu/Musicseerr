@@ -44,7 +44,8 @@ def _record_degradation(msg: str) -> None:
         ctx.record(IntegrationResult.error(source=_SOURCE, msg=msg))
 
 COVER_ART_ARCHIVE_BASE = "https://coverartarchive.org"
-DEFAULT_CACHE_DIR = Path("/app/cache/covers")
+from core.config import get_settings
+DEFAULT_CACHE_DIR = get_settings().cache_dir / "covers"
 COVER_NEGATIVE_TTL_SECONDS = 4 * 3600
 COVER_MEMORY_MAX_ENTRIES = 128
 COVER_MEMORY_MAX_BYTES = 16 * 1024 * 1024

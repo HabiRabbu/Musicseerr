@@ -5,6 +5,7 @@ from fastapi import FastAPI, APIRouter, HTTPException
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from fastapi.middleware.gzip import GZipMiddleware
+from fastapi.middleware.cors import CORSMiddleware
 from core.dependencies import (
     get_request_queue, 
     get_cache, 
@@ -278,6 +279,23 @@ app.add_middleware(
     },
 )
 app.add_middleware(GZipMiddleware, minimum_size=1000, compresslevel=6)
+
+app_settings = get_settings()
+if app_settings.debug:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=[
+            "http://localhost:5173",
+            "http://127.0.0.1:5173",
+            "http://localhost:4173",
+            "http://127.0.0.1:4173",
+            "http://localhost:3000",
+            "http://127.0.0.1:3000",
+        ],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
 
 @app.get("/health")

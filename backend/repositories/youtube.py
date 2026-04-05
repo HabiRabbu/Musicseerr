@@ -13,7 +13,8 @@ YOUTUBE_SEARCH_URL = "https://www.googleapis.com/youtube/v3/search"
 DEFAULT_DAILY_QUOTA_LIMIT = 80
 SEARCH_COST = 100
 PREVIEW_CACHE_MAX = 100
-QUOTA_FILE = Path("/app/cache/youtube_quota.json")
+from core.config import get_settings
+QUOTA_FILE = get_settings().cache_dir / "youtube_quota.json"
 
 
 class YouTubeQuotaState(msgspec.Struct):

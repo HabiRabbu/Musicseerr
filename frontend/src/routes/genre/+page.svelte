@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { getApiUrl } from '$lib/utils/api';
 	import { page } from '$app/stores';
 	import { onMount, onDestroy } from 'svelte';
 	import { beforeNavigate } from '$app/navigation';
@@ -51,9 +52,12 @@
 		heroArtistMbid = null;
 		heroImageLoaded = false;
 		try {
-			const data = await api.get<{ artist_mbid: string }>(`/api/v1/home/genre-artist/${encodeURIComponent(genreName)}`, {
-				signal: genreRequestAbortable.signal
-			});
+			const data = await api.get<{ artist_mbid: string }>(
+				`/api/v1/home/genre-artist/${encodeURIComponent(genreName)}`,
+				{
+					signal: genreRequestAbortable.signal
+				}
+			);
 			heroArtistMbid = data.artist_mbid;
 		} catch (e) {
 			if (isAbortError(e)) return;
@@ -190,7 +194,7 @@
 			style="z-index: 0;"
 		>
 			<img
-				src="/api/v1/covers/artist/{heroArtistMbid}?size=500"
+				src={getApiUrl(`/api/v1/covers/artist/${heroArtistMbid}?size=500`)}
 				alt=""
 				class="w-full h-full object-cover object-top transition-opacity duration-700 {heroImageLoaded
 					? 'opacity-20'

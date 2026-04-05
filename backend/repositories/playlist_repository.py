@@ -9,7 +9,8 @@ from uuid import uuid4
 
 logger = logging.getLogger(__name__)
 
-CACHE_DB_PATH = Path("/app/cache/library.db")
+from core.config import get_settings
+CACHE_DB_PATH = get_settings().library_db_path
 
 _UNSET = object()
 

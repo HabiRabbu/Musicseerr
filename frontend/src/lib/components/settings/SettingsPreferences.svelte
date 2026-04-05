@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { getApiUrl } from '$lib/utils/api';
 	import { browser } from '$app/environment';
 	import { preferencesStore } from '$lib/stores/preferences';
 	import { integrationStore } from '$lib/stores/integration';
@@ -6,7 +7,7 @@
 		UserPreferences,
 		ReleaseTypeOption,
 		LidarrMetadataProfilePreferences,
-		MetadataProfile,
+		MetadataProfile
 	} from '$lib/types';
 
 	let preferences: UserPreferences = $state({
@@ -50,13 +51,20 @@
 	];
 
 	const releaseStatuses: ReleaseTypeOption[] = [
-		{ id: 'official', title: 'Official', description: 'Officially released by the artist or label' },
+		{
+			id: 'official',
+			title: 'Official',
+			description: 'Officially released by the artist or label'
+		},
 		{ id: 'promotion', title: 'Promotion', description: 'Promotional releases' },
 		{ id: 'bootleg', title: 'Bootleg', description: 'Unofficial bootleg recordings' },
 		{ id: 'pseudo-release', title: 'Pseudo-Release', description: 'Placeholder or meta releases' }
 	];
 
-	function toggleType(category: 'primary_types' | 'secondary_types' | 'release_statuses', id: string) {
+	function toggleType(
+		category: 'primary_types' | 'secondary_types' | 'release_statuses',
+		id: string
+	) {
 		const index = preferences[category].indexOf(id);
 		if (index > -1) {
 			preferences[category] = preferences[category].filter((t) => t !== id);
@@ -101,7 +109,7 @@
 		lidarrError = '';
 		try {
 			if (lidarrProfiles.length === 0) {
-				const profilesRes = await fetch('/api/v1/settings/lidarr/metadata-profiles');
+				const profilesRes = await fetch(getApiUrl('/api/v1/settings/lidarr/metadata-profiles'));
 				if (profilesRes.ok) {
 					lidarrProfiles = await profilesRes.json();
 				}
@@ -109,7 +117,7 @@
 
 			const params = selectedProfileId != null ? `?profile_id=${selectedProfileId}` : '';
 			const response = await fetch(
-				`/api/v1/settings/lidarr/metadata-profile/preferences${params}`
+				getApiUrl(`/api/v1/settings/lidarr/metadata-profile/preferences${params}`)
 			);
 			if (response.ok) {
 				lidarrPrefs = await response.json();
@@ -134,11 +142,11 @@
 		try {
 			const params = selectedProfileId != null ? `?profile_id=${selectedProfileId}` : '';
 			const response = await fetch(
-				`/api/v1/settings/lidarr/metadata-profile/preferences${params}`,
+				getApiUrl(`/api/v1/settings/lidarr/metadata-profile/preferences${params}`),
 				{
 					method: 'PUT',
 					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify(preferences),
+					body: JSON.stringify(preferences)
 				}
 			);
 			if (response.ok) {
@@ -170,7 +178,9 @@
 			release_statuses: [...lidarrPrefs.release_statuses]
 		};
 		lidarrMessage = 'Imported from Lidarr — remember to save your settings';
-		setTimeout(() => { lidarrMessage = ''; }, 5000);
+		setTimeout(() => {
+			lidarrMessage = '';
+		}, 5000);
 	}
 
 	async function onProfileChange(event: Event) {
@@ -320,26 +330,18 @@
 							<span class="font-semibold">{lidarrPrefs.profile_name}</span>
 						{/if}
 					</label>
-				{#if mismatchCount > 0}
-					<span class="badge badge-warning badge-sm">
-						{mismatchCount} difference{mismatchCount !== 1 ? 's' : ''}
+					{#if mismatchCount > 0}
+						<span class="badge badge-warning badge-sm">
+							{mismatchCount} difference{mismatchCount !== 1 ? 's' : ''}
 						</span>
 					{:else}
 						<span class="badge badge-success badge-sm">In sync</span>
 					{/if}
 					<div class="ml-auto flex gap-2">
-						<button
-							class="btn btn-soft btn-sm"
-							onclick={importFromLidarr}
-							disabled={lidarrSyncing}
-						>
+						<button class="btn btn-soft btn-sm" onclick={importFromLidarr} disabled={lidarrSyncing}>
 							Import from Lidarr
 						</button>
-						<button
-							class="btn btn-primary btn-sm"
-							onclick={pushToLidarr}
-							disabled={lidarrSyncing}
-						>
+						<button class="btn btn-primary btn-sm" onclick={pushToLidarr} disabled={lidarrSyncing}>
 							{#if lidarrSyncing}
 								<span class="loading loading-spinner loading-xs"></span>
 							{/if}
@@ -352,7 +354,8 @@
 						class="w-full mt-2 alert text-sm"
 						class:alert-success={lidarrMessage.includes('success')}
 						class:alert-warning={lidarrMessage.includes('remember')}
-						class:alert-error={!lidarrMessage.includes('success') && !lidarrMessage.includes('remember')}
+						class:alert-error={!lidarrMessage.includes('success') &&
+							!lidarrMessage.includes('remember')}
 					>
 						<span>{lidarrMessage}</span>
 					</div>
