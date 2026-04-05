@@ -48,6 +48,7 @@ const AUTO_HIDE_ERROR_MS = 6000;
 function createSyncStatusStore() {
 	let status = $state<SyncStatus>({ ...EMPTY_STATUS });
 	let isDismissed = $state(false);
+	let isMinimized = $state(false);
 	let showIndicator = $state(false);
 	let connectionMode = $state<'sse' | 'polling'>('sse');
 
@@ -81,6 +82,7 @@ function createSyncStatusStore() {
 
 		if (newStatus.is_syncing && !wasSyncing) {
 			isDismissed = false;
+			isMinimized = false;
 		}
 
 		if (wasSyncing && !newStatus.is_syncing && !newStatus.error_message && browser) {
@@ -254,6 +256,9 @@ function createSyncStatusStore() {
 		get showIndicator() {
 			return showIndicator && !isDismissed;
 		},
+		get isMinimized() {
+			return isMinimized;
+		},
 		get connectionMode() {
 			return connectionMode;
 		},
@@ -287,6 +292,14 @@ function createSyncStatusStore() {
 
 		dismiss(): void {
 			isDismissed = true;
+		},
+
+		minimize(): void {
+			isMinimized = true;
+		},
+
+		expand(): void {
+			isMinimized = false;
 		},
 
 		checkStatus(): void {

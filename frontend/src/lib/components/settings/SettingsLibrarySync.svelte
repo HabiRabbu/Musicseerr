@@ -6,7 +6,7 @@
 	import { onDestroy } from 'svelte';
 
 	interface LibrarySyncSettings {
-		sync_frequency: 'manual' | '5min' | '10min' | '30min' | '1hr';
+		sync_frequency: 'manual' | '5min' | '10min' | '30min' | '1hr' | '6hr' | '12hr' | '24hr' | '3d' | '7d';
 		last_sync: number | null;
 		last_sync_success: boolean;
 	}
@@ -85,10 +85,19 @@
 					<div class="label"><span class="label-text">Sync Frequency</span></div>
 					<select bind:value={form.data.sync_frequency} class="select select-bordered">
 						<option value="manual">Manual only</option>
-						<option value="5min">Every 5 minutes</option>
-						<option value="10min">Every 10 minutes</option>
+						{#if form.data.sync_frequency === '5min'}
+							<option value="5min">Every 5 minutes (legacy)</option>
+						{/if}
+						{#if form.data.sync_frequency === '10min'}
+							<option value="10min">Every 10 minutes (legacy)</option>
+						{/if}
 						<option value="30min">Every 30 minutes</option>
 						<option value="1hr">Every hour</option>
+						<option value="6hr">Every 6 hours</option>
+						<option value="12hr">Every 12 hours</option>
+						<option value="24hr">Every 24 hours</option>
+						<option value="3d">Every 3 days</option>
+						<option value="7d">Every 7 days</option>
 					</select>
 				</label>
 

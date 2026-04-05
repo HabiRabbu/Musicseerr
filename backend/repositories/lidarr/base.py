@@ -49,7 +49,7 @@ class LidarrBase:
 
     @property
     def _base_url(self) -> str:
-        return self._settings.lidarr_url
+        return self._settings.lidarr_url.rstrip("/")
 
     def is_configured(self) -> bool:
         return bool(self._settings.lidarr_api_key)
@@ -78,7 +78,13 @@ class LidarrBase:
         if not self.is_configured():
             raise ExternalServiceError("Lidarr is not configured (no API key)")
 
-        url = f"{self._base_url}{endpoint}"
+        path = endpoint.lstrip("/")
+        url = f"{self._base_url}/{path}" if path else self._base_url
+
+        timeout = httpx.Timeout(
+            self._settings.lidarr_timeout,
+            connect=self._settings.http_connect_timeout,
+        )
 
         try:
             response = await self._client.request(
@@ -87,6 +93,7 @@ class LidarrBase:
                 headers=self._get_headers(),
                 params=params,
                 json=json_data,
+                timeout=timeout,
             )
 
             if method == "DELETE" and response.status_code in (200, 202, 204):

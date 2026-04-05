@@ -98,16 +98,19 @@ async def sync_library_periodically(
             if sync_freq == "manual":
                 await asyncio.sleep(3600)
                 continue
-            elif sync_freq == "5min":
-                interval = 300
-            elif sync_freq == "10min":
-                interval = 600
-            elif sync_freq == "30min":
-                interval = 1800
-            elif sync_freq == "1hr":
-                interval = 3600
-            else:
-                interval = 600
+            
+            freq_to_seconds = {
+                "5min": 300,
+                "10min": 600,
+                "30min": 1800,
+                "1hr": 3600,
+                "6hr": 21600,
+                "12hr": 43200,
+                "24hr": 86400,
+                "3d": 259200,
+                "7d": 604800,
+            }
+            interval = freq_to_seconds.get(sync_freq, 86400)
             
             await asyncio.sleep(interval)
             
