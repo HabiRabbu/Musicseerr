@@ -185,3 +185,34 @@ class TestAudiodbEnabledRoundTrip:
         assert frontend.audiodb_enabled is True
         restored = frontend.to_backend()
         assert restored.audiodb_enabled is True
+
+
+class TestSyncSettingsRoundTrip:
+    """Round-trip tests for the sync robustness settings."""
+
+    @pytest.mark.parametrize("field,backend_val,frontend_val", [
+        ("sync_stall_timeout_minutes", 15, 15),
+        ("sync_max_timeout_hours", 6, 6),
+        ("audiodb_prewarm_concurrency", 6, 6),
+        ("audiodb_prewarm_delay", 1.5, 1.5),
+        ("artist_discovery_precache_concurrency", 5, 5),
+    ])
+    def test_roundtrip_preserves_value(self, field: str, backend_val, frontend_val) -> None:
+        backend = AdvancedSettings(**{field: backend_val})
+        frontend = AdvancedSettingsFrontend.from_backend(backend)
+        assert getattr(frontend, field) == frontend_val
+        restored = frontend.to_backend()
+        assert getattr(restored, field) == backend_val
+
+    @pytest.mark.parametrize("field,default_val", [
+        ("sync_stall_timeout_minutes", 10),
+        ("sync_max_timeout_hours", 8),
+        ("audiodb_prewarm_concurrency", 4),
+        ("audiodb_prewarm_delay", 0.3),
+        ("artist_discovery_precache_concurrency", 3),
+    ])
+    def test_defaults_match(self, field: str, default_val) -> None:
+        backend = AdvancedSettings()
+        frontend = AdvancedSettingsFrontend()
+        assert getattr(backend, field) == default_val
+        assert getattr(frontend, field) == default_val

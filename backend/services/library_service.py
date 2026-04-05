@@ -71,6 +71,7 @@ class LibraryService:
         self._local_files_service = local_files_service
         self._jellyfin_library_service = jellyfin_library_service
         self._navidrome_library_service = navidrome_library_service
+        self._sync_state_store = sync_state_store
         self._can_precache = sync_state_store is not None and genre_index is not None
         self._precache_service: LibraryPrecacheService | None = None
         if self._can_precache:
@@ -287,11 +288,11 @@ class LibraryService:
             logger.error(f"Failed to fetch recently added: {e}")
             raise ExternalServiceError(f"Failed to fetch recently added: {e}")
     
-    async def sync_library(self, is_manual: bool = False) -> SyncLibraryResponse:
+    async def sync_library(self, is_manual: bool = False, force_full: bool = False) -> SyncLibraryResponse:
         from services.cache_status_service import CacheStatusService
 
         if not self._lidarr_repo.is_configured():
-            raise ExternalServiceError("Lidarr is not configured — set a Lidarr API key in Settings to sync your library.")
+            raise ExternalServiceError("Lidarr is not configured. Set a Lidarr API key in Settings to sync your library.")
 
         try:
             status_service = CacheStatusService()
@@ -368,13 +369,31 @@ class LibraryService:
                     self._last_manual_sync = now
 
                 if self._precache_service is None:
-                    logger.warning("Precache skipped — sync_state_store/genre_index not provided")
+                    logger.warning("Precache skipped: sync_state_store/genre_index not provided")
                     self._update_last_sync_timestamp()
                     result = SyncLibraryResponse(status='success', artists=len(artists), albums=len(albums))
                     self._sync_future.set_result(result)
                     return result
 
-                task = asyncio.create_task(self._precache_service.precache_library_resources(artists, albums))
+                resume = False
+                if not force_full and self._sync_state_store:
+                    try:
+                        last_state = await self._sync_state_store.get_sync_state()
+                        if last_state and last_state.get('status') == 'failed':
+                            resume = True
+                            logger.info("Previous sync failed, resuming from checkpoint")
+                    except Exception as e:  # noqa: BLE001
+                        logger.warning("Failed to check sync state for resume: %s", e)
+
+                if force_full and self._sync_state_store:
+                    try:
+                        await self._sync_state_store.clear_processed_items()
+                        await self._sync_state_store.clear_sync_state()
+                        logger.info("Force full sync: cleared previous progress")
+                    except Exception as e:  # noqa: BLE001
+                        logger.warning("Failed to clear sync state for force_full: %s", e)
+
+                task = asyncio.create_task(self._precache_service.precache_library_resources(artists, albums, resume=resume))
 
                 def on_task_done(t: asyncio.Task):
                     try:
@@ -571,8 +590,6 @@ class LibraryService:
                     await self._cover_repo.delete_covers_for_artist(artist_mbid)
             except Exception:  # noqa: BLE001
                 logger.warning("Failed to clean up cover images after removal", exc_info=True)
-
-    # Track resolution — extracted from routes/library.py
 
     async def _resolve_album_tracks(
         self,

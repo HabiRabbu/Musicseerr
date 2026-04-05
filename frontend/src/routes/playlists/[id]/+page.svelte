@@ -1,12 +1,18 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { onDestroy, untrack } from 'svelte';
-	import { deletePlaylist, fetchPlaylist, resolvePlaylistSources, type PlaylistDetail } from '$lib/api/playlists';
+	import {
+		deletePlaylist,
+		fetchPlaylist,
+		resolvePlaylistSources,
+		type PlaylistDetail
+	} from '$lib/api/playlists';
 	import { playlistTrackToQueueItem } from '$lib/player/queueHelpers';
 	import { playerStore } from '$lib/stores/player.svelte';
 	import { toastStore } from '$lib/stores/toast';
 	import { getCacheTTL } from '$lib/stores/cacheTtl';
 	import { extractDominantColor, DEFAULT_GRADIENT } from '$lib/utils/colors';
+	import { getApiUrl } from '$lib/utils/api';
 	import { Music } from 'lucide-svelte';
 	import BackButton from '$lib/components/BackButton.svelte';
 	import HeroBackdrop from '$lib/components/HeroBackdrop.svelte';
@@ -51,13 +57,17 @@
 				SOURCES_CACHE_PREFIX + playlistId,
 				JSON.stringify({ ts: Date.now(), data })
 			);
-		} catch { /* storage full — non-critical */ }
+		} catch {
+			/* storage full — non-critical */
+		}
 	}
 
 	function invalidateSourcesCache(playlistId: string) {
 		try {
 			localStorage.removeItem(SOURCES_CACHE_PREFIX + playlistId);
-		} catch { /* ignore */ }
+		} catch {
+			/* ignore */
+		}
 	}
 
 	function applySourcesMap(sources: Record<string, string[]>) {
@@ -188,8 +198,8 @@
 
 	let heroBgUrl = $derived.by(() => {
 		if (!playlist) return null;
-		if (playlist.custom_cover_url) return playlist.custom_cover_url;
-		if (playlist.cover_urls.length > 0) return playlist.cover_urls[0];
+		if (playlist.custom_cover_url) return getApiUrl(playlist.custom_cover_url);
+		if (playlist.cover_urls.length > 0) return getApiUrl(playlist.cover_urls[0]);
 		return null;
 	});
 
@@ -214,82 +224,96 @@
 </svelte:head>
 
 <div class="w-full px-2 sm:px-4 lg:px-8 py-4 sm:py-8 max-w-7xl mx-auto">
-{#if loading}
-	<div class="space-y-6 sm:space-y-8">
-		<div class="skeleton h-10 w-10 rounded-full"></div>
-		<div class="flex flex-col lg:flex-row gap-6 lg:gap-8">
-			<div class="skeleton w-full lg:w-64 xl:w-80 aspect-square rounded-box flex-shrink-0"></div>
-			<div class="flex-1 flex flex-col justify-end space-y-4">
-				<div class="skeleton h-4 w-20"></div>
-				<div class="skeleton h-12 w-3/4"></div>
-				<div class="skeleton h-6 w-1/2"></div>
-				<div class="flex gap-4 mt-6">
-					<div class="skeleton h-12 w-32"></div>
-					<div class="skeleton h-12 w-32"></div>
+	{#if loading}
+		<div class="space-y-6 sm:space-y-8">
+			<div class="skeleton h-10 w-10 rounded-full"></div>
+			<div class="flex flex-col lg:flex-row gap-6 lg:gap-8">
+				<div class="skeleton w-full lg:w-64 xl:w-80 aspect-square rounded-box flex-shrink-0"></div>
+				<div class="flex-1 flex flex-col justify-end space-y-4">
+					<div class="skeleton h-4 w-20"></div>
+					<div class="skeleton h-12 w-3/4"></div>
+					<div class="skeleton h-6 w-1/2"></div>
+					<div class="flex gap-4 mt-6">
+						<div class="skeleton h-12 w-32"></div>
+						<div class="skeleton h-12 w-32"></div>
+					</div>
 				</div>
 			</div>
+			<div class="space-y-2">
+				{#each Array(4) as _}
+					<div class="skeleton h-14 w-full"></div>
+				{/each}
+			</div>
 		</div>
-		<div class="space-y-2">
-			{#each Array(4) as _}
-				<div class="skeleton h-14 w-full"></div>
-			{/each}
+	{:else if loadError}
+		<div class="flex flex-col items-center justify-center py-20 gap-4 text-center">
+			<Music class="h-16 w-16 text-base-content/20" />
+			<h2 class="text-lg font-semibold text-base-content/80">Couldn't load this playlist</h2>
+			<p class="text-sm text-base-content/60">{loadError}</p>
+			<div class="flex items-center gap-2">
+				<button class="btn btn-sm btn-accent" onclick={() => void loadPlaylist(data.playlistId)}>
+					Retry
+				</button>
+				<BackButton fallback="/playlists" />
+			</div>
 		</div>
-	</div>
-{:else if loadError}
-	<div class="flex flex-col items-center justify-center py-20 gap-4 text-center">
-		<Music class="h-16 w-16 text-base-content/20" />
-		<h2 class="text-lg font-semibold text-base-content/80">Couldn't load this playlist</h2>
-		<p class="text-sm text-base-content/60">{loadError}</p>
-		<div class="flex items-center gap-2">
-			<button class="btn btn-sm btn-accent" onclick={() => void loadPlaylist(data.playlistId)}>
-				Retry
-			</button>
+	{:else if !playlist}
+		<div class="flex flex-col items-center justify-center py-20 gap-4">
+			<Music class="h-16 w-16 text-base-content/20" />
+			<h2 class="text-lg font-semibold text-base-content/60">Playlist not found</h2>
 			<BackButton fallback="/playlists" />
 		</div>
-	</div>
-{:else if !playlist}
-	<div class="flex flex-col items-center justify-center py-20 gap-4">
-		<Music class="h-16 w-16 text-base-content/20" />
-		<h2 class="text-lg font-semibold text-base-content/60">Playlist not found</h2>
-		<BackButton fallback="/playlists" />
-	</div>
-{:else}
-	<div class="space-y-6 sm:space-y-8">
-		<div class="group relative rounded-box playlist-hero" style="--hero-glow-color: var(--brand-hero);">
-			<div class="absolute inset-0 bg-gradient-to-b {heroGradient} transition-all duration-1000 rounded-box"></div>
-			<HeroBackdrop imageUrl={heroBgUrl} opacity={0.15} hoverOpacity={0.20} blur={3} hoverBlur={2} position="full" />
-			<div class="absolute inset-0 bg-gradient-to-b from-transparent via-base-100/50 to-base-100/80 rounded-box pointer-events-none"></div>
-
-			<div class="relative z-10 p-4 sm:p-6 lg:p-8">
-				<div class="mb-4">
-					<BackButton fallback="/playlists" />
-				</div>
-
-				<PlaylistHeader
-					bind:this={header}
-					{playlist}
-					onplayall={playAll}
-					onshuffleall={shuffleAll}
-					ondeleteclick={() => deleteModal?.showModal()}
-					onplaylistupdate={handlePlaylistUpdate}
+	{:else}
+		<div class="space-y-6 sm:space-y-8">
+			<div
+				class="group relative rounded-box playlist-hero"
+				style="--hero-glow-color: var(--brand-hero);"
+			>
+				<div
+					class="absolute inset-0 bg-gradient-to-b {heroGradient} transition-all duration-1000 rounded-box"
+				></div>
+				<HeroBackdrop
+					imageUrl={heroBgUrl}
+					opacity={0.15}
+					hoverOpacity={0.2}
+					blur={3}
+					hoverBlur={2}
+					position="full"
 				/>
+				<div
+					class="absolute inset-0 bg-gradient-to-b from-transparent via-base-100/50 to-base-100/80 rounded-box pointer-events-none"
+				></div>
+
+				<div class="relative z-10 p-4 sm:p-6 lg:p-8">
+					<div class="mb-4">
+						<BackButton fallback="/playlists" />
+					</div>
+
+					<PlaylistHeader
+						bind:this={header}
+						{playlist}
+						onplayall={playAll}
+						onshuffleall={shuffleAll}
+						ondeleteclick={() => deleteModal?.showModal()}
+						onplaylistupdate={handlePlaylistUpdate}
+					/>
+				</div>
 			</div>
+
+			<PlaylistTrackList
+				bind:this={trackList}
+				{playlist}
+				ontrackchange={() => {}}
+				onsourcechange={handleSourceChange}
+				onplaytrack={playFromTrack}
+			/>
 		</div>
 
-		<PlaylistTrackList
-			bind:this={trackList}
-			{playlist}
-			ontrackchange={() => {}}
-			onsourcechange={handleSourceChange}
-			onplaytrack={playFromTrack}
+		<DeletePlaylistModal
+			bind:this={deleteModal}
+			playlistName={playlist.name}
+			{deleting}
+			onconfirm={() => void confirmDelete()}
 		/>
-	</div>
-
-	<DeletePlaylistModal
-		bind:this={deleteModal}
-		playlistName={playlist.name}
-		{deleting}
-		onconfirm={() => void confirmDelete()}
-	/>
-{/if}
+	{/if}
 </div>

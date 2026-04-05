@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from api.v1.schemas.library import (
     LibraryResponse,
     LibraryArtistsResponse,
@@ -90,10 +90,11 @@ async def get_recently_added(
 
 @router.post("/sync", response_model=SyncLibraryResponse)
 async def sync_library(
+    force_full: bool = Query(default=False, description="Clear resume checkpoint and start a full sync from scratch"),
     library_service: LibraryService = Depends(get_library_service)
 ):
     try:
-        return await library_service.sync_library(is_manual=True)
+        return await library_service.sync_library(is_manual=True, force_full=force_full)
     except ExternalServiceError as e:
         if "cooldown" in str(e).lower():
             raise HTTPException(status_code=429, detail="Sync is on cooldown, please wait")

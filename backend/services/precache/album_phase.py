@@ -69,7 +69,7 @@ class AlbumPhase:
         advanced_settings = self._preferences_service.get_advanced_settings()
         batch_size = advanced_settings.batch_albums
         min_batch = max(1, advanced_settings.batch_albums - 2)
-        max_batch = min(20, advanced_settings.batch_albums + 7)
+        max_batch = min(20, advanced_settings.batch_albums + 12)
         metadata_fetched = 0
         covers_fetched = 0
         consecutive_slow_batches = 0

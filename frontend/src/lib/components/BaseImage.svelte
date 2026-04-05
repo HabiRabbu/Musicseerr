@@ -5,6 +5,7 @@
 	import { isValidMbid } from '$lib/utils/formatting';
 	import { imageSettingsStore } from '$lib/stores/imageSettings';
 	import { appendAudioDBSizeSuffix } from '$lib/utils/imageSuffix';
+	import { getApiUrl } from '$lib/utils/api';
 
 	export let mbid: string;
 	export let alt: string = 'Image';
@@ -73,20 +74,22 @@
 
 	$: canonicalAlbumCoverUrl =
 		imageType === 'album' && isValidMbid(mbid)
-			? `/api/v1/covers/release-group/${mbid}?size=${apiSizes[size]}`
+			? getApiUrl(`/api/v1/covers/release-group/${mbid}?size=${apiSizes[size]}`)
 			: null;
 	$: validMbid = imageType === 'artist' ? isValidMbid(mbid) : true;
 	$: hasSource =
 		(useRemoteUrl && resolvedRemoteUrl) ||
-		(imageType === 'album' ? (canonicalAlbumCoverUrl || customUrl || mbid) : validMbid);
+		(imageType === 'album' ? canonicalAlbumCoverUrl || customUrl || mbid : validMbid);
 	$: apiEndpoint = imageType === 'album' ? 'release-group' : 'artist';
-	$: fallbackCoverUrl = `/api/v1/covers/${apiEndpoint}/${mbid}?size=${apiSizes[size]}`;
-	$: coverUrl = imageType === 'album'
-		? (canonicalAlbumCoverUrl ?? customUrl ?? fallbackCoverUrl)
-		: fallbackCoverUrl;
-	$: retryCoverUrl = retryCount > 0
-		? coverUrl + (coverUrl.includes('?') ? '&' : '?') + `_r=${retryCount}`
-		: coverUrl;
+	$: fallbackCoverUrl = getApiUrl(`/api/v1/covers/${apiEndpoint}/${mbid}?size=${apiSizes[size]}`);
+	$: coverUrl =
+		imageType === 'album'
+			? (canonicalAlbumCoverUrl ?? customUrl ?? fallbackCoverUrl)
+			: fallbackCoverUrl;
+	$: retryCoverUrl =
+		retryCount > 0
+			? coverUrl + (coverUrl.includes('?') ? '&' : '?') + `_r=${retryCount}`
+			: coverUrl;
 	$: sizeClasses = imageType === 'album' ? albumSizeClasses : artistSizeClasses;
 	$: sizeClass = sizeClasses[size];
 	$: roundedClass = roundedClasses[rounded];
@@ -95,7 +98,10 @@
 		const newKey = coverUrl;
 		if (newKey !== retrySourceKey) {
 			retrySourceKey = newKey;
-			if (retryTimer) { clearTimeout(retryTimer); retryTimer = null; }
+			if (retryTimer) {
+				clearTimeout(retryTimer);
+				retryTimer = null;
+			}
 			retryCount = 0;
 			if (imgError) {
 				imgError = false;
@@ -168,18 +174,42 @@
 		<div class="absolute inset-0 w-full h-full flex items-center justify-center">
 			{#if imageType === 'album'}
 				<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" class="w-full h-full">
-					<rect fill={PLACEHOLDER_COLORS.DARK} width="200" height="200"/>
-					<circle cx="100" cy="100" r="70" fill={PLACEHOLDER_COLORS.MEDIUM} stroke={PLACEHOLDER_COLORS.LIGHT} stroke-width="2"/>
-					<circle cx="100" cy="100" r="50" fill="none" stroke={PLACEHOLDER_COLORS.LIGHT} stroke-width="1"/>
-					<circle cx="100" cy="100" r="30" fill="none" stroke={PLACEHOLDER_COLORS.LIGHT} stroke-width="1"/>
-					<circle cx="100" cy="100" r="12" fill={PLACEHOLDER_COLORS.LIGHT}/>
-					<circle cx="100" cy="100" r="4" fill={PLACEHOLDER_COLORS.DARK}/>
+					<rect fill={PLACEHOLDER_COLORS.DARK} width="200" height="200" />
+					<circle
+						cx="100"
+						cy="100"
+						r="70"
+						fill={PLACEHOLDER_COLORS.MEDIUM}
+						stroke={PLACEHOLDER_COLORS.LIGHT}
+						stroke-width="2"
+					/>
+					<circle
+						cx="100"
+						cy="100"
+						r="50"
+						fill="none"
+						stroke={PLACEHOLDER_COLORS.LIGHT}
+						stroke-width="1"
+					/>
+					<circle
+						cx="100"
+						cy="100"
+						r="30"
+						fill="none"
+						stroke={PLACEHOLDER_COLORS.LIGHT}
+						stroke-width="1"
+					/>
+					<circle cx="100" cy="100" r="12" fill={PLACEHOLDER_COLORS.LIGHT} />
+					<circle cx="100" cy="100" r="4" fill={PLACEHOLDER_COLORS.DARK} />
 				</svg>
 			{:else}
 				<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" class="w-full h-full">
-					<rect fill={PLACEHOLDER_COLORS.DARK} width="200" height="200"/>
-					<circle cx="100" cy="80" r="30" fill={PLACEHOLDER_COLORS.LIGHT}/>
-					<path d="M60 120 Q100 140 140 120 L140 160 Q100 180 60 160 Z" fill={PLACEHOLDER_COLORS.LIGHT}/>
+					<rect fill={PLACEHOLDER_COLORS.DARK} width="200" height="200" />
+					<circle cx="100" cy="80" r="30" fill={PLACEHOLDER_COLORS.LIGHT} />
+					<path
+						d="M60 120 Q100 140 140 120 L140 160 Q100 180 60 160 Z"
+						fill={PLACEHOLDER_COLORS.LIGHT}
+					/>
 				</svg>
 			{/if}
 		</div>

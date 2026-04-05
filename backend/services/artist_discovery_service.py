@@ -422,58 +422,88 @@ class ArtistDiscoveryService:
 
         cached_count = 0
         source_fetches = 0
-        for i, mbid in enumerate(artist_mbids):
+        advanced = self._preferences_service.get_advanced_settings() if self._preferences_service else None
+        discovery_concurrency = getattr(advanced, 'artist_discovery_precache_concurrency', 3) if advanced else 3
+        sem = asyncio.Semaphore(discovery_concurrency)
+        counter_lock = asyncio.Lock()
+        progress_counter = 0
+
+        async def process_artist(idx: int, mbid: str) -> bool:
+            nonlocal cached_count, source_fetches, progress_counter
             try:
-                for source in sources:
-                    similar_key = self._build_cache_key(
-                        "similar", mbid, DEFAULT_SIMILAR_COUNT, source
-                    )
-                    songs_key = self._build_cache_key(
-                        "top_songs", mbid, DEFAULT_TOP_SONGS_COUNT, source
-                    )
-                    albums_key = self._build_cache_key(
-                        "top_albums", mbid, DEFAULT_TOP_ALBUMS_COUNT, source
-                    )
+                async with sem:
+                    for source in sources:
+                        similar_key = self._build_cache_key(
+                            "similar", mbid, DEFAULT_SIMILAR_COUNT, source
+                        )
+                        songs_key = self._build_cache_key(
+                            "top_songs", mbid, DEFAULT_TOP_SONGS_COUNT, source
+                        )
+                        albums_key = self._build_cache_key(
+                            "top_albums", mbid, DEFAULT_TOP_ALBUMS_COUNT, source
+                        )
 
-                    has_all = (
-                        await self._cache.get(similar_key) is not None
-                        and await self._cache.get(songs_key) is not None
-                        and await self._cache.get(albums_key) is not None
-                    )
-                    if has_all:
-                        continue
+                        has_all = (
+                            await self._cache.get(similar_key) is not None
+                            and await self._cache.get(songs_key) is not None
+                            and await self._cache.get(albums_key) is not None
+                        )
+                        if has_all:
+                            continue
 
-                    results = await asyncio.gather(
-                        self.get_similar_artists(
-                            mbid, count=DEFAULT_SIMILAR_COUNT, source=source
-                        ),
-                        self.get_top_songs(
-                            mbid, count=DEFAULT_TOP_SONGS_COUNT, source=source
-                        ),
-                        self.get_top_albums(
-                            mbid, count=DEFAULT_TOP_ALBUMS_COUNT, source=source
-                        ),
-                        return_exceptions=True,
-                    )
-                    errors = [r for r in results if isinstance(r, Exception)]
-                    if errors:
-                        logger.debug("Discovery precache errors for %s: %s", mbid[:8], errors)
-                    source_fetches += 1
+                        results = await asyncio.gather(
+                            self.get_similar_artists(
+                                mbid, count=DEFAULT_SIMILAR_COUNT, source=source
+                            ),
+                            self.get_top_songs(
+                                mbid, count=DEFAULT_TOP_SONGS_COUNT, source=source
+                            ),
+                            self.get_top_albums(
+                                mbid, count=DEFAULT_TOP_ALBUMS_COUNT, source=source
+                            ),
+                            return_exceptions=True,
+                        )
+                        errors = [r for r in results if isinstance(r, Exception)]
+                        if errors:
+                            logger.debug("Discovery precache errors for %s: %s", mbid[:8], errors)
+                        async with counter_lock:
+                            source_fetches += 1
 
-                cached_count += 1
+                if delay > 0:
+                    await asyncio.sleep(delay)
 
-            except Exception as e:  # noqa: BLE001
-                logger.warning("Failed to precache discovery for %s: %s", mbid[:8], e)
-            finally:
+                async with counter_lock:
+                    cached_count += 1
+                    progress_counter += 1
+                    local_progress = progress_counter
+
                 if status_service:
                     artist_name = (mbid_to_name or {}).get(mbid, mbid[:8])
-                    await status_service.update_progress(i + 1, current_item=artist_name)
+                    await status_service.update_progress(local_progress, current_item=artist_name)
 
-                if (i + 1) % 10 == 0:
-                    logger.info("Discovery precache progress: %d/%d artists", i + 1, len(artist_mbids))
+                if local_progress % 10 == 0:
+                    logger.info("Discovery precache progress: %d/%d artists", local_progress, len(artist_mbids))
 
-                if delay > 0 and i < len(artist_mbids) - 1:
-                    await asyncio.sleep(delay)
+                return True
+            except Exception as e:  # noqa: BLE001
+                logger.warning("Failed to precache discovery for %s: %s", mbid[:8], e)
+                async with counter_lock:
+                    progress_counter += 1
+                    local_progress = progress_counter
+                if status_service:
+                    artist_name = (mbid_to_name or {}).get(mbid, mbid[:8])
+                    await status_service.update_progress(local_progress, current_item=artist_name)
+                return False
+
+        chunk = max(discovery_concurrency * 4, 20)
+        for i in range(0, len(artist_mbids), chunk):
+            if status_service and status_service.is_cancelled():
+                logger.info("Discovery precache cancelled by user")
+                break
+            batch = artist_mbids[i:i + chunk]
+            batch_tasks = [asyncio.create_task(process_artist(i + j, mbid)) for j, mbid in enumerate(batch)]
+            if batch_tasks:
+                await asyncio.gather(*batch_tasks, return_exceptions=True)
 
         logger.info(
             "Discovery precache complete: %d/%d artists refreshed (%d source fetches)",

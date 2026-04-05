@@ -56,13 +56,14 @@ class AdvancedSettings(AppStruct):
     http_timeout: int = 10
     http_connect_timeout: int = 5
     http_max_connections: int = 200
-    batch_artist_images: int = 5
-    batch_albums: int = 3
+    batch_artist_images: int = 10
+    batch_albums: int = 8
     delay_artist: float = 0.5
-    delay_albums: float = 1.0
+    delay_albums: float = 0.3
     artist_discovery_warm_interval: int = 14400
     artist_discovery_warm_delay: float = 0.5
     artist_discovery_precache_delay: float = 0.3
+    artist_discovery_precache_concurrency: int = 3
     memory_cache_max_entries: int = 10000
     memory_cache_cleanup_interval: int = 300
     cover_memory_cache_max_entries: int = 128
@@ -100,6 +101,10 @@ class AdvancedSettings(AppStruct):
     cache_ttl_audiodb_not_found: int = 86400
     cache_ttl_audiodb_library: int = 1209600
     cache_ttl_recently_viewed_bytes: int = 172800
+    sync_stall_timeout_minutes: int = 10
+    sync_max_timeout_hours: int = 8
+    audiodb_prewarm_concurrency: int = 4
+    audiodb_prewarm_delay: float = 0.3
     genre_section_ttl: int = 21600
     request_history_retention_days: int = 180
     ignored_releases_retention_days: int = 365
@@ -149,6 +154,11 @@ class AdvancedSettings(AppStruct):
             "recent_covers_max_size_mb": (100, 10000),
             "persistent_metadata_ttl_hours": (1, 168),
             "musicbrainz_concurrent_searches": (2, 10),
+            "artist_discovery_precache_concurrency": (1, 8),
+            "sync_stall_timeout_minutes": (2, 30),
+            "sync_max_timeout_hours": (1, 48),
+            "audiodb_prewarm_concurrency": (1, 8),
+            "audiodb_prewarm_delay": (0.0, 5.0),
             "discover_queue_size": (1, 20),
             "discover_queue_ttl": (3600, 604800),
             "discover_queue_polling_interval": (1000, 30000),
@@ -219,10 +229,10 @@ class AdvancedSettingsFrontend(AppStruct):
     http_timeout: int = 10
     http_connect_timeout: int = 5
     http_max_connections: int = 200
-    batch_artist_images: int = 5
-    batch_albums: int = 3
+    batch_artist_images: int = 10
+    batch_albums: int = 8
     delay_artist: float = 0.5
-    delay_albums: float = 1.0
+    delay_albums: float = 0.3
     artist_discovery_warm_interval: int = 240
     artist_discovery_warm_delay: float = 0.5
     artist_discovery_precache_delay: float = 0.3
@@ -268,6 +278,11 @@ class AdvancedSettingsFrontend(AppStruct):
     ignored_releases_retention_days: int = 365
     orphan_cover_demote_interval_hours: int = 24
     store_prune_interval_hours: int = 6
+    sync_stall_timeout_minutes: int = 10
+    sync_max_timeout_hours: int = 8
+    audiodb_prewarm_concurrency: int = 4
+    audiodb_prewarm_delay: float = 0.3
+    artist_discovery_precache_concurrency: int = 3
 
     def __post_init__(self) -> None:
         int_coerce_fields = [
@@ -371,6 +386,11 @@ class AdvancedSettingsFrontend(AppStruct):
             "ignored_releases_retention_days": (30, 3650),
             "orphan_cover_demote_interval_hours": (1, 168),
             "store_prune_interval_hours": (1, 168),
+            "sync_stall_timeout_minutes": (2, 30),
+            "sync_max_timeout_hours": (1, 48),
+            "audiodb_prewarm_concurrency": (1, 8),
+            "audiodb_prewarm_delay": (0.0, 5.0),
+            "artist_discovery_precache_concurrency": (1, 8),
         }
         for field_name, (minimum, maximum) in ranges.items():
             _validate_range(getattr(self, field_name), field_name, minimum, maximum)
@@ -450,6 +470,11 @@ class AdvancedSettingsFrontend(AppStruct):
             ignored_releases_retention_days=settings.ignored_releases_retention_days,
             orphan_cover_demote_interval_hours=settings.orphan_cover_demote_interval_hours,
             store_prune_interval_hours=settings.store_prune_interval_hours,
+            sync_stall_timeout_minutes=settings.sync_stall_timeout_minutes,
+            sync_max_timeout_hours=settings.sync_max_timeout_hours,
+            audiodb_prewarm_concurrency=settings.audiodb_prewarm_concurrency,
+            audiodb_prewarm_delay=settings.audiodb_prewarm_delay,
+            artist_discovery_precache_concurrency=settings.artist_discovery_precache_concurrency,
         )
 
     def to_backend(self) -> AdvancedSettings:
@@ -526,4 +551,9 @@ class AdvancedSettingsFrontend(AppStruct):
             ignored_releases_retention_days=self.ignored_releases_retention_days,
             orphan_cover_demote_interval_hours=self.orphan_cover_demote_interval_hours,
             store_prune_interval_hours=self.store_prune_interval_hours,
+            sync_stall_timeout_minutes=self.sync_stall_timeout_minutes,
+            sync_max_timeout_hours=self.sync_max_timeout_hours,
+            audiodb_prewarm_concurrency=self.audiodb_prewarm_concurrency,
+            audiodb_prewarm_delay=self.audiodb_prewarm_delay,
+            artist_discovery_precache_concurrency=self.artist_discovery_precache_concurrency,
         )

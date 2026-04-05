@@ -7,7 +7,10 @@ logger = logging.getLogger(__name__)
 
 
 class QueueStore:
-    def __init__(self, db_path: Path = Path("/app/cache/queue.db")) -> None:
+    def __init__(self, db_path: Path | None = None) -> None:
+        if db_path is None:
+            from core.config import get_settings
+            db_path = get_settings().queue_db_path
         self.db_path = Path(db_path)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self._write_lock = threading.Lock()

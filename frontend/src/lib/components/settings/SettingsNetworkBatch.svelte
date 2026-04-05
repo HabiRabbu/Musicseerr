@@ -101,3 +101,46 @@
 		max={5}
 	/>
 </div>
+<div class="divider my-4"></div>
+<h4 class="font-medium text-sm text-base-content/70 mb-3">Library Sync</h4>
+<div class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
+	<SettingsNumberField
+		label="Stall Timeout"
+		description="Cancel sync if no progress (default: 10 min)"
+		bind:value={data.sync_stall_timeout_minutes}
+		min={2}
+		max={30}
+		unit="min"
+	/>
+	<SettingsNumberField
+		label="Max Timeout"
+		description="Hard sync timeout (default: 8 hrs)"
+		bind:value={data.sync_max_timeout_hours}
+		min={1}
+		max={48}
+		unit="hrs"
+	/>
+	<SettingsNumberField
+		label="AudioDB Prewarm Concurrency"
+		description="Parallel AudioDB requests (default: 4)"
+		bind:value={data.audiodb_prewarm_concurrency}
+		min={1}
+		max={8}
+	/>
+	<SettingsNumberField
+		label="AudioDB Prewarm Delay"
+		description="Delay between items (default: 0.3s)"
+		bind:value={data.audiodb_prewarm_delay}
+		min={0}
+		max={5}
+		step={0.1}
+		unit="sec"
+	/>
+	<SettingsNumberField
+		label="Discovery Precache Concurrency"
+		description="Parallel discovery fetches (default: 3)"
+		bind:value={data.artist_discovery_precache_concurrency}
+		min={1}
+		max={8}
+	/>
+</div>

@@ -1,6 +1,7 @@
 import { browser } from '$app/environment';
 import { api } from '$lib/api/client';
 import { libraryStore } from '$lib/stores/library';
+import { getApiUrl } from '$lib/utils/api';
 
 export type SyncStatus = {
 	is_syncing: boolean;
@@ -128,7 +129,7 @@ function createSyncStatusStore() {
 			eventSource = null;
 		}
 
-		eventSource = new EventSource('/api/v1/cache/sync/stream');
+		eventSource = new EventSource(getApiUrl('/api/v1/cache/sync/stream'));
 
 		eventSource.onopen = () => {
 			connectionMode = 'sse';

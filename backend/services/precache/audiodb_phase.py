@@ -19,7 +19,6 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-_AUDIODB_PREWARM_INTER_ITEM_DELAY = 2.0
 _AUDIODB_PREWARM_LOG_INTERVAL = 100
 
 
@@ -33,6 +32,8 @@ class AudioDBPhase:
         self._cover_repo = cover_repo
         self._preferences_service = preferences_service
         self._audiodb_image_service = audiodb_image_service
+
+    _CACHE_CHECK_CHUNK = 200
 
     async def check_cache_needs(
         self,
@@ -56,14 +57,21 @@ class AudioDBPhase:
             cached = await svc.get_cached_album_images(mbid)
             return None if cached is not None else album
 
-        artist_results = await asyncio.gather(
-            *(check_artist(a) for a in artists), return_exceptions=True
-        )
-        album_results = await asyncio.gather(
-            *(check_album(a) for a in albums), return_exceptions=True
-        )
-        needed_artists = [r for r in artist_results if r is not None and not isinstance(r, Exception)]
-        needed_albums = [r for r in album_results if r is not None and not isinstance(r, Exception)]
+        needed_artists: list[dict] = []
+        chunk = self._CACHE_CHECK_CHUNK
+        for i in range(0, len(artists), chunk):
+            results = await asyncio.gather(
+                *(check_artist(a) for a in artists[i:i + chunk]), return_exceptions=True
+            )
+            needed_artists.extend(r for r in results if r is not None and not isinstance(r, Exception))
+
+        needed_albums: list[Any] = []
+        for i in range(0, len(albums), chunk):
+            results = await asyncio.gather(
+                *(check_album(a) for a in albums[i:i + chunk]), return_exceptions=True
+            )
+            needed_albums.extend(r for r in results if r is not None and not isinstance(r, Exception))
+
         return needed_artists, needed_albums
 
     async def download_bytes(self, url: str, entity_type: str, mbid: str) -> bool:
@@ -182,6 +190,9 @@ class AudioDBPhase:
             await status_service.skip_phase('audiodb_prewarm')
             return
 
+        concurrency = settings.audiodb_prewarm_concurrency
+        inter_item_delay = settings.audiodb_prewarm_delay
+
         needed_artists, needed_albums = await self.check_cache_needs(artists, albums)
         total = len(needed_artists) + len(needed_albums)
         if total == 0:
@@ -190,10 +201,10 @@ class AudioDBPhase:
             return
 
         original_total = len(artists) + len(albums)
-        hit_rate = ((original_total - total) / original_total * 100) if original_total > 0 else 100
+        initial_hit_rate = ((original_total - total) / original_total * 100) if original_total > 0 else 100
         logger.info(
-            "Phase 5 (AudioDB): Pre-warming %d items (%d artists, %d albums) — %.0f%% already cached",
-            total, len(needed_artists), len(needed_albums), hit_rate,
+            "Phase 5 (AudioDB): Pre-warming %d items (%d artists, %d albums), %.0f%% already cached, concurrency=%d delay=%.1fs",
+            total, len(needed_artists), len(needed_albums), initial_hit_rate, concurrency, inter_item_delay,
         )
         await status_service.update_phase('audiodb_prewarm', total)
 
@@ -204,71 +215,102 @@ class AudioDBPhase:
         bytes_ok = 0
         bytes_fail = 0
         svc = self._audiodb_image_service
+        sem = asyncio.Semaphore(concurrency)
+        counter_lock = asyncio.Lock()
 
-        for artist in needed_artists:
+        async def process_artist(artist: dict) -> None:
+            nonlocal processed, bytes_ok, bytes_fail
             if status_service.is_cancelled():
-                logger.info("AudioDB pre-warming cancelled during artist phase")
-                break
+                return
             if not self._preferences_service.get_advanced_settings().audiodb_enabled:
-                logger.info("AudioDB disabled during pre-warming, stopping")
-                break
+                return
 
             mbid = artist.get('mbid')
             name = artist.get('name', 'Unknown')
-            processed += 1
-            try:
-                result = await svc.fetch_and_cache_artist_images(mbid, name, is_monitored=True)
-                if result and not result.is_negative and result.thumb_url:
-                    if await self.download_bytes(result.thumb_url, "artist", mbid):
+
+            async with sem:
+                if inter_item_delay > 0:
+                    await asyncio.sleep(inter_item_delay)
+                try:
+                    result = await svc.fetch_and_cache_artist_images(mbid, name, is_monitored=True)
+                except Exception as e:  # noqa: BLE001
+                    result = None
+                    logger.warning("audiodb.prewarm action=artist_error mbid=%s error=%s", mbid[:8] if mbid else '?', e)
+
+            if result and not result.is_negative and result.thumb_url:
+                ok = await self.download_bytes(result.thumb_url, "artist", mbid)
+                async with counter_lock:
+                    if ok:
                         bytes_ok += 1
                     else:
                         bytes_fail += 1
-            except Exception as e:  # noqa: BLE001
-                logger.warning("audiodb.prewarm action=artist_error mbid=%s error=%s", mbid[:8] if mbid else '?', e)
 
-            await status_service.update_progress(processed, f"AudioDB: {name}")
+            async with counter_lock:
+                processed += 1
+                local_processed = processed
+                snap_ok, snap_fail = bytes_ok, bytes_fail
+            await status_service.update_progress(local_processed, f"AudioDB: {name}")
 
-            if processed % _AUDIODB_PREWARM_LOG_INTERVAL == 0:
+            if local_processed % _AUDIODB_PREWARM_LOG_INTERVAL == 0:
                 logger.info(
-                    "audiodb.prewarm processed=%d total=%d hit_rate=%.0f%% bytes_ok=%d bytes_fail=%d remaining=%d",
-                    processed, total, hit_rate, bytes_ok, bytes_fail, total - processed,
+                    "audiodb.prewarm processed=%d total=%d initial_hit=%.0f%% bytes_ok=%d bytes_fail=%d remaining=%d",
+                    local_processed, total, initial_hit_rate, snap_ok, snap_fail, total - local_processed,
                 )
 
-            await asyncio.sleep(_AUDIODB_PREWARM_INTER_ITEM_DELAY)
-
-        for album in needed_albums:
+        async def process_album(album: Any) -> None:
+            nonlocal processed, bytes_ok, bytes_fail
             if status_service.is_cancelled():
-                logger.info("AudioDB pre-warming cancelled during album phase")
-                break
+                return
             if not self._preferences_service.get_advanced_settings().audiodb_enabled:
-                logger.info("AudioDB disabled during pre-warming, stopping")
-                break
+                return
 
             mbid = getattr(album, 'musicbrainz_id', None) if hasattr(album, 'musicbrainz_id') else album.get('mbid') if isinstance(album, dict) else None
             artist_name = getattr(album, 'artist_name', None) if hasattr(album, 'artist_name') else album.get('artist_name') if isinstance(album, dict) else None
             album_name = getattr(album, 'title', None) if hasattr(album, 'title') else album.get('title') if isinstance(album, dict) else None
-            processed += 1
-            try:
-                result = await svc.fetch_and_cache_album_images(
-                    mbid, artist_name=artist_name, album_name=album_name, is_monitored=True,
-                )
-                if result and not result.is_negative and result.album_thumb_url:
-                    if await self.download_bytes(result.album_thumb_url, "album", mbid):
+
+            async with sem:
+                if inter_item_delay > 0:
+                    await asyncio.sleep(inter_item_delay)
+                try:
+                    result = await svc.fetch_and_cache_album_images(
+                        mbid, artist_name=artist_name, album_name=album_name, is_monitored=True,
+                    )
+                except Exception as e:  # noqa: BLE001
+                    result = None
+                    logger.warning("audiodb.prewarm action=album_error mbid=%s error=%s", mbid[:8] if mbid else '?', e)
+
+            if result and not result.is_negative and result.album_thumb_url:
+                ok = await self.download_bytes(result.album_thumb_url, "album", mbid)
+                async with counter_lock:
+                    if ok:
                         bytes_ok += 1
                     else:
                         bytes_fail += 1
-            except Exception as e:  # noqa: BLE001
-                logger.warning("audiodb.prewarm action=album_error mbid=%s error=%s", mbid[:8] if mbid else '?', e)
 
-            await status_service.update_progress(processed, f"AudioDB: {album_name or 'Unknown'}")
+            async with counter_lock:
+                processed += 1
+                local_processed = processed
+                snap_ok, snap_fail = bytes_ok, bytes_fail
+            await status_service.update_progress(local_processed, f"AudioDB: {album_name or 'Unknown'}")
 
-            if processed % _AUDIODB_PREWARM_LOG_INTERVAL == 0:
+            if local_processed % _AUDIODB_PREWARM_LOG_INTERVAL == 0:
                 logger.info(
-                    "audiodb.prewarm processed=%d total=%d hit_rate=%.0f%% bytes_ok=%d bytes_fail=%d remaining=%d",
-                    processed, total, hit_rate, bytes_ok, bytes_fail, total - processed,
+                    "audiodb.prewarm processed=%d total=%d initial_hit=%.0f%% bytes_ok=%d bytes_fail=%d remaining=%d",
+                    local_processed, total, initial_hit_rate, snap_ok, snap_fail, total - local_processed,
                 )
 
-            await asyncio.sleep(_AUDIODB_PREWARM_INTER_ITEM_DELAY)
+        chunk = max(concurrency * 4, 20)
+        for i in range(0, len(needed_artists), chunk):
+            if status_service.is_cancelled():
+                break
+            batch = needed_artists[i:i + chunk]
+            await asyncio.gather(*(process_artist(a) for a in batch), return_exceptions=True)
+
+        for i in range(0, len(needed_albums), chunk):
+            if status_service.is_cancelled():
+                break
+            batch = needed_albums[i:i + chunk]
+            await asyncio.gather(*(process_album(a) for a in batch), return_exceptions=True)
 
         logger.info(
             "audiodb.prewarm action=complete processed=%d total=%d bytes_ok=%d bytes_fail=%d",

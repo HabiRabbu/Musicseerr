@@ -27,6 +27,7 @@ Backend:
 ```bash
 cd backend
 pip install -r requirements-dev.txt
+cp env.dev.example .env
 uvicorn main:app --reload --port 8688
 ```
 
@@ -34,6 +35,7 @@ Frontend:
 
 ```bash
 cd frontend
+cp env.dev.example .env
 pnpm install
 pnpm run dev
 ```

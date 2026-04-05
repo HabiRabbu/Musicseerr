@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { getApiUrl } from '$lib/utils/api';
 	import type { BecauseYouListenTo } from '$lib/types';
 	import HomeSection from './HomeSection.svelte';
 	import HeroBackdrop from './HeroBackdrop.svelte';
@@ -13,26 +14,30 @@
 
 	let hasDirectBackdrop = $derived(
 		$imageSettingsStore.directRemoteImagesEnabled &&
-		!!(entry.banner_url || entry.wide_thumb_url || entry.fanart_url)
+			!!(entry.banner_url || entry.wide_thumb_url || entry.fanart_url)
 	);
 
-	let backdropUrl = $derived((() => {
-		if ($imageSettingsStore.directRemoteImagesEnabled) {
-			if (entry.banner_url) return entry.banner_url;
-			if (entry.wide_thumb_url) return entry.wide_thumb_url;
-			if (entry.fanart_url) return entry.fanart_url;
-		}
-		return entry.seed_artist_mbid
-			? `/api/v1/covers/artist/${entry.seed_artist_mbid}?size=500`
-			: null;
-	})());
+	let backdropUrl = $derived(
+		(() => {
+			if ($imageSettingsStore.directRemoteImagesEnabled) {
+				if (entry.banner_url) return entry.banner_url;
+				if (entry.wide_thumb_url) return entry.wide_thumb_url;
+				if (entry.fanart_url) return entry.fanart_url;
+			}
+			return entry.seed_artist_mbid
+				? getApiUrl(`/api/v1/covers/artist/${entry.seed_artist_mbid}?size=500`)
+				: null;
+		})()
+	);
 </script>
 
-<article class="discover-hero group relative overflow-hidden rounded-2xl transition-all duration-500 hover:shadow-[0_0_40px_rgb(var(--brand-discover)/0.12)]">
+<article
+	class="discover-hero group relative overflow-hidden rounded-2xl transition-all duration-500 hover:shadow-[0_0_40px_rgb(var(--brand-discover)/0.12)]"
+>
 	<HeroBackdrop
 		imageUrl={backdropUrl}
-		opacity={hasDirectBackdrop ? 0.20 : 0.12}
-		hoverOpacity={hasDirectBackdrop ? 0.30 : 0.18}
+		opacity={hasDirectBackdrop ? 0.2 : 0.12}
+		hoverOpacity={hasDirectBackdrop ? 0.3 : 0.18}
 		blur={hasDirectBackdrop ? 0 : 2}
 		hoverBlur={hasDirectBackdrop ? 0 : 1}
 		position="full"
@@ -41,7 +46,9 @@
 	<div class="relative px-4 pt-5 pb-1 sm:px-6 sm:pt-6">
 		<div class="flex items-center gap-3 mb-1">
 			<div class="flex items-center gap-2 min-w-0">
-				<span class="text-xs font-semibold uppercase tracking-widest text-base-content/40">Because You Listen To</span>
+				<span class="text-xs font-semibold uppercase tracking-widest text-base-content/40"
+					>Because You Listen To</span
+				>
 			</div>
 		</div>
 
@@ -50,8 +57,10 @@
 				{entry.seed_artist}
 			</h2>
 			{#if entry.listen_count > 0}
-				<span class="inline-flex items-center gap-1.5 shrink-0 rounded-full px-3 py-1 text-xs font-medium"
-					style="background: rgb(var(--brand-discover) / 0.12); color: rgb(var(--brand-discover));">
+				<span
+					class="inline-flex items-center gap-1.5 shrink-0 rounded-full px-3 py-1 text-xs font-medium"
+					style="background: rgb(var(--brand-discover) / 0.12); color: rgb(var(--brand-discover));"
+				>
 					<Headphones class="w-3 h-3" />
 					{entry.listen_count} listens this week
 				</span>
@@ -82,7 +91,7 @@
 		animation: hero-glow 4s ease-in-out infinite;
 	}
 	.discover-hero:hover {
-		border-color: rgb(var(--brand-discover) / 0.20);
+		border-color: rgb(var(--brand-discover) / 0.2);
 	}
 
 	@media (prefers-reduced-motion: reduce) {
