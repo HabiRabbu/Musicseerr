@@ -5,11 +5,20 @@ FROM node:22.16-alpine AS frontend-build
 
 WORKDIR /app/frontend
 
-COPY frontend/package*.json ./
-RUN npm ci --ignore-scripts
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
+
+# Install pnpm
+RUN npm install -g pnpm@10.33.0
+
+COPY frontend/package.json ./
+COPY frontend/pnpm-lock.yaml ./
+COPY frontend/pnpm-workspace.yaml ./
+
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
 
 COPY frontend/ .
-RUN npm run build
+RUN pnpm run build
 
 ##
 # Stage 2 — Install Python dependencies
