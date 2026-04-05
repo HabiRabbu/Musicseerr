@@ -106,7 +106,6 @@
 		abortInFlightRequests();
 	});
 
-
 	function withSource(url: string): string {
 		if (!source) return url;
 		const separator = url.includes('?') ? '&' : '?';
@@ -294,10 +293,7 @@
 		<div class="flex min-h-[400px] flex-col items-center justify-center text-center">
 			{#if errorIcon}
 				{@const SvelteComponent = errorIcon}
-				<SvelteComponent
-					class="h-12 w-12 text-base-content/40 mb-4"
-					strokeWidth={1.5}
-				/>
+				<SvelteComponent class="h-12 w-12 text-base-content/40 mb-4" strokeWidth={1.5} />
 			{:else}
 				<CircleAlert class="h-12 w-12 text-base-content/40 mb-4" strokeWidth={1.5} />
 			{/if}

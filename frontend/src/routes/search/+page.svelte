@@ -44,12 +44,12 @@
 	let isSearching = $derived(loadingArtists || loadingAlbums);
 	let hasResults = $derived(artists.length > 0 || albums.length > 0);
 	let hasTopResult = $derived(topArtist != null || topAlbum != null);
-	let displayedArtists = $derived(topArtist
-		? artists.filter((a) => a.musicbrainz_id !== topArtist?.musicbrainz_id)
-		: artists);
-	let displayedAlbums = $derived(topAlbum
-		? albums.filter((a) => a.musicbrainz_id !== topAlbum?.musicbrainz_id)
-		: albums);
+	let displayedArtists = $derived(
+		topArtist ? artists.filter((a) => a.musicbrainz_id !== topArtist?.musicbrainz_id) : artists
+	);
+	let displayedAlbums = $derived(
+		topAlbum ? albums.filter((a) => a.musicbrainz_id !== topAlbum?.musicbrainz_id) : albums
+	);
 
 	function navigateToBucket(bucket: 'artists' | 'albums') {
 		if (data.query) {

@@ -262,16 +262,17 @@
 	const whatsHotKeys = new Set(['popular_albums', 'trending_artists']);
 	let whatsHotBlocks = $derived(preGenreBlocks.filter((b) => whatsHotKeys.has(b.key)));
 	let forYouBlocks = $derived(preGenreBlocks.filter((b) => !whatsHotKeys.has(b.key)));
-	let hasContent =
-		$derived(preGenreBlocks.length > 0 ||
-		postGenreSections.length > 0 ||
-		(homeData?.genre_list?.items?.length ?? 0) > 0);
+	let hasContent = $derived(
+		preGenreBlocks.length > 0 ||
+			postGenreSections.length > 0 ||
+			(homeData?.genre_list?.items?.length ?? 0) > 0
+	);
 	let servicePrompts = $derived(homeData?.service_prompts || []);
 	let lidarrConfigured = $derived(homeData?.integration_status?.lidarr ?? true);
 	let lidarrPrompt = $derived(servicePrompts.find((p) => p.service === 'lidarr-connection'));
-	let otherPrompts = $derived(servicePrompts.filter(
-		(p) => p.service !== 'lidarr-connection' && !isDismissed(p.service)
-	));
+	let otherPrompts = $derived(
+		servicePrompts.filter((p) => p.service !== 'lidarr-connection' && !isDismissed(p.service))
+	);
 
 	let dismissedVersion = 0;
 	function handlePromptDismiss(_service: string) {

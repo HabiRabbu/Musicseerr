@@ -15,13 +15,11 @@ function mockLoadSuccess(data: ListenBrainzConnectionSettings = defaultResponse)
 }
 
 function mockLoadFailure() {
-	return vi
-		.fn()
-		.mockResolvedValue(
-			new Response(JSON.stringify({ error: { message: 'Failed to load ListenBrainz settings' } }), {
-				status: 500
-			})
-		);
+	return vi.fn().mockResolvedValue(
+		new Response(JSON.stringify({ error: { message: 'Failed to load ListenBrainz settings' } }), {
+			status: 500
+		})
+	);
 }
 
 describe('SettingsListenBrainz.svelte', () => {

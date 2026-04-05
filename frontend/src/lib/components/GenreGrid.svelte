@@ -10,12 +10,7 @@
 		genreArtistImages?: Record<string, string | null> | undefined;
 	}
 
-	let {
-		title,
-		genres,
-		genreArtists = undefined,
-		genreArtistImages = undefined
-	}: Props = $props();
+	let { title, genres, genreArtists = undefined, genreArtistImages = undefined }: Props = $props();
 
 	const genreColors = [
 		'from-rose-500/90 to-pink-700',

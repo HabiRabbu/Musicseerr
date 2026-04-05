@@ -97,7 +97,6 @@
 
 	let tocSections: ArtistTocSection[] = $state([]);
 
-
 	function sortReleasesByYear(releases: ArtistInfo['albums']) {
 		return [...releases].sort((a, b) => {
 			const yearA = a.year;
@@ -470,7 +469,6 @@
 	}
 
 	let currentArtistId: string | null = $state(null);
-
 
 	function resetState() {
 		artist = null;

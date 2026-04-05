@@ -30,11 +30,14 @@
 
 	let requesting = $state(false);
 
-	let inLibrary = $derived(libraryStore.isInLibrary(album.musicbrainz_id) || album.in_library || false);
-	let isRequested =
-		$derived(!inLibrary &&
-		!album.in_library &&
-		(album.requested || libraryStore.isRequested(album.musicbrainz_id)));
+	let inLibrary = $derived(
+		libraryStore.isInLibrary(album.musicbrainz_id) || album.in_library || false
+	);
+	let isRequested = $derived(
+		!inLibrary &&
+			!album.in_library &&
+			(album.requested || libraryStore.isRequested(album.musicbrainz_id))
+	);
 
 	async function handleRequest(e: Event) {
 		e.stopPropagation();

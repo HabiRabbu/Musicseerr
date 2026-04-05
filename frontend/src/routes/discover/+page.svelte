@@ -243,40 +243,46 @@
 		discoverQueueStatusStore.init(source);
 	}
 
-	let hasContent =
-		$derived((discoverData?.because_you_listen_to?.length ?? 0) > 0 ||
-		discoverData?.fresh_releases != null ||
-		discoverData?.missing_essentials != null ||
-		discoverData?.rediscover != null ||
-		discoverData?.artists_you_might_like != null ||
-		discoverData?.popular_in_your_genres != null ||
-		discoverData?.globally_trending != null ||
-		discoverData?.lastfm_weekly_artist_chart != null ||
-		discoverData?.lastfm_weekly_album_chart != null ||
-		discoverData?.lastfm_recent_scrobbles != null ||
-		(discoverData?.genre_list?.items?.length ?? 0) > 0);
-	let servicePrompts = $derived((discoverData?.service_prompts ?? []).filter((p) => !isDismissed(p.service)));
+	let hasContent = $derived(
+		(discoverData?.because_you_listen_to?.length ?? 0) > 0 ||
+			discoverData?.fresh_releases != null ||
+			discoverData?.missing_essentials != null ||
+			discoverData?.rediscover != null ||
+			discoverData?.artists_you_might_like != null ||
+			discoverData?.popular_in_your_genres != null ||
+			discoverData?.globally_trending != null ||
+			discoverData?.lastfm_weekly_artist_chart != null ||
+			discoverData?.lastfm_weekly_album_chart != null ||
+			discoverData?.lastfm_recent_scrobbles != null ||
+			(discoverData?.genre_list?.items?.length ?? 0) > 0
+	);
+	let servicePrompts = $derived(
+		(discoverData?.service_prompts ?? []).filter((p) => !isDismissed(p.service))
+	);
 
-	let hasCuratedGroup =
-		$derived((discoverData?.because_you_listen_to?.length ?? 0) > 0 ||
-		discoverData?.discover_queue_enabled ||
-		(activeSource === 'listenbrainz' &&
-			discoverData?.weekly_exploration &&
-			discoverData.weekly_exploration.tracks.length > 0));
+	let hasCuratedGroup = $derived(
+		(discoverData?.because_you_listen_to?.length ?? 0) > 0 ||
+			discoverData?.discover_queue_enabled ||
+			(activeSource === 'listenbrainz' &&
+				discoverData?.weekly_exploration &&
+				discoverData.weekly_exploration.tracks.length > 0)
+	);
 
-	let hasExploreGroup =
-		$derived((discoverData?.fresh_releases?.items?.length ?? 0) > 0 ||
-		(discoverData?.missing_essentials?.items?.length ?? 0) > 0 ||
-		(discoverData?.rediscover?.items?.length ?? 0) > 0 ||
-		(discoverData?.artists_you_might_like?.items?.length ?? 0) > 0 ||
-		(discoverData?.popular_in_your_genres?.items?.length ?? 0) > 0);
+	let hasExploreGroup = $derived(
+		(discoverData?.fresh_releases?.items?.length ?? 0) > 0 ||
+			(discoverData?.missing_essentials?.items?.length ?? 0) > 0 ||
+			(discoverData?.rediscover?.items?.length ?? 0) > 0 ||
+			(discoverData?.artists_you_might_like?.items?.length ?? 0) > 0 ||
+			(discoverData?.popular_in_your_genres?.items?.length ?? 0) > 0
+	);
 
-	let hasChartsGroup =
-		$derived((discoverData?.globally_trending?.items?.length ?? 0) > 0 ||
-		(discoverData?.lastfm_recent_scrobbles?.items?.length ?? 0) > 0 ||
-		(discoverData?.lastfm_weekly_artist_chart?.items?.length ?? 0) > 0 ||
-		(discoverData?.lastfm_weekly_album_chart?.items?.length ?? 0) > 0 ||
-		(discoverData?.genre_list?.items?.length ?? 0) > 0);
+	let hasChartsGroup = $derived(
+		(discoverData?.globally_trending?.items?.length ?? 0) > 0 ||
+			(discoverData?.lastfm_recent_scrobbles?.items?.length ?? 0) > 0 ||
+			(discoverData?.lastfm_weekly_artist_chart?.items?.length ?? 0) > 0 ||
+			(discoverData?.lastfm_weekly_album_chart?.items?.length ?? 0) > 0 ||
+			(discoverData?.genre_list?.items?.length ?? 0) > 0
+	);
 
 	function handlePromptDismiss(_service: string) {
 		servicePrompts = (discoverData?.service_prompts ?? []).filter((p) => !isDismissed(p.service));

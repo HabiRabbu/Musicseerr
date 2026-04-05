@@ -63,7 +63,12 @@
 	let albums: LibraryAlbum[] = $state([]);
 	let albumsTotal = $state(0);
 	let artists: LibraryArtist[] = $state([]);
-	let stats: LibraryStats = $state({ artist_count: 0, album_count: 0, last_sync: null, db_size_mb: 0 });
+	let stats: LibraryStats = $state({
+		artist_count: 0,
+		album_count: 0,
+		last_sync: null,
+		db_size_mb: 0
+	});
 
 	let loadingArtists = $state(true);
 	let loadingAlbums = $state(true);
@@ -85,10 +90,13 @@
 	let loadingRecentlyAdded = $derived($recentlyAddedStore.loading && !$recentlyAddedStore.data);
 	let isSearching = $derived(searchQuery.trim().length > 0);
 	let totalAlbumPages = $derived(Math.ceil(albumsTotal / ALBUMS_PER_PAGE));
-	let lastSyncText = $derived(stats.last_sync ? new Date(stats.last_sync * 1000).toLocaleString() : 'Never');
-	let isConnectionError =
-		$derived(errorCode === CIRCUIT_BREAKER_CODE ||
-		(error != null && /connection|DNS|not configured/i.test(error)));
+	let lastSyncText = $derived(
+		stats.last_sync ? new Date(stats.last_sync * 1000).toLocaleString() : 'Never'
+	);
+	let isConnectionError = $derived(
+		errorCode === CIRCUIT_BREAKER_CODE ||
+			(error != null && /connection|DNS|not configured/i.test(error))
+	);
 
 	const FREQ_LABELS: Record<string, string> = {
 		manual: 'Manual sync only',

@@ -89,24 +89,28 @@
 	let useRemoteUrl = $derived(remoteUrl && $imageSettingsStore.directRemoteImagesEnabled);
 	let resolvedRemoteUrl = $derived(remoteUrl ? appendAudioDBSizeSuffix(remoteUrl, size) : null);
 
-	let canonicalAlbumCoverUrl =
-		$derived(imageType === 'album' && isValidMbid(mbid)
+	let canonicalAlbumCoverUrl = $derived(
+		imageType === 'album' && isValidMbid(mbid)
 			? getApiUrl(`/api/v1/covers/release-group/${mbid}?size=${apiSizes[size]}`)
-			: null);
+			: null
+	);
 	let validMbid = $derived(imageType === 'artist' ? isValidMbid(mbid) : true);
-	let hasSource =
-		$derived((useRemoteUrl && resolvedRemoteUrl) ||
-		(imageType === 'album' ? canonicalAlbumCoverUrl || customUrl || mbid : validMbid));
+	let hasSource = $derived(
+		(useRemoteUrl && resolvedRemoteUrl) ||
+			(imageType === 'album' ? canonicalAlbumCoverUrl || customUrl || mbid : validMbid)
+	);
 	let apiEndpoint = $derived(imageType === 'album' ? 'release-group' : 'artist');
-	let fallbackCoverUrl = $derived(getApiUrl(`/api/v1/covers/${apiEndpoint}/${mbid}?size=${apiSizes[size]}`));
-	let coverUrl =
-		$derived(imageType === 'album'
+	let fallbackCoverUrl = $derived(
+		getApiUrl(`/api/v1/covers/${apiEndpoint}/${mbid}?size=${apiSizes[size]}`)
+	);
+	let coverUrl = $derived(
+		imageType === 'album'
 			? (canonicalAlbumCoverUrl ?? customUrl ?? fallbackCoverUrl)
-			: fallbackCoverUrl);
-	let retryCoverUrl =
-		$derived(retryCount > 0
-			? coverUrl + (coverUrl.includes('?') ? '&' : '?') + `_r=${retryCount}`
-			: coverUrl);
+			: fallbackCoverUrl
+	);
+	let retryCoverUrl = $derived(
+		retryCount > 0 ? coverUrl + (coverUrl.includes('?') ? '&' : '?') + `_r=${retryCount}` : coverUrl
+	);
 	let sizeClasses = $derived(imageType === 'album' ? albumSizeClasses : artistSizeClasses);
 	let sizeClass = $derived(sizeClasses[size]);
 	let roundedClass = $derived(roundedClasses[rounded]);

@@ -17,13 +17,11 @@ function mockLoadSuccess(data: LastFmConnectionSettingsResponse = defaultRespons
 }
 
 function mockLoadFailure() {
-	return vi
-		.fn()
-		.mockResolvedValue(
-			new Response(JSON.stringify({ error: { message: 'Failed to load Last.fm settings' } }), {
-				status: 500
-			})
-		);
+	return vi.fn().mockResolvedValue(
+		new Response(JSON.stringify({ error: { message: 'Failed to load Last.fm settings' } }), {
+			status: 500
+		})
+	);
 }
 
 describe('SettingsLastFm.svelte', () => {
