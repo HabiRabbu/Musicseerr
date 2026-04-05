@@ -193,9 +193,17 @@ function createPlayerStore() {
 				loadUrl: url
 			};
 		}
-		isSeekable = true;
+		let jellyfinSeekable = true;
+		try {
+			const headResp = await api.global.head(url!);
+			const ar = headResp.headers.get('Accept-Ranges');
+			jellyfinSeekable = ar !== null && ar !== 'none';
+		} catch {
+			jellyfinSeekable = true;
+		}
+		isSeekable = jellyfinSeekable;
 		return {
-			source: createPlaybackSource('jellyfin', { url: url!, seekable: true }),
+			source: createPlaybackSource('jellyfin', { url: url!, seekable: jellyfinSeekable }),
 			loadUrl: url
 		};
 	}
