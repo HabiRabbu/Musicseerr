@@ -227,8 +227,7 @@ export function createLibraryController<TAlbum>(adapter: LibraryAdapter<TAlbum>)
 		try {
 			await adapter.launchPlayback(album, false);
 		} catch (e) {
-			if (!isAbortError(e))
-				toastStore.show({ message: 'Playback failed', type: 'error' });
+			if (!isAbortError(e)) toastStore.show({ message: 'Playback failed', type: 'error' });
 		} finally {
 			playingAlbumId = null;
 		}
@@ -240,8 +239,7 @@ export function createLibraryController<TAlbum>(adapter: LibraryAdapter<TAlbum>)
 		try {
 			await adapter.launchPlayback(album, true);
 		} catch (e) {
-			if (!isAbortError(e))
-				toastStore.show({ message: 'Playback failed', type: 'error' });
+			if (!isAbortError(e)) toastStore.show({ message: 'Playback failed', type: 'error' });
 		} finally {
 			playingAlbumId = null;
 		}

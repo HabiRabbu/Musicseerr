@@ -33,7 +33,10 @@ function createServiceStatusStore() {
 		 */
 		recordFromHeader(header: string | null) {
 			if (!header) return;
-			const sources = header.split(',').map((s) => s.trim()).filter(Boolean);
+			const sources = header
+				.split(',')
+				.map((s) => s.trim())
+				.filter(Boolean);
 			if (sources.length === 0) return;
 			const patch: ServiceDegradation = {};
 			for (const src of sources) {

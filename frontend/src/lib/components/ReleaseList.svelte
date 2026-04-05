@@ -44,7 +44,9 @@
 			on:click={onToggleCollapse}
 		>
 			<span class="text-xl sm:text-2xl font-bold">{title} ({releases.length})</span>
-			<ChevronDown class="h-6 w-6 transition-transform duration-200 {collapsed ? '' : 'rotate-180'}" />
+			<ChevronDown
+				class="h-6 w-6 transition-transform duration-200 {collapsed ? '' : 'rotate-180'}"
+			/>
 		</button>
 	</div>
 	{#if !collapsed}
@@ -106,7 +108,11 @@
 											style="color: {colors.secondary};"
 										></span>
 									{:else}
-										<Download class="h-4 w-4 sm:h-5 sm:w-5" color={colors.secondary} strokeWidth={2.5} />
+										<Download
+											class="h-4 w-4 sm:h-5 sm:w-5"
+											color={colors.secondary}
+											strokeWidth={2.5}
+										/>
 									{/if}
 								</button>
 							{/if}

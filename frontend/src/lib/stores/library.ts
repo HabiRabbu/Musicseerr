@@ -86,7 +86,9 @@ function createLibraryStore() {
 		}
 
 		try {
-			const data = await api.global.get<{ mbids?: string[]; requested_mbids?: string[] }>('/api/v1/library/mbids');
+			const data = await api.global.get<{ mbids?: string[]; requested_mbids?: string[] }>(
+				'/api/v1/library/mbids'
+			);
 			const mbids: string[] = (data.mbids || []).map((m: string) => m.toLowerCase());
 			const requested: string[] = (data.requested_mbids || []).map((m: string) => m.toLowerCase());
 

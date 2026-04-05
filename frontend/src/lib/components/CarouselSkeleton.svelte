@@ -18,8 +18,14 @@
 	<span class="sr-only">Loading…</span>
 	{#each Array(count) as _}
 		<div class="{cardWidth} flex-shrink-0">
-			<div class="skeleton skeleton-shimmer aspect-square w-full {rounded === 'full' ? 'rounded-full' : 'rounded-lg'}"></div>
-			<div class="skeleton skeleton-shimmer mt-2 h-4 w-3/4 {rounded === 'full' ? 'mx-auto' : ''}"></div>
+			<div
+				class="skeleton skeleton-shimmer aspect-square w-full {rounded === 'full'
+					? 'rounded-full'
+					: 'rounded-lg'}"
+			></div>
+			<div
+				class="skeleton skeleton-shimmer mt-2 h-4 w-3/4 {rounded === 'full' ? 'mx-auto' : ''}"
+			></div>
 			{#if showSubtitle}
 				<div class="skeleton skeleton-shimmer mt-1 h-3 w-1/2"></div>
 			{/if}

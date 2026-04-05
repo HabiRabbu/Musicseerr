@@ -79,7 +79,9 @@ describe('pageFetch', () => {
 		const localController = new AbortController();
 		const mockFetch = vi.fn().mockImplementation((_url: string, init?: RequestInit) => {
 			return new Promise((_resolve, reject) => {
-				init?.signal?.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')));
+				init?.signal?.addEventListener('abort', () =>
+					reject(new DOMException('Aborted', 'AbortError'))
+				);
 			});
 		});
 		vi.stubGlobal('fetch', mockFetch);
@@ -95,7 +97,9 @@ describe('pageFetch', () => {
 		const localController = new AbortController();
 		const mockFetch = vi.fn().mockImplementation((_url: string, init?: RequestInit) => {
 			return new Promise((_resolve, reject) => {
-				init?.signal?.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')));
+				init?.signal?.addEventListener('abort', () =>
+					reject(new DOMException('Aborted', 'AbortError'))
+				);
 			});
 		});
 		vi.stubGlobal('fetch', mockFetch);

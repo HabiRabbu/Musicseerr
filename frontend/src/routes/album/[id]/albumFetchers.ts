@@ -38,16 +38,14 @@ export async function fetchDiscovery(
 }> {
 	const [moreByArtist, similarAlbums] = await Promise.all([
 		api
-			.get<MoreByArtistResponse>(
-				`/api/v1/albums/${albumId}/more-by-artist?artist_id=${artistId}`,
-				{ signal }
-			)
+			.get<MoreByArtistResponse>(`/api/v1/albums/${albumId}/more-by-artist?artist_id=${artistId}`, {
+				signal
+			})
 			.catch(() => null),
 		api
-			.get<SimilarAlbumsResponse>(
-				`/api/v1/albums/${albumId}/similar?artist_id=${artistId}`,
-				{ signal }
-			)
+			.get<SimilarAlbumsResponse>(`/api/v1/albums/${albumId}/similar?artist_id=${artistId}`, {
+				signal
+			})
 			.catch(() => null)
 	]);
 	return { moreByArtist, similarAlbums };
@@ -89,10 +87,7 @@ export async function fetchNavidromeMatch(
 	opts: { albumTitle?: string; artistName?: string },
 	signal?: AbortSignal
 ): Promise<NavidromeAlbumMatch | null> {
-	const matchUrl = new URL(
-		API.navidromeLibrary.albumMatch(albumId),
-		window.location.origin
-	);
+	const matchUrl = new URL(API.navidromeLibrary.albumMatch(albumId), window.location.origin);
 	if (opts.albumTitle) matchUrl.searchParams.set('name', opts.albumTitle);
 	if (opts.artistName) matchUrl.searchParams.set('artist', opts.artistName);
 	return api.get<NavidromeAlbumMatch>(matchUrl.toString(), { signal });
@@ -107,8 +102,7 @@ export async function fetchLastFm(
 		artist_name: opts.artistName,
 		album_name: opts.albumName
 	});
-	return api.get<LastFmAlbumEnrichment>(
-		`/api/v1/albums/${albumId}/lastfm?${params.toString()}`,
-		{ signal }
-	);
+	return api.get<LastFmAlbumEnrichment>(`/api/v1/albums/${albumId}/lastfm?${params.toString()}`, {
+		signal
+	});
 }

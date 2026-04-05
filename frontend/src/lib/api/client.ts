@@ -70,7 +70,12 @@ interface ApiClient {
 }
 
 function createClient(fetchFn: FetchFn): ApiClient {
-	async function request<T>(method: string, url: string, body?: unknown, opts?: RequestOptions): Promise<T> {
+	async function request<T>(
+		method: string,
+		url: string,
+		body?: unknown,
+		opts?: RequestOptions
+	): Promise<T> {
 		const { raw, ...fetchOpts } = opts ?? {};
 		const init: RequestInit = { method, ...fetchOpts };
 
@@ -92,13 +97,20 @@ function createClient(fetchFn: FetchFn): ApiClient {
 	}
 
 	return {
-		get: <T = unknown>(url: string, opts?: RequestOptions) => request<T>('GET', url, undefined, opts),
-		post: <T = unknown>(url: string, body?: unknown, opts?: RequestOptions) => request<T>('POST', url, body, opts),
-		put: <T = unknown>(url: string, body?: unknown, opts?: RequestOptions) => request<T>('PUT', url, body, opts),
-		patch: <T = unknown>(url: string, body?: unknown, opts?: RequestOptions) => request<T>('PATCH', url, body, opts),
-		delete: <T = void>(url: string, opts?: RequestOptions) => request<T>('DELETE', url, undefined, opts),
-		head: (url: string, opts?: RequestOptions) => request<Response>('HEAD', url, undefined, { ...opts, raw: true }),
-		upload: <T = unknown>(url: string, body: FormData, opts?: RequestOptions) => request<T>('POST', url, body, opts),
+		get: <T = unknown>(url: string, opts?: RequestOptions) =>
+			request<T>('GET', url, undefined, opts),
+		post: <T = unknown>(url: string, body?: unknown, opts?: RequestOptions) =>
+			request<T>('POST', url, body, opts),
+		put: <T = unknown>(url: string, body?: unknown, opts?: RequestOptions) =>
+			request<T>('PUT', url, body, opts),
+		patch: <T = unknown>(url: string, body?: unknown, opts?: RequestOptions) =>
+			request<T>('PATCH', url, body, opts),
+		delete: <T = void>(url: string, opts?: RequestOptions) =>
+			request<T>('DELETE', url, undefined, opts),
+		head: (url: string, opts?: RequestOptions) =>
+			request<Response>('HEAD', url, undefined, { ...opts, raw: true }),
+		upload: <T = unknown>(url: string, body: FormData, opts?: RequestOptions) =>
+			request<T>('POST', url, body, opts)
 	};
 }
 

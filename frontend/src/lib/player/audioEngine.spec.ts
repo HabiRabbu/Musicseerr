@@ -18,7 +18,10 @@ function createMockSource() {
 	};
 }
 
-function createMockContext(mockSource: ReturnType<typeof createMockSource>, mockFilterFactory: () => ReturnType<typeof createMockFilter>) {
+function createMockContext(
+	mockSource: ReturnType<typeof createMockSource>,
+	mockFilterFactory: () => ReturnType<typeof createMockFilter>
+) {
 	return {
 		state: 'suspended' as string,
 		destination: {},

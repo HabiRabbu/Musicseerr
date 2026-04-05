@@ -24,7 +24,8 @@
 	<div class="modal-box max-w-md">
 		<h3 class="text-lg font-bold">Artist Removed</h3>
 		<p class="py-4 text-base-content/70">
-			<span class="font-semibold text-base-content">{artistName}</span> was also removed from your library as they had no remaining albums.
+			<span class="font-semibold text-base-content">{artistName}</span> was also removed from your library
+			as they had no remaining albums.
 		</p>
 		<div class="modal-action">
 			<button class="btn btn-primary" onclick={handleClose}>OK</button>

@@ -12,7 +12,7 @@ function renderNav(letters: string[], props: Record<string, unknown> = {}) {
 	}
 
 	return render(AlphabetJumpNav, {
-		props: { letters, sectionIdPrefix: 'letter-', ...props },
+		props: { letters, sectionIdPrefix: 'letter-', ...props }
 	} as Parameters<typeof render<typeof AlphabetJumpNav>>[1]);
 }
 
@@ -22,7 +22,9 @@ describe('AlphabetJumpNav.svelte', () => {
 		// Both desktop and mobile navs render; use .first() to avoid strict-mode errors
 		await expect.element(page.getByLabelText('Jump to A').first()).toBeInTheDocument();
 		await expect.element(page.getByLabelText('Jump to Z').first()).toBeInTheDocument();
-		await expect.element(page.getByLabelText('Jump to numbers and symbols').first()).toBeInTheDocument();
+		await expect
+			.element(page.getByLabelText('Jump to numbers and symbols').first())
+			.toBeInTheDocument();
 	});
 
 	it('disables letters without content', async () => {

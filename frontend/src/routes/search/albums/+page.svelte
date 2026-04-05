@@ -102,9 +102,7 @@
 			const newMbids: Set<string> = new Set();
 			if (offset === 0 && albums.length > 0) {
 				const existingIds = new Set(albums.map((a) => a.musicbrainz_id));
-				const uniqueNewAlbums = newAlbums.filter(
-					(a: Album) => !existingIds.has(a.musicbrainz_id)
-				);
+				const uniqueNewAlbums = newAlbums.filter((a: Album) => !existingIds.has(a.musicbrainz_id));
 				albums = [...albums, ...uniqueNewAlbums];
 				offset = albums.length;
 				uniqueNewAlbums.forEach((a) => newMbids.add(a.musicbrainz_id));

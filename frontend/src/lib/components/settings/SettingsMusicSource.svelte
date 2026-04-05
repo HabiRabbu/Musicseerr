@@ -42,18 +42,25 @@
 	<div class="card-body">
 		<h2 class="card-title text-2xl">Primary Music Source</h2>
 		<p class="text-base-content/70 mb-4">
-			Choose which listening service powers Home and Discover by default. You can still switch sources on each page.
+			Choose which listening service powers Home and Discover by default. You can still switch
+			sources on each page.
 		</p>
 
 		{#if !bothConnected}
 			<div class="alert alert-info">
 				<span>
 					Connect both
-					{#if !lbConnected}<a href="/settings?tab=listenbrainz" class="link font-medium">ListenBrainz</a>{:else}ListenBrainz{/if}
+					{#if !lbConnected}<a href="/settings?tab=listenbrainz" class="link font-medium"
+							>ListenBrainz</a
+						>{:else}ListenBrainz{/if}
 					and
-					{#if !lfmConnected}<a href="/settings?tab=lastfm" class="link font-medium">Last.fm</a>{:else}Last.fm{/if}
-					before choosing a default source.
-					Right now MusicSeerr is using {lbConnected ? 'ListenBrainz' : lfmConnected ? 'Last.fm' : 'no service'}.
+					{#if !lfmConnected}<a href="/settings?tab=lastfm" class="link font-medium">Last.fm</a
+						>{:else}Last.fm{/if}
+					before choosing a default source. Right now MusicSeerr is using {lbConnected
+						? 'ListenBrainz'
+						: lfmConnected
+							? 'Last.fm'
+							: 'no service'}.
 				</span>
 			</div>
 		{:else}

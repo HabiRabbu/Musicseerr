@@ -12,7 +12,7 @@
 	let {
 		imageUrl,
 		opacity = 0.14,
-		hoverOpacity = 0.20,
+		hoverOpacity = 0.2,
 		blur = 2,
 		hoverBlur = 1,
 		position = 'right',
@@ -41,7 +41,10 @@
 			loading="lazy"
 			aria-hidden="true"
 			onload={() => (loaded = true)}
-			class="hero-backdrop-img absolute top-0 h-full object-cover transition-all duration-700 {position === 'right' ? 'right-0 w-2/5' : 'inset-0 w-full'}"
+			class="hero-backdrop-img absolute top-0 h-full object-cover transition-all duration-700 {position ===
+			'right'
+				? 'right-0 w-2/5'
+				: 'inset-0 w-full'}"
 		/>
 		{#if tintColor}
 			<div
@@ -49,7 +52,9 @@
 				style:background={`linear-gradient(to right, ${tintColor}, oklch(var(--b1) / 0.98) 55%, transparent)`}
 			></div>
 		{/if}
-		<div class="absolute inset-0 bg-gradient-to-t from-base-100/90 via-transparent to-base-100/40"></div>
+		<div
+			class="absolute inset-0 bg-gradient-to-t from-base-100/90 via-transparent to-base-100/40"
+		></div>
 	</div>
 {/if}
 
@@ -60,7 +65,7 @@
 	}
 
 	:global(.group):hover .hero-backdrop-img {
-		opacity: var(--hb-hover-opacity, 0.20);
+		opacity: var(--hb-hover-opacity, 0.2);
 		filter: blur(var(--hb-hover-blur, 1px));
 		scale: 1.05;
 	}

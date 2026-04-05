@@ -1,5 +1,9 @@
 <script lang="ts">
-	import { musicSourceStore, type MusicSource, type MusicSourcePage } from '$lib/stores/musicSource';
+	import {
+		musicSourceStore,
+		type MusicSource,
+		type MusicSourcePage
+	} from '$lib/stores/musicSource';
 	import { integrationStore } from '$lib/stores/integration';
 	import { fromStore } from 'svelte/store';
 

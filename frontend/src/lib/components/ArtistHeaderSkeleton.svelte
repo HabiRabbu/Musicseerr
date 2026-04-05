@@ -4,8 +4,12 @@
 <div class="relative w-full min-h-[420px] md:min-h-[480px] mb-8">
 	<div class="absolute inset-0 bg-gradient-to-b from-base-300/80 via-base-300/40 to-base-100"></div>
 
-	<div class="relative z-10 flex flex-col items-center justify-end h-full min-h-[420px] md:min-h-[480px] pb-8 pt-16 px-4">
-		<div class="skeleton skeleton-shimmer w-40 h-40 md:w-56 md:h-56 rounded-full mb-6 shadow-2xl"></div>
+	<div
+		class="relative z-10 flex flex-col items-center justify-end h-full min-h-[420px] md:min-h-[480px] pb-8 pt-16 px-4"
+	>
+		<div
+			class="skeleton skeleton-shimmer w-40 h-40 md:w-56 md:h-56 rounded-full mb-6 shadow-2xl"
+		></div>
 
 		<div class="skeleton skeleton-shimmer h-12 md:h-16 w-64 md:w-96 mb-4"></div>
 

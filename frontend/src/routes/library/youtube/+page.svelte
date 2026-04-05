@@ -31,10 +31,7 @@
 		searchQuery.trim()
 			? links.filter((l) => {
 					const q = searchQuery.trim().toLowerCase();
-					return (
-						l.album_name.toLowerCase().includes(q) ||
-						l.artist_name.toLowerCase().includes(q)
-					);
+					return l.album_name.toLowerCase().includes(q) || l.artist_name.toLowerCase().includes(q);
 				})
 			: links
 	);
@@ -171,12 +168,21 @@
 	{#if !$integrationStore.youtube}
 		<div class="alert alert-warning mb-4">
 			<Info class="h-4 w-4" />
-			<span>YouTube is not enabled. <a href="/settings?tab=youtube" class="link">Enable it in settings</a> to use YouTube features.</span>
+			<span
+				>YouTube is not enabled. <a href="/settings?tab=youtube" class="link"
+					>Enable it in settings</a
+				> to use YouTube features.</span
+			>
 		</div>
 	{:else if !$integrationStore.youtube_api}
 		<div class="alert alert-info mb-4">
 			<Info class="h-4 w-4" />
-			<span>YouTube API is not configured. You can add links manually, or <a href="/settings?tab=youtube" class="link">enable the API in settings</a> for auto-generation.</span>
+			<span
+				>YouTube API is not configured. You can add links manually, or <a
+					href="/settings?tab=youtube"
+					class="link">enable the API in settings</a
+				> for auto-generation.</span
+			>
 		</div>
 	{/if}
 
@@ -217,7 +223,12 @@
 				<div
 					class="card bg-base-100 w-full shadow-sm group relative cursor-pointer transition-transform hover:scale-105 hover:shadow-lg active:scale-95"
 					onclick={() => openDetail(link)}
-					onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openDetail(link); } }}
+					onkeydown={(e) => {
+						if (e.key === 'Enter' || e.key === ' ') {
+							e.preventDefault();
+							openDetail(link);
+						}
+					}}
 					role="button"
 					tabindex="0"
 				>
@@ -246,15 +257,27 @@
 						<!-- svelte-ignore a11y_no_static_element_interactions -->
 						<div
 							class="absolute top-1 right-1 z-30"
-							onclick={(e) => { e.stopPropagation(); e.preventDefault(); }}
-							onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); e.preventDefault(); } }}
+							onclick={(e) => {
+								e.stopPropagation();
+								e.preventDefault();
+							}}
+							onkeydown={(e) => {
+								if (e.key === 'Enter' || e.key === ' ') {
+									e.stopPropagation();
+									e.preventDefault();
+								}
+							}}
 						>
-							<div class="rounded-full bg-black/50 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity">
+							<div
+								class="rounded-full bg-black/50 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity"
+							>
 								<ContextMenu items={getCardMenuItems(link)} position="end" size="sm" />
 							</div>
 						</div>
 
-						<div class="absolute bottom-2 right-2 flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity z-20">
+						<div
+							class="absolute bottom-2 right-2 flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity z-20"
+						>
 							<button
 								class="btn btn-circle btn-sm btn-ghost bg-black/50 backdrop-blur-sm text-white shadow-md hover:bg-black/70"
 								onclick={(e) => quickShuffle(link, e)}

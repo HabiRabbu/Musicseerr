@@ -1,5 +1,9 @@
 <script lang="ts">
-	import type { WeeklyExplorationSection as SectionType, YouTubeQuotaStatus, TrackCacheCheckItem } from '$lib/types';
+	import type {
+		WeeklyExplorationSection as SectionType,
+		YouTubeQuotaStatus,
+		TrackCacheCheckItem
+	} from '$lib/types';
 	import { Sparkles, ExternalLink } from 'lucide-svelte';
 	import { onMount } from 'svelte';
 	import { API } from '$lib/constants';
@@ -30,9 +34,12 @@
 	onMount(async () => {
 		if (!ytConfigured || section.tracks.length === 0) return;
 		try {
-			const data = await api.global.post<{ items: TrackCacheCheckItem[] }>(API.discoverQueueYoutubeCacheCheck(), {
-				items: section.tracks.map((t) => ({ artist: t.artist_name, track: t.title }))
-			});
+			const data = await api.global.post<{ items: TrackCacheCheckItem[] }>(
+				API.discoverQueueYoutubeCacheCheck(),
+				{
+					items: section.tracks.map((t) => ({ artist: t.artist_name, track: t.title }))
+				}
+			);
 			const map = new Map<string, boolean>();
 			for (const item of data.items) {
 				map.set(cacheKey(item.artist, item.track), item.cached);

@@ -345,7 +345,12 @@ describe('playlistTrackToQueueItem', () => {
 
 	it('maps jellyfin track to QueueItem with correct streamUrl', () => {
 		expect.assertions(3);
-		const track: PlaylistTrack = { ...basePlaylistTrack, source_type: 'jellyfin', track_source_id: 'jf-123', format: 'opus' };
+		const track: PlaylistTrack = {
+			...basePlaylistTrack,
+			source_type: 'jellyfin',
+			track_source_id: 'jf-123',
+			format: 'opus'
+		};
 		const item = playlistTrackToQueueItem(track)!;
 		expect(item.sourceType).toBe('jellyfin');
 		expect(item.streamUrl).toBe('/api/v1/stream/jellyfin/jf-123');
@@ -354,7 +359,11 @@ describe('playlistTrackToQueueItem', () => {
 
 	it('maps youtube track with undefined streamUrl', () => {
 		expect.assertions(2);
-		const track: PlaylistTrack = { ...basePlaylistTrack, source_type: 'youtube', track_source_id: 'yt-abc' };
+		const track: PlaylistTrack = {
+			...basePlaylistTrack,
+			source_type: 'youtube',
+			track_source_id: 'yt-abc'
+		};
 		const item = playlistTrackToQueueItem(track)!;
 		expect(item.sourceType).toBe('youtube');
 		expect(item.streamUrl).toBeUndefined();
@@ -403,7 +412,12 @@ describe('playlistTrackToQueueItem', () => {
 
 	it('uses aac as default format for jellyfin when format is null', () => {
 		expect.assertions(1);
-		const track: PlaylistTrack = { ...basePlaylistTrack, source_type: 'jellyfin', track_source_id: 'jf-1', format: null };
+		const track: PlaylistTrack = {
+			...basePlaylistTrack,
+			source_type: 'jellyfin',
+			track_source_id: 'jf-1',
+			format: null
+		};
 		const item = playlistTrackToQueueItem(track)!;
 		expect(item.streamUrl).toBe('/api/v1/stream/jellyfin/jf-1');
 	});

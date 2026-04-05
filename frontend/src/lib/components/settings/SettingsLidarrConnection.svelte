@@ -47,7 +47,9 @@
 			return;
 		}
 		form.showMessage(
-			result.message.toLowerCase().includes('failed') ? result.message : `Connection failed: ${result.message}`,
+			result.message.toLowerCase().includes('failed')
+				? result.message
+				: `Connection failed: ${result.message}`,
 			'error',
 			false
 		);
@@ -98,7 +100,7 @@
 							class="input input-bordered join-item flex-1"
 							placeholder="Your Lidarr API key"
 						/>
-						<button type="button" class="btn join-item" onclick={() => showApiKey = !showApiKey}>
+						<button type="button" class="btn join-item" onclick={() => (showApiKey = !showApiKey)}>
 							{showApiKey ? 'Hide' : 'Show'}
 						</button>
 					</div>
@@ -155,13 +157,22 @@
 				{/if}
 
 				{#if form.message}
-					<div class="alert" class:alert-success={form.messageType === 'success'} class:alert-error={form.messageType === 'error'}>
+					<div
+						class="alert"
+						class:alert-success={form.messageType === 'success'}
+						class:alert-error={form.messageType === 'error'}
+					>
 						<span>{form.message}</span>
 					</div>
 				{/if}
 
 				<div class="flex justify-end gap-2 pt-2">
-					<button type="button" class="btn btn-ghost" onclick={verify} disabled={form.testing || !form.data.lidarr_url || !form.data.lidarr_api_key}>
+					<button
+						type="button"
+						class="btn btn-ghost"
+						onclick={verify}
+						disabled={form.testing || !form.data.lidarr_url || !form.data.lidarr_api_key}
+					>
 						{#if form.testing}
 							<span class="loading loading-spinner loading-sm"></span>
 						{/if}

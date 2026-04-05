@@ -21,13 +21,9 @@
 		audiodb_prewarm: Image
 	};
 
-	let PhaseIcon = $derived(
-		syncStatus.phase ? (phaseIcons[syncStatus.phase] ?? Loader2) : Loader2
-	);
+	let PhaseIcon = $derived(syncStatus.phase ? (phaseIcons[syncStatus.phase] ?? Loader2) : Loader2);
 
-	let isComplete = $derived(
-		!syncStatus.isActive && !syncStatus.error && syncStatus.showIndicator
-	);
+	let isComplete = $derived(!syncStatus.isActive && !syncStatus.error && syncStatus.showIndicator);
 
 	let pillLabel = $derived.by(() => {
 		if (isComplete) return 'Sync Complete';
@@ -58,7 +54,9 @@
 					{:else if syncStatus.error}
 						<TriangleAlert class="h-3.5 w-3.5 text-error" />
 					{:else}
-						<PhaseIcon class="h-3.5 w-3.5 text-primary {syncStatus.isActive ? 'animate-pulse' : ''}" />
+						<PhaseIcon
+							class="h-3.5 w-3.5 text-primary {syncStatus.isActive ? 'animate-pulse' : ''}"
+						/>
 					{/if}
 				</div>
 				<span
@@ -72,7 +70,9 @@
 			</button>
 		{:else}
 			<!-- Expanded card -->
-			<div class="bg-base-200 rounded-box shadow-xl border border-base-300 p-4 animate-slide-in-right">
+			<div
+				class="bg-base-200 rounded-box shadow-xl border border-base-300 p-4 animate-slide-in-right"
+			>
 				<div class="flex items-center justify-between gap-2 mb-3">
 					<div class="flex items-center gap-2.5 min-w-0">
 						{#if isComplete}
@@ -87,7 +87,9 @@
 							<span class="font-semibold text-sm text-error">Sync Failed</span>
 						{:else}
 							<div class="bg-primary/10 rounded-full p-1.5 shrink-0">
-								<PhaseIcon class="h-4 w-4 text-primary {syncStatus.isActive ? 'animate-pulse' : ''}" />
+								<PhaseIcon
+									class="h-4 w-4 text-primary {syncStatus.isActive ? 'animate-pulse' : ''}"
+								/>
 							</div>
 							<div class="min-w-0">
 								<span class="font-semibold text-sm">{syncStatus.phaseLabel}</span>

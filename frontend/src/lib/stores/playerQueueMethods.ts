@@ -6,12 +6,10 @@ export function addItemToQueue(
 	queue: QueueItem[],
 	item: QueueItem,
 	shuffleEnabled: boolean,
-	shuffleOrder: number[],
+	shuffleOrder: number[]
 ): { newQueue: QueueItem[]; newShuffleOrder: number[] } {
 	const newQueue = [...queue, stampSingleOrigin(item, 'manual')];
-	const newShuffleOrder = shuffleEnabled
-		? [...shuffleOrder, newQueue.length - 1]
-		: shuffleOrder;
+	const newShuffleOrder = shuffleEnabled ? [...shuffleOrder, newQueue.length - 1] : shuffleOrder;
 	return { newQueue, newShuffleOrder };
 }
 
@@ -19,7 +17,7 @@ export function addMultipleItems(
 	queue: QueueItem[],
 	items: QueueItem[],
 	shuffleEnabled: boolean,
-	shuffleOrder: number[],
+	shuffleOrder: number[]
 ): { newQueue: QueueItem[]; newShuffleOrder: number[] } {
 	const stamped = stampOrigin(items, 'manual');
 	const startIdx = queue.length;
@@ -35,7 +33,7 @@ export function insertPlayNext(
 	item: QueueItem,
 	currentIndex: number,
 	shuffleEnabled: boolean,
-	shuffleOrder: number[],
+	shuffleOrder: number[]
 ): { newQueue: QueueItem[]; newShuffleOrder: number[] } {
 	const insertAt = currentIndex + 1;
 	const newQueue = [...queue];
@@ -55,7 +53,7 @@ export function insertMultipleNext(
 	items: QueueItem[],
 	currentIndex: number,
 	shuffleEnabled: boolean,
-	shuffleOrder: number[],
+	shuffleOrder: number[]
 ): { newQueue: QueueItem[]; newShuffleOrder: number[] } {
 	const stamped = stampOrigin(items, 'manual');
 	const insertAt = currentIndex + 1;
@@ -77,7 +75,7 @@ export function removeAtIndex(
 	index: number,
 	currentIndex: number,
 	shuffleEnabled: boolean,
-	shuffleOrder: number[],
+	shuffleOrder: number[]
 ): { newQueue: QueueItem[]; newIndex: number; newShuffleOrder: number[]; wasPlaying: boolean } {
 	const wasPlaying = index === currentIndex;
 	const newQueue = queue.filter((_, i) => i !== index);
@@ -86,7 +84,9 @@ export function removeAtIndex(
 		: shuffleOrder;
 	const newIndex = wasPlaying
 		? Math.min(index, newQueue.length - 1)
-		: currentIndex > index ? currentIndex - 1 : currentIndex;
+		: currentIndex > index
+			? currentIndex - 1
+			: currentIndex;
 	return { newQueue, newIndex, newShuffleOrder, wasPlaying };
 }
 
@@ -94,9 +94,15 @@ export function performReorder(
 	queue: QueueItem[],
 	fromIndex: number,
 	toIndex: number,
-	currentIndex: number,
+	currentIndex: number
 ): { newQueue: QueueItem[]; newCurrentIndex: number } {
-	if (fromIndex === toIndex || fromIndex < 0 || fromIndex >= queue.length || toIndex < 0 || toIndex >= queue.length) {
+	if (
+		fromIndex === toIndex ||
+		fromIndex < 0 ||
+		fromIndex >= queue.length ||
+		toIndex < 0 ||
+		toIndex >= queue.length
+	) {
 		return { newQueue: queue, newCurrentIndex: currentIndex };
 	}
 	const newQueue = reorderItems(queue, fromIndex, toIndex);
@@ -114,14 +120,14 @@ export function performReorder(
 export function performShuffleReorder(
 	shuffleOrder: number[],
 	fromPos: number,
-	toPos: number,
+	toPos: number
 ): number[] {
 	return reorderShuffleItems(shuffleOrder, fromPos, toPos);
 }
 
 export function clearQueueKeepCurrent(
 	queue: QueueItem[],
-	currentIndex: number,
+	currentIndex: number
 ): { newQueue: QueueItem[]; newIndex: number } {
 	const currentItem = queue[currentIndex];
 	if (!currentItem) return { newQueue: [], newIndex: 0 };

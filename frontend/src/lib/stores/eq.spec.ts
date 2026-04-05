@@ -28,7 +28,7 @@ vi.stubGlobal('localStorage', mockLocalStorage);
 vi.stubGlobal('window', globalThis);
 
 describe('eqStore', () => {
-	let eqStore: typeof import('./eq.svelte')['eqStore'];
+	let eqStore: (typeof import('./eq.svelte'))['eqStore'];
 
 	beforeEach(async () => {
 		vi.useFakeTimers();

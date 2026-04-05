@@ -121,13 +121,15 @@
 		aria-label="Open {playlist.name}"
 	>
 		<figure class="aspect-square overflow-hidden relative">
-			<div class="w-full h-full transition-transform duration-200 group-hover:scale-105 transform-gpu">
-			<PlaylistMosaic
-				coverUrls={playlist.cover_urls}
-				customCoverUrl={playlist.custom_cover_url}
-				size="w-full h-full"
-				rounded="none"
-			/>
+			<div
+				class="w-full h-full transition-transform duration-200 group-hover:scale-105 transform-gpu"
+			>
+				<PlaylistMosaic
+					coverUrls={playlist.cover_urls}
+					customCoverUrl={playlist.custom_cover_url}
+					size="w-full h-full"
+					rounded="none"
+				/>
 			</div>
 		</figure>
 		<div class="px-3 pt-3 pb-1">

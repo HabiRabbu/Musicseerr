@@ -30,8 +30,13 @@
 
 <div class="relative mb-6 overflow-hidden {gradientClass}">
 	<div class="absolute inset-0 bg-gradient-to-t from-base-100 to-transparent"></div>
-	<div class="absolute inset-0 opacity-[0.03]" style="background-image: url('data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 200 200%22><filter id=%22n%22><feTurbulence type=%22fractalNoise%22 baseFrequency=%220.9%22 numOctaves=%224%22 stitchTiles=%22stitch%22/></filter><rect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23n)%22 opacity=%220.5%22/></svg>'); background-size: 200px;"></div>
-	<div class="absolute left-0 top-1/2 -translate-y-1/2 w-96 h-48 rounded-full bg-primary/10 blur-3xl pointer-events-none"></div>
+	<div
+		class="absolute inset-0 opacity-[0.03]"
+		style="background-image: url('data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 200 200%22><filter id=%22n%22><feTurbulence type=%22fractalNoise%22 baseFrequency=%220.9%22 numOctaves=%224%22 stitchTiles=%22stitch%22/></filter><rect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23n)%22 opacity=%220.5%22/></svg>'); background-size: 200px;"
+	></div>
+	<div
+		class="absolute left-0 top-1/2 -translate-y-1/2 w-96 h-48 rounded-full bg-primary/10 blur-3xl pointer-events-none"
+	></div>
 	<div class="relative px-4 py-8 sm:px-6 sm:py-12 lg:px-8">
 		<div class="flex items-start justify-between">
 			<div>

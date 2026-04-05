@@ -14,7 +14,13 @@
 		ytConfigured?: boolean;
 	}
 
-	let { songs, loading = false, configured = true, source = '', ytConfigured = false }: Props = $props();
+	let {
+		songs,
+		loading = false,
+		configured = true,
+		source = '',
+		ytConfigured = false
+	}: Props = $props();
 
 	let cacheMap = $state<Map<string, boolean>>(new Map());
 	let resolveMap = $state<Map<string, ResolvedTrack>>(new Map());
@@ -48,9 +54,12 @@
 
 		(async () => {
 			try {
-				const data = await api.global.post<{ items: TrackCacheCheckItem[] }>(API.discoverQueueYoutubeCacheCheck(), {
-					items: songs.map((s) => ({ artist: s.artist_name, track: s.title }))
-				});
+				const data = await api.global.post<{ items: TrackCacheCheckItem[] }>(
+					API.discoverQueueYoutubeCacheCheck(),
+					{
+						items: songs.map((s) => ({ artist: s.artist_name, track: s.title }))
+					}
+				);
 				if (lastFetchedKey === key) {
 					const map = new Map<string, boolean>();
 					for (const item of data.items) {
@@ -73,17 +82,25 @@
 
 		(async () => {
 			try {
-				const data = await api.global.post<{ items: ResolvedTrack[] }>(API.library.resolveTracks(), {
-					items: resolvable.map((s) => ({
-						release_group_mbid: s.release_group_mbid,
-						disc_number: s.disc_number ?? 1,
-						track_number: s.track_number
-					}))
-				});
+				const data = await api.global.post<{ items: ResolvedTrack[] }>(
+					API.library.resolveTracks(),
+					{
+						items: resolvable.map((s) => ({
+							release_group_mbid: s.release_group_mbid,
+							disc_number: s.disc_number ?? 1,
+							track_number: s.track_number
+						}))
+					}
+				);
 				if (lastResolveKey === key) {
 					const map = new Map<string, ResolvedTrack>();
 					for (const item of data.items) {
-						if (item.source && item.track_source_id && item.release_group_mbid && item.track_number != null) {
+						if (
+							item.source &&
+							item.track_source_id &&
+							item.release_group_mbid &&
+							item.track_number != null
+						) {
 							map.set(
 								resolveKey(item.release_group_mbid, item.disc_number ?? 1, item.track_number),
 								item
@@ -100,7 +117,11 @@
 
 	function getResolvedTrack(song: TopSong): ResolvedTrack | null {
 		if (!song.release_group_mbid || song.track_number == null) return null;
-		return resolveMap.get(resolveKey(song.release_group_mbid, song.disc_number ?? 1, song.track_number)) ?? null;
+		return (
+			resolveMap.get(
+				resolveKey(song.release_group_mbid, song.disc_number ?? 1, song.track_number)
+			) ?? null
+		);
 	}
 
 	function buildQueueItems(startSong: TopSong): { items: QueueItem[]; startIndex: number } {
@@ -124,7 +145,7 @@
 				sourceType: resolved.source as SourceType,
 				streamUrl: resolved.stream_url ?? undefined,
 				format: resolved.format ?? undefined,
-				duration: resolved.duration ?? undefined,
+				duration: resolved.duration ?? undefined
 			});
 		}
 
@@ -170,15 +191,15 @@
 		<div class="space-y-1">
 			{#each songs as song, i}
 				<TrackRow
-				{song}
-				position={i + 1}
-				{source}
-				showPreview={ytConfigured}
-				{ytConfigured}
-				initialCached={cacheMap.get(cacheKey(song.artist_name, song.title)) ?? null}
-				resolvedTrack={getResolvedTrack(song)}
-				onPlay={() => handlePlay(song)}
-			/>
+					{song}
+					position={i + 1}
+					{source}
+					showPreview={ytConfigured}
+					{ytConfigured}
+					initialCached={cacheMap.get(cacheKey(song.artist_name, song.title)) ?? null}
+					resolvedTrack={getResolvedTrack(song)}
+					onPlay={() => handlePlay(song)}
+				/>
 			{/each}
 		</div>
 	{/if}

@@ -76,9 +76,9 @@
 		{trackLinks}
 		{albumLink}
 		apiConfigured={youtubeApiConfigured}
-		onTrackLinksUpdate={onTrackLinksUpdate}
-		onAlbumLinkUpdate={onAlbumLinkUpdate}
-		onQuotaUpdate={onQuotaUpdate}
+		{onTrackLinksUpdate}
+		{onAlbumLinkUpdate}
+		{onQuotaUpdate}
 	/>
 {/if}
 

@@ -134,19 +134,29 @@ export function getTrackContextMenuItems(
 	resolvedNavidrome: NavidromeTrackInfo | null,
 	playlistModalRef: { open: (tracks: QueueItem[]) => void } | null
 ): MenuItem[] {
-	const queueItem = buildTrackQueueItem(track, album, resolvedLocal, resolvedJellyfin, resolvedNavidrome);
+	const queueItem = buildTrackQueueItem(
+		track,
+		album,
+		resolvedLocal,
+		resolvedJellyfin,
+		resolvedNavidrome
+	);
 	const hasSource = queueItem !== null;
 	return [
 		{
 			label: 'Add to Queue',
 			icon: ListPlus,
-			onclick: () => { if (queueItem) playerStore.addToQueue(queueItem); },
+			onclick: () => {
+				if (queueItem) playerStore.addToQueue(queueItem);
+			},
 			disabled: !hasSource
 		},
 		{
 			label: 'Play Next',
 			icon: ListStart,
-			onclick: () => { if (queueItem) playerStore.playNext(queueItem); },
+			onclick: () => {
+				if (queueItem) playerStore.playNext(queueItem);
+			},
 			disabled: !hasSource
 		},
 		{
@@ -200,19 +210,37 @@ export function buildSourceCallbacks(
 		onAddAllToQueue: () => {
 			const a = albumGetter();
 			if (!a) return;
-			const items = getSourceQueueItems(source, a, tracksGetters.jellyfin(), tracksGetters.local(), tracksGetters.navidrome());
+			const items = getSourceQueueItems(
+				source,
+				a,
+				tracksGetters.jellyfin(),
+				tracksGetters.local(),
+				tracksGetters.navidrome()
+			);
 			if (items.length > 0) playerStore.addMultipleToQueue(items);
 		},
 		onPlayAllNext: () => {
 			const a = albumGetter();
 			if (!a) return;
-			const items = getSourceQueueItems(source, a, tracksGetters.jellyfin(), tracksGetters.local(), tracksGetters.navidrome());
+			const items = getSourceQueueItems(
+				source,
+				a,
+				tracksGetters.jellyfin(),
+				tracksGetters.local(),
+				tracksGetters.navidrome()
+			);
 			if (items.length > 0) playerStore.playMultipleNext(items);
 		},
 		onAddAllToPlaylist: () => {
 			const a = albumGetter();
 			if (!a) return;
-			const items = getSourceQueueItems(source, a, tracksGetters.jellyfin(), tracksGetters.local(), tracksGetters.navidrome());
+			const items = getSourceQueueItems(
+				source,
+				a,
+				tracksGetters.jellyfin(),
+				tracksGetters.local(),
+				tracksGetters.navidrome()
+			);
 			if (items.length > 0) playlistModalRefGetter()?.open(items);
 		}
 	};

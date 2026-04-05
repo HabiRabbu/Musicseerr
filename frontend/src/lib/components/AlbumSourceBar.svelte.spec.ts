@@ -42,20 +42,18 @@ describe('AlbumSourceBar.svelte', () => {
 
 	it('fires onPlayAll callback when Play All is clicked', async () => {
 		const props = makeProps();
-		render(
-			AlbumSourceBar,
-			{ props } as unknown as Parameters<typeof render<typeof AlbumSourceBar>>[1]
-		);
+		render(AlbumSourceBar, { props } as unknown as Parameters<
+			typeof render<typeof AlbumSourceBar>
+		>[1]);
 		await page.getByText('Play All').click();
 		expect(props.onPlayAll).toHaveBeenCalledOnce();
 	});
 
 	it('fires onShuffle callback when Shuffle is clicked', async () => {
 		const props = makeProps();
-		render(
-			AlbumSourceBar,
-			{ props } as unknown as Parameters<typeof render<typeof AlbumSourceBar>>[1]
-		);
+		render(AlbumSourceBar, { props } as unknown as Parameters<
+			typeof render<typeof AlbumSourceBar>
+		>[1]);
 		await page.getByText('Shuffle').click();
 		expect(props.onShuffle).toHaveBeenCalledOnce();
 	});

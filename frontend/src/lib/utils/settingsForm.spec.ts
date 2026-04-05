@@ -4,7 +4,7 @@ const { mockApiGet, mockApiPut, mockApiPost, mockSetStatus } = vi.hoisted(() => 
 	mockApiGet: vi.fn(),
 	mockApiPut: vi.fn(),
 	mockApiPost: vi.fn(),
-	mockSetStatus: vi.fn(),
+	mockSetStatus: vi.fn()
 }));
 
 vi.mock('$lib/api/client', () => {
@@ -23,18 +23,21 @@ vi.mock('$lib/api/client', () => {
 	return {
 		api: {
 			global: { get: mockApiGet, put: mockApiPut, post: mockApiPost },
-			get: mockApiGet, put: mockApiPut, post: mockApiPost,
+			get: mockApiGet,
+			put: mockApiPut,
+			post: mockApiPost
 		},
-		ApiError,
+		ApiError
 	};
 });
 
 vi.mock('$lib/utils/errorHandling', () => ({
-	isAbortError: (e: unknown) => e instanceof DOMException && (e as DOMException).name === 'AbortError',
+	isAbortError: (e: unknown) =>
+		e instanceof DOMException && (e as DOMException).name === 'AbortError'
 }));
 
 vi.mock('$lib/stores/integration', () => ({
-	integrationStore: { setStatus: mockSetStatus },
+	integrationStore: { setStatus: mockSetStatus }
 }));
 
 import { createSettingsForm } from './settingsForm.svelte';
@@ -46,7 +49,7 @@ interface TestSettings {
 
 const defaultConfig = {
 	loadEndpoint: '/api/v1/settings/test',
-	saveEndpoint: '/api/v1/settings/test',
+	saveEndpoint: '/api/v1/settings/test'
 };
 
 describe('createSettingsForm', () => {
@@ -106,7 +109,7 @@ describe('createSettingsForm', () => {
 			mockApiGet.mockRejectedValueOnce(new Error('fail'));
 			const form = createSettingsForm<TestSettings>({
 				...defaultConfig,
-				defaultValue,
+				defaultValue
 			});
 			await form.load();
 
@@ -183,7 +186,7 @@ describe('createSettingsForm', () => {
 
 			const form = createSettingsForm<TestSettings>({
 				...defaultConfig,
-				refreshIntegration: true,
+				refreshIntegration: true
 			});
 			await form.load();
 			await form.save();
@@ -200,7 +203,7 @@ describe('createSettingsForm', () => {
 
 			const form = createSettingsForm<TestSettings>({
 				...defaultConfig,
-				afterSave,
+				afterSave
 			});
 			await form.load();
 			await form.save();
@@ -215,7 +218,7 @@ describe('createSettingsForm', () => {
 
 			const form = createSettingsForm<TestSettings>({
 				...defaultConfig,
-				enabledField: 'enabled',
+				enabledField: 'enabled'
 			});
 			await form.load();
 			expect(form.wasAlreadyEnabled).toBe(false);
@@ -235,7 +238,7 @@ describe('createSettingsForm', () => {
 
 			const form = createSettingsForm<TestSettings>({
 				...defaultConfig,
-				testEndpoint: '/api/v1/settings/test/verify',
+				testEndpoint: '/api/v1/settings/test/verify'
 			});
 			await form.load();
 			await form.test();
@@ -254,7 +257,7 @@ describe('createSettingsForm', () => {
 			const form = createSettingsForm<TestSettings>({
 				...defaultConfig,
 				testEndpoint: '/api/v1/settings/test/verify',
-				afterTest,
+				afterTest
 			});
 			await form.load();
 			await form.test();
@@ -269,7 +272,7 @@ describe('createSettingsForm', () => {
 
 			const form = createSettingsForm<TestSettings>({
 				...defaultConfig,
-				testEndpoint: '/api/v1/settings/test/verify',
+				testEndpoint: '/api/v1/settings/test/verify'
 			});
 			await form.load();
 			await form.test();
@@ -277,7 +280,7 @@ describe('createSettingsForm', () => {
 			expect(form.testResult).toEqual({
 				success: false,
 				valid: false,
-				message: "Couldn't test the connection",
+				message: "Couldn't test the connection"
 			});
 			form.cleanup();
 		});

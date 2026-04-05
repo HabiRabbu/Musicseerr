@@ -57,9 +57,7 @@
 			{@const artistMbid = genreArtists?.[genre.name]}
 			{@const cdnUrl = genreArtistImages?.[genre.name] ?? null}
 			{@const useCdn =
-				cdnUrl &&
-				$imageSettingsStore.directRemoteImagesEnabled &&
-				!cdnFailedSet.has(genre.name)}
+				cdnUrl && $imageSettingsStore.directRemoteImagesEnabled && !cdnFailedSet.has(genre.name)}
 			{@const hasImage = useCdn || artistMbid}
 			{@const isLoaded = loadedSet.has(genre.name)}
 			<a
@@ -74,10 +72,7 @@
 				></div>
 
 				{#if hasImage && !isLoaded}
-					<div
-						class="absolute inset-0 animate-pulse bg-white/5"
-						style="z-index: 4;"
-					></div>
+					<div class="absolute inset-0 animate-pulse bg-white/5" style="z-index: 4;"></div>
 				{/if}
 
 				{#if useCdn}
@@ -116,15 +111,11 @@
 					style="z-index: 10;"
 				>
 					{#if genre.listen_count}
-						<span
-							class="mb-1 text-[10px] font-medium tracking-wide text-white/70 sm:text-xs"
-						>
+						<span class="mb-1 text-[10px] font-medium tracking-wide text-white/70 sm:text-xs">
 							{formatCount(genre.listen_count)} plays
 						</span>
 					{/if}
-					<h3
-						class="line-clamp-2 text-sm font-bold leading-tight drop-shadow-md sm:text-base"
-					>
+					<h3 class="line-clamp-2 text-sm font-bold leading-tight drop-shadow-md sm:text-base">
 						{genre.name}
 					</h3>
 				</div>

@@ -10,7 +10,7 @@ function mockScrobbleSettings(
 	return {
 		scrobble_to_lastfm: false,
 		scrobble_to_listenbrainz: false,
-		...overrides,
+		...overrides
 	};
 }
 

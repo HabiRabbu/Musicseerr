@@ -66,10 +66,8 @@
 				statsRes.status === 'fulfilled';
 			return {
 				data: {
-					recentAlbums:
-						recentRes.status === 'fulfilled' ? recentRes.value : current.recentAlbums,
-					favoriteAlbums:
-						favRes.status === 'fulfilled' ? favRes.value : current.favoriteAlbums,
+					recentAlbums: recentRes.status === 'fulfilled' ? recentRes.value : current.recentAlbums,
+					favoriteAlbums: favRes.status === 'fulfilled' ? favRes.value : current.favoriteAlbums,
 					genres: genreRes.status === 'fulfilled' ? genreRes.value : current.genres,
 					stats:
 						statsRes.status === 'fulfilled'
@@ -115,7 +113,11 @@
 			const c = getJellyfinSidebarCachedData();
 			if (!c) return null;
 			return {
-				data: { ...c.data, favoriteAlbums: c.data.favoriteAlbums ?? [], genres: c.data.genres ?? [] } as SidebarData<JellyfinAlbumSummary>,
+				data: {
+					...c.data,
+					favoriteAlbums: c.data.favoriteAlbums ?? [],
+					genres: c.data.genres ?? []
+				} as SidebarData<JellyfinAlbumSummary>,
 				timestamp: c.timestamp
 			};
 		},

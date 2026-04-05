@@ -194,9 +194,7 @@ describe('AddToPlaylistModal.svelte', () => {
 
 		await expect.element(page.getByText("Couldn't add those tracks")).toBeVisible();
 
-		await expect
-			.element(page.getByLabelText('Add to My Playlist'))
-			.toBeVisible();
+		await expect.element(page.getByLabelText('Add to My Playlist')).toBeVisible();
 	});
 
 	it('shows tick for playlists where all tracks already exist', async () => {

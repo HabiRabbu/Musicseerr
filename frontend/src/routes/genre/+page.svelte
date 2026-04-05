@@ -51,9 +51,12 @@
 		heroArtistMbid = null;
 		heroImageLoaded = false;
 		try {
-			const data = await api.get<{ artist_mbid: string }>(`/api/v1/home/genre-artist/${encodeURIComponent(genreName)}`, {
-				signal: genreRequestAbortable.signal
-			});
+			const data = await api.get<{ artist_mbid: string }>(
+				`/api/v1/home/genre-artist/${encodeURIComponent(genreName)}`,
+				{
+					signal: genreRequestAbortable.signal
+				}
+			);
 			heroArtistMbid = data.artist_mbid;
 		} catch (e) {
 			if (isAbortError(e)) return;

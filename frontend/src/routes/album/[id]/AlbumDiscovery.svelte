@@ -13,7 +13,7 @@
 </script>
 
 <div class="mt-8">
-	<DiscoveryAlbumCarousel 
+	<DiscoveryAlbumCarousel
 		albums={moreByArtist?.albums || []}
 		loading={loadingDiscovery}
 		configured={true}
@@ -22,7 +22,7 @@
 	/>
 </div>
 
-<DiscoveryAlbumCarousel 
+<DiscoveryAlbumCarousel
 	albums={similarAlbums?.albums || []}
 	loading={loadingDiscovery}
 	configured={similarAlbums?.configured ?? true}

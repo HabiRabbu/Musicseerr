@@ -56,7 +56,9 @@ function createIntegrationStore() {
 
 			loadPromise = (async () => {
 				try {
-					const status = await api.global.get<Partial<IntegrationStatus>>(API.homeIntegrationStatus());
+					const status = await api.global.get<Partial<IntegrationStatus>>(
+						API.homeIntegrationStatus()
+					);
 					update((state) => ({ ...state, ...status, loaded: true }));
 					return;
 				} catch {}

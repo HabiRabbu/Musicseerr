@@ -40,10 +40,9 @@
 
 		async fetchAlbums({ limit, offset, sortBy, sortOrder, genre, search, signal }) {
 			if (search) {
-				const data: NavidromeSearchResponse = await api.get(
-					API.navidromeLibrary.search(search),
-					{ signal }
-				);
+				const data: NavidromeSearchResponse = await api.get(API.navidromeLibrary.search(search), {
+					signal
+				});
 				const items = data.albums ?? [];
 				return { items, total: items.length };
 			}
@@ -75,10 +74,8 @@
 				statsRes.status === 'fulfilled';
 			return {
 				data: {
-					recentAlbums:
-						recentRes.status === 'fulfilled' ? recentRes.value : current.recentAlbums,
-					favoriteAlbums:
-						favRes.status === 'fulfilled' ? favRes.value : current.favoriteAlbums,
+					recentAlbums: recentRes.status === 'fulfilled' ? recentRes.value : current.recentAlbums,
+					favoriteAlbums: favRes.status === 'fulfilled' ? favRes.value : current.favoriteAlbums,
 					genres: genreRes.status === 'fulfilled' ? genreRes.value : current.genres,
 					stats:
 						statsRes.status === 'fulfilled'
@@ -115,10 +112,7 @@
 				albumId: album.musicbrainz_id || album.navidrome_id,
 				albumName: album.name,
 				artistName: album.artist_name,
-				coverUrl: getCoverUrl(
-					album.image_url ?? null,
-					album.musicbrainz_id || album.navidrome_id
-				)
+				coverUrl: getCoverUrl(album.image_url ?? null, album.musicbrainz_id || album.navidrome_id)
 			});
 		},
 
@@ -129,7 +123,11 @@
 			const c = getNavidromeSidebarCachedData();
 			if (!c) return null;
 			return {
-				data: { ...c.data, favoriteAlbums: c.data.favoriteAlbums ?? [], genres: c.data.genres ?? [] } as SidebarData<NavidromeAlbumSummary>,
+				data: {
+					...c.data,
+					favoriteAlbums: c.data.favoriteAlbums ?? [],
+					genres: c.data.genres ?? []
+				} as SidebarData<NavidromeAlbumSummary>,
 				timestamp: c.timestamp
 			};
 		},

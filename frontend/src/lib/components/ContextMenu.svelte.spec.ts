@@ -9,7 +9,7 @@ import { ListPlus, ListStart } from 'lucide-svelte';
 function makeItems(overrides: Partial<MenuItem>[] = []): MenuItem[] {
 	const defaults: MenuItem[] = [
 		{ label: 'Add to Queue', icon: ListPlus, onclick: vi.fn() },
-		{ label: 'Play Next', icon: ListStart, onclick: vi.fn() },
+		{ label: 'Play Next', icon: ListStart, onclick: vi.fn() }
 	];
 	return defaults.map((d, i) => ({ ...d, ...overrides[i] }));
 }

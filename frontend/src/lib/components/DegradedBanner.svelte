@@ -11,9 +11,7 @@
 	const hasDegradation = $derived(degradedSources.length > 0 && !dismissed);
 
 	const sourceLabel = $derived(
-		degradedSources
-			.map((s) => s.charAt(0).toUpperCase() + s.slice(1))
-			.join(', ')
+		degradedSources.map((s) => s.charAt(0).toUpperCase() + s.slice(1)).join(', ')
 	);
 
 	const verb = $derived(degradedSources.length > 1 ? 'are' : 'is');

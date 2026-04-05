@@ -93,7 +93,9 @@
 
 	function showStatus(text: string, type: 'success' | 'error') {
 		statusMessage = { text, type };
-		setTimeout(() => { statusMessage = null; }, 3000);
+		setTimeout(() => {
+			statusMessage = null;
+		}, 3000);
 	}
 
 	async function handleAdd(playlist: PlaylistSummary) {
@@ -118,7 +120,10 @@
 			);
 			const addedCount = trackData.length;
 			if (existingIndices.size > 0) {
-				showStatus(`Added ${addedCount} new track${addedCount === 1 ? '' : 's'} to '${playlist.name}' (${existingIndices.size} already existed)`, 'success');
+				showStatus(
+					`Added ${addedCount} new track${addedCount === 1 ? '' : 's'} to '${playlist.name}' (${existingIndices.size} already existed)`,
+					'success'
+				);
 			} else {
 				showStatus(`Added to '${playlist.name}'`, 'success');
 			}
@@ -230,7 +235,11 @@
 						<span class="truncate flex-1">{playlist.name}</span>
 						<span class="text-sm text-base-content/60">{playlist.track_count}</span>
 						{#if addedSet.has(playlist.id) || allTracksExist(playlist.id)}
-							<button class="btn btn-ghost btn-sm btn-circle text-success" disabled aria-label="Already in playlist">
+							<button
+								class="btn btn-ghost btn-sm btn-circle text-success"
+								disabled
+								aria-label="Already in playlist"
+							>
 								<Check class="h-4 w-4" />
 							</button>
 						{:else if addingSet.has(playlist.id)}
@@ -265,7 +274,12 @@
 		<div class="modal-action">
 			{#if statusMessage}
 				<div class="flex-1">
-					<div role="alert" class="alert {statusMessage.type === 'success' ? 'alert-success' : 'alert-error'} alert-sm py-1 px-3">
+					<div
+						role="alert"
+						class="alert {statusMessage.type === 'success'
+							? 'alert-success'
+							: 'alert-error'} alert-sm py-1 px-3"
+					>
 						<span class="text-sm">{statusMessage.text}</span>
 					</div>
 				</div>

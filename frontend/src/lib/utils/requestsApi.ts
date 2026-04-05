@@ -1,7 +1,4 @@
-import type {
-	ActiveRequestsResponse,
-	RequestHistoryResponse
-} from '$lib/types';
+import type { ActiveRequestsResponse, RequestHistoryResponse } from '$lib/types';
 import { api } from '$lib/api/client';
 import { requestCountStore } from '$lib/stores/requestCountStore.svelte';
 export type { ActiveRequestsResponse, RequestHistoryResponse } from '$lib/types';
@@ -30,7 +27,9 @@ export async function fetchRequestHistory(
 export async function cancelRequest(
 	musicbrainzId: string
 ): Promise<{ success: boolean; message: string }> {
-	const data = await api.global.delete<{ success: boolean; message: string }>(`/api/v1/requests/active/${musicbrainzId}`);
+	const data = await api.global.delete<{ success: boolean; message: string }>(
+		`/api/v1/requests/active/${musicbrainzId}`
+	);
 	notifyRequestCountChanged();
 	return data;
 }
@@ -38,18 +37,20 @@ export async function cancelRequest(
 export async function retryRequest(
 	musicbrainzId: string
 ): Promise<{ success: boolean; message: string }> {
-	const data = await api.global.post<{ success: boolean; message: string }>(`/api/v1/requests/retry/${musicbrainzId}`);
+	const data = await api.global.post<{ success: boolean; message: string }>(
+		`/api/v1/requests/retry/${musicbrainzId}`
+	);
 	notifyRequestCountChanged();
 	return data;
 }
 
-export async function clearHistoryItem(
-	musicbrainzId: string
-): Promise<{ success: boolean }> {
+export async function clearHistoryItem(musicbrainzId: string): Promise<{ success: boolean }> {
 	return api.global.delete<{ success: boolean }>(`/api/v1/requests/history/${musicbrainzId}`);
 }
 
 export async function fetchActiveRequestCount(signal?: AbortSignal): Promise<number> {
-	const data = await api.global.get<{ count?: number }>('/api/v1/requests/active/count', { signal });
+	const data = await api.global.get<{ count?: number }>('/api/v1/requests/active/count', {
+		signal
+	});
 	return data.count ?? 0;
 }

@@ -1,5 +1,9 @@
 <script lang="ts">
-	import type { LastFmConnectionSettingsResponse, LastFmAuthTokenResponse, LastFmAuthSessionResponse } from '$lib/types';
+	import type {
+		LastFmConnectionSettingsResponse,
+		LastFmAuthTokenResponse,
+		LastFmAuthSessionResponse
+	} from '$lib/types';
 	import { api, ApiError } from '$lib/api/client';
 	import { isAbortError } from '$lib/utils/errorHandling';
 	import { createSettingsForm } from '$lib/utils/settingsForm.svelte';
@@ -146,7 +150,11 @@
 				<div class="alert alert-success mb-4">
 					<CircleCheck class="w-5 h-5 shrink-0" />
 					<span>Connected as <strong>{form.data.username}</strong></span>
-					<button type="button" class="btn btn-ghost btn-sm ml-auto" onclick={() => showDetails = !showDetails}>
+					<button
+						type="button"
+						class="btn btn-ghost btn-sm ml-auto"
+						onclick={() => (showDetails = !showDetails)}
+					>
 						{showDetails ? 'Hide details' : 'Edit settings'}
 					</button>
 				</div>
@@ -159,7 +167,9 @@
 
 						{#if !step1Complete}
 							<div class="bg-base-300 rounded-lg p-4 space-y-2">
-								<p class="text-sm font-medium">You will need a Last.fm API key and shared secret:</p>
+								<p class="text-sm font-medium">
+									You will need a Last.fm API key and shared secret:
+								</p>
 								<ol class="list-decimal list-inside text-sm space-y-1 text-base-content/70">
 									<li>
 										<a
@@ -173,7 +183,9 @@
 											<span class="sr-only">(opens in new tab)</span>
 										</a>
 									</li>
-									<li>Copy the <strong>API Key</strong> and <strong>Shared Secret</strong> from that page</li>
+									<li>
+										Copy the <strong>API Key</strong> and <strong>Shared Secret</strong> from that page
+									</li>
 									<li>Paste them here, then click <strong>Save &amp; Test</strong></li>
 								</ol>
 							</div>
@@ -193,7 +205,13 @@
 							{#if step1Complete}
 								<div class="label">
 									<span class="label-text-alt text-base-content/50">
-										Get credentials at <a href="https://www.last.fm/api/account/create" target="_blank" rel="noopener noreferrer" class="link link-primary">last.fm/api<span class="sr-only"> (opens in new tab)</span></a>
+										Get credentials at <a
+											href="https://www.last.fm/api/account/create"
+											target="_blank"
+											rel="noopener noreferrer"
+											class="link link-primary"
+											>last.fm/api<span class="sr-only"> (opens in new tab)</span></a
+										>
 									</span>
 								</div>
 							{/if}
@@ -211,14 +229,22 @@
 									class="input input-bordered join-item flex-1"
 									placeholder="Your Last.fm shared secret"
 								/>
-								<button type="button" class="btn join-item" onclick={() => showSecret = !showSecret}>
+								<button
+									type="button"
+									class="btn join-item"
+									onclick={() => (showSecret = !showSecret)}
+								>
 									{showSecret ? 'Hide' : 'Show'}
 								</button>
 							</div>
 						</div>
 
 						{#if testResult}
-							<div class="alert" class:alert-success={testResult.valid} class:alert-error={!testResult.valid}>
+							<div
+								class="alert"
+								class:alert-success={testResult.valid}
+								class:alert-error={!testResult.valid}
+							>
 								<span>{testResult.message}</span>
 							</div>
 						{/if}
@@ -239,7 +265,10 @@
 								type="button"
 								class="btn btn-primary"
 								onclick={saveAndTest}
-								disabled={form.saving || form.testing || !form.data.api_key || !form.data.shared_secret}
+								disabled={form.saving ||
+									form.testing ||
+									!form.data.api_key ||
+									!form.data.shared_secret}
 							>
 								{#if form.saving}
 									<span class="loading loading-spinner loading-sm"></span>
@@ -295,20 +324,31 @@
 											Once you have approved access in Last.fm, finish the connection here.
 										</p>
 										<div class="flex gap-2">
-											<button type="button" class="btn btn-primary btn-sm" onclick={completeAuth} disabled={exchanging}>
+											<button
+												type="button"
+												class="btn btn-primary btn-sm"
+												onclick={completeAuth}
+												disabled={exchanging}
+											>
 												{#if exchanging}
 													<span class="loading loading-spinner loading-sm"></span>
 												{/if}
 												Complete Authorization
 											</button>
-											<button type="button" class="btn btn-ghost btn-sm" onclick={cancelAuth}>Cancel</button>
+											<button type="button" class="btn btn-ghost btn-sm" onclick={cancelAuth}
+												>Cancel</button
+											>
 										</div>
 									</div>
 								</div>
 							{/if}
 
 							{#if authResult}
-								<div class="alert" class:alert-success={authResult.success} class:alert-error={!authResult.success}>
+								<div
+									class="alert"
+									class:alert-success={authResult.success}
+									class:alert-error={!authResult.success}
+								>
 									<span>{authResult.message}</span>
 								</div>
 							{/if}
@@ -356,7 +396,9 @@
 						<div class="alert alert-info">
 							<span>
 								Want to scrobble to Last.fm too?
-								<a href="/settings?tab=scrobbling" class="link font-medium">Turn it on in the Scrobbling tab</a>
+								<a href="/settings?tab=scrobbling" class="link font-medium"
+									>Turn it on in the Scrobbling tab</a
+								>
 							</span>
 						</div>
 					{/if}
@@ -364,7 +406,11 @@
 			{/if}
 
 			{#if form.message}
-				<div class="alert mt-4" class:alert-success={form.messageType === 'success'} class:alert-error={form.messageType === 'error'}>
+				<div
+					class="alert mt-4"
+					class:alert-success={form.messageType === 'success'}
+					class:alert-error={form.messageType === 'error'}
+				>
 					<span>{form.message}</span>
 				</div>
 			{/if}

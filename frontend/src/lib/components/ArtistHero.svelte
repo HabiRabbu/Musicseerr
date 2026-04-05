@@ -15,8 +15,7 @@
 	let heroImageLoaded = false;
 	let avatarRemoteError = false;
 
-	$: useRemoteAvatar =
-		artist.thumb_url && $imageSettingsStore.directRemoteImagesEnabled;
+	$: useRemoteAvatar = artist.thumb_url && $imageSettingsStore.directRemoteImagesEnabled;
 	$: resolvedRemoteAvatar = artist.thumb_url
 		? appendAudioDBSizeSuffix(artist.thumb_url, 'hero')
 		: null;
@@ -34,7 +33,8 @@
 		return null;
 	})();
 
-	$: hasDistinctBackdrop = $imageSettingsStore.directRemoteImagesEnabled &&
+	$: hasDistinctBackdrop =
+		$imageSettingsStore.directRemoteImagesEnabled &&
 		!!(artist.banner_url || artist.wide_thumb_url || artist.fanart_url);
 
 	function onHeroImageLoad() {
@@ -47,7 +47,9 @@
 	$: validLinks = artist.external_links.filter((link) => link.url && link.url.trim() !== '');
 </script>
 
-<div class="artist-hero group relative -mx-2 sm:-mx-4 lg:-mx-8 -mt-4 sm:-mt-8 overflow-hidden rounded-2xl transition-all duration-500">
+<div
+	class="artist-hero group relative -mx-2 sm:-mx-4 lg:-mx-8 -mt-4 sm:-mt-8 overflow-hidden rounded-2xl transition-all duration-500"
+>
 	<div class="absolute inset-0 bg-gradient-to-b {heroGradient} transition-all duration-1000"></div>
 
 	<HeroBackdrop
@@ -123,7 +125,7 @@
 						</div>
 						{#if artist.in_library}
 							<div class="absolute -bottom-2 -right-2 badge badge-success badge-lg gap-1 shadow-lg">
-							<Check class="h-4 w-4" />
+								<Check class="h-4 w-4" />
 								In Library
 							</div>
 						{/if}
@@ -132,7 +134,9 @@
 
 				<div class="flex-1 text-center sm:text-left min-w-0">
 					{#if artist.type}
-						<span class="text-xs sm:text-sm font-medium text-base-content/70 uppercase tracking-wider">
+						<span
+							class="text-xs sm:text-sm font-medium text-base-content/70 uppercase tracking-wider"
+						>
 							{artist.type === 'Group' ? 'Band' : artist.type === 'Person' ? 'Artist' : artist.type}
 						</span>
 					{/if}
@@ -161,7 +165,7 @@
 		animation: hero-glow 4s ease-in-out infinite;
 	}
 	.artist-hero:hover {
-		border-color: rgb(var(--brand-hero) / 0.20);
+		border-color: rgb(var(--brand-hero) / 0.2);
 	}
 	@media (prefers-reduced-motion: reduce) {
 		.artist-hero {

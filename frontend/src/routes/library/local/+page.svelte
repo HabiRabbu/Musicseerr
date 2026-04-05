@@ -53,12 +53,10 @@
 				api.get<LocalAlbumSummary[]>(API.local.recent(), { signal }),
 				api.get<LocalStorageStats>(API.local.stats(), { signal })
 			]);
-			const hasFreshData =
-				recentRes.status === 'fulfilled' || statsRes.status === 'fulfilled';
+			const hasFreshData = recentRes.status === 'fulfilled' || statsRes.status === 'fulfilled';
 			return {
 				data: {
-					recentAlbums:
-						recentRes.status === 'fulfilled' ? recentRes.value : current.recentAlbums,
+					recentAlbums: recentRes.status === 'fulfilled' ? recentRes.value : current.recentAlbums,
 					favoriteAlbums: [],
 					genres: [],
 					stats:
@@ -71,9 +69,7 @@
 		},
 
 		async fetchAlbumQueueItems(album) {
-			const tracks: LocalTrackInfo[] = await api.get(
-				API.local.albumTracks(album.lidarr_album_id)
-			);
+			const tracks: LocalTrackInfo[] = await api.get(API.local.albumTracks(album.lidarr_album_id));
 			if (tracks.length === 0) return [];
 			const sorted = [...tracks].sort((a, b) => a.track_number - b.track_number);
 			return buildQueueItemsFromLocal(sorted, {
@@ -86,9 +82,7 @@
 		},
 
 		async launchPlayback(album, shuffle) {
-			const tracks: LocalTrackInfo[] = await api.get(
-				API.local.albumTracks(album.lidarr_album_id)
-			);
+			const tracks: LocalTrackInfo[] = await api.get(API.local.albumTracks(album.lidarr_album_id));
 			if (tracks.length === 0) return;
 			launchLocalPlayback(tracks, 0, shuffle, {
 				albumId: album.musicbrainz_id || String(album.lidarr_album_id),

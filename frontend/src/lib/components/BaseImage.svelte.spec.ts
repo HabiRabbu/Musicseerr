@@ -19,15 +19,17 @@ import BaseImage from './BaseImage.svelte';
 const validMbid = 'b1392450-e666-3926-a536-22c65f834433';
 const cdnUrl = 'https://r2.theaudiodb.com/images/media/artist/thumb/abc123.jpg';
 
-function renderComponent(overrides: Partial<{
-	mbid: string;
-	remoteUrl: string | null;
-	customUrl: string | null;
-	imageType: 'album' | 'artist';
-	size: 'xs' | 'sm' | 'md' | 'lg' | 'xl' | 'hero' | 'full';
-	lazy: boolean;
-	alt: string;
-}> = {}) {
+function renderComponent(
+	overrides: Partial<{
+		mbid: string;
+		remoteUrl: string | null;
+		customUrl: string | null;
+		imageType: 'album' | 'artist';
+		size: 'xs' | 'sm' | 'md' | 'lg' | 'xl' | 'hero' | 'full';
+		lazy: boolean;
+		alt: string;
+	}> = {}
+) {
 	return render(BaseImage, {
 		props: {
 			mbid: overrides.mbid ?? validMbid,
@@ -36,8 +38,8 @@ function renderComponent(overrides: Partial<{
 			imageType: overrides.imageType ?? 'album',
 			size: overrides.size ?? 'md',
 			lazy: overrides.lazy ?? false,
-			alt: overrides.alt ?? 'Test Image',
-		},
+			alt: overrides.alt ?? 'Test Image'
+		}
 	} as Parameters<typeof render<typeof BaseImage>>[1]);
 }
 
@@ -82,10 +84,7 @@ describe('BaseImage.svelte — remoteUrl', () => {
 
 		const img = page.getByAltText('Test Image');
 		await expect.element(img).toBeInTheDocument();
-		await expect.element(img).toHaveAttribute(
-			'src',
-			`/api/v1/covers/artist/${validMbid}?size=250`
-		);
+		await expect.element(img).toHaveAttribute('src', `/api/v1/covers/artist/${validMbid}?size=250`);
 	});
 
 	it('renders proxy URL when remoteUrl is set but setting is disabled', async () => {
@@ -94,10 +93,7 @@ describe('BaseImage.svelte — remoteUrl', () => {
 
 		const img = page.getByAltText('Test Image');
 		await expect.element(img).toBeInTheDocument();
-		await expect.element(img).toHaveAttribute(
-			'src',
-			`/api/v1/covers/artist/${validMbid}?size=250`
-		);
+		await expect.element(img).toHaveAttribute('src', `/api/v1/covers/artist/${validMbid}?size=250`);
 		await expect.element(img).not.toHaveAttribute('referrerpolicy');
 	});
 
@@ -109,9 +105,8 @@ describe('BaseImage.svelte — remoteUrl', () => {
 
 		img.element().dispatchEvent(new Event('error'));
 
-		await expect.element(page.getByAltText('Test Image')).toHaveAttribute(
-			'src',
-			`/api/v1/covers/artist/${validMbid}?size=250`
-		);
+		await expect
+			.element(page.getByAltText('Test Image'))
+			.toHaveAttribute('src', `/api/v1/covers/artist/${validMbid}?size=250`);
 	});
 });

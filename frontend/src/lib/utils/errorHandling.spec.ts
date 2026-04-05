@@ -29,9 +29,7 @@ describe('getCoverUrl', () => {
 
 	it('returns API URL when albumId is a valid MBID', () => {
 		expect.assertions(1);
-		expect(getCoverUrl(null, validMbid)).toBe(
-			`/api/v1/covers/release-group/${validMbid}?size=250`
-		);
+		expect(getCoverUrl(null, validMbid)).toBe(`/api/v1/covers/release-group/${validMbid}?size=250`);
 	});
 
 	it('ignores coverUrl when albumId is a valid MBID', () => {
@@ -62,9 +60,7 @@ describe('getCoverUrl', () => {
 
 	it('returns API fallback URL when coverUrl is empty string', () => {
 		expect.assertions(1);
-		expect(getCoverUrl('', 'not-a-uuid')).toBe(
-			'/api/v1/covers/release-group/not-a-uuid?size=250'
-		);
+		expect(getCoverUrl('', 'not-a-uuid')).toBe('/api/v1/covers/release-group/not-a-uuid?size=250');
 	});
 
 	it('always returns a non-empty string', () => {

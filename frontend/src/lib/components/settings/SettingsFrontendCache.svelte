@@ -7,7 +7,8 @@
 
 <div class="alert alert-info alert-soft mb-4">
 	<span class="text-sm"
-		>Choose how long pages stay fresh in your browser. Lower values update sooner. Higher values feel faster when you come back.</span
+		>Choose how long pages stay fresh in your browser. Lower values update sooner. Higher values
+		feel faster when you come back.</span
 	>
 </div>
 <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 pt-2">
