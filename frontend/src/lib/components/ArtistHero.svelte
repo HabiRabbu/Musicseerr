@@ -23,16 +23,16 @@
 	let avatarRemoteError = $state(false);
 
 	let useRemoteAvatar = $derived(artist.thumb_url && $imageSettingsStore.directRemoteImagesEnabled);
-	let resolvedRemoteAvatar = $derived(artist.thumb_url
-		? appendAudioDBSizeSuffix(artist.thumb_url, 'hero')
-		: null);
+	let resolvedRemoteAvatar = $derived(
+		artist.thumb_url ? appendAudioDBSizeSuffix(artist.thumb_url, 'hero') : null
+	);
 	run(() => {
 		if (artist.musicbrainz_id) {
 			avatarRemoteError = false;
 		}
 	});
 
-	let resolvedBackdropUrl = $derived((() => {
+	let resolvedBackdropUrl = $derived.by(() => {
 		if ($imageSettingsStore.directRemoteImagesEnabled) {
 			if (artist.banner_url) return artist.banner_url;
 			if (artist.wide_thumb_url) return artist.wide_thumb_url;
@@ -41,11 +41,12 @@
 		if (heroImageLoaded)
 			return getApiUrl(`/api/v1/covers/artist/${artist.musicbrainz_id}?size=500`);
 		return null;
-	})());
+	});
 
-	let hasDistinctBackdrop =
-		$derived($imageSettingsStore.directRemoteImagesEnabled &&
-		!!(artist.banner_url || artist.wide_thumb_url || artist.fanart_url));
+	let hasDistinctBackdrop = $derived(
+		$imageSettingsStore.directRemoteImagesEnabled &&
+			!!(artist.banner_url || artist.wide_thumb_url || artist.fanart_url)
+	);
 
 	function onHeroImageLoad() {
 		heroImageLoaded = true;
@@ -54,7 +55,9 @@
 		);
 	}
 
-	let validLinks = $derived(artist.external_links.filter((link) => link.url && link.url.trim() !== ''));
+	let validLinks = $derived(
+		artist.external_links.filter((link) => link.url && link.url.trim() !== '')
+	);
 </script>
 
 <div
