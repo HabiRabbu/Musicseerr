@@ -103,7 +103,18 @@ backend-test-local-files-fallback: $(BACKEND_VENV_STAMP) ## Run local files stal
 backend-test-jellyfin-proxy: $(BACKEND_VENV_STAMP) ## Run Jellyfin stream proxy tests
 	cd "$(BACKEND_DIR)" && .venv/bin/python -m pytest tests/routes/test_stream_routes.py -v
 
+backend-test-sync-watchdog: $(BACKEND_VENV_STAMP) ## Run adaptive watchdog timeout tests
+	cd "$(BACKEND_DIR)" && .venv/bin/python -m pytest tests/test_sync_watchdog.py -v
+
+backend-test-sync-resume: $(BACKEND_VENV_STAMP) ## Run sync resume-on-failure tests
+	cd "$(BACKEND_DIR)" && .venv/bin/python -m pytest tests/test_sync_resume.py -v
+
+backend-test-audiodb-parallel: $(BACKEND_VENV_STAMP) ## Run AudioDB parallel prewarm tests
+	cd "$(BACKEND_DIR)" && .venv/bin/python -m pytest tests/test_audiodb_parallel.py -v
+
 test-audiodb-all: backend-test-audiodb backend-test-audiodb-prewarm backend-test-audiodb-settings backend-test-coverart-audiodb backend-test-audiodb-phase8 backend-test-audiodb-phase9 frontend-test-audiodb-images ## Run every AudioDB test target
+
+test-sync-all: backend-test-sync-watchdog backend-test-sync-resume backend-test-audiodb-parallel ## Run all sync robustness tests
 
 frontend-install: ## Install frontend npm dependencies
 	cd "$(FRONTEND_DIR)" && $(NPM) install

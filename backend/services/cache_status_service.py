@@ -69,6 +69,7 @@ class CacheStatusService:
         self._last_persist_time: float = 0.0
         self._last_broadcast_time: float = 0.0
         self._persist_item_counter: int = 0
+        self._last_progress_at: float = time.time()
 
     def set_sync_state_store(self, sync_state_store: 'SyncStateStore'):
         self._sync_state_store = sync_state_store
@@ -120,6 +121,7 @@ class CacheStatusService:
             self._last_persist_time = 0.0
             self._last_broadcast_time = 0.0
             self._persist_item_counter = 0
+            self._last_progress_at = time.time()
             started_at = time.time()
             self._progress = CacheSyncProgress(
                 is_syncing=True,
@@ -167,6 +169,7 @@ class CacheStatusService:
                     self._progress.processed_artists = processed_artists
                 if processed_albums is not None:
                     self._progress.processed_albums = processed_albums
+                self._last_progress_at = time.time()
 
         now = time.time()
         is_final = processed >= self._progress.total_items
@@ -180,8 +183,9 @@ class CacheStatusService:
             self._progress.total_items = total_items
             self._progress.processed_items = 0
             self._progress.current_item = None
+            self._last_progress_at = time.time()
 
-            if self._sync_state_store:
+            if self._sync_state_store and self._progress.is_syncing:
                 try:
                     await self._sync_state_store.save_sync_state(
                         status='running',
@@ -207,6 +211,9 @@ class CacheStatusService:
         await self.broadcast_progress()
         logger.info(f"Phase skipped (already cached): {phase}")
         await asyncio.sleep(0.5)
+
+    def get_last_progress_at(self) -> float:
+        return self._last_progress_at
 
     _PERSIST_INTERVAL_SECONDS = 5.0
     _PERSIST_ITEM_INTERVAL = 10
@@ -244,7 +251,10 @@ class CacheStatusService:
 
     async def complete_sync(self, error_message: Optional[str] = None):
         async with self._state_lock:
-            status = 'failed' if error_message else 'completed'
+            if not self._progress.is_syncing:
+                return
+            is_success = error_message is None
+            status = 'completed' if is_success else 'failed'
             logger.info(f"Cache sync {status}: {self._progress.phase}")
 
             if self._sync_state_store:
@@ -259,7 +269,9 @@ class CacheStatusService:
                         error_message=error_message,
                         started_at=self._progress.started_at
                     )
-                    await self._sync_state_store.clear_sync_state()
+                    if is_success:
+                        await self._sync_state_store.clear_sync_state()
+                        await self._sync_state_store.clear_processed_items()
                 except Exception as e:  # noqa: BLE001
                     logger.warning(f"Failed to persist completion: {e}")
 

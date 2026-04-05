@@ -46,6 +46,8 @@ def _make_settings(enabled=True, name_search_fallback=False):
     s.cache_ttl_audiodb_found = 604800
     s.cache_ttl_audiodb_not_found = 86400
     s.cache_ttl_audiodb_library = 1209600
+    s.audiodb_prewarm_concurrency = 4
+    s.audiodb_prewarm_delay = 0.0
     return s
 
 
@@ -276,6 +278,8 @@ class TestPrewarmLogContract:
             settings = MagicMock()
             settings.audiodb_enabled = True
             settings.audiodb_name_search_fallback = False
+            settings.audiodb_prewarm_concurrency = 4
+            settings.audiodb_prewarm_delay = 0.0
             prefs = MagicMock()
             prefs.get_advanced_settings.return_value = settings
         return LibraryPrecacheService(

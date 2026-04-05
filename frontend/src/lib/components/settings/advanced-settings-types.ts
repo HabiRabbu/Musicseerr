@@ -59,4 +59,9 @@ export interface AdvancedSettingsForm {
 	cache_ttl_audiodb_not_found: number;
 	cache_ttl_audiodb_library: number;
 	cache_ttl_recently_viewed_bytes: number;
+	sync_stall_timeout_minutes: number;
+	sync_max_timeout_hours: number;
+	audiodb_prewarm_concurrency: number;
+	audiodb_prewarm_delay: number;
+	artist_discovery_precache_concurrency: number;
 }

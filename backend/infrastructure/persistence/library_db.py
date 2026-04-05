@@ -27,7 +27,6 @@ def _escape_like(term: str) -> str:
 _CROSS_DOMAIN_CLEAR_TABLES = (
     "artist_genres",
     "artist_genre_lookup",
-    "processed_items",
 )
 
 _FULL_CLEAR_EXTRA_TABLES = (
