@@ -49,7 +49,7 @@ class LidarrBase:
 
     @property
     def _base_url(self) -> str:
-        return self._settings.lidarr_url
+        return self._settings.lidarr_url.rstrip("/")
 
     def is_configured(self) -> bool:
         return bool(self._settings.lidarr_api_key)
@@ -79,18 +79,12 @@ class LidarrBase:
             raise ExternalServiceError("Lidarr is not configured (no API key)")
 
         path = endpoint.lstrip("/")
-        base = self._base_url.rstrip("/")
-        url = f"{base}/{path}" if path else base
+        url = f"{self._base_url}/{path}" if path else self._base_url
 
-        try:
-            lidarr_t = float(self._settings.lidarr_timeout)
-        except (TypeError, ValueError):
-            lidarr_t = 60.0
-        try:
-            connect_t = float(self._settings.http_connect_timeout)
-        except (TypeError, ValueError):
-            connect_t = 5.0
-        timeout = httpx.Timeout(lidarr_t, connect=connect_t)
+        timeout = httpx.Timeout(
+            self._settings.lidarr_timeout,
+            connect=self._settings.http_connect_timeout,
+        )
 
         try:
             response = await self._client.request(

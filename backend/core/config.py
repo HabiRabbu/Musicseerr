@@ -23,7 +23,9 @@ class Settings(BaseSettings):
     lidarr_url: str = Field(default="http://lidarr:8686")
     lidarr_api_key: str = Field(default="")
     lidarr_timeout: float = Field(
-        default=60.0,
+        default=30.0,
+        ge=5.0,
+        le=600.0,
         description="HTTP read/write timeout in seconds for Lidarr API calls.",
     )
     
