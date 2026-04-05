@@ -34,7 +34,9 @@ export function normalizeSourceType(sourceType: SourceType | 'howler'): SourceTy
 	return sourceType === 'howler' ? 'local' : sourceType;
 }
 
-export function migrateLegacyItem(item: QueueItem & { sourceType: SourceType | 'howler' }): QueueItem {
+export function migrateLegacyItem(
+	item: QueueItem & { sourceType: SourceType | 'howler' }
+): QueueItem {
 	const sourceType = normalizeSourceType(item.sourceType);
 	const availableSources = item.availableSources?.map((source) =>
 		normalizeSourceType(source as SourceType | 'howler')
@@ -43,7 +45,7 @@ export function migrateLegacyItem(item: QueueItem & { sourceType: SourceType | '
 		...item,
 		sourceType,
 		availableSources,
-		queueOrigin: item.queueOrigin ?? 'context',
+		queueOrigin: item.queueOrigin ?? 'context'
 	};
 }
 

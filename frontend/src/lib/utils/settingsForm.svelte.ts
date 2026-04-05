@@ -41,7 +41,9 @@ export function createSettingsForm<T>(config: SettingsFormConfig<T>) {
 
 	async function refreshIntegrationStatus() {
 		try {
-			const status = await api.global.get<Record<string, boolean>>('/api/v1/home/integration-status');
+			const status = await api.global.get<Record<string, boolean>>(
+				'/api/v1/home/integration-status'
+			);
 			if (status) integrationStore.setStatus(status);
 		} catch {
 			/* sidebar will refresh on next page load */
@@ -119,21 +121,41 @@ export function createSettingsForm<T>(config: SettingsFormConfig<T>) {
 	}
 
 	return {
-		get data() { return data; },
-		set data(v: T | null) { data = v; },
-		get loading() { return loading; },
-		get saving() { return saving; },
-		get testing() { return testing; },
-		get message() { return message; },
-		get messageType() { return messageType; },
-		get testResult() { return testResult; },
-		set testResult(v: unknown) { testResult = v; },
-		get wasAlreadyEnabled() { return wasAlreadyEnabled; },
+		get data() {
+			return data;
+		},
+		set data(v: T | null) {
+			data = v;
+		},
+		get loading() {
+			return loading;
+		},
+		get saving() {
+			return saving;
+		},
+		get testing() {
+			return testing;
+		},
+		get message() {
+			return message;
+		},
+		get messageType() {
+			return messageType;
+		},
+		get testResult() {
+			return testResult;
+		},
+		set testResult(v: unknown) {
+			testResult = v;
+		},
+		get wasAlreadyEnabled() {
+			return wasAlreadyEnabled;
+		},
 		load,
 		save,
 		test,
 		showMessage,
 		clearMessage,
-		cleanup,
+		cleanup
 	};
 }

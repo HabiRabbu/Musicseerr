@@ -32,7 +32,7 @@
 		endpoint="/api/v1/home/popular/albums"
 		title="Popular Right Now"
 		subtitle={`Most listened albums on ${sourceLabel}`}
-		source={source}
+		{source}
 		errorEmoji="💿"
 		errorIcon={Disc3}
 	/>

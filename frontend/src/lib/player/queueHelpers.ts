@@ -1,5 +1,10 @@
 import type { QueueItem, SourceType } from '$lib/player/types';
-import type { JellyfinTrackInfo, LocalTrackInfo, NavidromeTrackInfo, YouTubeTrackLink } from '$lib/types';
+import type {
+	JellyfinTrackInfo,
+	LocalTrackInfo,
+	NavidromeTrackInfo,
+	YouTubeTrackLink
+} from '$lib/types';
 import type { PlaylistTrack } from '$lib/api/playlists';
 import { API } from '$lib/constants';
 import { getCoverUrl } from '$lib/utils/errorHandling';
@@ -178,10 +183,7 @@ export function buildQueueItemsFromNavidrome(
 	});
 }
 
-export function buildQueueItemsFromLocal(
-	tracks: LocalTrackInfo[],
-	meta: TrackMeta
-): QueueItem[] {
+export function buildQueueItemsFromLocal(tracks: LocalTrackInfo[], meta: TrackMeta): QueueItem[] {
 	const normalizedCoverUrl = getCoverUrl(meta.coverUrl, meta.albumId);
 	return tracks.map((t) => ({
 		trackSourceId: String(t.track_file_id),
@@ -201,10 +203,7 @@ export function buildQueueItemsFromLocal(
 	}));
 }
 
-export function buildQueueItemFromYouTube(
-	track: YouTubeTrackLink,
-	meta: TrackMeta
-): QueueItem {
+export function buildQueueItemFromYouTube(track: YouTubeTrackLink, meta: TrackMeta): QueueItem {
 	const normalizedCoverUrl = getCoverUrl(meta.coverUrl, meta.albumId);
 	return {
 		trackSourceId: track.video_id,

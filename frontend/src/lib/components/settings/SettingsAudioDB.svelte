@@ -7,8 +7,8 @@
 
 <div class="alert alert-info alert-soft mb-4">
 	<span class="text-sm"
-		>AudioDB provides rich artist and album images (fanart, banners, logos, CD art). The
-		free tier allows 30 requests/minute. A premium API key removes this limit.</span
+		>AudioDB provides rich artist and album images (fanart, banners, logos, CD art). The free tier
+		allows 30 requests/minute. A premium API key removes this limit.</span
 	>
 </div>
 
@@ -17,11 +17,7 @@
 		<legend class="fieldset-legend">AudioDB Enabled</legend>
 		<label class="label cursor-pointer gap-3">
 			<span class="text-sm">Fetch images from TheAudioDB</span>
-			<input
-				type="checkbox"
-				bind:checked={data.audiodb_enabled}
-				class="toggle toggle-primary"
-			/>
+			<input type="checkbox" bind:checked={data.audiodb_enabled} class="toggle toggle-primary" />
 		</label>
 	</fieldset>
 
@@ -65,8 +61,8 @@
 			/>
 		</label>
 		<p class="label text-base-content/50">
-			When enabled, your browser loads images directly from TheAudioDB's CDN (faster).
-			Disable to route all images through MusicSeerr (more private).
+			When enabled, your browser loads images directly from TheAudioDB's CDN (faster). Disable to
+			route all images through MusicSeerr (more private).
 		</p>
 	</fieldset>
 

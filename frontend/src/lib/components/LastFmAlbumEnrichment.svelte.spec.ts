@@ -8,16 +8,16 @@ const fullEnrichment: LastFmAlbumEnrichmentType = {
 	summary: 'A groundbreaking album released in 1997.',
 	tags: [
 		{ name: 'alternative', url: 'https://last.fm/tag/alternative' },
-		{ name: 'electronic', url: 'https://last.fm/tag/electronic' },
+		{ name: 'electronic', url: 'https://last.fm/tag/electronic' }
 	],
 	listeners: 1200000,
 	playcount: 45000000,
-	url: 'https://www.last.fm/music/TestArtist/TestAlbum',
+	url: 'https://www.last.fm/music/TestArtist/TestAlbum'
 };
 
 function renderComponent(props: Record<string, unknown> = {}) {
 	return render(LastFmAlbumEnrichment, {
-		props: { enrichment: fullEnrichment, ...props },
+		props: { enrichment: fullEnrichment, ...props }
 	} as Parameters<typeof render<typeof LastFmAlbumEnrichment>>[1]);
 }
 
@@ -32,17 +32,13 @@ describe('LastFmAlbumEnrichment.svelte', () => {
 	it('should render nothing when not enabled', async () => {
 		renderComponent({ enabled: false });
 
-		await expect
-			.element(page.getByText('Last.fm'))
-			.not.toBeInTheDocument();
+		await expect.element(page.getByText('Last.fm')).not.toBeInTheDocument();
 	});
 
 	it('should render nothing when enrichment is null', async () => {
 		renderComponent({ enrichment: null });
 
-		await expect
-			.element(page.getByText('Last.fm'))
-			.not.toBeInTheDocument();
+		await expect.element(page.getByText('Last.fm')).not.toBeInTheDocument();
 	});
 
 	it('should display Last.fm badge when enrichment is present', async () => {
@@ -54,17 +50,13 @@ describe('LastFmAlbumEnrichment.svelte', () => {
 	it('should display formatted listener count', async () => {
 		renderComponent();
 
-		await expect
-			.element(page.getByText('1.2M listeners'))
-			.toBeInTheDocument();
+		await expect.element(page.getByText('1.2M listeners')).toBeInTheDocument();
 	});
 
 	it('should display formatted play count', async () => {
 		renderComponent();
 
-		await expect
-			.element(page.getByText('45.0M plays'))
-			.toBeInTheDocument();
+		await expect.element(page.getByText('45.0M plays')).toBeInTheDocument();
 	});
 
 	it('should display summary text', async () => {
@@ -80,15 +72,11 @@ describe('LastFmAlbumEnrichment.svelte', () => {
 
 		const altLink = page.getByRole('link', { name: 'alternative' });
 		await expect.element(altLink).toBeInTheDocument();
-		await expect
-			.element(altLink)
-			.toHaveAttribute('href', '/genre?name=alternative');
+		await expect.element(altLink).toHaveAttribute('href', '/genre?name=alternative');
 
 		const electronicLink = page.getByRole('link', { name: 'electronic' });
 		await expect.element(electronicLink).toBeInTheDocument();
-		await expect
-			.element(electronicLink)
-			.toHaveAttribute('href', '/genre?name=electronic');
+		await expect.element(electronicLink).toHaveAttribute('href', '/genre?name=electronic');
 	});
 
 	it('should display View on Last.fm link', async () => {
@@ -103,12 +91,10 @@ describe('LastFmAlbumEnrichment.svelte', () => {
 
 	it('should hide stats section when both counts are zero', async () => {
 		renderComponent({
-			enrichment: { ...fullEnrichment, listeners: 0, playcount: 0 },
+			enrichment: { ...fullEnrichment, listeners: 0, playcount: 0 }
 		});
 
-		await expect
-			.element(page.getByText('listeners'))
-			.not.toBeInTheDocument();
+		await expect.element(page.getByText('listeners')).not.toBeInTheDocument();
 	});
 
 	it('should render enrichment with only summary (no tags, no stats)', async () => {
@@ -117,8 +103,8 @@ describe('LastFmAlbumEnrichment.svelte', () => {
 				...fullEnrichment,
 				tags: [],
 				listeners: 0,
-				playcount: 0,
-			},
+				playcount: 0
+			}
 		});
 
 		await expect.element(page.getByText('Last.fm', { exact: true })).toBeInTheDocument();

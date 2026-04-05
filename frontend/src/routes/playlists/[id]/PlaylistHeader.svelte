@@ -56,7 +56,7 @@
 	function buildUpdatedPlaylist(changes: Partial<PlaylistDetail>): PlaylistDetail {
 		return {
 			...playlist,
-			...changes,
+			...changes
 		};
 	}
 
@@ -76,10 +76,12 @@
 		try {
 			const updated = await updatePlaylist(playlist.id, { name: trimmed });
 			editingName = false;
-			onplaylistupdate(buildUpdatedPlaylist({
-				name: updated.name,
-				updated_at: updated.updated_at,
-			}));
+			onplaylistupdate(
+				buildUpdatedPlaylist({
+					name: updated.name,
+					updated_at: updated.updated_at
+				})
+			);
 			toastStore.show({ message: 'Playlist renamed', type: 'success' });
 		} catch {
 			toastStore.show({ message: "Couldn't rename the playlist", type: 'error' });
@@ -122,9 +124,11 @@
 		uploading = true;
 		try {
 			const result = await uploadPlaylistCover(playlist.id, file);
-			onplaylistupdate(buildUpdatedPlaylist({
-				custom_cover_url: result.cover_url + '?t=' + Date.now(),
-			}));
+			onplaylistupdate(
+				buildUpdatedPlaylist({
+					custom_cover_url: result.cover_url + '?t=' + Date.now()
+				})
+			);
 			toastStore.show({ message: 'Cover updated', type: 'success' });
 		} catch {
 			toastStore.show({ message: "Couldn't upload the cover", type: 'error' });
@@ -253,7 +257,9 @@
 				class="group/name flex items-center gap-2 text-left"
 				aria-label="Edit playlist name"
 			>
-				<h1 class="text-3xl sm:text-4xl lg:text-5xl xl:text-6xl font-bold leading-tight truncate">{playlist.name}</h1>
+				<h1 class="text-3xl sm:text-4xl lg:text-5xl xl:text-6xl font-bold leading-tight truncate">
+					{playlist.name}
+				</h1>
 				<Pencil
 					class="h-4 w-4 flex-shrink-0 text-base-content/30 opacity-0 group-hover/name:opacity-100 transition-opacity"
 				/>

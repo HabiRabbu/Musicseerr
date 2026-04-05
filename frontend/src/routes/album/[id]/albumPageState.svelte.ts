@@ -30,10 +30,7 @@ import {
 	albumSourceMatchCache
 } from '$lib/utils/albumDetailCache';
 import { hydrateDetailCacheEntry } from '$lib/utils/detailCacheHydration';
-import {
-	compareDiscTrack,
-	getDiscTrackKey
-} from '$lib/player/queueHelpers';
+import { compareDiscTrack, getDiscTrackKey } from '$lib/player/queueHelpers';
 import type { QueueItem } from '$lib/player/types';
 import { launchJellyfinPlayback } from '$lib/player/launchJellyfinPlayback';
 import { launchLocalPlayback } from '$lib/player/launchLocalPlayback';
@@ -115,14 +112,31 @@ export function createAlbumPageState(albumIdGetter: () => string) {
 	);
 
 	function resetState() {
-		if (abortController) { abortController.abort(); abortController = null; }
-		album = null; tracksInfo = null; renderedTrackSections = []; error = null;
-		loadingBasic = true; loadingTracks = true; tracksError = false;
-		loadingDiscovery = true; moreByArtist = null; similarAlbums = null;
-		trackLinks = []; albumLink = null; quota = null;
-		jellyfinMatch = null; localMatch = null; navidromeMatch = null;
-		loadingJellyfin = false; loadingLocal = false; loadingNavidrome = false;
-		lastfmEnrichment = null; loadingLastfm = true;
+		if (abortController) {
+			abortController.abort();
+			abortController = null;
+		}
+		album = null;
+		tracksInfo = null;
+		renderedTrackSections = [];
+		error = null;
+		loadingBasic = true;
+		loadingTracks = true;
+		tracksError = false;
+		loadingDiscovery = true;
+		moreByArtist = null;
+		similarAlbums = null;
+		trackLinks = [];
+		albumLink = null;
+		quota = null;
+		jellyfinMatch = null;
+		localMatch = null;
+		navidromeMatch = null;
+		loadingJellyfin = false;
+		loadingLocal = false;
+		loadingNavidrome = false;
+		lastfmEnrichment = null;
+		loadingLastfm = true;
 	}
 
 	function hydrateFromCache(albumId: string) {
@@ -166,7 +180,9 @@ export function createAlbumPageState(albumIdGetter: () => string) {
 				jellyfinMatch = cached.data.jellyfin;
 				localMatch = cached.data.local;
 				navidromeMatch = cached.data.navidrome;
-				loadingJellyfin = false; loadingLocal = false; loadingNavidrome = false;
+				loadingJellyfin = false;
+				loadingLocal = false;
+				loadingNavidrome = false;
 				return false;
 			}
 			return true;
@@ -177,18 +193,28 @@ export function createAlbumPageState(albumIdGetter: () => string) {
 	async function doFetchBasic(albumId: string, signal: AbortSignal) {
 		try {
 			const result = await fetchAlbumBasic(albumId, signal);
-			if (result) { album = result; extractServiceStatus(album); albumBasicCache.set(album, albumId); }
+			if (result) {
+				album = result;
+				extractServiceStatus(album);
+				albumBasicCache.set(album, albumId);
+			}
 		} catch (e) {
 			if (isAbortError(e)) return;
 			if (!album) error = 'Error loading album';
-		} finally { if (!signal.aborted) loadingBasic = false; }
+		} finally {
+			if (!signal.aborted) loadingBasic = false;
+		}
 	}
 
 	async function doFetchTracks(albumId: string, signal: AbortSignal) {
 		tracksError = false;
 		try {
 			const result = await fetchAlbumTracks(albumId, signal);
-			if (result) { tracksInfo = result; renderedTrackSections = buildRenderedTrackSections(result.tracks); albumTracksCache.set(result, albumId); }
+			if (result) {
+				tracksInfo = result;
+				renderedTrackSections = buildRenderedTrackSections(result.tracks);
+				albumTracksCache.set(result, albumId);
+			}
 		} catch (e) {
 			if (isAbortError(e)) return;
 			if (!tracksInfo) tracksError = true;
@@ -197,15 +223,21 @@ export function createAlbumPageState(albumIdGetter: () => string) {
 	}
 
 	async function doFetchDiscovery(albumId: string, signal: AbortSignal) {
-		if (!album?.artist_id) { loadingDiscovery = false; return; }
+		if (!album?.artist_id) {
+			loadingDiscovery = false;
+			return;
+		}
 		loadingDiscovery = true;
 		try {
 			const result = await fetchDiscovery(albumId, album.artist_id, signal);
 			if (result.moreByArtist) moreByArtist = result.moreByArtist;
 			if (result.similarAlbums) similarAlbums = result.similarAlbums;
 			albumDiscoveryCache.set({ moreByArtist, similarAlbums }, albumId);
-		} catch (e) { if (isAbortError(e)) return; }
-		finally { if (!signal.aborted) loadingDiscovery = false; }
+		} catch (e) {
+			if (isAbortError(e)) return;
+		} finally {
+			if (!signal.aborted) loadingDiscovery = false;
+		}
 	}
 
 	async function doFetchYouTube(albumId: string, signal: AbortSignal) {
@@ -217,44 +249,76 @@ export function createAlbumPageState(albumIdGetter: () => string) {
 		}
 		try {
 			const [linkData, tracksData] = await Promise.all([
-				fetchYouTubeAlbumLink(albumId, signal), fetchYouTubeTrackLinks(albumId, signal)
+				fetchYouTubeAlbumLink(albumId, signal),
+				fetchYouTubeTrackLinks(albumId, signal)
 			]);
 			if (linkData) albumLink = linkData;
 			if (tracksData) trackLinks = tracksData;
 			albumYouTubeCache.set({ albumLink: linkData, trackLinks: tracksData ?? [] }, albumId);
-		} catch (e) { if (isAbortError(e)) return; }
+		} catch (e) {
+			if (isAbortError(e)) return;
+		}
 	}
 
 	async function doFetchSourceMatch<T>(
-		signal: AbortSignal, fetcher: () => Promise<T | null>,
-		setter: (v: T | null) => void, loadingSetter: (v: boolean) => void, label: string,
-		albumId: string, cacheField: 'jellyfin' | 'local' | 'navidrome'
+		signal: AbortSignal,
+		fetcher: () => Promise<T | null>,
+		setter: (v: T | null) => void,
+		loadingSetter: (v: boolean) => void,
+		label: string,
+		albumId: string,
+		cacheField: 'jellyfin' | 'local' | 'navidrome'
 	) {
 		loadingSetter(true);
 		try {
 			const result = await fetcher();
 			setter(result);
-			const existing = albumSourceMatchCache.get(albumId)?.data ?? { jellyfin: null, local: null, navidrome: null };
+			const existing = albumSourceMatchCache.get(albumId)?.data ?? {
+				jellyfin: null,
+				local: null,
+				navidrome: null
+			};
 			albumSourceMatchCache.set({ ...existing, [cacheField]: result }, albumId);
+		} catch (e) {
+			if (isAbortError(e)) return;
+			console.error(`Failed to fetch ${label} album data:`, e);
+		} finally {
+			if (!signal.aborted) loadingSetter(false);
 		}
-		catch (e) { if (isAbortError(e)) return; console.error(`Failed to fetch ${label} album data:`, e); }
-		finally { if (!signal.aborted) loadingSetter(false); }
 	}
 
 	async function doFetchLastFm(albumId: string, signal: AbortSignal) {
-		if (!album) { loadingLastfm = false; return; }
+		if (!album) {
+			loadingLastfm = false;
+			return;
+		}
 		await integrationStore.ensureLoaded();
-		if (!get(integrationStore).lastfm) { loadingLastfm = false; return; }
+		if (!get(integrationStore).lastfm) {
+			loadingLastfm = false;
+			return;
+		}
 		loadingLastfm = true;
 		try {
-			const result = await fetchLastFm(albumId, { artistName: album.artist_name, albumName: album.title }, signal);
-			if (result) { lastfmEnrichment = result; albumLastFmCache.set(result, albumId); }
-		} catch (e) { if (isAbortError(e)) return; console.error('Failed to fetch Last.fm album data:', e); }
-		finally { if (!signal.aborted) loadingLastfm = false; }
+			const result = await fetchLastFm(
+				albumId,
+				{ artistName: album.artist_name, albumName: album.title },
+				signal
+			);
+			if (result) {
+				lastfmEnrichment = result;
+				albumLastFmCache.set(result, albumId);
+			}
+		} catch (e) {
+			if (isAbortError(e)) return;
+			console.error('Failed to fetch Last.fm album data:', e);
+		} finally {
+			if (!signal.aborted) loadingLastfm = false;
+		}
 	}
 
 	async function loadAlbum(albumId: string) {
-		const { refreshBasic, refreshTracks, refreshDiscovery, refreshLastfm, refreshSourceMatch } = hydrateFromCache(albumId);
+		const { refreshBasic, refreshTracks, refreshDiscovery, refreshLastfm, refreshSourceMatch } =
+			hydrateFromCache(albumId);
 		if (abortController) abortController.abort();
 		abortController = new AbortController();
 		const signal = abortController.signal;
@@ -267,12 +331,28 @@ export function createAlbumPageState(albumIdGetter: () => string) {
 					if (signal.aborted) return;
 					const integrations = get(integrationStore);
 					if (integrations.jellyfin)
-						void doFetchSourceMatch(signal, () => fetchJellyfinMatch(albumId, signal),
-							(v) => (jellyfinMatch = v), (v) => (loadingJellyfin = v), 'Jellyfin', albumId, 'jellyfin');
+						void doFetchSourceMatch(
+							signal,
+							() => fetchJellyfinMatch(albumId, signal),
+							(v) => (jellyfinMatch = v),
+							(v) => (loadingJellyfin = v),
+							'Jellyfin',
+							albumId,
+							'jellyfin'
+						);
 					if (integrations.localfiles)
-						void doFetchSourceMatch(signal, () => fetchLocalMatch(albumId, signal),
-							(v) => (localMatch = v), (v) => (loadingLocal = v), 'local', albumId, 'local');
-				} catch { /* ignore integration loading errors */ }
+						void doFetchSourceMatch(
+							signal,
+							() => fetchLocalMatch(albumId, signal),
+							(v) => (localMatch = v),
+							(v) => (loadingLocal = v),
+							'local',
+							albumId,
+							'local'
+						);
+				} catch {
+					/* ignore integration loading errors */
+				}
 			})();
 		}
 
@@ -280,7 +360,9 @@ export function createAlbumPageState(albumIdGetter: () => string) {
 			if (refreshTracks) void doFetchTracks(albumId, signal);
 			void doFetchYouTube(albumId, signal);
 			await doFetchBasic(albumId, signal);
-		} else { void doFetchBasic(albumId, signal); }
+		} else {
+			void doFetchBasic(albumId, signal);
+		}
 		if (signal.aborted || !album) return;
 		if (refreshTracks && !refreshBasic) void doFetchTracks(albumId, signal);
 		if (refreshDiscovery) void doFetchDiscovery(albumId, signal);
@@ -294,10 +376,23 @@ export function createAlbumPageState(albumIdGetter: () => string) {
 					if (signal.aborted) return;
 					const integrations = get(integrationStore);
 					if (integrations.navidrome)
-						void doFetchSourceMatch(signal,
-							() => fetchNavidromeMatch(albumId, { albumTitle: album?.title, artistName: album?.artist_name }, signal),
-							(v) => (navidromeMatch = v), (v) => (loadingNavidrome = v), 'Navidrome', albumId, 'navidrome');
-				} catch { /* ignore integration loading errors */ }
+						void doFetchSourceMatch(
+							signal,
+							() =>
+								fetchNavidromeMatch(
+									albumId,
+									{ albumTitle: album?.title, artistName: album?.artist_name },
+									signal
+								),
+							(v) => (navidromeMatch = v),
+							(v) => (loadingNavidrome = v),
+							'Navidrome',
+							albumId,
+							'navidrome'
+						);
+				} catch {
+					/* ignore integration loading errors */
+				}
 			})();
 		}
 	}
@@ -305,8 +400,16 @@ export function createAlbumPageState(albumIdGetter: () => string) {
 	$effect(() => {
 		const albumId = albumIdGetter();
 		if (!browser || !albumId) return;
-		untrack(() => { resetState(); void loadAlbum(albumId); });
-		return () => { if (abortController) { abortController.abort(); abortController = null; } };
+		untrack(() => {
+			resetState();
+			void loadAlbum(albumId);
+		});
+		return () => {
+			if (abortController) {
+				abortController.abort();
+				abortController = null;
+			}
+		};
 	});
 
 	const eventHandlers = createEventHandlers({
@@ -323,7 +426,10 @@ export function createAlbumPageState(albumIdGetter: () => string) {
 		setShowDeleteModal: (v) => (showDeleteModal = v),
 		setShowArtistRemovedModal: (v) => (showArtistRemovedModal = v),
 		setRemovedArtistName: (v) => (removedArtistName = v),
-		setToast: (msg, type) => { toastMessage = msg; toastType = type; },
+		setToast: (msg, type) => {
+			toastMessage = msg;
+			toastType = type;
+		},
 		setShowToast: (v) => (showToast = v)
 	});
 
@@ -349,7 +455,16 @@ export function createAlbumPageState(albumIdGetter: () => string) {
 		title: string
 	): void {
 		if (!album) return;
-		playSourceTrackImpl(source, trackPosition, discNumber, title, album, jellyfinMatch, localMatch, navidromeMatch);
+		playSourceTrackImpl(
+			source,
+			trackPosition,
+			discNumber,
+			title,
+			album,
+			jellyfinMatch,
+			localMatch,
+			navidromeMatch
+		);
 	}
 
 	function getTrackContextMenuItems(
@@ -359,65 +474,168 @@ export function createAlbumPageState(albumIdGetter: () => string) {
 		resolvedNavidrome: NavidromeTrackInfo | null = null
 	): MenuItem[] {
 		if (!album) return [];
-		return getTrackContextMenuItemsImpl(track, album, resolvedLocal, resolvedJellyfin, resolvedNavidrome, playlistModalRef);
+		return getTrackContextMenuItemsImpl(
+			track,
+			album,
+			resolvedLocal,
+			resolvedJellyfin,
+			resolvedNavidrome,
+			playlistModalRef
+		);
 	}
 
 	const jellyfinCallbacks: SourceCallbacks = buildSourceCallbacks(
-		() => jellyfinMatch, launchJellyfinPlayback, 'jellyfin',
-		albumGetter, tracksGetters, playlistRefGetter
+		() => jellyfinMatch,
+		launchJellyfinPlayback,
+		'jellyfin',
+		albumGetter,
+		tracksGetters,
+		playlistRefGetter
 	);
 	const localCallbacks: SourceCallbacks = buildSourceCallbacks(
-		() => localMatch, launchLocalPlayback, 'local',
-		albumGetter, tracksGetters, playlistRefGetter
+		() => localMatch,
+		launchLocalPlayback,
+		'local',
+		albumGetter,
+		tracksGetters,
+		playlistRefGetter
 	);
 	const navidromeCallbacks: SourceCallbacks = buildSourceCallbacks(
-		() => navidromeMatch, launchNavidromePlayback, 'navidrome',
-		albumGetter, tracksGetters, playlistRefGetter
+		() => navidromeMatch,
+		launchNavidromePlayback,
+		'navidrome',
+		albumGetter,
+		tracksGetters,
+		playlistRefGetter
 	);
 
 	return {
-		get album() { return album; },
-		get tracksInfo() { return tracksInfo; },
-		get error() { return error; },
-		get loadingBasic() { return loadingBasic; },
-		get loadingTracks() { return loadingTracks; },
-		get tracksError() { return tracksError; },
-		get showToast() { return showToast; },
-		set showToast(v: boolean) { showToast = v; },
-		get toastMessage() { return toastMessage; },
-		get toastType() { return toastType; },
-		get requesting() { return requesting; },
-		get showDeleteModal() { return showDeleteModal; },
-		set showDeleteModal(v: boolean) { showDeleteModal = v; },
-		get showArtistRemovedModal() { return showArtistRemovedModal; },
-		set showArtistRemovedModal(v: boolean) { showArtistRemovedModal = v; },
-		get removedArtistName() { return removedArtistName; },
-		get moreByArtist() { return moreByArtist; },
-		get similarAlbums() { return similarAlbums; },
-		get loadingDiscovery() { return loadingDiscovery; },
-		get trackLinks() { return trackLinks; },
-		get albumLink() { return albumLink; },
-		get quota() { return quota; },
-		get jellyfinMatch() { return jellyfinMatch; },
-		get localMatch() { return localMatch; },
-		get navidromeMatch() { return navidromeMatch; },
-		get loadingJellyfin() { return loadingJellyfin; },
-		get loadingLocal() { return loadingLocal; },
-		get loadingNavidrome() { return loadingNavidrome; },
-		get lastfmEnrichment() { return lastfmEnrichment; },
-		get loadingLastfm() { return loadingLastfm; },
-		get renderedTrackSections() { return renderedTrackSections; },
-		get trackLinkMap() { return trackLinkMap; },
-		get jellyfinTracks() { return jellyfinTracks; },
-		get localTracks() { return localTracks; },
-		get navidromeTracks() { return navidromeTracks; },
-		get jellyfinTrackMap() { return jellyfinTrackMap; },
-		get localTrackMap() { return localTrackMap; },
-		get navidromeTrackMap() { return navidromeTrackMap; },
-		get inLibrary() { return inLibrary; },
-		get isRequested() { return isRequested; },
-		get playlistModalRef() { return playlistModalRef; },
-		set playlistModalRef(v) { playlistModalRef = v; },
+		get album() {
+			return album;
+		},
+		get tracksInfo() {
+			return tracksInfo;
+		},
+		get error() {
+			return error;
+		},
+		get loadingBasic() {
+			return loadingBasic;
+		},
+		get loadingTracks() {
+			return loadingTracks;
+		},
+		get tracksError() {
+			return tracksError;
+		},
+		get showToast() {
+			return showToast;
+		},
+		set showToast(v: boolean) {
+			showToast = v;
+		},
+		get toastMessage() {
+			return toastMessage;
+		},
+		get toastType() {
+			return toastType;
+		},
+		get requesting() {
+			return requesting;
+		},
+		get showDeleteModal() {
+			return showDeleteModal;
+		},
+		set showDeleteModal(v: boolean) {
+			showDeleteModal = v;
+		},
+		get showArtistRemovedModal() {
+			return showArtistRemovedModal;
+		},
+		set showArtistRemovedModal(v: boolean) {
+			showArtistRemovedModal = v;
+		},
+		get removedArtistName() {
+			return removedArtistName;
+		},
+		get moreByArtist() {
+			return moreByArtist;
+		},
+		get similarAlbums() {
+			return similarAlbums;
+		},
+		get loadingDiscovery() {
+			return loadingDiscovery;
+		},
+		get trackLinks() {
+			return trackLinks;
+		},
+		get albumLink() {
+			return albumLink;
+		},
+		get quota() {
+			return quota;
+		},
+		get jellyfinMatch() {
+			return jellyfinMatch;
+		},
+		get localMatch() {
+			return localMatch;
+		},
+		get navidromeMatch() {
+			return navidromeMatch;
+		},
+		get loadingJellyfin() {
+			return loadingJellyfin;
+		},
+		get loadingLocal() {
+			return loadingLocal;
+		},
+		get loadingNavidrome() {
+			return loadingNavidrome;
+		},
+		get lastfmEnrichment() {
+			return lastfmEnrichment;
+		},
+		get loadingLastfm() {
+			return loadingLastfm;
+		},
+		get renderedTrackSections() {
+			return renderedTrackSections;
+		},
+		get trackLinkMap() {
+			return trackLinkMap;
+		},
+		get jellyfinTracks() {
+			return jellyfinTracks;
+		},
+		get localTracks() {
+			return localTracks;
+		},
+		get navidromeTracks() {
+			return navidromeTracks;
+		},
+		get jellyfinTrackMap() {
+			return jellyfinTrackMap;
+		},
+		get localTrackMap() {
+			return localTrackMap;
+		},
+		get navidromeTrackMap() {
+			return navidromeTrackMap;
+		},
+		get inLibrary() {
+			return inLibrary;
+		},
+		get isRequested() {
+			return isRequested;
+		},
+		get playlistModalRef() {
+			return playlistModalRef;
+		},
+		set playlistModalRef(v) {
+			playlistModalRef = v;
+		},
 		jellyfinCallbacks,
 		localCallbacks,
 		navidromeCallbacks,

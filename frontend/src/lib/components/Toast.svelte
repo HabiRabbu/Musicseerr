@@ -9,7 +9,12 @@
 		duration?: number;
 	}
 
-	let { show = $bindable(false), message = 'Added to Library', type = 'success', duration = TOAST_DURATION }: Props = $props();
+	let {
+		show = $bindable(false),
+		message = 'Added to Library',
+		type = 'success',
+		duration = TOAST_DURATION
+	}: Props = $props();
 
 	$effect(() => {
 		if (show && duration > 0) {

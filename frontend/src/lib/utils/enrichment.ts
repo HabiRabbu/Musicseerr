@@ -35,10 +35,7 @@ export async function fetchEnrichmentBatch(
 	}
 }
 
-export function applyArtistEnrichment(
-	artists: Artist[],
-	enrichment: EnrichmentResponse
-): Artist[] {
+export function applyArtistEnrichment(artists: Artist[], enrichment: EnrichmentResponse): Artist[] {
 	if (enrichment.artists.length === 0) return artists;
 
 	const map = new Map(enrichment.artists.map((a) => [a.musicbrainz_id, a]));

@@ -1,6 +1,5 @@
 declare global {
-	namespace App {
-	}
+	namespace App {}
 }
 
 export {};

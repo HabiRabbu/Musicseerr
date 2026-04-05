@@ -6,7 +6,17 @@
 		HomeTrack,
 		HomeGenre
 	} from '$lib/types';
-	import { ArrowRight, X, Check, Music2, Tv, Sparkles, Search, Radio, Headphones } from 'lucide-svelte';
+	import {
+		ArrowRight,
+		X,
+		Check,
+		Music2,
+		Tv,
+		Sparkles,
+		Search,
+		Radio,
+		Headphones
+	} from 'lucide-svelte';
 	import { goto } from '$app/navigation';
 	import { albumHrefOrNull, artistHrefOrNull } from '$lib/utils/entityRoutes';
 	import { formatListenCount, formatListenedAt } from '$lib/utils/formatting';
@@ -35,7 +45,10 @@
 	}
 
 	function handleTrackAlbumSearch(track: HomeTrack) {
-		const query = [track.artist_name, track.album_name || track.name].filter(Boolean).join(' ').trim();
+		const query = [track.artist_name, track.album_name || track.name]
+			.filter(Boolean)
+			.join(' ')
+			.trim();
 		if (query) {
 			goto(`/search/albums?q=${encodeURIComponent(query)}`);
 		}
@@ -249,7 +262,11 @@
 						>
 							<figure class="w-16 h-16 flex-shrink-0">
 								{#if item.image_url}
-									<img src={item.image_url} alt={item.album_name || item.name} class="w-full h-full object-cover" />
+									<img
+										src={item.image_url}
+										alt={item.album_name || item.name}
+										class="w-full h-full object-cover"
+									/>
 								{:else}
 									<div class="w-full h-full flex items-center justify-center text-2xl bg-base-200">
 										<Music2 class="h-6 w-6 text-base-content/40" />

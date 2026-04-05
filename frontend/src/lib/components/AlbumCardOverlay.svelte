@@ -87,8 +87,16 @@
 	<!-- svelte-ignore a11y_no_static_element_interactions -->
 	<div
 		class="absolute top-2 right-2 z-20"
-		onclick={(e) => { e.stopPropagation(); e.preventDefault(); }}
-		onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); e.preventDefault(); } }}
+		onclick={(e) => {
+			e.stopPropagation();
+			e.preventDefault();
+		}}
+		onkeydown={(e) => {
+			if (e.key === 'Enter' || e.key === ' ') {
+				e.stopPropagation();
+				e.preventDefault();
+			}
+		}}
 	>
 		<div class="rounded-full bg-black/50 backdrop-blur-sm">
 			<ContextMenu items={getMenuItems()} position="end" size="xs" />

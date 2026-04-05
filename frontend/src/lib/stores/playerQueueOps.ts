@@ -4,7 +4,7 @@ export function computeNextIndex(
 	currentIndex: number,
 	queueLength: number,
 	shuffleEnabled: boolean,
-	shuffleOrder: number[],
+	shuffleOrder: number[]
 ): number | null {
 	if (queueLength <= 1) return null;
 	if (shuffleEnabled) {
@@ -20,7 +20,7 @@ export function computePreviousIndex(
 	currentIndex: number,
 	queueLength: number,
 	shuffleEnabled: boolean,
-	shuffleOrder: number[],
+	shuffleOrder: number[]
 ): number | null {
 	if (queueLength <= 1) return null;
 	if (shuffleEnabled) {
@@ -36,7 +36,7 @@ export function computeUpcomingLength(
 	queueLength: number,
 	currentIndex: number,
 	shuffleEnabled: boolean,
-	shuffleOrder: number[],
+	shuffleOrder: number[]
 ): number {
 	if (queueLength === 0) return 0;
 	if (shuffleEnabled) {
@@ -52,17 +52,20 @@ export function performCleanup(
 	currentIndex: number,
 	shuffleEnabled: boolean,
 	shuffleOrder: number[],
-	maxHistory: number,
+	maxHistory: number
 ): { newQueue: QueueItem[]; newIndex: number; newShuffleOrder: number[] } {
-	if (queue.length <= 1) return { newQueue: queue, newIndex: currentIndex, newShuffleOrder: shuffleOrder };
+	if (queue.length <= 1)
+		return { newQueue: queue, newIndex: currentIndex, newShuffleOrder: shuffleOrder };
 
 	let playedIndices: number[];
 	if (shuffleEnabled) {
 		const currentShufflePos = shuffleOrder.indexOf(currentIndex);
-		if (currentShufflePos <= 0) return { newQueue: queue, newIndex: currentIndex, newShuffleOrder: shuffleOrder };
+		if (currentShufflePos <= 0)
+			return { newQueue: queue, newIndex: currentIndex, newShuffleOrder: shuffleOrder };
 		playedIndices = shuffleOrder.slice(0, currentShufflePos);
 	} else {
-		if (currentIndex <= 0) return { newQueue: queue, newIndex: currentIndex, newShuffleOrder: shuffleOrder };
+		if (currentIndex <= 0)
+			return { newQueue: queue, newIndex: currentIndex, newShuffleOrder: shuffleOrder };
 		playedIndices = Array.from({ length: currentIndex }, (_, i) => i);
 	}
 
@@ -77,7 +80,8 @@ export function performCleanup(
 		for (let i = 0; i < excess; i++) toRemove.add(remainingPlayed[i]);
 	}
 
-	if (toRemove.size === 0) return { newQueue: queue, newIndex: currentIndex, newShuffleOrder: shuffleOrder };
+	if (toRemove.size === 0)
+		return { newQueue: queue, newIndex: currentIndex, newShuffleOrder: shuffleOrder };
 
 	const indexMap = new Map<number, number>();
 	let shift = 0;
@@ -109,7 +113,7 @@ export function reorderItems<T>(items: T[], fromIndex: number, toIndex: number):
 export function reorderShuffleItems(
 	shuffleOrder: number[],
 	fromPos: number,
-	toPos: number,
+	toPos: number
 ): number[] {
 	if (fromPos === toPos) return shuffleOrder;
 	const newOrder = [...shuffleOrder];

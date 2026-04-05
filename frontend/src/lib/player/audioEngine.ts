@@ -44,10 +44,7 @@ export class AudioEngine {
 	setAllGains(gains: readonly number[]): void {
 		for (let i = 0; i < EQ_BAND_COUNT; i++) {
 			if (this.filters[i]) {
-				this.filters[i].gain.value = Math.max(
-					EQ_MIN_GAIN,
-					Math.min(EQ_MAX_GAIN, gains[i] ?? 0)
-				);
+				this.filters[i].gain.value = Math.max(EQ_MIN_GAIN, Math.min(EQ_MAX_GAIN, gains[i] ?? 0));
 			}
 		}
 	}

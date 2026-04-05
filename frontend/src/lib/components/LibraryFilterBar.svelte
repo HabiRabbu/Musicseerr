@@ -109,9 +109,7 @@
 					aria-label={isAscending ? 'Switch to descending sort' : 'Switch to ascending sort'}
 					title={isAscending ? 'Ascending' : 'Descending'}
 				>
-					<ArrowDown
-						class="h-4 w-4 transition-transform {isAscending ? '' : 'rotate-180'}"
-					/>
+					<ArrowDown class="h-4 w-4 transition-transform {isAscending ? '' : 'rotate-180'}" />
 				</button>
 			{/if}
 

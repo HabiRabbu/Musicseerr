@@ -2,10 +2,7 @@
 	import { Music, Play, Loader2, RefreshCw } from 'lucide-svelte';
 	import { getQueueCachedData, subscribeQueueCacheChanges } from '$lib/utils/discoverQueueCache';
 	import type { MusicSource } from '$lib/stores/musicSource';
-	import {
-		discoverQueueStatusStore,
-		type QueueBuildStatus,
-	} from '$lib/stores/discoverQueueStatus';
+	import { discoverQueueStatusStore, type QueueBuildStatus } from '$lib/stores/discoverQueueStatus';
 
 	let { onLaunch, source }: { onLaunch: () => void; source: MusicSource } = $props();
 
@@ -53,17 +50,24 @@
 		{isReady ? 'animate-glow-pulse' : ''}"
 	style={isReady ? 'box-shadow: 0 0 25px rgba(174,213,242,0.2);' : ''}
 >
-	<div class="absolute inset-0 rounded-[inherit] pointer-events-none"
+	<div
+		class="absolute inset-0 rounded-[inherit] pointer-events-none"
 		style="border: 2px dashed rgb(var(--brand-discover) / 0.25); border-radius: inherit;"
 	></div>
 	<div class="card-body items-center gap-5 py-12 text-center">
 		<div class="text-primary opacity-70">
 			{#if isBuilding && !hasCachedQueue}
 				<div class="flex items-end gap-[3px] h-10 w-10 justify-center pb-1">
-					<span class="w-1.5 bg-primary rounded-full animate-equalizer-1" style="height: 60%;"></span>
-					<span class="w-1.5 bg-primary rounded-full animate-equalizer-2" style="height: 80%;"></span>
-					<span class="w-1.5 bg-primary rounded-full animate-equalizer-3" style="height: 40%;"></span>
-					<span class="w-1.5 bg-primary rounded-full animate-equalizer-1" style="height: 70%; animation-delay: 0.2s;"></span>
+					<span class="w-1.5 bg-primary rounded-full animate-equalizer-1" style="height: 60%;"
+					></span>
+					<span class="w-1.5 bg-primary rounded-full animate-equalizer-2" style="height: 80%;"
+					></span>
+					<span class="w-1.5 bg-primary rounded-full animate-equalizer-3" style="height: 40%;"
+					></span>
+					<span
+						class="w-1.5 bg-primary rounded-full animate-equalizer-1"
+						style="height: 70%; animation-delay: 0.2s;"
+					></span>
 				</div>
 			{:else}
 				<Music class="h-10 w-10" strokeWidth={1.5} />

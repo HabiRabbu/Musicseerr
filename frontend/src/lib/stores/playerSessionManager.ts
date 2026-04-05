@@ -1,5 +1,10 @@
 import type { NowPlaying, QueueItem, SourceType } from '$lib/player/types';
-import { getStoredSession, storeSessionData, normalizeSourceType, migrateLegacyItem } from './playerUtils';
+import {
+	getStoredSession,
+	storeSessionData,
+	normalizeSourceType,
+	migrateLegacyItem
+} from './playerUtils';
 import type { StoredSession } from './playerUtils';
 
 export function persistSession(
@@ -8,7 +13,7 @@ export function persistSession(
 	currentIndex: number,
 	progress: number,
 	shuffleEnabled: boolean,
-	shuffleOrder: number[],
+	shuffleOrder: number[]
 ): void {
 	if (!nowPlaying) {
 		storeSessionData(null);
@@ -34,7 +39,7 @@ export interface ResumeState {
 export function buildResumeState(session: StoredSession): ResumeState | null {
 	const migratedNowPlaying: NowPlaying = {
 		...session.nowPlaying,
-		sourceType: normalizeSourceType(session.nowPlaying.sourceType as SourceType | 'howler'),
+		sourceType: normalizeSourceType(session.nowPlaying.sourceType as SourceType | 'howler')
 	};
 	const migratedQueue = session.queue.map((item) =>
 		migrateLegacyItem(item as QueueItem & { sourceType: SourceType | 'howler' })
@@ -53,6 +58,6 @@ export function buildResumeState(session: StoredSession): ResumeState | null {
 		progress: session.progress,
 		shuffleEnabled: session.shuffleEnabled,
 		shuffleOrder: session.shuffleOrder,
-		currentItem,
+		currentItem
 	};
 }

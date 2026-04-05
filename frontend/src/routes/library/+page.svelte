@@ -86,7 +86,8 @@
 	$: isSearching = searchQuery.trim().length > 0;
 	$: totalAlbumPages = Math.ceil(albumsTotal / ALBUMS_PER_PAGE);
 	$: lastSyncText = stats.last_sync ? new Date(stats.last_sync * 1000).toLocaleString() : 'Never';
-	$: isConnectionError = errorCode === CIRCUIT_BREAKER_CODE ||
+	$: isConnectionError =
+		errorCode === CIRCUIT_BREAKER_CODE ||
 		(error != null && /connection|DNS|not configured/i.test(error));
 
 	const FREQ_LABELS: Record<string, string> = {
@@ -271,7 +272,10 @@
 				>
 				<button
 					class="btn btn-sm btn-circle btn-ghost"
-					onclick={() => { error = null; errorCode = null; }}
+					onclick={() => {
+						error = null;
+						errorCode = null;
+					}}
 					aria-label="Dismiss"
 				>
 					<X class="h-4 w-4" />
@@ -391,7 +395,8 @@
 	</div>
 	{#if isSearching && !loadingAlbums}
 		<p class="text-sm text-base-content/50 mb-4 ml-4">
-			{albumsTotal} {albumsTotal === 1 ? 'album' : 'albums'} found
+			{albumsTotal}
+			{albumsTotal === 1 ? 'album' : 'albums'} found
 		</p>
 	{/if}
 

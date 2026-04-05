@@ -19,15 +19,7 @@
 		onFallbackClick: (item: HomeAlbum | HomeArtist) => void;
 	}
 
-	let {
-		item,
-		itemType,
-		href = null,
-		rank,
-		variant,
-		className,
-		onFallbackClick
-	}: Props = $props();
+	let { item, itemType, href = null, rank, variant, className, onFallbackClick }: Props = $props();
 
 	function isAlbum(value: HomeAlbum | HomeArtist): value is HomeAlbum {
 		return itemType === 'album';
@@ -79,7 +71,9 @@
 					lazy={false}
 				/>
 			{/if}
-			<div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
+			<div
+				class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"
+			></div>
 			<div class="absolute left-3 top-3 flex items-center gap-2">
 				<span class="badge badge-primary badge-lg font-bold">#{rank}</span>
 				<span class="badge badge-ghost badge-sm">Most Popular</span>
@@ -143,9 +137,12 @@
 						size="sm"
 					/>
 				{/if}
-				<div class="badge badge-sm absolute bottom-1 left-1 font-bold {variant === 'expanded' && rank <= 3
-					? 'badge-primary'
-					: 'badge-neutral'}">
+				<div
+					class="badge badge-sm absolute bottom-1 left-1 font-bold {variant === 'expanded' &&
+					rank <= 3
+						? 'badge-primary'
+						: 'badge-neutral'}"
+				>
 					#{rank}
 				</div>
 				{#if !item.mbid}
@@ -160,11 +157,11 @@
 				{/if}
 			</figure>
 		{:else}
-			<figure class={
-				variant === 'overview'
+			<figure
+				class={variant === 'overview'
 					? 'relative flex justify-center pt-4'
-					: 'relative aspect-square overflow-hidden'
-			}>
+					: 'relative aspect-square overflow-hidden'}
+			>
 				<ArtistImage
 					mbid={item.mbid || ''}
 					alt={item.name}
@@ -178,9 +175,12 @@
 						<Check class="h-3 w-3" />
 					</div>
 				{/if}
-				<div class="badge badge-sm absolute bottom-1 left-1 font-bold {variant === 'expanded' && rank <= 3
-					? 'badge-primary'
-					: 'badge-neutral'}">
+				<div
+					class="badge badge-sm absolute bottom-1 left-1 font-bold {variant === 'expanded' &&
+					rank <= 3
+						? 'badge-primary'
+						: 'badge-neutral'}"
+				>
 					#{rank}
 				</div>
 				{#if !item.mbid}
@@ -196,7 +196,11 @@
 			</figure>
 		{/if}
 		<div class={variant === 'expanded' ? 'card-body p-2 sm:p-3' : 'card-body p-2'}>
-			<h3 class={variant === 'expanded' ? 'card-title line-clamp-1 text-xs sm:text-sm' : 'card-title line-clamp-1 text-xs'}>
+			<h3
+				class={variant === 'expanded'
+					? 'card-title line-clamp-1 text-xs sm:text-sm'
+					: 'card-title line-clamp-1 text-xs'}
+			>
 				{item.name}
 			</h3>
 			{#if isAlbum(item) && item.artist_name}

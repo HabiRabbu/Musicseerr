@@ -60,7 +60,9 @@
 							<span class="label-text font-medium">Scrobble to Last.fm</span>
 							<p class="text-xs text-base-content/50">
 								{#if !lastfmConnected}
-									<a href="/settings?tab=lastfm" class="link link-primary">Connect Last.fm first →</a>
+									<a href="/settings?tab=lastfm" class="link link-primary"
+										>Connect Last.fm first →</a
+									>
 								{:else}
 									Send listening activity to your Last.fm profile
 								{/if}
@@ -81,7 +83,9 @@
 							<span class="label-text font-medium">Scrobble to ListenBrainz</span>
 							<p class="text-xs text-base-content/50">
 								{#if !listenbrainzConnected}
-									<a href="/settings?tab=listenbrainz" class="link link-primary">Connect ListenBrainz first →</a>
+									<a href="/settings?tab=listenbrainz" class="link link-primary"
+										>Connect ListenBrainz first →</a
+									>
 								{:else}
 									Send listening activity to your ListenBrainz profile
 								{/if}
@@ -93,8 +97,8 @@
 				{#if form.message}
 					<div
 						class="alert"
-				class:alert-success={form.messageType === 'success'}
-					class:alert-error={form.messageType === 'error'}
+						class:alert-success={form.messageType === 'success'}
+						class:alert-error={form.messageType === 'error'}
 					>
 						<span>{form.message}</span>
 					</div>

@@ -31,7 +31,7 @@ export function buildPrefetchUrl(item: QueueItem): string | null {
 
 export function buildStreamUrlForSource(
 	sourceType: SourceType,
-	trackSourceId: string,
+	trackSourceId: string
 ): string | undefined {
 	switch (sourceType) {
 		case 'local':
@@ -58,6 +58,6 @@ export function buildNowPlayingMetadata(item: QueueItem): NowPlaying {
 		artistId: item.artistId,
 		streamUrl: item.streamUrl,
 		format: item.format,
-		playlistTrackId: item.playlistTrackId,
+		playlistTrackId: item.playlistTrackId
 	};
 }

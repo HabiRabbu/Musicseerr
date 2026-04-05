@@ -27,7 +27,7 @@ function readCachedSource(): MusicSource {
 function createMusicSourceStore() {
 	const { subscribe, set, update } = writable<MusicSourceState>({
 		source: readCachedSource(),
-		loaded: false,
+		loaded: false
 	});
 
 	let loadPromise: Promise<void> | null = null;
@@ -122,7 +122,7 @@ function createMusicSourceStore() {
 		getSource,
 		getCachedSource,
 		getPageSource,
-		setPageSource,
+		setPageSource
 	};
 }
 

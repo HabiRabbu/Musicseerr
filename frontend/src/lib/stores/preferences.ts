@@ -23,7 +23,10 @@ async function loadPreferences(): Promise<void> {
 
 async function savePreferences(prefs: UserPreferences): Promise<boolean> {
 	try {
-		const updated = await api.global.put<UserPreferences>(`${API_BASE}/settings/preferences`, prefs);
+		const updated = await api.global.put<UserPreferences>(
+			`${API_BASE}/settings/preferences`,
+			prefs
+		);
 		set(updated);
 		return true;
 	} catch (e) {

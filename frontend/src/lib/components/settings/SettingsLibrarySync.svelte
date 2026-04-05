@@ -6,7 +6,17 @@
 	import { onDestroy } from 'svelte';
 
 	interface LibrarySyncSettings {
-		sync_frequency: 'manual' | '5min' | '10min' | '30min' | '1hr' | '6hr' | '12hr' | '24hr' | '3d' | '7d';
+		sync_frequency:
+			| 'manual'
+			| '5min'
+			| '10min'
+			| '30min'
+			| '1hr'
+			| '6hr'
+			| '12hr'
+			| '24hr'
+			| '3d'
+			| '7d';
 		last_sync: number | null;
 		last_sync_success: boolean;
 	}
@@ -73,9 +83,13 @@
 						<div class="stat-value text-lg">{formatLastSync(form.data.last_sync)}</div>
 						<div class="stat-desc">
 							{#if form.data.last_sync_success === true}
-							<span class="text-success inline-flex items-center gap-0.5"><Check class="h-3 w-3" /> Successful</span>
-						{:else if form.data.last_sync_success === false}
-							<span class="text-error inline-flex items-center gap-0.5"><X class="h-3 w-3" /> Failed</span>
+								<span class="text-success inline-flex items-center gap-0.5"
+									><Check class="h-3 w-3" /> Successful</span
+								>
+							{:else if form.data.last_sync_success === false}
+								<span class="text-error inline-flex items-center gap-0.5"
+									><X class="h-3 w-3" /> Failed</span
+								>
 							{/if}
 						</div>
 					</div>
@@ -102,7 +116,11 @@
 				</label>
 
 				{#if form.message}
-					<div class="alert" class:alert-success={form.messageType === 'success'} class:alert-error={form.messageType === 'error'}>
+					<div
+						class="alert"
+						class:alert-success={form.messageType === 'success'}
+						class:alert-error={form.messageType === 'error'}
+					>
 						<span>{form.message}</span>
 					</div>
 				{/if}

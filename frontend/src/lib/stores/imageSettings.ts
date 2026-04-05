@@ -19,7 +19,9 @@ async function load(): Promise<void> {
 	if (now - lastFetch < CACHE_MS) return;
 
 	try {
-		const data = await api.global.get<{ direct_remote_images_enabled?: boolean }>('/api/v1/settings/advanced');
+		const data = await api.global.get<{ direct_remote_images_enabled?: boolean }>(
+			'/api/v1/settings/advanced'
+		);
 		set({
 			directRemoteImagesEnabled: data.direct_remote_images_enabled ?? true
 		});

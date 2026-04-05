@@ -24,7 +24,7 @@ vi.mock('$lib/api/playlists', () => ({
 	reorderPlaylistTrack: (...args: unknown[]) => mockReorderPlaylistTrack(...args),
 	uploadPlaylistCover: (...args: unknown[]) => mockUploadPlaylistCover(...args),
 	deletePlaylistCover: (...args: unknown[]) => mockDeletePlaylistCover(...args),
-	resolvePlaylistSources: (...args: unknown[]) => mockResolvePlaylistSources(...args),
+	resolvePlaylistSources: (...args: unknown[]) => mockResolvePlaylistSources(...args)
 }));
 
 const mockToastShow = vi.fn();
@@ -39,7 +39,7 @@ vi.mock('$lib/stores/player.svelte', () => ({
 	playerStore: {
 		playQueue: (...args: unknown[]) => mockPlayQueue(...args),
 		addToQueue: (...args: unknown[]) => mockAddToQueue(...args),
-		playNext: (...args: unknown[]) => mockPlayNext(...args),
+		playNext: (...args: unknown[]) => mockPlayNext(...args)
 	}
 }));
 
@@ -94,7 +94,13 @@ function makePlaylist(overrides: Partial<PlaylistDetail> = {}): PlaylistDetail {
 		updated_at: '2026-01-02T00:00:00Z',
 		tracks: [
 			makeTrack({ id: 'trk-1', position: 0, track_name: 'First Track', duration: 240 }),
-			makeTrack({ id: 'trk-2', position: 1, track_name: 'Second Track', artist_name: 'Other Artist', duration: 240 }),
+			makeTrack({
+				id: 'trk-2',
+				position: 1,
+				track_name: 'Second Track',
+				artist_name: 'Other Artist',
+				duration: 240
+			})
 		],
 		...overrides
 	};
@@ -117,14 +123,20 @@ describe('Playlist detail page', () => {
 		mockAddToQueue.mockReset();
 		mockPlayNext.mockReset();
 		mockGoto.mockReset();
-		try { localStorage.clear(); } catch { /* ignore in non-browser */ }
+		try {
+			localStorage.clear();
+		} catch {
+			/* ignore in non-browser */
+		}
 	});
 
 	it('renders header with playlist name, track count, and duration', async () => {
 		mockFetchPlaylist.mockResolvedValue(makePlaylist());
 		renderDetail('pl-1');
 
-		await expect.element(page.getByRole('heading', { name: 'My Playlist', level: 1 })).toBeVisible();
+		await expect
+			.element(page.getByRole('heading', { name: 'My Playlist', level: 1 }))
+			.toBeVisible();
 		await expect.element(page.getByText(/2 tracks/)).toBeVisible();
 		await expect.element(page.getByText(/8 min/)).toBeVisible();
 	});
@@ -157,7 +169,9 @@ describe('Playlist detail page', () => {
 		mockFetchPlaylist.mockResolvedValue(makePlaylist());
 		renderDetail('pl-1');
 
-		await expect.element(page.getByRole('heading', { name: 'My Playlist', level: 1 })).toBeVisible();
+		await expect
+			.element(page.getByRole('heading', { name: 'My Playlist', level: 1 }))
+			.toBeVisible();
 
 		const playBtn = page.getByRole('button', { name: /Play All/ });
 		await playBtn.click();
@@ -173,7 +187,9 @@ describe('Playlist detail page', () => {
 		mockFetchPlaylist.mockResolvedValue(makePlaylist());
 		renderDetail('pl-1');
 
-		await expect.element(page.getByRole('heading', { name: 'My Playlist', level: 1 })).toBeVisible();
+		await expect
+			.element(page.getByRole('heading', { name: 'My Playlist', level: 1 }))
+			.toBeVisible();
 
 		const shuffleBtn = page.getByRole('button', { name: /Shuffle/ });
 		await shuffleBtn.click();
@@ -195,7 +211,9 @@ describe('Playlist detail page', () => {
 		mockFetchPlaylist.mockResolvedValue(makePlaylist());
 		renderDetail('pl-1');
 
-		await expect.element(page.getByRole('heading', { name: 'My Playlist', level: 1 })).toBeVisible();
+		await expect
+			.element(page.getByRole('heading', { name: 'My Playlist', level: 1 }))
+			.toBeVisible();
 
 		await expect.element(page.getByText(/Delete "My Playlist"\?/)).not.toBeVisible();
 
@@ -206,7 +224,9 @@ describe('Playlist detail page', () => {
 		mockFetchPlaylist.mockResolvedValue(makePlaylist());
 		renderDetail('pl-1');
 
-		await expect.element(page.getByRole('heading', { name: 'My Playlist', level: 1 })).toBeVisible();
+		await expect
+			.element(page.getByRole('heading', { name: 'My Playlist', level: 1 }))
+			.toBeVisible();
 
 		const backButton = page.getByRole('button', { name: /Go back/ });
 		await expect.element(backButton).toBeVisible();
@@ -216,7 +236,9 @@ describe('Playlist detail page', () => {
 		mockFetchPlaylist.mockResolvedValue(makePlaylist());
 		renderDetail('pl-1');
 
-		await expect.element(page.getByRole('heading', { name: 'My Playlist', level: 1 })).toBeVisible();
+		await expect
+			.element(page.getByRole('heading', { name: 'My Playlist', level: 1 }))
+			.toBeVisible();
 
 		const editBtn = page.getByRole('button', { name: /Edit playlist name/ });
 		await editBtn.click();
@@ -226,7 +248,9 @@ describe('Playlist detail page', () => {
 
 		await userEvent.keyboard('{Escape}');
 
-		await expect.element(page.getByRole('heading', { name: 'My Playlist', level: 1 })).toBeVisible();
+		await expect
+			.element(page.getByRole('heading', { name: 'My Playlist', level: 1 }))
+			.toBeVisible();
 		expect(mockUpdatePlaylist).not.toHaveBeenCalled();
 	});
 
@@ -235,7 +259,9 @@ describe('Playlist detail page', () => {
 		mockFetchPlaylist.mockResolvedValue(makePlaylist());
 		renderDetail('pl-1');
 
-		await expect.element(page.getByRole('heading', { name: 'My Playlist', level: 1 })).toBeVisible();
+		await expect
+			.element(page.getByRole('heading', { name: 'My Playlist', level: 1 }))
+			.toBeVisible();
 
 		const editBtn = page.getByRole('button', { name: /Edit playlist name/ });
 		await editBtn.click();
@@ -255,7 +281,9 @@ describe('Playlist detail page', () => {
 		mockFetchPlaylist.mockResolvedValue(makePlaylist());
 		renderDetail('pl-1');
 
-		await expect.element(page.getByRole('heading', { name: 'My Playlist', level: 1 })).toBeVisible();
+		await expect
+			.element(page.getByRole('heading', { name: 'My Playlist', level: 1 }))
+			.toBeVisible();
 
 		await page.getByRole('button', { name: /Edit playlist name/ }).click();
 
@@ -276,7 +304,9 @@ describe('Playlist detail page', () => {
 		mockFetchPlaylist.mockResolvedValue(makePlaylist());
 		renderDetail('pl-1');
 
-		await expect.element(page.getByRole('heading', { name: 'My Playlist', level: 1 })).toBeVisible();
+		await expect
+			.element(page.getByRole('heading', { name: 'My Playlist', level: 1 }))
+			.toBeVisible();
 
 		// Modal exists in DOM but is not visible until opened
 		await expect.element(page.getByText(/This will permanently remove/)).not.toBeVisible();
@@ -298,7 +328,9 @@ describe('Playlist detail page', () => {
 		mockResolvePlaylistSources.mockResolvedValue({});
 		renderDetail('pl-1');
 
-		await expect.element(page.getByRole('heading', { name: 'My Playlist', level: 1 })).toBeVisible();
+		await expect
+			.element(page.getByRole('heading', { name: 'My Playlist', level: 1 }))
+			.toBeVisible();
 		await vi.waitFor(() => {
 			expect(mockResolvePlaylistSources).toHaveBeenCalledWith('pl-1');
 		});

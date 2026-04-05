@@ -12,7 +12,13 @@
 	aria-label="Open {artist.title}"
 >
 	<figure class="aspect-square p-3">
-		<ArtistImage mbid={artist.musicbrainz_id} alt={artist.title} size="full" remoteUrl={artist.thumb_url ?? null} className="w-full h-full" />
+		<ArtistImage
+			mbid={artist.musicbrainz_id}
+			alt={artist.title}
+			size="full"
+			remoteUrl={artist.thumb_url ?? null}
+			className="w-full h-full"
+		/>
 	</figure>
 
 	<div class="card-body p-2 pt-0 items-center text-center">

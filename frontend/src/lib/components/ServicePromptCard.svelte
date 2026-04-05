@@ -78,7 +78,10 @@
 			<X class="h-3.5 w-3.5" />
 		</button>
 		<div class="flex-shrink-0" style={getIconColor()}>
-			<svelte:component this={serviceIcons[prompt.service] || Music} class="h-10 w-10 sm:h-12 sm:w-12" />
+			<svelte:component
+				this={serviceIcons[prompt.service] || Music}
+				class="h-10 w-10 sm:h-12 sm:w-12"
+			/>
 		</div>
 		<div class="min-w-0 flex-1 pr-6">
 			<h3 class="card-title mb-1 text-base sm:text-lg">{prompt.title}</h3>
@@ -92,7 +95,10 @@
 			</div>
 		</div>
 		<div class="flex-shrink-0">
-			<a href={getSettingsLink(prompt.service)} class="btn btn-sm sm:btn-md {getPromptButtonClass(prompt.color)}">
+			<a
+				href={getSettingsLink(prompt.service)}
+				class="btn btn-sm sm:btn-md {getPromptButtonClass(prompt.color)}"
+			>
 				Connect
 				<ArrowRight class="h-4 w-4" />
 			</a>

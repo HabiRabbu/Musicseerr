@@ -16,9 +16,7 @@ describe('DegradedBanner.svelte', () => {
 	it('is hidden when store is empty', async () => {
 		expect.assertions(1);
 		renderBanner();
-		await expect
-			.element(page.getByRole('status'))
-			.not.toBeInTheDocument();
+		await expect.element(page.getByRole('status')).not.toBeInTheDocument();
 	});
 
 	it('renders when store has degraded services', async () => {
@@ -35,7 +33,9 @@ describe('DegradedBanner.svelte', () => {
 		serviceStatusStore.recordFromResponse({ musicbrainz: 'error', audiodb: 'degraded' });
 		renderBanner();
 		await expect
-			.element(page.getByText(/Musicbrainz, Audiodb are unavailable, so some results may be missing/))
+			.element(
+				page.getByText(/Musicbrainz, Audiodb are unavailable, so some results may be missing/)
+			)
 			.toBeVisible();
 	});
 
@@ -44,14 +44,10 @@ describe('DegradedBanner.svelte', () => {
 		serviceStatusStore.recordFromResponse({ musicbrainz: 'error' });
 		renderBanner();
 
-		await expect
-			.element(page.getByRole('status'))
-			.toBeVisible();
+		await expect.element(page.getByRole('status')).toBeVisible();
 
 		await page.getByLabelText('Dismiss').click();
 
-		await expect
-			.element(page.getByRole('status'))
-			.not.toBeInTheDocument();
+		await expect.element(page.getByRole('status')).not.toBeInTheDocument();
 	});
 });

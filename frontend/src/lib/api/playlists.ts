@@ -86,10 +86,7 @@ export async function createPlaylist(name: string): Promise<PlaylistDetail> {
 	return api.global.post<PlaylistDetail>(API.playlists.create(), { name });
 }
 
-export async function updatePlaylist(
-	id: string,
-	data: { name?: string }
-): Promise<PlaylistDetail> {
+export async function updatePlaylist(id: string, data: { name?: string }): Promise<PlaylistDetail> {
 	return api.global.put<PlaylistDetail>(API.playlists.update(id), data);
 }
 
@@ -104,21 +101,18 @@ export async function addTracksToPlaylist(
 ): Promise<PlaylistTrack[]> {
 	const body: { tracks: TrackData[]; position?: number } = { tracks };
 	if (position != null) body.position = position;
-	const data = await api.global.post<{ tracks: PlaylistTrack[] }>(API.playlists.addTracks(id), body);
+	const data = await api.global.post<{ tracks: PlaylistTrack[] }>(
+		API.playlists.addTracks(id),
+		body
+	);
 	return data.tracks;
 }
 
-export async function removeTrackFromPlaylist(
-	id: string,
-	trackId: string
-): Promise<void> {
+export async function removeTrackFromPlaylist(id: string, trackId: string): Promise<void> {
 	await api.global.delete(API.playlists.removeTrack(id, trackId));
 }
 
-export async function removeTracksFromPlaylist(
-	id: string,
-	trackIds: string[]
-): Promise<void> {
+export async function removeTracksFromPlaylist(id: string, trackIds: string[]): Promise<void> {
 	await api.global.post(API.playlists.removeTracks(id), { track_ids: trackIds });
 }
 
@@ -135,16 +129,13 @@ export async function reorderPlaylistTrack(
 	trackId: string,
 	newPosition: number
 ): Promise<{ actual_position: number }> {
-	return api.global.patch<{ actual_position: number }>(
-		API.playlists.reorderTrack(id),
-		{ track_id: trackId, new_position: newPosition }
-	);
+	return api.global.patch<{ actual_position: number }>(API.playlists.reorderTrack(id), {
+		track_id: trackId,
+		new_position: newPosition
+	});
 }
 
-export async function uploadPlaylistCover(
-	id: string,
-	file: File
-): Promise<{ cover_url: string }> {
+export async function uploadPlaylistCover(id: string, file: File): Promise<{ cover_url: string }> {
 	const formData = new FormData();
 	formData.append('cover_image', file);
 	return api.global.upload<{ cover_url: string }>(API.playlists.uploadCover(id), formData);
@@ -164,9 +155,7 @@ export async function checkTrackMembership(
 	return data.membership;
 }
 
-export async function resolvePlaylistSources(
-	id: string
-): Promise<Record<string, string[]>> {
+export async function resolvePlaylistSources(id: string): Promise<Record<string, string[]>> {
 	const data = await api.global.post<{ sources: Record<string, string[]> }>(
 		API.playlists.resolveSources(id)
 	);

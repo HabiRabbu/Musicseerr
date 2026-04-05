@@ -160,7 +160,10 @@
 			class:pointer-events-none={isYouTube || !eqStore.enabled}
 		>
 			<div class="flex">
-				<div class="flex flex-col justify-between pr-2 select-none" style="height: {TRACK_HEIGHT}px;">
+				<div
+					class="flex flex-col justify-between pr-2 select-none"
+					style="height: {TRACK_HEIGHT}px;"
+				>
 					{#each DB_TICKS as tick}
 						<span class="text-[9px] tabular-nums opacity-40 leading-none text-right w-5">
 							{tick > 0 ? '+' : ''}{tick}
@@ -171,10 +174,16 @@
 				<div class="flex flex-1 gap-0">
 					{#each { length: EQ_BAND_COUNT } as _, i}
 						<div class="flex flex-col items-center flex-1 min-w-[28px]">
-							<span class="text-[10px] tabular-nums font-semibold mb-1.5 select-none h-3 leading-none"
-								style="color: oklch(var(--a) / {Math.min(1, 0.5 + Math.abs(eqStore.gains[i]) / EQ_MAX_GAIN * 0.5)})"
+							<span
+								class="text-[10px] tabular-nums font-semibold mb-1.5 select-none h-3 leading-none"
+								style="color: oklch(var(--a) / {Math.min(
+									1,
+									0.5 + (Math.abs(eqStore.gains[i]) / EQ_MAX_GAIN) * 0.5
+								)})"
 							>
-								{eqStore.gains[i] > 0 ? '+' : ''}{eqStore.gains[i].toFixed(eqStore.gains[i] % 1 === 0 ? 0 : 1)}
+								{eqStore.gains[i] > 0 ? '+' : ''}{eqStore.gains[i].toFixed(
+									eqStore.gains[i] % 1 === 0 ? 0 : 1
+								)}
 							</span>
 
 							<div
@@ -191,7 +200,9 @@
 								aria-valuemax={EQ_MAX_GAIN}
 								aria-valuenow={eqStore.gains[i]}
 							>
-								<div class="absolute left-1/2 -translate-x-1/2 w-[3px] h-full rounded-full bg-base-content/8"></div>
+								<div
+									class="absolute left-1/2 -translate-x-1/2 w-[3px] h-full rounded-full bg-base-content/8"
+								></div>
 
 								<div
 									class="absolute left-0 right-0 h-px bg-base-content/15"
@@ -200,7 +211,8 @@
 
 								<div
 									class="absolute left-1/2 -translate-x-1/2 w-[7px] rounded-full transition-[height,top] duration-75"
-									style="top: {barStyle(eqStore.gains[i]).top}; height: {barStyle(eqStore.gains[i]).height}; background: oklch(var(--a) / 0.7);"
+									style="top: {barStyle(eqStore.gains[i]).top}; height: {barStyle(eqStore.gains[i])
+										.height}; background: oklch(var(--a) / 0.7);"
 								></div>
 
 								<div

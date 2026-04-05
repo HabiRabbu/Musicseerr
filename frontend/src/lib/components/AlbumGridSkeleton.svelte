@@ -1,5 +1,5 @@
 <script lang="ts">
-	export let title: string = "Albums";
+	export let title: string = 'Albums';
 	export let count: number = 12;
 </script>
 
@@ -8,7 +8,7 @@
 		<h2 class="text-2xl font-bold">{title}</h2>
 		<div class="skeleton skeleton-shimmer h-6 w-24"></div>
 	</div>
-	
+
 	<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
 		{#each Array(count) as _}
 			<div class="card bg-base-100 w-full shadow-sm">

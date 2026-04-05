@@ -9,11 +9,9 @@ vi.mock('$lib/constants', () => ({
 			update: (id: string) => `/api/v1/playlists/${id}`,
 			delete: (id: string) => `/api/v1/playlists/${id}`,
 			addTracks: (id: string) => `/api/v1/playlists/${id}/tracks`,
-			removeTrack: (id: string, trackId: string) =>
-				`/api/v1/playlists/${id}/tracks/${trackId}`,
+			removeTrack: (id: string, trackId: string) => `/api/v1/playlists/${id}/tracks/${trackId}`,
 			removeTracks: (id: string) => `/api/v1/playlists/${id}/tracks/batch-remove`,
-			updateTrack: (id: string, trackId: string) =>
-				`/api/v1/playlists/${id}/tracks/${trackId}`,
+			updateTrack: (id: string, trackId: string) => `/api/v1/playlists/${id}/tracks/${trackId}`,
 			reorderTrack: (id: string) => `/api/v1/playlists/${id}/tracks/reorder`,
 			uploadCover: (id: string) => `/api/v1/playlists/${id}/cover`,
 			deleteCover: (id: string) => `/api/v1/playlists/${id}/cover`,
@@ -38,7 +36,7 @@ vi.mock('$lib/api/client', () => ({
 			put: (...args: unknown[]) => mockPut(...args),
 			patch: (...args: unknown[]) => mockPatch(...args),
 			delete: (...args: unknown[]) => mockDelete(...args),
-			upload: (...args: unknown[]) => mockUpload(...args),
+			upload: (...args: unknown[]) => mockUpload(...args)
 		}
 	},
 	ApiError: class ApiError extends Error {
@@ -160,7 +158,9 @@ describe('playlists API client', () => {
 
 	describe('addTracksToPlaylist', () => {
 		it('sends POST with { tracks, position } and unwraps .tracks', async () => {
-			const tracks = [{ track_name: 'Song', artist_name: 'Art', album_name: 'Alb', source_type: 'jellyfin' }];
+			const tracks = [
+				{ track_name: 'Song', artist_name: 'Art', album_name: 'Alb', source_type: 'jellyfin' }
+			];
 			const responseTracks = [{ id: 't1', position: 0, track_name: 'Song' }];
 			mockPost.mockResolvedValue({ tracks: responseTracks });
 
@@ -174,7 +174,9 @@ describe('playlists API client', () => {
 		});
 
 		it('omits position when not provided', async () => {
-			const tracks = [{ track_name: 'Song', artist_name: 'Art', album_name: 'Alb', source_type: 'jellyfin' }];
+			const tracks = [
+				{ track_name: 'Song', artist_name: 'Art', album_name: 'Alb', source_type: 'jellyfin' }
+			];
 			mockPost.mockResolvedValue({ tracks: [] });
 
 			await addTracksToPlaylist('p1', tracks);
@@ -199,7 +201,9 @@ describe('playlists API client', () => {
 
 			await updatePlaylistTrack('p1', 't1', { source_type: 'local' });
 
-			expect(mockPatch).toHaveBeenCalledWith('/api/v1/playlists/p1/tracks/t1', { source_type: 'local' });
+			expect(mockPatch).toHaveBeenCalledWith('/api/v1/playlists/p1/tracks/t1', {
+				source_type: 'local'
+			});
 		});
 	});
 

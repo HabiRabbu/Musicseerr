@@ -52,7 +52,9 @@
 <div class="space-y-6">
 	<div>
 		<h2 class="text-2xl font-bold">Advanced Settings</h2>
-		<p class="text-base-content/60 mt-1">Control cache freshness, background work, and image loading.</p>
+		<p class="text-base-content/60 mt-1">
+			Control cache freshness, background work, and image loading.
+		</p>
 	</div>
 
 	{#if form.loading}
@@ -61,7 +63,9 @@
 		</div>
 	{:else if form.data}
 		{#if form.message}
-			<div class="alert {form.messageType === 'success' ? 'alert-success' : 'alert-error'} alert-soft">
+			<div
+				class="alert {form.messageType === 'success' ? 'alert-success' : 'alert-error'} alert-soft"
+			>
 				{#if form.messageType === 'success'}
 					<CircleCheck class="w-5 h-5 shrink-0" />
 				{:else}

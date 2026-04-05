@@ -27,12 +27,7 @@
 </script>
 
 <div class="collapse collapse-arrow bg-base-200 rounded-box">
-	<input
-		type="radio"
-		{name}
-		checked={isOpen}
-		onchange={() => (isOpen = true)}
-	/>
+	<input type="radio" {name} checked={isOpen} onchange={() => (isOpen = true)} />
 	<div class="collapse-title">
 		<div class="flex items-center gap-3">
 			<div class="{iconBgClass} p-2 rounded-lg">

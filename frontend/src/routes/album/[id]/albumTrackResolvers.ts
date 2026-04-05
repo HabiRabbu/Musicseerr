@@ -17,9 +17,7 @@ export function buildSortedTrackMap<
 	);
 }
 
-export function resolveSourceTrack<
-	T extends { track_number: number; disc_number?: number | null }
->(
+export function resolveSourceTrack<T extends { track_number: number; disc_number?: number | null }>(
 	discNumber: number | undefined,
 	position: number,
 	rowIndex: number,

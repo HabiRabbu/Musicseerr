@@ -23,9 +23,7 @@
 				<ArrowLeft class="h-4 w-4" />
 				Back to Playlists
 			</a>
-			<button class="btn btn-accent btn-sm" onclick={() => location.reload()}>
-				Retry
-			</button>
+			<button class="btn btn-accent btn-sm" onclick={() => location.reload()}> Retry </button>
 		</div>
 	</div>
 </div>

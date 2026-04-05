@@ -127,7 +127,8 @@
 	);
 
 	const btnClasses = $derived.by(() => {
-		const base = size === 'sm' ? 'btn btn-circle btn-ghost btn-xs' : 'btn btn-circle btn-ghost btn-sm';
+		const base =
+			size === 'sm' ? 'btn btn-circle btn-ghost btn-xs' : 'btn btn-circle btn-ghost btn-sm';
 		if (!ytConfigured) return `${base} text-base-content/20 cursor-not-allowed`;
 		if (searching) return `${base} text-primary`;
 		if (errorFlash) return `${base} text-error`;

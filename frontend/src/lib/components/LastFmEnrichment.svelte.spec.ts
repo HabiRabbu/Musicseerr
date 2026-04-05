@@ -10,17 +10,17 @@ const fullEnrichment: LastFmArtistEnrichment = {
 	tags: [
 		{ name: 'rock', url: 'https://last.fm/tag/rock' },
 		{ name: 'classic rock', url: 'https://last.fm/tag/classic+rock' },
-		{ name: 'british', url: 'https://last.fm/tag/british' },
+		{ name: 'british', url: 'https://last.fm/tag/british' }
 	],
 	listeners: 2500000,
 	playcount: 150000000,
 	similar_artists: [],
-	url: 'https://www.last.fm/music/TestArtist',
+	url: 'https://www.last.fm/music/TestArtist'
 };
 
 function renderComponent(props: Record<string, unknown> = {}) {
 	return render(LastFmEnrichment, {
-		props: { enrichment: fullEnrichment, ...props },
+		props: { enrichment: fullEnrichment, ...props }
 	} as Parameters<typeof render<typeof LastFmEnrichment>>[1]);
 }
 
@@ -35,17 +35,13 @@ describe('LastFmEnrichment.svelte', () => {
 	it('should render nothing when not enabled', async () => {
 		renderComponent({ enabled: false });
 
-		await expect
-			.element(page.getByText('Last.fm'))
-			.not.toBeInTheDocument();
+		await expect.element(page.getByText('Last.fm')).not.toBeInTheDocument();
 	});
 
 	it('should render nothing when enrichment is null', async () => {
 		renderComponent({ enrichment: null });
 
-		await expect
-			.element(page.getByText('Last.fm'))
-			.not.toBeInTheDocument();
+		await expect.element(page.getByText('Last.fm')).not.toBeInTheDocument();
 	});
 
 	it('should display Last.fm badge when enrichment is present', async () => {
@@ -57,17 +53,13 @@ describe('LastFmEnrichment.svelte', () => {
 	it('should display formatted listener count', async () => {
 		renderComponent();
 
-		await expect
-			.element(page.getByText('2.5M listeners'))
-			.toBeInTheDocument();
+		await expect.element(page.getByText('2.5M listeners')).toBeInTheDocument();
 	});
 
 	it('should display formatted play count', async () => {
 		renderComponent();
 
-		await expect
-			.element(page.getByText('150.0M plays'))
-			.toBeInTheDocument();
+		await expect.element(page.getByText('150.0M plays')).toBeInTheDocument();
 	});
 
 	it('should display bio text', async () => {
@@ -87,9 +79,7 @@ describe('LastFmEnrichment.svelte', () => {
 
 		const classicRockLink = page.getByRole('link', { name: 'classic rock' });
 		await expect.element(classicRockLink).toBeInTheDocument();
-		await expect
-			.element(classicRockLink)
-			.toHaveAttribute('href', '/genre?name=classic%20rock');
+		await expect.element(classicRockLink).toHaveAttribute('href', '/genre?name=classic%20rock');
 	});
 
 	it('should display View on Last.fm link', async () => {
@@ -97,19 +87,15 @@ describe('LastFmEnrichment.svelte', () => {
 
 		const link = page.getByRole('link', { name: /View on Last\.fm/ });
 		await expect.element(link).toBeInTheDocument();
-		await expect
-			.element(link)
-			.toHaveAttribute('href', 'https://www.last.fm/music/TestArtist');
+		await expect.element(link).toHaveAttribute('href', 'https://www.last.fm/music/TestArtist');
 	});
 
 	it('should hide stats section when both counts are zero', async () => {
 		renderComponent({
-			enrichment: { ...fullEnrichment, listeners: 0, playcount: 0 },
+			enrichment: { ...fullEnrichment, listeners: 0, playcount: 0 }
 		});
 
-		await expect
-			.element(page.getByText('listeners'))
-			.not.toBeInTheDocument();
+		await expect.element(page.getByText('listeners')).not.toBeInTheDocument();
 	});
 
 	it('should render enrichment with only tags (no bio, no stats)', async () => {
@@ -118,8 +104,8 @@ describe('LastFmEnrichment.svelte', () => {
 				...fullEnrichment,
 				bio: null,
 				listeners: 0,
-				playcount: 0,
-			},
+				playcount: 0
+			}
 		});
 
 		await expect.element(page.getByText('Last.fm', { exact: true })).toBeInTheDocument();

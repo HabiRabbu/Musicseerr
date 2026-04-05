@@ -17,7 +17,10 @@
 	import { eqStore } from '$lib/stores/eq.svelte';
 	import Player from '$lib/components/Player.svelte';
 	import CacheSyncIndicator from '$lib/components/CacheSyncIndicator.svelte';
-	import AddToPlaylistModal, { registerPlaylistModal, unregisterPlaylistModal } from '$lib/components/AddToPlaylistModal.svelte';
+	import AddToPlaylistModal, {
+		registerPlaylistModal,
+		unregisterPlaylistModal
+	} from '$lib/components/AddToPlaylistModal.svelte';
 	import { syncStatus } from '$lib/stores/syncStatus.svelte';
 	import YouTubeIcon from '$lib/components/YouTubeIcon.svelte';
 	import NavidromeIcon from '$lib/components/NavidromeIcon.svelte';
@@ -32,7 +35,22 @@
 	import { requestCountStore } from '$lib/stores/requestCountStore.svelte';
 	import { createNavigationProgressController } from '$lib/utils/navigationProgress';
 	import { fromStore } from 'svelte/store';
-	import { Settings, Search, House, Compass, Menu, Headphones, Download, PanelLeft, TriangleAlert, Info, X, UserRound, Check, ListMusic } from 'lucide-svelte';
+	import {
+		Settings,
+		Search,
+		House,
+		Compass,
+		Menu,
+		Headphones,
+		Download,
+		PanelLeft,
+		TriangleAlert,
+		Info,
+		X,
+		UserRound,
+		Check,
+		ListMusic
+	} from 'lucide-svelte';
 	import type { Snippet } from 'svelte';
 
 	let { children }: { children: Snippet } = $props();
@@ -72,8 +90,6 @@
 		navigationProgress.finish();
 		libraryStore.refreshIfStale(10_000);
 	});
-
-
 
 	let cleanupResumeListeners: (() => void) | null = null;
 
@@ -236,20 +252,20 @@
 						<img src="/logo_wide.png" alt="Musicseerr" class="h-8" />
 					</a>
 				</div>
-			<div class="navbar-center grow px-4 justify-center">
+				<div class="navbar-center grow px-4 justify-center">
 					<div class="w-full max-w-2xl">
-							<SearchSuggestions
-								bind:query
-								onSearch={handleSearch}
-								onSelect={handleSuggestionSelect}
-								id="navbar-suggest"
-							/>
-						</div>
+						<SearchSuggestions
+							bind:query
+							onSearch={handleSearch}
+							onSelect={handleSuggestionSelect}
+							id="navbar-suggest"
+						/>
+					</div>
 				</div>
 				<div class="navbar-end w-auto pr-2">
-				<a href="/profile" class="btn btn-ghost btn-circle btn-md" aria-label="Profile">
-					<UserRound class="h-6 w-6" />
-				</a>
+					<a href="/profile" class="btn btn-ghost btn-circle btn-md" aria-label="Profile">
+						<UserRound class="h-6 w-6" />
+					</a>
 				</div>
 			</div>
 
@@ -265,18 +281,18 @@
 			>
 				<ul class="menu w-full grow p-2 [&_li>*]:py-3">
 					<li>
-							<button
-								onclick={() =>
-									(document.getElementById('search_modal') as HTMLDialogElement)?.showModal()}
-								class="is-drawer-close:tooltip is-drawer-close:tooltip-right"
-								data-tip="Search"
-							>
-								<Search class="h-6 w-6" />
-								<span class="is-drawer-close:hidden">Search</span>
-							</button>
-						</li>
+						<button
+							onclick={() =>
+								(document.getElementById('search_modal') as HTMLDialogElement)?.showModal()}
+							class="is-drawer-close:tooltip is-drawer-close:tooltip-right"
+							data-tip="Search"
+						>
+							<Search class="h-6 w-6" />
+							<span class="is-drawer-close:hidden">Search</span>
+						</button>
+					</li>
 
-						<div class="divider my-0"></div>
+					<div class="divider my-0"></div>
 
 					<li>
 						<a
@@ -310,7 +326,10 @@
 								<div class="relative">
 									<Menu class="h-6 w-6" />
 									{#if syncStatus.isActive}
-										<span class="absolute -top-1 -right-1 badge badge-primary badge-xs w-2.5 h-2.5 p-0 animate-pulse" aria-label="Library sync in progress"></span>
+										<span
+											class="absolute -top-1 -right-1 badge badge-primary badge-xs w-2.5 h-2.5 p-0 animate-pulse"
+											aria-label="Library sync in progress"
+										></span>
 									{/if}
 								</div>
 								<span class="is-drawer-close:hidden">Library</span>
@@ -427,11 +446,7 @@
 				</ul>
 				<div class="w-full p-2 flex flex-col gap-1" class:pb-24={playerStore.isPlayerVisible}>
 					<div class="is-drawer-close:tooltip is-drawer-close:tooltip-right" data-tip="Settings">
-						<a
-							href="/settings"
-							class="btn btn-ghost btn-circle"
-							aria-label="Settings"
-						>
+						<a href="/settings" class="btn btn-ghost btn-circle" aria-label="Settings">
 							<Settings class="h-6 w-6" />
 						</a>
 					</div>

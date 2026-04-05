@@ -32,7 +32,7 @@
 		endpoint="/api/v1/home/trending/artists"
 		title="Trending Artists"
 		subtitle={`Most listened artists on ${sourceLabel}`}
-		source={source}
+		{source}
 		errorEmoji="🎤"
 		errorIcon={Mic}
 	/>

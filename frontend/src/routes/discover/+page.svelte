@@ -13,7 +13,11 @@
 	import type { DiscoverResponse } from '$lib/types';
 	import CarouselSkeleton from '$lib/components/CarouselSkeleton.svelte';
 	import PageHeader from '$lib/components/PageHeader.svelte';
-	import { getDiscoverCachedData, setDiscoverCachedData, isDiscoverCacheStale } from '$lib/utils/discoverCache';
+	import {
+		getDiscoverCachedData,
+		setDiscoverCachedData,
+		isDiscoverCacheStale
+	} from '$lib/utils/discoverCache';
 	import { removeAllQueueCachedData } from '$lib/utils/discoverQueueCache';
 	import { isAbortError } from '$lib/utils/errorHandling';
 	import { api } from '$lib/api/client';
@@ -77,9 +81,12 @@
 		error = '';
 
 		try {
-			const data: DiscoverResponse = await api.get(`/api/v1/discover?source=${encodeURIComponent(source)}`, {
-				signal: abortController.signal
-			});
+			const data: DiscoverResponse = await api.get(
+				`/api/v1/discover?source=${encodeURIComponent(source)}`,
+				{
+					signal: abortController.signal
+				}
+			);
 			discoverData = data;
 			lastUpdated = new Date();
 			const dataHasContent =
@@ -111,9 +118,12 @@
 		const source = resolveDiscoverSource(sourceOverride);
 
 		try {
-			const data: DiscoverResponse = await api.get(`/api/v1/discover?source=${encodeURIComponent(source)}`, {
-				signal: abortController.signal
-			});
+			const data: DiscoverResponse = await api.get(
+				`/api/v1/discover?source=${encodeURIComponent(source)}`,
+				{
+					signal: abortController.signal
+				}
+			);
 			const hasContent =
 				(data.because_you_listen_to?.length ?? 0) > 0 ||
 				data.fresh_releases != null ||
@@ -141,7 +151,9 @@
 				await new Promise((r) => setTimeout(r, 3000));
 				if (runId !== pollRunId) return;
 				try {
-					const data: DiscoverResponse = await api.get(`/api/v1/discover?source=${encodeURIComponent(source)}`);
+					const data: DiscoverResponse = await api.get(
+						`/api/v1/discover?source=${encodeURIComponent(source)}`
+					);
 					const ready =
 						(data.because_you_listen_to?.length ?? 0) > 0 ||
 						data.fresh_releases != null ||
@@ -181,7 +193,9 @@
 				await new Promise((r) => setTimeout(r, 2000));
 				if (runId !== pollRunId) return;
 				try {
-					const data: DiscoverResponse = await api.get(`/api/v1/discover?source=${encodeURIComponent(source)}`);
+					const data: DiscoverResponse = await api.get(
+						`/api/v1/discover?source=${encodeURIComponent(source)}`
+					);
 					if (!data.refreshing) {
 						discoverData = data;
 						lastUpdated = new Date();
@@ -246,7 +260,9 @@
 	$: hasCuratedGroup =
 		(discoverData?.because_you_listen_to?.length ?? 0) > 0 ||
 		discoverData?.discover_queue_enabled ||
-		(activeSource === 'listenbrainz' && discoverData?.weekly_exploration && discoverData.weekly_exploration.tracks.length > 0);
+		(activeSource === 'listenbrainz' &&
+			discoverData?.weekly_exploration &&
+			discoverData.weekly_exploration.tracks.length > 0);
 
 	$: hasExploreGroup =
 		(discoverData?.fresh_releases?.items?.length ?? 0) > 0 ||
@@ -296,7 +312,8 @@
 		<div class="mt-16 flex flex-col items-center justify-center px-4">
 			<CircleAlert class="mb-4 h-10 w-10 text-base-content/50" />
 			<p class="text-base-content/70">{error}</p>
-			<button class="btn btn-primary mt-4" on:click={() => loadDiscoverData(true, activeSource)}>Try Again</button
+			<button class="btn btn-primary mt-4" on:click={() => loadDiscoverData(true, activeSource)}
+				>Try Again</button
 			>
 		</div>
 	{:else}
@@ -320,7 +337,6 @@
 				</div>
 			{:else if discoverData}
 				<div class="space-y-10 sm:space-y-12">
-
 					{#if hasCuratedGroup}
 						<div>
 							<SectionDivider label="Curated For You">
@@ -337,12 +353,18 @@
 								{/if}
 
 								<div>
-									<DiscoverQueueCard source={activeSource} onLaunch={() => (queueModalOpen = true)} />
+									<DiscoverQueueCard
+										source={activeSource}
+										onLaunch={() => (queueModalOpen = true)}
+									/>
 								</div>
 
 								{#if activeSource === 'listenbrainz' && discoverData.weekly_exploration && discoverData.weekly_exploration.tracks.length > 0}
 									<div>
-										<WeeklyExploration section={discoverData.weekly_exploration} ytConfigured={discoverData.integration_status?.youtube ?? false} />
+										<WeeklyExploration
+											section={discoverData.weekly_exploration}
+											ytConfigured={discoverData.integration_status?.youtube ?? false}
+										/>
 									</div>
 								{/if}
 							</div>
@@ -456,15 +478,16 @@
 					{:else if !hasContent && servicePrompts.length > 0}
 						<div class="flex flex-col items-center justify-center py-12 sm:py-16">
 							<Compass class="mb-4 h-12 w-12 sm:mb-6 sm:h-14 sm:w-14 text-base-content/50" />
-							<h2 class="mb-2 text-center text-xl font-bold sm:text-2xl">Nothing to Discover Yet</h2>
+							<h2 class="mb-2 text-center text-xl font-bold sm:text-2xl">
+								Nothing to Discover Yet
+							</h2>
 							<p class="mb-6 max-w-md px-4 text-center text-sm text-base-content/70 sm:text-base">
-								Connect your music services to get personalized recommendations. The more services you
-								connect, the better your recommendations will be.
+								Connect your music services to get personalized recommendations. The more services
+								you connect, the better your recommendations will be.
 							</p>
 							<a href="/settings" class="btn btn-primary">Connect Services</a>
 						</div>
 					{/if}
-
 				</div>
 			{/if}
 		</div>

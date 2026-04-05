@@ -73,7 +73,11 @@
 	}
 
 	function handleDragOver(e: DragEvent, displayPos: number) {
-		if (displayPos <= currentDisplayPosition || dragSourceIndex === null || dragSourceIndex <= currentDisplayPosition) {
+		if (
+			displayPos <= currentDisplayPosition ||
+			dragSourceIndex === null ||
+			dragSourceIndex <= currentDisplayPosition
+		) {
 			return;
 		}
 		e.preventDefault();
@@ -90,7 +94,11 @@
 		const fromDisplayPos = dragSourceIndex;
 		dragOverIndex = null;
 		dragSourceIndex = null;
-		if (toDisplayPos <= currentDisplayPosition || fromDisplayPos === null || fromDisplayPos <= currentDisplayPosition) {
+		if (
+			toDisplayPos <= currentDisplayPosition ||
+			fromDisplayPos === null ||
+			fromDisplayPos <= currentDisplayPosition
+		) {
 			return;
 		}
 		if (fromDisplayPos !== null && fromDisplayPos !== toDisplayPos) {
@@ -160,7 +168,9 @@
 	const queue = $derived(playerStore.queue);
 	const currentIndex = $derived(playerStore.currentIndex);
 	const upcomingCount = $derived(playerStore.upcomingQueueLength);
-	const displayOrder = $derived(playerStore.shuffleEnabled ? playerStore.shuffleOrder : queue.map((_, i) => i));
+	const displayOrder = $derived(
+		playerStore.shuffleEnabled ? playerStore.shuffleOrder : queue.map((_, i) => i)
+	);
 	const currentDisplayPosition = $derived.by(() => {
 		if (playerStore.shuffleEnabled) {
 			const pos = playerStore.shuffleOrder.indexOf(currentIndex);
@@ -203,10 +213,7 @@
 					>
 						<Shuffle class="h-3.5 w-3.5" />
 					</button>
-					<button
-						class="btn btn-ghost btn-sm gap-1 text-error"
-						onclick={handleClearQueue}
-					>
+					<button class="btn btn-ghost btn-sm gap-1 text-error" onclick={handleClearQueue}>
 						<Trash2 class="h-3.5 w-3.5" />
 						Clear
 					</button>
@@ -226,9 +233,7 @@
 				<div class="flex flex-col items-center justify-center h-full gap-3 p-8">
 					<ListMusic class="h-12 w-12 opacity-20" />
 					<p class="text-sm opacity-50">Queue is empty</p>
-					<p class="text-xs opacity-30 text-center">
-						Add tracks from album pages or your library
-					</p>
+					<p class="text-xs opacity-30 text-center">Add tracks from album pages or your library</p>
 				</div>
 			{:else}
 				<div class="flex flex-col" role="group" aria-label="Queue tracks">
@@ -240,14 +245,18 @@
 						{@const coverUrl = getCoverUrl(item.coverUrl, item.albumId)}
 						{#if displayPosition === currentDisplayPosition + 1}
 							<div class="flex items-center gap-2 px-4 py-1.5">
-								<span class="text-[0.65rem] font-semibold uppercase tracking-wider opacity-40">Up next</span>
+								<span class="text-[0.65rem] font-semibold uppercase tracking-wider opacity-40"
+									>Up next</span
+								>
 								<div class="flex-1 border-t border-base-content/5"></div>
 							</div>
 						{/if}
 						<div
 							use:trackCurrentEl={isCurrent}
 							class="flex items-center gap-2 px-3 py-2 transition-colors cursor-pointer group/item
-								{isCurrent ? 'bg-accent/10 border-l-2 border-accent' : 'hover:bg-base-300/50 border-l-2 border-transparent'}
+								{isCurrent
+								? 'bg-accent/10 border-l-2 border-accent'
+								: 'hover:bg-base-300/50 border-l-2 border-transparent'}
 								{isPlayed ? 'opacity-40' : ''}
 								{dragOverIndex === displayPosition ? 'border-t-2 border-t-accent' : ''}"
 							draggable={isReorderable}
@@ -257,7 +266,12 @@
 							ondrop={(e) => handleDrop(e, displayPosition)}
 							ondragend={handleDragEnd}
 							onclick={() => jumpToTrack(queueIndex)}
-							onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); jumpToTrack(queueIndex); } }}
+							onkeydown={(e) => {
+								if (e.key === 'Enter' || e.key === ' ') {
+									e.preventDefault();
+									jumpToTrack(queueIndex);
+								}
+							}}
 							role="button"
 							tabindex="0"
 						>
@@ -277,11 +291,7 @@
 
 							<div class="flex-shrink-0 w-10 h-10 rounded overflow-hidden">
 								{#if coverUrl}
-									<img
-										src={coverUrl}
-										alt={item.albumName}
-										class="w-full h-full object-cover"
-									/>
+									<img src={coverUrl} alt={item.albumName} class="w-full h-full object-cover" />
 								{:else}
 									<div class="w-full h-full bg-base-300 flex items-center justify-center">
 										<Music class="h-4 w-4 opacity-30" />
@@ -297,7 +307,8 @@
 							</div>
 
 							{#if item.duration}
-								<span class="text-xs opacity-40 flex-shrink-0">{formatDuration(item.duration)}</span>
+								<span class="text-xs opacity-40 flex-shrink-0">{formatDuration(item.duration)}</span
+								>
 							{/if}
 
 							<div class="flex-shrink-0">

@@ -1,11 +1,6 @@
 import { goto } from '$app/navigation';
 import { artistHref } from '$lib/utils/entityRoutes';
-import type {
-	AlbumBasicInfo,
-	YouTubeTrackLink,
-	YouTubeLink,
-	YouTubeQuotaStatus
-} from '$lib/types';
+import type { AlbumBasicInfo, YouTubeTrackLink, YouTubeLink, YouTubeQuotaStatus } from '$lib/types';
 import { compareDiscTrack, getDiscTrackKey } from '$lib/player/queueHelpers';
 import { requestAlbum } from '$lib/utils/albumRequest';
 
@@ -76,10 +71,7 @@ export function createEventHandlers(deps: EventHandlerDeps) {
 		deps.setShowDeleteModal(true);
 	}
 
-	function handleDeleted(result: {
-		artist_removed: boolean;
-		artist_name?: string | null;
-	}): void {
+	function handleDeleted(result: { artist_removed: boolean; artist_name?: string | null }): void {
 		deps.setShowDeleteModal(false);
 		const album = deps.getAlbum();
 		if (album) {

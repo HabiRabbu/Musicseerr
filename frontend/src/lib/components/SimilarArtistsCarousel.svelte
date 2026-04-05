@@ -33,10 +33,7 @@
 	{:else}
 		<HorizontalCarousel>
 			{#each artists as artist}
-				<a
-					href={artistHref(artist.musicbrainz_id)}
-					class="w-32 flex-shrink-0 cursor-pointer"
-				>
+				<a href={artistHref(artist.musicbrainz_id)} class="w-32 flex-shrink-0 cursor-pointer">
 					<div class="relative group">
 						<div
 							class="aspect-square rounded-full overflow-hidden transition-transform group-hover:scale-105"
@@ -53,7 +50,7 @@
 								class="absolute bottom-1 right-1 rounded-full p-1"
 								style="background-color: {colors.accent};"
 							>
-							<Check class="w-3 h-3" color={colors.secondary} strokeWidth={3} />
+								<Check class="w-3 h-3" color={colors.secondary} strokeWidth={3} />
 							</div>
 						{/if}
 					</div>

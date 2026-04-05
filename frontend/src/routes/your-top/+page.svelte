@@ -32,7 +32,7 @@
 		endpoint="/api/v1/home/your-top/albums"
 		title="Your Top Albums"
 		subtitle={`Your most listened albums on ${sourceLabel}`}
-		source={source}
+		{source}
 		errorEmoji="💿"
 		errorIcon={Disc3}
 	/>

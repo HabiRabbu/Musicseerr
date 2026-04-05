@@ -89,7 +89,11 @@
 						<h2 class="text-xl sm:text-2xl font-bold">Tracks</h2>
 						{#if state.quota}
 							<div class="flex items-center gap-2">
-								<progress class="progress progress-accent w-20 h-1.5" value={state.quota.used} max={state.quota.limit}></progress>
+								<progress
+									class="progress progress-accent w-20 h-1.5"
+									value={state.quota.used}
+									max={state.quota.limit}
+								></progress>
 								<span class="text-xs opacity-60">{state.quota.remaining}/{state.quota.limit}</span>
 							</div>
 						{/if}
@@ -151,9 +155,7 @@
 					<h2 class="text-xl sm:text-2xl font-bold">Tracks</h2>
 					<div class="alert alert-warning">
 						<span>Couldn't load the track list.</span>
-						<button class="btn btn-sm btn-ghost" onclick={state.retryTracks}>
-							Retry
-						</button>
+						<button class="btn btn-sm btn-ghost" onclick={state.retryTracks}> Retry </button>
 					</div>
 				</div>
 			{:else}
@@ -161,16 +163,15 @@
 					<h2 class="text-xl sm:text-2xl font-bold">Tracks</h2>
 					<div class="alert alert-warning">
 						<span>No tracks available.</span>
-						<button class="btn btn-sm btn-ghost" onclick={state.retryTracks}>
-							Retry
-						</button>
+						<button class="btn btn-sm btn-ghost" onclick={state.retryTracks}> Retry </button>
 					</div>
 				</div>
 			{/if}
 
 			{#if album.release_date}
 				<div class="text-xs opacity-60">
-					<span class="font-semibold">Release Date:</span> {album.release_date}
+					<span class="font-semibold">Release Date:</span>
+					{album.release_date}
 				</div>
 			{/if}
 
@@ -204,13 +205,17 @@
 		artistName={state.album.artist_name}
 		musicbrainzId={state.album.musicbrainz_id}
 		ondeleted={state.handleDeleted}
-		onclose={() => { state.showDeleteModal = false; }}
+		onclose={() => {
+			state.showDeleteModal = false;
+		}}
 	/>
 {/if}
 
 {#if state.showArtistRemovedModal}
 	<ArtistRemovedModal
 		artistName={state.removedArtistName}
-		onclose={() => { state.showArtistRemovedModal = false; }}
+		onclose={() => {
+			state.showArtistRemovedModal = false;
+		}}
 	/>
 {/if}

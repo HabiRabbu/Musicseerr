@@ -70,7 +70,11 @@
 				<div class="alert alert-success mb-4">
 					<CircleCheck class="w-5 h-5 shrink-0" />
 					<span>Connected as <strong>{form.data.username}</strong></span>
-					<button type="button" class="btn btn-ghost btn-sm ml-auto" onclick={() => showDetails = !showDetails}>
+					<button
+						type="button"
+						class="btn btn-ghost btn-sm ml-auto"
+						onclick={() => (showDetails = !showDetails)}
+					>
 						{showDetails ? 'Hide details' : 'Edit settings'}
 					</button>
 				</div>
@@ -129,7 +133,11 @@
 									class="input input-bordered join-item flex-1"
 									placeholder="For private statistics"
 								/>
-								<button type="button" class="btn join-item" onclick={() => showToken = !showToken}>
+								<button
+									type="button"
+									class="btn join-item"
+									onclick={() => (showToken = !showToken)}
+								>
 									{showToken ? 'Hide' : 'Show'}
 								</button>
 							</div>
@@ -151,7 +159,11 @@
 						</div>
 
 						{#if testResult}
-							<div class="alert" class:alert-success={testResult.valid} class:alert-error={!testResult.valid}>
+							<div
+								class="alert"
+								class:alert-success={testResult.valid}
+								class:alert-error={!testResult.valid}
+							>
 								<span>{testResult.message}</span>
 							</div>
 						{/if}
@@ -198,7 +210,8 @@
 										<span class="label-text font-medium">Enable ListenBrainz Integration</span>
 										<p class="text-xs text-base-content/50">
 											{#if form.data.enabled && !step1Complete}
-												Integration is enabled but credentials are incomplete. Consider updating your username above.
+												Integration is enabled but credentials are incomplete. Consider updating
+												your username above.
 											{:else}
 												Show personalized recommendations and listening stats on the home page.
 											{/if}
@@ -223,7 +236,9 @@
 						<div class="alert alert-info">
 							<span>
 								To scrobble your listening activity to ListenBrainz,
-								<a href="/settings?tab=scrobbling" class="link font-medium">enable it in the Scrobbling tab →</a>
+								<a href="/settings?tab=scrobbling" class="link font-medium"
+									>enable it in the Scrobbling tab →</a
+								>
 							</span>
 						</div>
 					{/if}
@@ -231,7 +246,11 @@
 			{/if}
 
 			{#if form.message}
-				<div class="alert mt-4" class:alert-success={form.messageType === 'success'} class:alert-error={form.messageType === 'error'}>
+				<div
+					class="alert mt-4"
+					class:alert-success={form.messageType === 'success'}
+					class:alert-error={form.messageType === 'error'}
+				>
 					<span>{form.message}</span>
 				</div>
 			{/if}

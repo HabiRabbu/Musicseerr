@@ -7,7 +7,7 @@ import type { ListenBrainzConnectionSettings } from '$lib/types';
 const defaultResponse: ListenBrainzConnectionSettings = {
 	username: 'testuser',
 	user_token: '',
-	enabled: false,
+	enabled: false
 };
 
 function mockLoadSuccess(data: ListenBrainzConnectionSettings = defaultResponse) {
@@ -15,9 +15,13 @@ function mockLoadSuccess(data: ListenBrainzConnectionSettings = defaultResponse)
 }
 
 function mockLoadFailure() {
-	return vi.fn().mockResolvedValue(
-		new Response(JSON.stringify({ error: { message: 'Failed to load ListenBrainz settings' } }), { status: 500 })
-	);
+	return vi
+		.fn()
+		.mockResolvedValue(
+			new Response(JSON.stringify({ error: { message: 'Failed to load ListenBrainz settings' } }), {
+				status: 500
+			})
+		);
 }
 
 describe('SettingsListenBrainz.svelte', () => {
@@ -70,7 +74,7 @@ describe('SettingsListenBrainz.svelte', () => {
 		globalThis.fetch = mockLoadSuccess({
 			username: '',
 			user_token: '',
-			enabled: false,
+			enabled: false
 		});
 		render(SettingsListenBrainz);
 
@@ -96,7 +100,7 @@ describe('SettingsListenBrainz.svelte', () => {
 		globalThis.fetch = mockLoadSuccess({
 			username: 'myuser',
 			user_token: 'token',
-			enabled: true,
+			enabled: true
 		});
 		render(SettingsListenBrainz);
 
@@ -111,7 +115,7 @@ describe('SettingsListenBrainz.svelte', () => {
 		globalThis.fetch = mockLoadSuccess({
 			username: 'myuser',
 			user_token: 'token',
-			enabled: true,
+			enabled: true
 		});
 		render(SettingsListenBrainz);
 

@@ -46,8 +46,10 @@
 	let toastType = $state<'success' | 'error' | 'info'>('success');
 	let isPolling = $state(false);
 
-	const downloadingCount = $derived(activeItems.filter(i => i.status === 'downloading').length);
-	const pendingCount = $derived(activeItems.filter(i => i.status === 'pending' || i.status === 'queued').length);
+	const downloadingCount = $derived(activeItems.filter((i) => i.status === 'downloading').length);
+	const pendingCount = $derived(
+		activeItems.filter((i) => i.status === 'pending' || i.status === 'queued').length
+	);
 
 	function abortActiveLoad() {
 		if (activeAbortController) {
@@ -100,7 +102,9 @@
 			if (activeAbortController === controller) {
 				activeAbortController = null;
 			}
-			setTimeout(() => { isPolling = false; }, 500);
+			setTimeout(() => {
+				isPolling = false;
+			}, 500);
 		}
 	}
 
@@ -260,9 +264,7 @@
 	<div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-6">
 		<div>
 			<h1 class="text-2xl sm:text-3xl font-bold text-base-content">Requests</h1>
-			<p class="text-base-content/50 text-sm mt-0.5">
-				Track your album requests and downloads
-			</p>
+			<p class="text-base-content/50 text-sm mt-0.5">Track your album requests and downloads</p>
 		</div>
 		{#if activeCount > 0}
 			<div class="flex items-center gap-3 text-xs text-base-content/50">
@@ -293,7 +295,9 @@
 			<Download class="h-4 w-4" />
 			Active
 			{#if activeCount > 0}
-				<span class="inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full bg-info/15 text-info text-xs font-medium tabular-nums">
+				<span
+					class="inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full bg-info/15 text-info text-xs font-medium tabular-nums"
+				>
 					{activeCount}
 				</span>
 			{/if}
@@ -311,7 +315,9 @@
 			<History class="h-4 w-4" />
 			History
 			{#if historyTotal > 0}
-				<span class="inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full bg-base-content/8 text-base-content/50 text-xs font-medium tabular-nums">
+				<span
+					class="inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full bg-base-content/8 text-base-content/50 text-xs font-medium tabular-nums"
+				>
 					{historyTotal}
 				</span>
 			{/if}
@@ -331,7 +337,10 @@
 			{#if activeLoading && activeItems.length === 0}
 				<div class="flex flex-col gap-2.5">
 					{#each Array(3) as _, i}
-						<div class="flex items-center gap-3 sm:gap-4 p-3 sm:p-4 bg-base-200 rounded-box animate-pulse" style="animation-delay: {i * 100}ms">
+						<div
+							class="flex items-center gap-3 sm:gap-4 p-3 sm:p-4 bg-base-200 rounded-box animate-pulse"
+							style="animation-delay: {i * 100}ms"
+						>
 							<div class="w-14 h-14 sm:w-[72px] sm:h-[72px] bg-base-300 rounded-lg"></div>
 							<div class="flex-1">
 								<div class="h-4 bg-base-300 rounded w-44 mb-2"></div>
@@ -359,17 +368,12 @@
 				<div class="flex flex-col gap-2.5">
 					{#each activeItems as item, i (item.musicbrainz_id)}
 						<div in:fly={{ y: 12, duration: 200, delay: i * 30 }}>
-							<RequestCard
-								{item}
-								mode="active"
-								oncancel={handleCancel}
-							/>
+							<RequestCard {item} mode="active" oncancel={handleCancel} />
 						</div>
 					{/each}
 				</div>
 			{/if}
 		</div>
-
 	{:else}
 		<div in:fade={{ duration: 150 }}>
 			<div class="flex flex-wrap items-center gap-2 mb-4">
@@ -418,7 +422,10 @@
 			{#if historyLoading && historyItems.length === 0}
 				<div class="flex flex-col gap-2.5">
 					{#each Array(5) as _, i}
-						<div class="flex items-center gap-3 sm:gap-4 p-3 sm:p-4 bg-base-200 rounded-box animate-pulse" style="animation-delay: {i * 80}ms">
+						<div
+							class="flex items-center gap-3 sm:gap-4 p-3 sm:p-4 bg-base-200 rounded-box animate-pulse"
+							style="animation-delay: {i * 80}ms"
+						>
 							<div class="w-14 h-14 sm:w-[72px] sm:h-[72px] bg-base-300 rounded-lg"></div>
 							<div class="flex-1">
 								<div class="h-4 bg-base-300 rounded w-44 mb-2"></div>
@@ -433,7 +440,9 @@
 				</div>
 			{:else if historyItems.length === 0}
 				<div class="flex flex-col items-center justify-center min-h-[240px] text-center py-16">
-					<div class="w-16 h-16 rounded-full bg-base-content/3 flex items-center justify-center mb-4">
+					<div
+						class="w-16 h-16 rounded-full bg-base-content/3 flex items-center justify-center mb-4"
+					>
 						<Clock class="h-8 w-8 text-base-content/15" />
 					</div>
 					<h2 class="text-lg font-semibold mb-1.5 text-base-content/50">No history yet</h2>
@@ -505,7 +514,14 @@
 	}
 
 	@keyframes pulse-dot {
-		0%, 100% { opacity: 0.3; transform: scale(0.8); }
-		50% { opacity: 1; transform: scale(1.2); }
+		0%,
+		100% {
+			opacity: 0.3;
+			transform: scale(0.8);
+		}
+		50% {
+			opacity: 1;
+			transform: scale(1.2);
+		}
 	}
 </style>
