@@ -80,7 +80,7 @@ backend-test-infra-hardening: $(BACKEND_VENV_STAMP) ## Run infrastructure harden
 	cd "$(BACKEND_DIR)" && .venv/bin/python -m pytest tests/infrastructure/test_circuit_breaker_sync.py tests/infrastructure/test_disk_cache_periodic.py tests/infrastructure/test_retry_non_breaking.py
 
 backend-test-discovery-precache: $(BACKEND_VENV_STAMP) ## Run artist discovery precache tests
-	cd "$(BACKEND_DIR)" && .venv/bin/python -m pytest tests/services/test_discovery_precache_progress.py tests/infrastructure/test_retry_non_breaking.py -v
+	cd "$(BACKEND_DIR)" && .venv/bin/python -m pytest tests/services/test_discovery_precache_progress.py tests/services/test_discovery_precache_lock.py tests/infrastructure/test_retry_non_breaking.py -v
 
 backend-test-library-pagination: $(BACKEND_VENV_STAMP) ## Run library pagination tests
 	cd "$(BACKEND_DIR)" && .venv/bin/python -m pytest tests/infrastructure/test_library_pagination.py -v
