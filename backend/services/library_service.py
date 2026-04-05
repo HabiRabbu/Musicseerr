@@ -292,7 +292,7 @@ class LibraryService:
         from services.cache_status_service import CacheStatusService
 
         if not self._lidarr_repo.is_configured():
-            raise ExternalServiceError("Lidarr is not configured — set a Lidarr API key in Settings to sync your library.")
+            raise ExternalServiceError("Lidarr is not configured. Set a Lidarr API key in Settings to sync your library.")
 
         try:
             status_service = CacheStatusService()
@@ -369,7 +369,7 @@ class LibraryService:
                     self._last_manual_sync = now
 
                 if self._precache_service is None:
-                    logger.warning("Precache skipped — sync_state_store/genre_index not provided")
+                    logger.warning("Precache skipped: sync_state_store/genre_index not provided")
                     self._update_last_sync_timestamp()
                     result = SyncLibraryResponse(status='success', artists=len(artists), albums=len(albums))
                     self._sync_future.set_result(result)
@@ -381,7 +381,7 @@ class LibraryService:
                         last_state = await self._sync_state_store.get_sync_state()
                         if last_state and last_state.get('status') == 'failed':
                             resume = True
-                            logger.info("Previous sync failed — will resume from checkpoint")
+                            logger.info("Previous sync failed, resuming from checkpoint")
                     except Exception as e:  # noqa: BLE001
                         logger.warning("Failed to check sync state for resume: %s", e)
 
@@ -389,7 +389,7 @@ class LibraryService:
                     try:
                         await self._sync_state_store.clear_processed_items()
                         await self._sync_state_store.clear_sync_state()
-                        logger.info("Force full sync — cleared previous progress")
+                        logger.info("Force full sync: cleared previous progress")
                     except Exception as e:  # noqa: BLE001
                         logger.warning("Failed to clear sync state for force_full: %s", e)
 
@@ -590,8 +590,6 @@ class LibraryService:
                     await self._cover_repo.delete_covers_for_artist(artist_mbid)
             except Exception:  # noqa: BLE001
                 logger.warning("Failed to clean up cover images after removal", exc_info=True)
-
-    # Track resolution — extracted from routes/library.py
 
     async def _resolve_album_tracks(
         self,

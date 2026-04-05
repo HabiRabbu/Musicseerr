@@ -1,4 +1,4 @@
-"""Domain 5 — Sync lifecycle persistence."""
+"""Domain 5: Sync lifecycle persistence."""
 
 import logging
 import sqlite3

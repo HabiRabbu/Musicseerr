@@ -203,7 +203,7 @@ class AudioDBPhase:
         original_total = len(artists) + len(albums)
         initial_hit_rate = ((original_total - total) / original_total * 100) if original_total > 0 else 100
         logger.info(
-            "Phase 5 (AudioDB): Pre-warming %d items (%d artists, %d albums) — %.0f%% already cached — concurrency=%d delay=%.1fs",
+            "Phase 5 (AudioDB): Pre-warming %d items (%d artists, %d albums), %.0f%% already cached, concurrency=%d delay=%.1fs",
             total, len(needed_artists), len(needed_albums), initial_hit_rate, concurrency, inter_item_delay,
         )
         await status_service.update_phase('audiodb_prewarm', total)

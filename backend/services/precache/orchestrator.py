@@ -1,4 +1,4 @@
-"""Pre-cache orchestrator — delegates to phase sub-services."""
+"""Pre-cache orchestrator: delegates to phase sub-services."""
 
 from __future__ import annotations
 
@@ -82,7 +82,7 @@ class LibraryPrecacheService:
                 {task, watchdog}, return_when=asyncio.FIRST_COMPLETED
             )
 
-            # Always prioritise the main task result — if it completed
+            # Always prioritise the main task result; if it completed
             # successfully we don't care about a simultaneous watchdog error.
             if task in done:
                 watchdog.cancel()
@@ -133,7 +133,7 @@ class LibraryPrecacheService:
             stall_duration = time.time() - status_service.get_last_progress_at()
             if stall_duration > stall_timeout_s:
                 msg = (
-                    f"Sync stalled — no progress for {stall_duration / 60:.0f} minutes "
+                    f"Sync stalled: no progress for {stall_duration / 60:.0f} minutes "
                     f"during {status_service.get_progress().phase or 'unknown'} phase"
                 )
                 logger.error(msg)

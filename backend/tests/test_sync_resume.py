@@ -33,7 +33,7 @@ class TestResumeOnFailure:
         svc = CacheStatusService(store)
         await svc.start_sync('artists', 100)
         await svc.update_progress(50, "some artist")
-        await svc.complete_sync("Sync stalled — no progress")
+        await svc.complete_sync("Sync stalled: no progress")
 
         store.save_sync_state.assert_called()
         last_call = store.save_sync_state.call_args

@@ -1,4 +1,4 @@
-"""Domain 1 — Library state persistence (artists, albums, metadata)."""
+"""Domain 1: Library state persistence (artists, albums, metadata)."""
 
 import json
 import logging

@@ -71,7 +71,7 @@ class TestAdaptiveWatchdog:
             with pytest.raises(ExternalServiceError, match="stalled"):
                 await svc.precache_library_resources([], [])
 
-        assert True  # Reached here means watchdog worked
+        assert True
 
     @pytest.mark.asyncio
     async def test_progressing_sync_completes(self):
@@ -89,7 +89,7 @@ class TestAdaptiveWatchdog:
         with patch.object(svc, '_do_precache', side_effect=fast_precache):
             await svc.precache_library_resources([], [])
 
-        assert True  # Completed without timeout
+        assert True
 
     @pytest.mark.asyncio
     async def test_max_timeout_cancels_even_with_progress(self):
