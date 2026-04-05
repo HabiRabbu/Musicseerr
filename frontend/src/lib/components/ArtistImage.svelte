@@ -1,14 +1,27 @@
 <script lang="ts">
 	import BaseImage from './BaseImage.svelte';
 
-	export let mbid: string;
-	export let alt: string = 'Artist';
-	export let size: 'xs' | 'sm' | 'md' | 'lg' | 'xl' | 'hero' | 'full' = 'md';
-	export let lazy: boolean = true;
-	export let showPlaceholder: boolean = true;
-	export let className: string = '';
-	export let rounded: 'none' | 'sm' | 'md' | 'lg' | 'xl' | 'full' = 'full';
-	export let remoteUrl: string | null = null;
+	interface Props {
+		mbid: string;
+		alt?: string;
+		size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl' | 'hero' | 'full';
+		lazy?: boolean;
+		showPlaceholder?: boolean;
+		className?: string;
+		rounded?: 'none' | 'sm' | 'md' | 'lg' | 'xl' | 'full';
+		remoteUrl?: string | null;
+	}
+
+	let {
+		mbid,
+		alt = 'Artist',
+		size = 'md',
+		lazy = true,
+		showPlaceholder = true,
+		className = '',
+		rounded = 'full',
+		remoteUrl = null
+	}: Props = $props();
 </script>
 
 <BaseImage

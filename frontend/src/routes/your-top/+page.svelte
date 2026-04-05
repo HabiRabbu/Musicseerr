@@ -5,7 +5,7 @@
 	import { musicSourceStore, type MusicSource } from '$lib/stores/musicSource';
 	import { Disc3 } from 'lucide-svelte';
 
-	let source: MusicSource | null = null;
+	let source: MusicSource | null = $state(null);
 
 	onMount(async () => {
 		await musicSourceStore.load();
@@ -16,7 +16,7 @@
 		source = nextSource;
 	}
 
-	$: sourceLabel = source === 'lastfm' ? 'Last.fm' : 'ListenBrainz';
+	let sourceLabel = $derived(source === 'lastfm' ? 'Last.fm' : 'ListenBrainz');
 </script>
 
 <svelte:head>

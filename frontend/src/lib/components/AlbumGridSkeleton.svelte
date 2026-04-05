@@ -1,6 +1,10 @@
 <script lang="ts">
-	export let title: string = 'Albums';
-	export let count: number = 12;
+	interface Props {
+		title?: string;
+		count?: number;
+	}
+
+	let { title = 'Albums', count = 12 }: Props = $props();
 </script>
 
 <div class="mb-8">

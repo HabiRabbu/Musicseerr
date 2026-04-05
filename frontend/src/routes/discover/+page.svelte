@@ -27,15 +27,15 @@
 	import { discoverQueueStatusStore } from '$lib/stores/discoverQueueStatus';
 	import { Compass, CircleAlert, Sparkles, Music, BarChart3 } from 'lucide-svelte';
 
-	let discoverData: DiscoverResponse | null = null;
-	let loading = true;
-	let refreshing = false;
-	let isUpdating = false;
-	let error = '';
-	let lastUpdated: Date | null = null;
+	let discoverData: DiscoverResponse | null = $state(null);
+	let loading = $state(true);
+	let refreshing = $state(false);
+	let isUpdating = $state(false);
+	let error = $state('');
+	let lastUpdated: Date | null = $state(null);
 	let abortController: AbortController | null = null;
-	let queueModalOpen = false;
-	let activeSource: MusicSource = 'listenbrainz';
+	let queueModalOpen = $state(false);
+	let activeSource: MusicSource = $state('listenbrainz');
 	let pollRunId = 0;
 
 	function resolveDiscoverSource(source?: MusicSource): MusicSource {
@@ -243,8 +243,8 @@
 		discoverQueueStatusStore.init(source);
 	}
 
-	$: hasContent =
-		(discoverData?.because_you_listen_to?.length ?? 0) > 0 ||
+	let hasContent =
+		$derived((discoverData?.because_you_listen_to?.length ?? 0) > 0 ||
 		discoverData?.fresh_releases != null ||
 		discoverData?.missing_essentials != null ||
 		discoverData?.rediscover != null ||
@@ -254,29 +254,29 @@
 		discoverData?.lastfm_weekly_artist_chart != null ||
 		discoverData?.lastfm_weekly_album_chart != null ||
 		discoverData?.lastfm_recent_scrobbles != null ||
-		(discoverData?.genre_list?.items?.length ?? 0) > 0;
-	$: servicePrompts = (discoverData?.service_prompts ?? []).filter((p) => !isDismissed(p.service));
+		(discoverData?.genre_list?.items?.length ?? 0) > 0);
+	let servicePrompts = $derived((discoverData?.service_prompts ?? []).filter((p) => !isDismissed(p.service)));
 
-	$: hasCuratedGroup =
-		(discoverData?.because_you_listen_to?.length ?? 0) > 0 ||
+	let hasCuratedGroup =
+		$derived((discoverData?.because_you_listen_to?.length ?? 0) > 0 ||
 		discoverData?.discover_queue_enabled ||
 		(activeSource === 'listenbrainz' &&
 			discoverData?.weekly_exploration &&
-			discoverData.weekly_exploration.tracks.length > 0);
+			discoverData.weekly_exploration.tracks.length > 0));
 
-	$: hasExploreGroup =
-		(discoverData?.fresh_releases?.items?.length ?? 0) > 0 ||
+	let hasExploreGroup =
+		$derived((discoverData?.fresh_releases?.items?.length ?? 0) > 0 ||
 		(discoverData?.missing_essentials?.items?.length ?? 0) > 0 ||
 		(discoverData?.rediscover?.items?.length ?? 0) > 0 ||
 		(discoverData?.artists_you_might_like?.items?.length ?? 0) > 0 ||
-		(discoverData?.popular_in_your_genres?.items?.length ?? 0) > 0;
+		(discoverData?.popular_in_your_genres?.items?.length ?? 0) > 0);
 
-	$: hasChartsGroup =
-		(discoverData?.globally_trending?.items?.length ?? 0) > 0 ||
+	let hasChartsGroup =
+		$derived((discoverData?.globally_trending?.items?.length ?? 0) > 0 ||
 		(discoverData?.lastfm_recent_scrobbles?.items?.length ?? 0) > 0 ||
 		(discoverData?.lastfm_weekly_artist_chart?.items?.length ?? 0) > 0 ||
 		(discoverData?.lastfm_weekly_album_chart?.items?.length ?? 0) > 0 ||
-		(discoverData?.genre_list?.items?.length ?? 0) > 0;
+		(discoverData?.genre_list?.items?.length ?? 0) > 0);
 
 	function handlePromptDismiss(_service: string) {
 		servicePrompts = (discoverData?.service_prompts ?? []).filter((p) => !isDismissed(p.service));
@@ -312,7 +312,7 @@
 		<div class="mt-16 flex flex-col items-center justify-center px-4">
 			<CircleAlert class="mb-4 h-10 w-10 text-base-content/50" />
 			<p class="text-base-content/70">{error}</p>
-			<button class="btn btn-primary mt-4" on:click={() => loadDiscoverData(true, activeSource)}
+			<button class="btn btn-primary mt-4" onclick={() => loadDiscoverData(true, activeSource)}
 				>Try Again</button
 			>
 		</div>
@@ -465,7 +465,7 @@
 								</p>
 								<button
 									class="btn btn-primary"
-									on:click={() => void handleRefresh()}
+									onclick={() => void handleRefresh()}
 									disabled={refreshing}
 								>
 									{#if refreshing}

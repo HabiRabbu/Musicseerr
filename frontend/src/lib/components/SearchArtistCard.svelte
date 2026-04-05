@@ -6,10 +6,14 @@
 	import { Music2 } from 'lucide-svelte';
 	import ArtistImage from './ArtistImage.svelte';
 
-	export let artist: Artist;
-	export let enrichmentSource: EnrichmentSource = 'none';
+	interface Props {
+		artist: Artist;
+		enrichmentSource?: EnrichmentSource;
+	}
 
-	$: listenTitle = getListenTitle(enrichmentSource, 'artist');
+	let { artist, enrichmentSource = 'none' }: Props = $props();
+
+	let listenTitle = $derived(getListenTitle(enrichmentSource, 'artist'));
 </script>
 
 <a

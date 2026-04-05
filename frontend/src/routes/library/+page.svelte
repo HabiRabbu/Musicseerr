@@ -60,35 +60,35 @@
 	const ARTIST_CAROUSEL_LIMIT = 50;
 	const SEARCH_DEBOUNCE_MS = 300;
 
-	let albums: LibraryAlbum[] = [];
-	let albumsTotal = 0;
-	let artists: LibraryArtist[] = [];
-	let stats: LibraryStats = { artist_count: 0, album_count: 0, last_sync: null, db_size_mb: 0 };
+	let albums: LibraryAlbum[] = $state([]);
+	let albumsTotal = $state(0);
+	let artists: LibraryArtist[] = $state([]);
+	let stats: LibraryStats = $state({ artist_count: 0, album_count: 0, last_sync: null, db_size_mb: 0 });
 
-	let loadingArtists = true;
-	let loadingAlbums = true;
-	let loadingStats = true;
-	let syncing = false;
-	let error: string | null = null;
-	let errorCode: string | null = null;
-	let syncFrequencyLabel: string | null = null;
+	let loadingArtists = $state(true);
+	let loadingAlbums = $state(true);
+	let loadingStats = $state(true);
+	let syncing = $state(false);
+	let error: string | null = $state(null);
+	let errorCode: string | null = $state(null);
+	let syncFrequencyLabel: string | null = $state(null);
 
-	let currentAlbumPage = 1;
-	let sortBy = 'date_added';
-	let sortOrder = 'desc';
-	let searchQuery = '';
+	let currentAlbumPage = $state(1);
+	let sortBy = $state('date_added');
+	let sortOrder = $state('desc');
+	let searchQuery = $state('');
 	let searchTimeout: ReturnType<typeof setTimeout> | null = null;
 	let albumsFetchId = 0;
 	let albumsAbort: AbortController | null = null;
 
-	$: recentlyAdded = $recentlyAddedStore.data ?? { artists: [], albums: [] };
-	$: loadingRecentlyAdded = $recentlyAddedStore.loading && !$recentlyAddedStore.data;
-	$: isSearching = searchQuery.trim().length > 0;
-	$: totalAlbumPages = Math.ceil(albumsTotal / ALBUMS_PER_PAGE);
-	$: lastSyncText = stats.last_sync ? new Date(stats.last_sync * 1000).toLocaleString() : 'Never';
-	$: isConnectionError =
-		errorCode === CIRCUIT_BREAKER_CODE ||
-		(error != null && /connection|DNS|not configured/i.test(error));
+	let recentlyAdded = $derived($recentlyAddedStore.data ?? { artists: [], albums: [] });
+	let loadingRecentlyAdded = $derived($recentlyAddedStore.loading && !$recentlyAddedStore.data);
+	let isSearching = $derived(searchQuery.trim().length > 0);
+	let totalAlbumPages = $derived(Math.ceil(albumsTotal / ALBUMS_PER_PAGE));
+	let lastSyncText = $derived(stats.last_sync ? new Date(stats.last_sync * 1000).toLocaleString() : 'Never');
+	let isConnectionError =
+		$derived(errorCode === CIRCUIT_BREAKER_CODE ||
+		(error != null && /connection|DNS|not configured/i.test(error)));
 
 	const FREQ_LABELS: Record<string, string> = {
 		manual: 'Manual sync only',

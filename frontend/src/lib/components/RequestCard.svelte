@@ -264,7 +264,7 @@
 				class="badge {statusConfig.badgeClass} badge-sm gap-1"
 				aria-label="Status: {statusConfig.label}"
 			>
-				<svelte:component this={statusConfig.icon} class="h-3 w-3" />
+				<statusConfig.icon class="h-3 w-3" />
 				{statusConfig.label}
 			</span>
 

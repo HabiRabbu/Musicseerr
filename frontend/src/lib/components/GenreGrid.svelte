@@ -3,10 +3,19 @@
 	import { imageSettingsStore } from '$lib/stores/imageSettings';
 	import { appendAudioDBSizeSuffix } from '$lib/utils/imageSuffix';
 
-	export let title: string;
-	export let genres: { name: string; listen_count?: number | null; artist_count?: number | null }[];
-	export let genreArtists: Record<string, string | null> | undefined = undefined;
-	export let genreArtistImages: Record<string, string | null> | undefined = undefined;
+	interface Props {
+		title: string;
+		genres: { name: string; listen_count?: number | null; artist_count?: number | null }[];
+		genreArtists?: Record<string, string | null> | undefined;
+		genreArtistImages?: Record<string, string | null> | undefined;
+	}
+
+	let {
+		title,
+		genres,
+		genreArtists = undefined,
+		genreArtistImages = undefined
+	}: Props = $props();
 
 	const genreColors = [
 		'from-rose-500/90 to-pink-700',
@@ -35,8 +44,8 @@
 		return n.toString();
 	}
 
-	let cdnFailedSet = new Set<string>();
-	let loadedSet = new Set<string>();
+	let cdnFailedSet = $state(new Set<string>());
+	let loadedSet = $state(new Set<string>());
 
 	function onCdnError(genreName: string) {
 		cdnFailedSet.add(genreName);
@@ -86,8 +95,8 @@
 						style="z-index: 5;"
 						loading="lazy"
 						referrerpolicy="no-referrer"
-						on:error={() => onCdnError(genre.name)}
-						on:load={() => onImgLoad(genre.name)}
+						onerror={() => onCdnError(genre.name)}
+						onload={() => onImgLoad(genre.name)}
 					/>
 				{:else if artistMbid}
 					<img
@@ -98,7 +107,7 @@
 							: 'opacity-0'}"
 						style="z-index: 5;"
 						loading="lazy"
-						on:load={() => onImgLoad(genre.name)}
+						onload={() => onImgLoad(genre.name)}
 					/>
 				{/if}
 

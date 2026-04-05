@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { run } from 'svelte/legacy';
+
 	import { onMount, onDestroy } from 'svelte';
 	import { browser } from '$app/environment';
 	import type {
@@ -39,38 +41,42 @@
 	import { api } from '$lib/api/client';
 	import { extractServiceStatus } from '$lib/utils/serviceStatus';
 
-	export let data: { artistId: string };
+	interface Props {
+		data: { artistId: string };
+	}
 
-	let artist: ArtistInfo | null = null;
-	let loadingBasic = true;
-	let loadingExtended = true;
-	let error: string | null = null;
-	let showToast = false;
+	let { data }: Props = $props();
+
+	let artist: ArtistInfo | null = $state(null);
+	let loadingBasic = $state(true);
+	let loadingExtended = $state(true);
+	let error: string | null = $state(null);
+	let showToast = $state(false);
 	let toastMessage = 'Added to Library';
-	let showArtistRemovedModal = false;
-	let removedArtistName = '';
-	let requestingAlbums = new Set<string>();
+	let showArtistRemovedModal = $state(false);
+	let removedArtistName = $state('');
+	let requestingAlbums = $state(new Set<string>());
 	let abortController: AbortController | null = null;
-	let albumsCollapsed = false;
-	let epsCollapsed = false;
-	let singlesCollapsed = false;
-	let loadingMoreReleases = false;
+	let albumsCollapsed = $state(false);
+	let epsCollapsed = $state(false);
+	let singlesCollapsed = $state(false);
+	let loadingMoreReleases = $state(false);
 	let currentOffset = 50;
-	let hasMoreReleases = false;
-	let totalReleaseCount = 0;
-	let loadedReleaseCount = 0;
+	let hasMoreReleases = $state(false);
+	let totalReleaseCount = $state(0);
+	let loadedReleaseCount = $state(0);
 	const BATCH_SIZE = 50;
 	let fetchMoreTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
-	let similarArtists: SimilarArtistsResponse | null = null;
-	let topSongs: TopSongsResponse | null = null;
-	let topAlbums: TopAlbumsResponse | null = null;
-	let loadingSimilar = true;
-	let loadingTopSongs = true;
-	let loadingTopAlbums = true;
+	let similarArtists: SimilarArtistsResponse | null = $state(null);
+	let topSongs: TopSongsResponse | null = $state(null);
+	let topAlbums: TopAlbumsResponse | null = $state(null);
+	let loadingSimilar = $state(true);
+	let loadingTopSongs = $state(true);
+	let loadingTopAlbums = $state(true);
 
-	let lastfmEnrichment: LastFmArtistEnrichment | null = null;
-	let loadingLastfm = true;
+	let lastfmEnrichment: LastFmArtistEnrichment | null = $state(null);
+	let loadingLastfm = $state(true);
 
 	type ArtistReleasePaginationState = {
 		loadedReleaseCount: number;
@@ -89,18 +95,8 @@
 		label: string;
 	};
 
-	let tocSections: ArtistTocSection[] = [];
+	let tocSections: ArtistTocSection[] = $state([]);
 
-	$: tocSections = artist
-		? [
-				{ id: 'section-overview', label: 'Overview' },
-				{ id: 'section-about', label: 'About' },
-				{ id: 'section-similar', label: 'Similar Artists' },
-				...(artist.albums.length > 0 ? [{ id: 'section-albums', label: 'Albums' }] : []),
-				...(artist.eps.length > 0 ? [{ id: 'section-eps', label: 'EPs' }] : []),
-				...(artist.singles.length > 0 ? [{ id: 'section-singles', label: 'Singles' }] : [])
-			]
-		: [];
 
 	function sortReleasesByYear(releases: ArtistInfo['albums']) {
 		return [...releases].sort((a, b) => {
@@ -473,13 +469,8 @@
 		}
 	}
 
-	let currentArtistId: string | null = null;
+	let currentArtistId: string | null = $state(null);
 
-	$: if (browser && data.artistId && data.artistId !== currentArtistId) {
-		currentArtistId = data.artistId;
-		resetState();
-		fetchArtist();
-	}
 
 	function resetState() {
 		artist = null;
@@ -563,6 +554,25 @@
 		artist = artist;
 		artistBasicCache.set(artist, data.artistId);
 	}
+	run(() => {
+		tocSections = artist
+			? [
+					{ id: 'section-overview', label: 'Overview' },
+					{ id: 'section-about', label: 'About' },
+					{ id: 'section-similar', label: 'Similar Artists' },
+					...(artist.albums.length > 0 ? [{ id: 'section-albums', label: 'Albums' }] : []),
+					...(artist.eps.length > 0 ? [{ id: 'section-eps', label: 'EPs' }] : []),
+					...(artist.singles.length > 0 ? [{ id: 'section-singles', label: 'Singles' }] : [])
+				]
+			: [];
+	});
+	run(() => {
+		if (browser && data.artistId && data.artistId !== currentArtistId) {
+			currentArtistId = data.artistId;
+			resetState();
+			fetchArtist();
+		}
+	});
 </script>
 
 <div class="w-full px-2 sm:px-4 lg:px-8 py-4 sm:py-8 max-w-7xl mx-auto">

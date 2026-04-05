@@ -1,17 +1,17 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
 	import { colors } from '$lib/colors';
 	import { ChevronRight } from 'lucide-svelte';
 
-	let imgError = false;
+	let imgError = $state(false);
 
 	function handleError() {
 		imgError = true;
 	}
 
 	function handleClick() {
-		const query = $page.url.searchParams.get('q') || '';
+		const query = page.url.searchParams.get('q') || '';
 		if (query) {
 			goto(`/search/artists?q=${encodeURIComponent(query)}`);
 		}
@@ -20,7 +20,7 @@
 
 <button
 	class="relative w-full aspect-square cursor-pointer transition-transform duration-200 ease-in-out hover:scale-105 rounded-full overflow-hidden"
-	on:click={handleClick}
+	onclick={handleClick}
 >
 	{#if imgError}
 		<div class="absolute inset-0 bg-base-200"></div>
@@ -31,7 +31,7 @@
 				alt=""
 				class="w-full h-full object-cover"
 				style="filter: blur(8px);"
-				on:error={handleError}
+				onerror={handleError}
 			/>
 		</div>
 	{/if}

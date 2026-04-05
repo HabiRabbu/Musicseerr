@@ -18,8 +18,12 @@
 		lastfm: '--brand-lastfm'
 	};
 
-	export let prompt: ServicePrompt;
-	export let ondismiss: ((service: string) => void) | undefined = undefined;
+	interface Props {
+		prompt: ServicePrompt;
+		ondismiss?: ((service: string) => void) | undefined;
+	}
+
+	let { prompt, ondismiss = undefined }: Props = $props();
 
 	function getBorderColor(): string {
 		const v = serviceBrandVars[prompt.service];
@@ -62,6 +66,8 @@
 		dismiss(prompt.service);
 		ondismiss?.(prompt.service);
 	}
+
+	const SvelteComponent = $derived(serviceIcons[prompt.service] || Music);
 </script>
 
 <div
@@ -78,8 +84,7 @@
 			<X class="h-3.5 w-3.5" />
 		</button>
 		<div class="flex-shrink-0" style={getIconColor()}>
-			<svelte:component
-				this={serviceIcons[prompt.service] || Music}
+			<SvelteComponent
 				class="h-10 w-10 sm:h-12 sm:w-12"
 			/>
 		</div>

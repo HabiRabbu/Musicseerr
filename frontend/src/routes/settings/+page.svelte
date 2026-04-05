@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
 	import { onMount } from 'svelte';
 	import { fromStore } from 'svelte/store';
 	import { integrationStore } from '$lib/stores/integration';
@@ -80,7 +80,7 @@
 	});
 
 	$effect(() => {
-		const tabParam = $page.url.searchParams.get('tab');
+		const tabParam = page.url.searchParams.get('tab');
 		if (tabParam && tabs.some((t) => t.id === tabParam)) {
 			activeTab = tabParam;
 		}

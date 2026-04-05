@@ -3,7 +3,11 @@
 	import { artistHref } from '$lib/utils/entityRoutes';
 	import ArtistImage from './ArtistImage.svelte';
 
-	export let artist: Artist;
+	interface Props {
+		artist: Artist;
+	}
+
+	let { artist }: Props = $props();
 </script>
 
 <a

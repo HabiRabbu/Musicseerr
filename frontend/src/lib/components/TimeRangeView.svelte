@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { run } from 'svelte/legacy';
+
 	import { onDestroy, onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { CACHE_KEYS, CACHE_TTL } from '$lib/constants';
@@ -34,13 +36,25 @@
 		has_more: boolean;
 	}
 
-	export let itemType: ItemType;
-	export let endpoint: string;
-	export let title: string;
-	export let subtitle: string;
-	export let errorEmoji = '💿';
-	export let errorIcon: ComponentType | null = null;
-	export let source: 'listenbrainz' | 'lastfm' | null = null;
+	interface Props {
+		itemType: ItemType;
+		endpoint: string;
+		title: string;
+		subtitle: string;
+		errorEmoji?: string;
+		errorIcon?: ComponentType | null;
+		source?: 'listenbrainz' | 'lastfm' | null;
+	}
+
+	let {
+		itemType,
+		endpoint,
+		title,
+		subtitle,
+		errorEmoji = '💿',
+		errorIcon = null,
+		source = null
+	}: Props = $props();
 
 	const timeRanges: { key: TimeRangeKey; label: string }[] = [
 		{ key: 'this_week', label: 'This Week' },
@@ -49,14 +63,14 @@
 		{ key: 'all_time', label: 'All Time' }
 	];
 
-	let overviewData: OverviewData | null = null;
-	let expandedRange: TimeRangeKey | null = null;
-	let expandedData: RangeResponse | null = null;
-	let loading = true;
-	let loadingMore = false;
-	let paginationError: string | null = null;
-	let mounted = false;
-	let lastSourceKey = '';
+	let overviewData: OverviewData | null = $state(null);
+	let expandedRange: TimeRangeKey | null = $state(null);
+	let expandedData: RangeResponse | null = $state(null);
+	let loading = $state(true);
+	let loadingMore = $state(false);
+	let paginationError: string | null = $state(null);
+	let mounted = $state(false);
+	let lastSourceKey = $state('');
 	let overviewAbortController: AbortController | null = null;
 	let expandAbortController: AbortController | null = null;
 	let loadMoreAbortController: AbortController | null = null;
@@ -92,13 +106,6 @@
 		abortInFlightRequests();
 	});
 
-	$: if (mounted && (source ?? '') !== lastSourceKey) {
-		abortInFlightRequests();
-		lastSourceKey = source ?? '';
-		expandedRange = null;
-		expandedData = null;
-		loadOverview();
-	}
 
 	function withSource(url: string): string {
 		if (!source) return url;
@@ -257,6 +264,15 @@
 		if (!overviewData) return null;
 		return overviewData[rangeKey]?.featured || null;
 	}
+	run(() => {
+		if (mounted && (source ?? '') !== lastSourceKey) {
+			abortInFlightRequests();
+			lastSourceKey = source ?? '';
+			expandedRange = null;
+			expandedData = null;
+			loadOverview();
+		}
+	});
 </script>
 
 <div class="container mx-auto p-4 md:p-6 lg:p-8">
@@ -277,8 +293,8 @@
 	{:else if !overviewData}
 		<div class="flex min-h-[400px] flex-col items-center justify-center text-center">
 			{#if errorIcon}
-				<svelte:component
-					this={errorIcon}
+				{@const SvelteComponent = errorIcon}
+				<SvelteComponent
 					class="h-12 w-12 text-base-content/40 mb-4"
 					strokeWidth={1.5}
 				/>

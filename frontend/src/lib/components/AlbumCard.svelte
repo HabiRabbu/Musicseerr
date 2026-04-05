@@ -12,20 +12,29 @@
 	import LibraryBadge from './LibraryBadge.svelte';
 	import AlbumCardOverlay from './AlbumCardOverlay.svelte';
 
-	export let album: Album;
-	export let enrichmentSource: EnrichmentSource = 'none';
-	export let onadded: (() => void) | undefined = undefined;
-	export let onremoved: (() => void) | undefined = undefined;
+	interface Props {
+		album: Album;
+		enrichmentSource?: EnrichmentSource;
+		onadded?: (() => void) | undefined;
+		onremoved?: (() => void) | undefined;
+	}
 
-	$: listenTitle = getListenTitle(enrichmentSource, 'album');
+	let {
+		album = $bindable(),
+		enrichmentSource = 'none',
+		onadded = undefined,
+		onremoved = undefined
+	}: Props = $props();
 
-	let requesting = false;
+	let listenTitle = $derived(getListenTitle(enrichmentSource, 'album'));
 
-	$: inLibrary = libraryStore.isInLibrary(album.musicbrainz_id) || album.in_library || false;
-	$: isRequested =
-		!inLibrary &&
+	let requesting = $state(false);
+
+	let inLibrary = $derived(libraryStore.isInLibrary(album.musicbrainz_id) || album.in_library || false);
+	let isRequested =
+		$derived(!inLibrary &&
 		!album.in_library &&
-		(album.requested || libraryStore.isRequested(album.musicbrainz_id));
+		(album.requested || libraryStore.isRequested(album.musicbrainz_id)));
 
 	async function handleRequest(e: Event) {
 		e.stopPropagation();

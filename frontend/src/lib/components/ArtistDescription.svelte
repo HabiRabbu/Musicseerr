@@ -1,14 +1,20 @@
 <script lang="ts">
+	import { run } from 'svelte/legacy';
+
 	import { ChevronUp, ChevronDown } from 'lucide-svelte';
 	import { colors } from '$lib/colors';
 	import { onMount } from 'svelte';
 
-	export let description: string | null | undefined;
-	export let loading = false;
+	interface Props {
+		description: string | null | undefined;
+		loading?: boolean;
+	}
 
-	let descriptionExpanded = false;
-	let descriptionElement: HTMLElement;
-	let showViewMore = false;
+	let { description, loading = false }: Props = $props();
+
+	let descriptionExpanded = $state(false);
+	let descriptionElement: HTMLElement = $state();
+	let showViewMore = $state(false);
 
 	function checkDescriptionHeight() {
 		if (descriptionElement && !descriptionExpanded) {
@@ -23,9 +29,11 @@
 		setTimeout(() => checkDescriptionHeight(), 50);
 	});
 
-	$: if (description && !loading) {
-		setTimeout(() => checkDescriptionHeight(), 50);
-	}
+	run(() => {
+		if (description && !loading) {
+			setTimeout(() => checkDescriptionHeight(), 50);
+		}
+	});
 </script>
 
 <div class="bg-base-200/50 rounded-box p-4 sm:p-6">
@@ -44,7 +52,7 @@
 				<button
 					class="btn btn-sm mt-3 gap-2"
 					style="background-color: {colors.accent}; color: {colors.secondary};"
-					on:click={() => (descriptionExpanded = false)}
+					onclick={() => (descriptionExpanded = false)}
 				>
 					Show Less
 					<ChevronUp class="h-4 w-4" />
@@ -61,7 +69,7 @@
 					<button
 						class="btn btn-sm mt-3 gap-2"
 						style="background-color: {colors.accent}; color: {colors.secondary};"
-						on:click={() => (descriptionExpanded = true)}
+						onclick={() => (descriptionExpanded = true)}
 					>
 						Read More
 						<ChevronDown class="h-4 w-4" />

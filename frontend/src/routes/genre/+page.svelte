@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { getApiUrl } from '$lib/utils/api';
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
 	import { onMount, onDestroy } from 'svelte';
 	import { beforeNavigate } from '$app/navigation';
 	import GenreArtistCard from '$lib/components/GenreArtistCard.svelte';
@@ -44,7 +44,7 @@
 	}
 
 	$effect(() => {
-		genreName = $page.url.searchParams.get('name') || '';
+		genreName = page.url.searchParams.get('name') || '';
 	});
 
 	async function loadHeroArtist() {

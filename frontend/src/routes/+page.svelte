@@ -28,12 +28,12 @@
 	import { removeQueueCachedData } from '$lib/utils/discoverQueueCache';
 	import { isDismissed } from '$lib/utils/dismissedPrompts';
 
-	let homeData: HomeResponse | null = null;
-	let loading = true;
-	let refreshing = false;
-	let isUpdating = false;
-	let error = '';
-	let lastUpdated: Date | null = null;
+	let homeData: HomeResponse | null = $state(null);
+	let loading = $state(true);
+	let refreshing = $state(false);
+	let isUpdating = $state(false);
+	let error = $state('');
+	let lastUpdated: Date | null = $state(null);
 	let abortController: AbortController | null = null;
 	let activeSource: MusicSource = 'listenbrainz';
 
@@ -256,22 +256,22 @@
 		}
 		return sections;
 	}
-	$: preGenreBlocks = homeData ? getPreGenreBlocks() : [];
-	$: postGenreSections = homeData ? getPostGenreSections() : [];
+	let preGenreBlocks = $derived(homeData ? getPreGenreBlocks() : []);
+	let postGenreSections = $derived(homeData ? getPostGenreSections() : []);
 
 	const whatsHotKeys = new Set(['popular_albums', 'trending_artists']);
-	$: whatsHotBlocks = preGenreBlocks.filter((b) => whatsHotKeys.has(b.key));
-	$: forYouBlocks = preGenreBlocks.filter((b) => !whatsHotKeys.has(b.key));
-	$: hasContent =
-		preGenreBlocks.length > 0 ||
+	let whatsHotBlocks = $derived(preGenreBlocks.filter((b) => whatsHotKeys.has(b.key)));
+	let forYouBlocks = $derived(preGenreBlocks.filter((b) => !whatsHotKeys.has(b.key)));
+	let hasContent =
+		$derived(preGenreBlocks.length > 0 ||
 		postGenreSections.length > 0 ||
-		(homeData?.genre_list?.items?.length ?? 0) > 0;
-	$: servicePrompts = homeData?.service_prompts || [];
-	$: lidarrConfigured = homeData?.integration_status?.lidarr ?? true;
-	$: lidarrPrompt = servicePrompts.find((p) => p.service === 'lidarr-connection');
-	$: otherPrompts = servicePrompts.filter(
+		(homeData?.genre_list?.items?.length ?? 0) > 0);
+	let servicePrompts = $derived(homeData?.service_prompts || []);
+	let lidarrConfigured = $derived(homeData?.integration_status?.lidarr ?? true);
+	let lidarrPrompt = $derived(servicePrompts.find((p) => p.service === 'lidarr-connection'));
+	let otherPrompts = $derived(servicePrompts.filter(
 		(p) => p.service !== 'lidarr-connection' && !isDismissed(p.service)
-	);
+	));
 
 	let dismissedVersion = 0;
 	function handlePromptDismiss(_service: string) {
@@ -309,7 +309,7 @@
 		<div class="mt-16 flex flex-col items-center justify-center px-4">
 			<CircleAlert class="mb-4 h-10 w-10 text-base-content/50" />
 			<p class="text-base-content/70">{error}</p>
-			<button class="btn btn-primary mt-4" on:click={() => loadHomeData(true)}>Try Again</button>
+			<button class="btn btn-primary mt-4" onclick={() => loadHomeData(true)}>Try Again</button>
 		</div>
 	{:else}
 		<div class="space-y-10 px-4 sm:space-y-12 sm:px-6 lg:px-8">
