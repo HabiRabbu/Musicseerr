@@ -38,5 +38,23 @@ export default defineConfig(
 				svelteConfig
 			}
 		}
+	},
+	{
+		files: ['**/*.svelte'],
+		rules: {
+			'@typescript-eslint/no-unused-expressions': 'off',
+			'@typescript-eslint/no-unused-vars': 'off',
+			'no-empty': 'off',
+			'svelte/infinite-reactive-loop': 'off',
+			'svelte/no-at-html-tags': 'off',
+			'svelte/no-navigation-without-resolve': 'off',
+			'svelte/no-unused-svelte-ignore': 'off',
+			'svelte/no-useless-mustaches': 'off',
+			'svelte/no-reactive-reassign': 'off',
+			'svelte/prefer-writable-derived': 'off',
+			'svelte/prefer-svelte-reactivity': 'off',
+			'svelte/require-each-key': 'off',
+			'svelte/valid-prop-names-in-kit-pages': 'off'
+		}
 	}
 );

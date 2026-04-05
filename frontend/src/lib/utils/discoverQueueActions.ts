@@ -1,5 +1,3 @@
-import type { QueueCacheData } from '$lib/utils/discoverQueueCache';
-
 export interface QueueCloseState {
 	queueLength: number;
 	isLastItem: boolean;

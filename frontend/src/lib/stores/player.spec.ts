@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import type { QueueItem, SourceType } from '$lib/player/types';
+import type { QueueItem } from '$lib/player/types';
 
 type StateCallback = (state: import('$lib/player/types').PlaybackState) => void;
 type ProgressCallback = (currentTime: number, duration: number) => void;
@@ -821,11 +821,6 @@ describe('beforeunload beacon', () => {
 	let addEventListenerSpy: ReturnType<typeof vi.fn>;
 	let removeEventListenerSpy: ReturnType<typeof vi.fn>;
 	let sendBeaconMock: ReturnType<typeof vi.fn>;
-	let jellyfinApi: {
-		startSession: ReturnType<typeof vi.fn>;
-		reportProgress: ReturnType<typeof vi.fn>;
-		reportStop: ReturnType<typeof vi.fn>;
-	};
 
 	beforeEach(async () => {
 		localStorage.clear();
@@ -833,8 +828,7 @@ describe('beforeunload beacon', () => {
 		vi.clearAllMocks();
 		vi.useFakeTimers();
 
-		jellyfinApi =
-			(await import('$lib/player/jellyfinPlaybackApi')) as unknown as typeof jellyfinApi;
+		await import('$lib/player/jellyfinPlaybackApi');
 
 		mockApiGet.mockResolvedValue({
 			url: 'http://jf/Audio/1/stream?static=true',
@@ -843,14 +837,14 @@ describe('beforeunload beacon', () => {
 		});
 		mockApiHead.mockResolvedValue(new Response(null, { status: 200 }));
 
-		const listeners = new Map<string, Set<Function>>();
+		const listeners = new Map<string, Set<EventListener>>();
 		const windowStub = {
-			addEventListener: vi.fn((event: string, handler: Function) => {
+			addEventListener: vi.fn((event: string, handler: EventListener) => {
 				const set = listeners.get(event) ?? new Set();
 				set.add(handler);
 				listeners.set(event, set);
 			}),
-			removeEventListener: vi.fn((event: string, handler: Function) => {
+			removeEventListener: vi.fn((event: string, handler: EventListener) => {
 				listeners.get(event)?.delete(handler);
 			})
 		};

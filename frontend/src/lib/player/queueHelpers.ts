@@ -230,7 +230,7 @@ export function buildQueueItemsFromYouTube(
 function resolveStreamUrl(
 	sourceType: string,
 	trackSourceId: string,
-	format?: string | null
+	_format?: string | null
 ): string | undefined {
 	if (sourceType === 'local') return API.stream.local(trackSourceId);
 	if (sourceType === 'navidrome') return API.stream.navidrome(trackSourceId);

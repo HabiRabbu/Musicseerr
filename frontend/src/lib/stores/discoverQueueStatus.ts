@@ -1,4 +1,4 @@
-import { writable, get } from 'svelte/store';
+import { writable } from 'svelte/store';
 import { browser } from '$app/environment';
 import { API } from '$lib/constants';
 import { musicSourceStore, type MusicSource } from '$lib/stores/musicSource';

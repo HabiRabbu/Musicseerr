@@ -68,14 +68,18 @@ export function getStoredVolume(): number {
 	try {
 		const stored = localStorage.getItem(VOLUME_STORAGE_KEY);
 		if (stored !== null) return Math.max(0, Math.min(100, Number(stored)));
-	} catch {}
+	} catch {
+		// ignore storage read errors
+	}
 	return 75;
 }
 
 export function storeVolume(volume: number): void {
 	try {
 		localStorage.setItem(VOLUME_STORAGE_KEY, String(volume));
-	} catch {}
+	} catch {
+		// ignore storage write errors
+	}
 }
 
 export function getStoredSession(): StoredSession | null {
@@ -84,7 +88,9 @@ export function getStoredSession(): StoredSession | null {
 		if (!stored) return null;
 		const parsed = JSON.parse(stored);
 		if (parsed && parsed.nowPlaying) return parsed as StoredSession;
-	} catch {}
+	} catch {
+		// ignore parse/storage errors
+	}
 	return null;
 }
 
@@ -95,5 +101,7 @@ export function storeSessionData(data: StoredSession | null): void {
 		} else {
 			localStorage.removeItem(SESSION_STORAGE_KEY);
 		}
-	} catch {}
+	} catch {
+		// ignore session storage errors
+	}
 }

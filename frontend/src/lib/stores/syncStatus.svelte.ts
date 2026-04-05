@@ -57,7 +57,6 @@ function createSyncStatusStore() {
 	let hideTimeout: ReturnType<typeof setTimeout> | null = null;
 	let reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
 	let reconnectAttempts = 0;
-	let statusVersion = 0;
 	let connected = false;
 
 	function clearAllTimers(): void {
@@ -76,7 +75,6 @@ function createSyncStatusStore() {
 	}
 
 	function applyStatus(newStatus: SyncStatus): void {
-		statusVersion++;
 		const wasSyncing = status.is_syncing;
 		status = newStatus;
 

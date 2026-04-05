@@ -2,7 +2,7 @@ import { browser } from '$app/environment';
 
 let sharedObserver: IntersectionObserver | null = null;
 let observerRefCount = 0;
-let pendingImages: Set<HTMLImageElement> = new Set();
+const pendingImages: Set<HTMLImageElement> = new Set();
 
 export function cancelPendingImages() {
 	pendingImages.forEach((img) => {

@@ -173,7 +173,7 @@ function createPlayerStore() {
 
 	async function resolveSourceForItem(
 		item: QueueItem,
-		index: number
+		_index: number
 	): Promise<{ source: PlaybackSource; loadUrl: string | undefined }> {
 		const url = resolveSourceUrl(item);
 		if (item.sourceType === 'youtube') {

@@ -7,12 +7,6 @@ import type {
 } from '$lib/types';
 import { api } from '$lib/api/client';
 import {
-	SCROBBLE_PERCENT_THRESHOLD,
-	SCROBBLE_TIME_THRESHOLD_MS,
-	NOW_PLAYING_DEBOUNCE_MS,
-	SEEK_TOLERANCE_S,
-	MIN_TRACK_DURATION_MS,
-	LOOP_RESET_TOLERANCE_S,
 	makeTrackKey,
 	shouldAccumulate,
 	isLoopReset,

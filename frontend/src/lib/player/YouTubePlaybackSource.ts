@@ -7,6 +7,7 @@ declare global {
 	}
 }
 
+/* eslint-disable @typescript-eslint/no-namespace -- mirrors window.YT typings */
 declare namespace YT {
 	class Player {
 		constructor(elementId: string, options: PlayerOptions);
@@ -41,6 +42,7 @@ declare namespace YT {
 		CUED = 5
 	}
 }
+/* eslint-enable @typescript-eslint/no-namespace */
 
 let apiLoaded = false;
 let apiLoading = false;
@@ -49,7 +51,11 @@ const apiReadyQueue: { resolve: () => void; reject: (err: Error) => void }[] = [
 function flushQueue(error?: Error): void {
 	const pending = apiReadyQueue.splice(0);
 	for (const { resolve, reject } of pending) {
-		error ? reject(error) : resolve();
+		if (error) {
+			reject(error);
+		} else {
+			resolve();
+		}
 	}
 }
 

@@ -1,4 +1,6 @@
 import type { PlaybackSource, PlaybackState } from './types';
+
+type LoadInfo = Parameters<PlaybackSource['load']>[0];
 import { getAudioElement } from './audioElement';
 
 const LOAD_TIMEOUT_MS = 15_000;
@@ -31,7 +33,8 @@ export class NativeAudioSource implements PlaybackSource {
 		this.audio = getAudioElement();
 	}
 
-	async load(_info?: unknown): Promise<void> {
+	async load(_info?: LoadInfo): Promise<void> {
+		void _info;
 		this.destroyed = false;
 		this.cleanupListeners();
 		this.clearStallTimeout();
