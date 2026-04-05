@@ -376,7 +376,7 @@ async def warm_artist_discovery_cache_periodically(
     interval: int = 14400,
     delay: float = 0.5,
 ) -> None:
-    await asyncio.sleep(60)
+    await asyncio.sleep(300)  # Wait for Phase 1.5 sync to finish first
 
     while True:
         try:

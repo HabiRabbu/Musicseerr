@@ -15,6 +15,9 @@ def _make_service(*, lb_configured: bool = True, lastfm_enabled: bool = False):
     lastfm_repo = MagicMock() if lastfm_enabled else None
     prefs = MagicMock()
     prefs.is_lastfm_enabled.return_value = lastfm_enabled
+    advanced = MagicMock()
+    advanced.artist_discovery_precache_concurrency = 3
+    prefs.get_advanced_settings.return_value = advanced
 
     cache = AsyncMock()
     cache.get = AsyncMock(return_value=None)
@@ -38,8 +41,9 @@ def _make_service(*, lb_configured: bool = True, lastfm_enabled: bool = False):
 @pytest.mark.asyncio
 async def test_progress_updates_on_success():
     svc = _make_service()
-    status = AsyncMock()
+    status = MagicMock()
     status.update_progress = AsyncMock()
+    status.is_cancelled = MagicMock(return_value=False)
 
     with (
         patch.object(svc, "get_similar_artists", new_callable=AsyncMock, return_value=MagicMock()),
@@ -61,8 +65,9 @@ async def test_progress_updates_on_success():
 @pytest.mark.asyncio
 async def test_progress_updates_even_on_failure():
     svc = _make_service()
-    status = AsyncMock()
+    status = MagicMock()
     status.update_progress = AsyncMock()
+    status.is_cancelled = MagicMock(return_value=False)
 
     with (
         patch.object(svc, "get_similar_artists", new_callable=AsyncMock, side_effect=RuntimeError("boom")),
@@ -85,8 +90,9 @@ async def test_progress_updates_even_on_failure():
 @pytest.mark.asyncio
 async def test_progress_updates_on_mixed_success_and_failure():
     svc = _make_service()
-    status = AsyncMock()
+    status = MagicMock()
     status.update_progress = AsyncMock()
+    status.is_cancelled = MagicMock(return_value=False)
 
     call_count = 0
 
@@ -114,8 +120,9 @@ async def test_progress_updates_on_mixed_success_and_failure():
 @pytest.mark.asyncio
 async def test_cached_artists_still_update_progress():
     svc = _make_service()
-    status = AsyncMock()
+    status = MagicMock()
     status.update_progress = AsyncMock()
+    status.is_cancelled = MagicMock(return_value=False)
 
     svc._cache.get = AsyncMock(return_value="cached-value")
 
