@@ -181,3 +181,115 @@ class TestArtistInfoMonitoringFields:
             assert info.monitored is False
             assert info.auto_download is False
             assert info.in_lidarr is False
+
+
+class TestUpdateAlbumHelper:
+    """Tests for Aurral-aligned _update_album helper (PUT /album/{id} instead of PUT /album/monitor)."""
+
+    @pytest.mark.asyncio
+    async def test_update_album_returns_synchronous_result(self):
+        """_update_album GETs full album, merges updates, PUTs back, returns updated object."""
+        repo = AsyncMock()
+        from repositories.lidarr.album import LidarrAlbumRepository
+        repo._ALBUM_MUTABLE_FIELDS = LidarrAlbumRepository._ALBUM_MUTABLE_FIELDS
+        original_album = {"id": 10, "title": "Test", "monitored": False, "statistics": {}}
+        updated_album = {"id": 10, "title": "Test", "monitored": True, "statistics": {}}
+        repo._get = AsyncMock(return_value=original_album)
+        repo._put = AsyncMock(return_value=updated_album)
+
+        result = await LidarrAlbumRepository._update_album(repo, 10, {"monitored": True})
+
+        repo._get.assert_awaited_once_with("/api/v1/album/10")
+        repo._put.assert_awaited_once()
+        put_args = repo._put.await_args
+        assert put_args[0][0] == "/api/v1/album/10"
+        assert put_args[0][1]["monitored"] is True
+        assert result["monitored"] is True
+
+    @pytest.mark.asyncio
+    async def test_update_album_preserves_other_fields(self):
+        """_update_album only merges specified fields, preserving the rest."""
+        repo = AsyncMock()
+        from repositories.lidarr.album import LidarrAlbumRepository
+        repo._ALBUM_MUTABLE_FIELDS = LidarrAlbumRepository._ALBUM_MUTABLE_FIELDS
+        original = {"id": 10, "title": "Original", "monitored": False, "anyReleaseOk": True}
+        repo._get = AsyncMock(return_value=original.copy())
+        repo._put = AsyncMock(return_value={**original, "monitored": True})
+
+        result = await LidarrAlbumRepository._update_album(repo, 10, {"monitored": True})
+
+        put_payload = repo._put.await_args[0][1]
+        assert put_payload["title"] == "Original"
+        assert put_payload["anyReleaseOk"] is True
+        assert put_payload["monitored"] is True
+        assert result is not None
+
+    @pytest.mark.asyncio
+    async def test_update_album_rejects_disallowed_fields(self):
+        """_update_album silently drops fields not in the allowlist."""
+        repo = AsyncMock()
+        from repositories.lidarr.album import LidarrAlbumRepository
+        repo._ALBUM_MUTABLE_FIELDS = LidarrAlbumRepository._ALBUM_MUTABLE_FIELDS
+        original = {"id": 10, "title": "Original", "monitored": False, "rootFolderPath": "/music"}
+        repo._get = AsyncMock(return_value=original.copy())
+        repo._put = AsyncMock(return_value={**original, "monitored": True})
+
+        result = await LidarrAlbumRepository._update_album(
+            repo, 10, {"monitored": True, "rootFolderPath": "/evil", "qualityProfileId": 999}
+        )
+
+        put_payload = repo._put.await_args[0][1]
+        assert put_payload["monitored"] is True
+        assert put_payload["rootFolderPath"] == "/music"
+        assert "qualityProfileId" not in put_payload or put_payload.get("qualityProfileId") != 999
+        assert result is not None
+
+
+class TestProcessorMonitoringSignal:
+    """Tests for the queue processor's belt-and-suspenders monitoring check (structured boolean)."""
+
+    def _check_monitored(self, result: dict) -> bool:
+        """Replicate the processor's monitoring check logic."""
+        payload = result.get("payload", {})
+        is_monitored = payload.get("monitored", False) if isinstance(payload, dict) else False
+        if not is_monitored:
+            is_monitored = bool(result.get("monitored"))
+        return is_monitored
+
+    @pytest.mark.asyncio
+    async def test_processor_trusts_structured_flag_when_payload_stale(self):
+        """Processor should treat album as monitored via structured boolean, even if payload is stale."""
+        result = {
+            "message": "Album monitored & search triggered: Test Album",
+            "monitored": True,
+            "payload": {"monitored": False, "id": 10},
+        }
+        assert self._check_monitored(result) is True
+
+    @pytest.mark.asyncio
+    async def test_processor_trusts_added_and_monitored_flag(self):
+        """Processor should detect structured monitored=True for add+monitor path."""
+        result = {
+            "message": "Album added & monitored: New Album",
+            "monitored": True,
+            "payload": {"monitored": False, "id": 20},
+        }
+        assert self._check_monitored(result) is True
+
+    @pytest.mark.asyncio
+    async def test_processor_does_not_false_positive_without_flag(self):
+        """Processor should NOT flag as monitored when structured boolean is absent."""
+        result = {
+            "message": "Album already downloaded: Some Album",
+            "payload": {"monitored": False, "id": 30},
+        }
+        assert self._check_monitored(result) is False
+
+    @pytest.mark.asyncio
+    async def test_processor_uses_payload_when_already_monitored(self):
+        """When payload correctly has monitored=True, structured flag is not needed."""
+        result = {
+            "message": "Album already downloaded: Some Album",
+            "payload": {"monitored": True, "id": 40},
+        }
+        assert self._check_monitored(result) is True

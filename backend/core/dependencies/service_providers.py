@@ -140,6 +140,10 @@ def get_request_queue() -> "RequestQueue":
         if payload and isinstance(payload, dict):
             is_monitored = payload.get("monitored", False)
 
+            # Belt-andsuspenders: prefer structured signal over payload inspection
+            if not is_monitored:
+                is_monitored = bool(result.get("monitored"))
+
             if is_monitored:
                 logger.info(f"Album {album_mbid[:8]}... successfully monitored - promoting cache entries to persistent")
 

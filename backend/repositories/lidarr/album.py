@@ -280,6 +280,19 @@ class LidarrAlbumRepository(LidarrHistoryRepository):
             logger.warning(f"Error getting album by foreign ID {album_mbid}: {e}")
             return None
 
+    _ALBUM_MUTABLE_FIELDS = frozenset({"monitored"})
+
+    async def _update_album(self, album_id: int, updates: dict[str, Any]) -> dict[str, Any]:
+        """Update album via PUT /album/{id} - synchronous 200 OK, returns updated object.
+
+        Callers must hold the per-artist lock to avoid lost-update races.
+        Only fields in _ALBUM_MUTABLE_FIELDS are applied unknown keys are silently dropped.
+        """
+        safe_updates = {k: v for k, v in updates.items() if k in self._ALBUM_MUTABLE_FIELDS}
+        album = await self._get(f"/api/v1/album/{album_id}")
+        album.update(safe_updates)
+        return await self._put(f"/api/v1/album/{album_id}", album)
+
     async def delete_album(self, album_id: int, delete_files: bool = False) -> bool:
         try:
             params = {"deleteFiles": str(delete_files).lower(), "addImportListExclusion": "false"}
@@ -379,10 +392,7 @@ class LidarrAlbumRepository(LidarrHistoryRepository):
                 }
 
             if not is_monitored:
-                await self._put(
-                    "/api/v1/album/monitor",
-                    {"albumIds": [album_id], "monitored": True},
-                )
+                album_obj = await self._update_album(album_id, {"monitored": True})
 
             try:
                 await self._post_command({"name": "AlbumSearch", "albumIds": [album_id]})
@@ -395,9 +405,6 @@ class LidarrAlbumRepository(LidarrHistoryRepository):
             await self._invalidate_album_list_caches()
             await self._cache.clear_prefix(f"{LIDARR_PREFIX}artists:mbids")
 
-            # Re-fetch so payload reflects the monitored=True state
-            final_album = await self._get_album_by_foreign_id(musicbrainz_id) or album_obj
-
             total_ms = int((time.monotonic() - t0) * 1000)
             logger.info(
                 "add_album timing: album=%s artist_ensure=%dms total=%dms (existing album, monitor+search)",
@@ -406,7 +413,8 @@ class LidarrAlbumRepository(LidarrHistoryRepository):
 
             return {
                 "message": f"Album monitored & search triggered: {album_title}",
-                "payload": final_album,
+                "monitored": True,
+                "payload": album_obj,
             }
 
         # Album doesn't exist yet — wait for indexing after artist add/refresh
@@ -465,10 +473,7 @@ class LidarrAlbumRepository(LidarrHistoryRepository):
                     album_obj = await self._get_album_by_foreign_id(musicbrainz_id)
                     if album_obj:
                         if not album_obj.get("monitored"):
-                            await self._put(
-                                "/api/v1/album/monitor",
-                                {"albumIds": [album_obj["id"]], "monitored": True},
-                            )
+                            album_obj = await self._update_album(album_obj["id"], {"monitored": True})
                         try:
                             await self._post_command(
                                 {"name": "AlbumSearch", "albumIds": [album_obj["id"]]}
@@ -524,6 +529,7 @@ class LidarrAlbumRepository(LidarrHistoryRepository):
 
         return {
             "message": f"Album added & monitored: {album_title}",
+            "monitored": True,
             "payload": final_album or album_obj,
         }
 
@@ -572,26 +578,19 @@ class LidarrAlbumRepository(LidarrHistoryRepository):
     ) -> None:
         for attempt in range(max_attempts):
             try:
-                if set_artist_monitored:
+                if set_artist_monitored and attempt == 0:
                     await self._put(
                         "/api/v1/artist/editor",
                         {"artistIds": [artist_id], "monitored": True, "monitorNewItems": "none"},
                     )
 
-                await asyncio.sleep(2.0 + (attempt * 2.0))
-
-                await self._put("/api/v1/album/monitor", {"albumIds": [album_id], "monitored": True})
-
-                async def album_monitored():
-                    album = await self._get_album_by_foreign_id(album_mbid)
-                    return album and album.get("monitored")
-
-                timeout = 15.0 + (attempt * 5.0)
-                if await self._wait_for(album_monitored, timeout=timeout, poll=1.0):
+                updated = await self._update_album(album_id, {"monitored": True})
+                if updated and updated.get("monitored"):
                     return
 
                 if attempt < max_attempts - 1:
                     logger.warning("Album monitoring verification failed, attempt %d/%d", attempt + 1, max_attempts)
+                    await asyncio.sleep(2.0 + (attempt * 2.0))
 
             except Exception as e:  # noqa: BLE001
                 if attempt == max_attempts - 1:
