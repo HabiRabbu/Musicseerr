@@ -1,4 +1,5 @@
 import asyncio
+import collections
 import logging
 import time
 from typing import Any, Optional
@@ -16,6 +17,31 @@ from .history import LidarrHistoryRepository
 logger = logging.getLogger(__name__)
 
 _album_details_deduplicator = RequestDeduplicator()
+
+_MAX_ARTIST_LOCKS = 64
+_artist_locks: collections.OrderedDict[str, asyncio.Lock] = collections.OrderedDict()
+
+
+def _get_artist_lock(artist_mbid: str) -> asyncio.Lock:
+    """Get or create a per-artist lock. Evicts only unlocked entries when over limit."""
+    if artist_mbid in _artist_locks:
+        _artist_locks.move_to_end(artist_mbid)
+        return _artist_locks[artist_mbid]
+    lock = asyncio.Lock()
+    _artist_locks[artist_mbid] = lock
+    while len(_artist_locks) > _MAX_ARTIST_LOCKS:
+        # Find the oldest unlocked entry to evict
+        evicted = False
+        for key in list(_artist_locks.keys()):
+            if key == artist_mbid:
+                continue
+            if not _artist_locks[key].locked():
+                del _artist_locks[key]
+                evicted = True
+                break
+        if not evicted:
+            break
+    return lock
 
 
 def _safe_int(value: Any, fallback: int = 0) -> int:
@@ -266,6 +292,7 @@ class LidarrAlbumRepository(LidarrHistoryRepository):
             raise
 
     async def add_album(self, musicbrainz_id: str, artist_repo) -> dict:
+        t0 = time.monotonic()
         if not musicbrainz_id or not isinstance(musicbrainz_id, str):
             raise ExternalServiceError("Invalid MBID provided")
 
@@ -289,104 +316,215 @@ class LidarrAlbumRepository(LidarrHistoryRepository):
         if not artist_mbid:
             raise ExternalServiceError("Album lookup did not include artist MBID")
 
-        artist = await artist_repo._ensure_artist_exists(artist_mbid, artist_name)
+        # Serialize per-artist to prevent duplicate artist creation from concurrent requests
+        lock = _get_artist_lock(artist_mbid)
+        async with lock:
+            return await self._add_album_locked(
+                musicbrainz_id, artist_repo, t0,
+                candidate, album_title, album_type, secondary_types,
+                artist_mbid, artist_name,
+            )
+
+    async def _add_album_locked(
+        self,
+        musicbrainz_id: str,
+        artist_repo,
+        t0: float,
+        candidate: dict,
+        album_title: str,
+        album_type: str,
+        secondary_types: list,
+        artist_mbid: str,
+        artist_name: str | None,
+    ) -> dict:
+        # Capture which albums are already monitored so we can revert any Lidarr auto-monitors after the add
+        pre_add_monitored_ids: set[int] = set()
+        try:
+            existing_items = await self._get("/api/v1/artist", params={"mbId": artist_mbid})
+            if existing_items:
+                existing_artist_id = existing_items[0].get("id")
+                if existing_artist_id:
+                    albums_before = await self._get(
+                        "/api/v1/album", params={"artistId": existing_artist_id}
+                    )
+                    if isinstance(albums_before, list):
+                        pre_add_monitored_ids = {
+                            a["id"] for a in albums_before if a.get("monitored")
+                        }
+        except ExternalServiceError:
+            pass
+
+        t_artist = time.monotonic()
+        artist, artist_created = await artist_repo._ensure_artist_exists(artist_mbid, artist_name)
         artist_id = artist["id"]
+        artist_ensure_ms = int((time.monotonic() - t_artist) * 1000)
 
         album_obj = await self._get_album_by_foreign_id(musicbrainz_id)
-        action = "exists"
 
-        if not album_obj:
-            async def album_is_indexed():
-                a = await self._get_album_by_foreign_id(musicbrainz_id)
-                return a and a.get("id")
+        if album_obj:
+            album_id = album_obj["id"]
+            has_files = (album_obj.get("statistics") or {}).get("trackFileCount", 0) > 0
+            is_monitored = album_obj.get("monitored", False)
 
-            await self._wait_for_artist_commands_to_complete(artist_id, timeout=600.0)
-            album_obj = await self._wait_for(album_is_indexed, timeout=60.0, poll=5.0)
-
-            if not album_obj:
-                profile_id = artist.get("qualityProfileId")
-                if profile_id is None:
-                    try:
-                        qps = await self._get("/api/v1/qualityprofile")
-                        if not qps:
-                            raise ExternalServiceError("No quality profiles in Lidarr")
-                        profile_id = qps[0]["id"]
-                    except Exception:  # noqa: BLE001
-                        profile_id = self._settings.quality_profile_id
-
-                payload = {
-                    "title": album_title,
-                    "artistId": artist_id,
-                    "artist": artist,
-                    "foreignAlbumId": musicbrainz_id,
-                    "monitored": True,
-                    "anyReleaseOk": True,
-                    "profileId": profile_id,
-                    "images": [],
-                    "addOptions": {"addType": "automatic", "searchForNewAlbum": True},
+            if has_files and is_monitored:
+                total_ms = int((time.monotonic() - t0) * 1000)
+                logger.info(
+                    "add_album timing: album=%s artist_ensure=%dms total=%dms (already downloaded)",
+                    musicbrainz_id[:8], artist_ensure_ms, total_ms,
+                )
+                await self._invalidate_album_list_caches()
+                return {
+                    "message": f"Album already downloaded: {album_title}",
+                    "payload": album_obj,
                 }
 
+            if not is_monitored:
+                await self._put(
+                    "/api/v1/album/monitor",
+                    {"albumIds": [album_id], "monitored": True},
+                )
+
+            try:
+                await self._post_command({"name": "AlbumSearch", "albumIds": [album_id]})
+            except ExternalServiceError as exc:
+                logger.warning("Failed to queue AlbumSearch for %s: %s", musicbrainz_id, exc)
+
+            await self._unmonitor_auto_monitored_albums(
+                artist_id, musicbrainz_id, album_id, pre_add_monitored_ids
+            )
+            await self._invalidate_album_list_caches()
+            await self._cache.clear_prefix(f"{LIDARR_PREFIX}artists:mbids")
+
+            total_ms = int((time.monotonic() - t0) * 1000)
+            logger.info(
+                "add_album timing: album=%s artist_ensure=%dms total=%dms (existing album, monitor+search)",
+                musicbrainz_id[:8], artist_ensure_ms, total_ms,
+            )
+
+            return {
+                "message": f"Album monitored & search triggered: {album_title}",
+                "payload": album_obj,
+            }
+
+        # Album doesn't exist yet — wait for indexing after artist add/refresh
+        if artist_created:
+            await self._wait_for_artist_commands_to_complete(artist_id, timeout=120.0)
+
+        async def album_is_indexed():
+            a = await self._get_album_by_foreign_id(musicbrainz_id)
+            return a and a.get("id")
+
+        # Only wait for auto-indexing if we just created/refreshed the artist;
+        # for existing artists nothing triggered new indexing, so skip the long wait.
+        if artist_created:
+            album_obj = await self._wait_for(album_is_indexed, timeout=60.0, poll=5.0)
+        else:
+            album_obj = await album_is_indexed()
+
+        if not album_obj:
+            # Album not auto-indexed; POST to add it directly
+            profile_id = artist.get("qualityProfileId")
+            if profile_id is None:
                 try:
-                    album_obj = await self._post("/api/v1/album", payload)
-                    action = "added"
-                    album_obj = await self._wait_for(album_is_indexed, timeout=120.0, poll=2.0)
-                except Exception as e:
-                    err_str = str(e)
-                    if "POST failed" in err_str or "405" in err_str:
-                        logger.debug("Raw Lidarr rejection for %s: %s", album_title, err_str)
-                        raise ExternalServiceError(
-                            f"Cannot add this {album_type}. "
-                            f"Lidarr rejected adding '{album_title}'. This is likely because your Lidarr "
-                            f"Metadata Profile is configured to exclude {album_type}s{' (' + ', '.join(secondary_types) + ')' if secondary_types else ''}. "
-                            f"To fix this: Go to Lidarr -> Settings -> Profiles -> Metadata Profiles, "
-                            f"and enable '{album_type}' in your active profile."
-                        )
-                    else:
-                        logger.debug("Unexpected error adding '%s': %s", album_title, err_str)
-                        raise
+                    qps = await self._get("/api/v1/qualityprofile")
+                    if not qps:
+                        raise ExternalServiceError("No quality profiles in Lidarr")
+                    profile_id = qps[0]["id"]
+                except Exception:  # noqa: BLE001
+                    profile_id = self._settings.quality_profile_id
+
+            payload = {
+                "title": album_title,
+                "artistId": artist_id,
+                "artist": {
+                    "id": artist["id"],
+                    "artistName": artist.get("artistName"),
+                    "foreignArtistId": artist.get("foreignArtistId"),
+                    "qualityProfileId": artist.get("qualityProfileId"),
+                    "metadataProfileId": artist.get("metadataProfileId"),
+                    "rootFolderPath": artist.get("rootFolderPath"),
+                },
+                "foreignAlbumId": musicbrainz_id,
+                "monitored": True,
+                "anyReleaseOk": True,
+                "profileId": profile_id,
+                "images": [],
+                "addOptions": {"addType": "automatic", "searchForNewAlbum": True},
+            }
+
+            try:
+                album_obj = await self._post("/api/v1/album", payload)
+                album_obj = await self._wait_for(album_is_indexed, timeout=120.0, poll=2.0)
+            except ExternalServiceError as e:
+                err_str = str(e).lower()
+                if "already exists" in err_str:
+                    logger.info("Album %s already exists per Lidarr, fetching", musicbrainz_id)
+                    album_obj = await self._get_album_by_foreign_id(musicbrainz_id)
+                    if album_obj:
+                        if not album_obj.get("monitored"):
+                            await self._put(
+                                "/api/v1/album/monitor",
+                                {"albumIds": [album_obj["id"]], "monitored": True},
+                            )
+                        try:
+                            await self._post_command(
+                                {"name": "AlbumSearch", "albumIds": [album_obj["id"]]}
+                            )
+                        except ExternalServiceError:
+                            pass
+                elif "post failed" in err_str or "405" in err_str or "metadata" in err_str:
+                    raise ExternalServiceError(
+                        f"Lidarr rejected '{album_title}' ({album_type}"
+                        f"{' — ' + ', '.join(secondary_types) if secondary_types else ''}). "
+                        f"Your Metadata Profile probably excludes {album_type}s. "
+                        f"Go to Lidarr > Settings > Profiles > Metadata Profiles and enable '{album_type}'."
+                    )
+                else:
+                    logger.error("Unexpected error adding '%s': %s", album_title, e)
+                    raise
 
         if not album_obj or "id" not in album_obj:
             raise ExternalServiceError(
-                f"Cannot add this {album_type}. "
-                f"'{album_title}' could not be found in Lidarr after the artist refresh. This usually means "
-                f"your Lidarr Metadata Profile is configured to exclude {album_type}s. "
-                f"To fix this: Go to Lidarr -> Settings -> Profiles -> Metadata Profiles, "
-                f"enable '{album_type}', then refresh the artist in Lidarr."
+                f"'{album_title}' wasn't found in Lidarr after refreshing the artist. "
+                f"Your Metadata Profile may exclude {album_type}s. "
+                f"Go to Lidarr > Settings > Profiles > Metadata Profiles, enable '{album_type}', then refresh the artist."
             )
 
         album_id = album_obj["id"]
 
-        await self._wait_for_artist_commands_to_complete(artist_id, timeout=600.0)
-        await self._monitor_artist_and_album(artist_id, album_id, musicbrainz_id, album_title)
+        # Only monitor the specific album; only set artist monitored if newly created
+        await self._monitor_artist_and_album(
+            artist_id, album_id, musicbrainz_id, album_title,
+            set_artist_monitored=artist_created,
+        )
 
         try:
             await self._post_command({"name": "AlbumSearch", "albumIds": [album_id]})
         except ExternalServiceError as exc:
-            logger.warning("Failed to queue Lidarr AlbumSearch for %s: %s", musicbrainz_id, exc)
+            logger.warning("Failed to queue AlbumSearch for %s: %s", musicbrainz_id, exc)
+
+        # Unmonitor albums that Lidarr auto-monitored during the add
+        await self._unmonitor_auto_monitored_albums(
+            artist_id, musicbrainz_id, album_id, pre_add_monitored_ids
+        )
 
         final_album = await self._get_album_by_foreign_id(musicbrainz_id)
-
-        if final_album and not final_album.get("monitored"):
-            try:
-                await self._put("/api/v1/album/monitor", {
-                    "albumIds": [album_id],
-                    "monitored": True
-                })
-                await asyncio.sleep(2.0)
-                final_album = await self._get_album_by_foreign_id(musicbrainz_id)
-            except ExternalServiceError as exc:
-                logger.warning("Failed to update Lidarr album monitor state for %s: %s", musicbrainz_id, exc)
 
         await self._invalidate_album_list_caches()
         await self._cache.clear_prefix(f"{LIDARR_PREFIX}artists:mbids")
 
-        msg = "Album added & monitored" if action == "added" else "Album exists; monitored ensured"
+        total_ms = int((time.monotonic() - t0) * 1000)
+        logger.info(
+            "add_album timing: album=%s artist_ensure=%dms total=%dms (new album, created=%s)",
+            musicbrainz_id[:8], artist_ensure_ms, total_ms, artist_created,
+        )
+
         return {
-            "message": f"{msg}: {album_title}",
-            "payload": final_album or album_obj
+            "message": f"Album added & monitored: {album_title}",
+            "payload": final_album or album_obj,
         }
 
-    async def _wait_for_artist_commands_to_complete(self, artist_id: int, timeout: float = 600.0) -> None:
+    async def _wait_for_artist_commands_to_complete(self, artist_id: int, timeout: float = 120.0) -> None:
         deadline = time.monotonic() + timeout
 
         while time.monotonic() < deadline:
@@ -418,7 +556,7 @@ class LidarrAlbumRepository(LidarrHistoryRepository):
 
             await asyncio.sleep(5.0)
 
-        await asyncio.sleep(5.0)
+        await asyncio.sleep(1.0)
 
     async def _monitor_artist_and_album(
         self,
@@ -426,35 +564,70 @@ class LidarrAlbumRepository(LidarrHistoryRepository):
         album_id: int,
         album_mbid: str,
         album_title: str,
-        max_attempts: int = 3
+        max_attempts: int = 2,
+        set_artist_monitored: bool = False,
     ) -> None:
         for attempt in range(max_attempts):
             try:
-                await self._put(
-                    "/api/v1/artist/editor",
-                    {"artistIds": [artist_id], "monitored": True, "monitorNewItems": "none"},
-                )
+                if set_artist_monitored:
+                    await self._put(
+                        "/api/v1/artist/editor",
+                        {"artistIds": [artist_id], "monitored": True, "monitorNewItems": "none"},
+                    )
 
-                await asyncio.sleep(5.0 + (attempt * 3.0))
+                await asyncio.sleep(2.0 + (attempt * 2.0))
 
                 await self._put("/api/v1/album/monitor", {"albumIds": [album_id], "monitored": True})
 
-                async def both_monitored():
+                async def album_monitored():
                     album = await self._get_album_by_foreign_id(album_mbid)
-                    artist_data = await self._get(f"/api/v1/artist/{artist_id}")
-                    return (album and album.get("monitored")) and (artist_data and artist_data.get("monitored"))
+                    return album and album.get("monitored")
 
-                timeout = 20.0 + (attempt * 10.0)
-                if await self._wait_for(both_monitored, timeout=timeout, poll=1.0):
+                timeout = 15.0 + (attempt * 5.0)
+                if await self._wait_for(album_monitored, timeout=timeout, poll=1.0):
                     return
 
                 if attempt < max_attempts - 1:
-                    logger.warning(f"Monitoring verification failed, attempt {attempt + 1}/{max_attempts}")
-                    await asyncio.sleep(5.0)
+                    logger.warning("Album monitoring verification failed, attempt %d/%d", attempt + 1, max_attempts)
 
             except Exception as e:  # noqa: BLE001
                 if attempt == max_attempts - 1:
                     raise ExternalServiceError(
                         f"Failed to set monitoring status after {max_attempts} attempts: {str(e)}"
                     )
-                await asyncio.sleep(5.0)
+                await asyncio.sleep(3.0)
+
+    async def _unmonitor_auto_monitored_albums(
+        self,
+        artist_id: int,
+        requested_mbid: str,
+        requested_album_id: int,
+        pre_add_monitored_ids: set[int],
+    ) -> None:
+        """Unmonitor albums that Lidarr auto-monitored during artist add (Aurral pattern)."""
+        try:
+            current_albums = await self._get(
+                "/api/v1/album", params={"artistId": artist_id}
+            )
+            if not isinstance(current_albums, list):
+                return
+
+            to_unmonitor = [
+                a["id"]
+                for a in current_albums
+                if a.get("monitored")
+                and a["id"] != requested_album_id
+                and a["id"] not in pre_add_monitored_ids
+            ]
+
+            if to_unmonitor:
+                await self._put(
+                    "/api/v1/album/monitor",
+                    {"albumIds": to_unmonitor, "monitored": False},
+                )
+                logger.info(
+                    "Unmonitored %d auto-monitored albums for artist %d (kept requested %s)",
+                    len(to_unmonitor), artist_id, requested_mbid[:8],
+                )
+        except ExternalServiceError as exc:
+            logger.warning("Failed to unmonitor auto-monitored albums: %s", exc)

@@ -216,12 +216,15 @@ class LidarrArtistRepository(LidarrBase):
             logger.error(f"Failed to delete artist {artist_id}: {e}")
             raise
 
-    async def _ensure_artist_exists(self, artist_mbid: str, artist_name_hint: Optional[str] = None) -> dict[str, Any]:
+    async def _ensure_artist_exists(
+        self, artist_mbid: str, artist_name_hint: Optional[str] = None
+    ) -> tuple[dict[str, Any], bool]:
+        """Return (artist_dict, created). created=True means we just added the artist."""
         try:
             items = await self._get("/api/v1/artist", params={"mbId": artist_mbid})
             if items:
-                logger.info(f"Artist already exists: {items[0].get('artistName')}")
-                return items[0]
+                logger.info("Artist already exists: %s", items[0].get("artistName"))
+                return items[0], False
         except ExternalServiceError as exc:
             logger.debug("Failed to query existing Lidarr artist %s: %s", artist_mbid, exc)
 
@@ -264,23 +267,20 @@ class LidarrArtistRepository(LidarrBase):
         try:
             created = await self._post("/api/v1/artist", payload)
             artist_id = created["id"]
-            logger.info(f"Created artist {artist_name} (ID: {artist_id}), triggering refresh commands")
+            logger.info("Created artist %s (ID: %s), triggering refresh", artist_name, artist_id)
 
-            logger.info(f"Refreshing artist {artist_name} library (this may take several minutes)...")
             await self._await_command(
                 {"name": "RefreshArtist", "artistId": artist_id},
-                timeout=600.0
+                timeout=180.0,
             )
 
-            logger.info(f"Rescanning artist {artist_name} library...")
-            await self._await_command(
-                {"name": "RescanArtist", "artistId": artist_id},
-                timeout=300.0
-            )
-
-            await asyncio.sleep(5.0)
-
-            logger.info(f"Artist {artist_name} library refresh complete")
-            return created
-        except Exception as e:  # noqa: BLE001
-            raise ExternalServiceError(f"Failed to add artist: {e}")
+            logger.info("Artist %s refresh complete", artist_name)
+            return created, True
+        except ExternalServiceError as exc:
+            err_str = str(exc).lower()
+            if "already exists" in err_str or "409" in err_str:
+                logger.info("Artist %s was added concurrently, retrying GET", artist_mbid)
+                items = await self._get("/api/v1/artist", params={"mbId": artist_mbid})
+                if items:
+                    return items[0], False
+            raise ExternalServiceError(f"Failed to add artist: {exc}")

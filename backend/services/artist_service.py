@@ -268,6 +268,8 @@ class ArtistService:
         task_names.append("cache_mbids")
         parallel_tasks.append(self._lidarr_repo.get_artist_albums(artist_id))
         task_names.append("lidarr_albums")
+        parallel_tasks.append(self._lidarr_repo.get_requested_mbids())
+        task_names.append("requested_mbids")
         if need_musicbrainz:
             parallel_tasks.append(self._mb_repo.get_artist_by_id(artist_id))
             task_names.append("mb_artist")
@@ -282,9 +284,12 @@ class ArtistService:
         cache_mbids = cache_result if not isinstance(cache_result, Exception) and cache_result else {}
         library_album_mbids = library_album_mbids | cache_mbids
         
+        req_result = result_map.get("requested_mbids")
+        requested_mbids = req_result if not isinstance(req_result, Exception) and req_result else set()
+
         albums_result = result_map.get("lidarr_albums")
         lidarr_albums = albums_result if not isinstance(albums_result, Exception) and albums_result else []
-        albums, singles, eps = self._categorize_lidarr_albums(lidarr_albums, library_album_mbids)
+        albums, singles, eps = self._categorize_lidarr_albums(lidarr_albums, library_album_mbids, requested_mbids=requested_mbids)
         
         aliases = []
         life_span = None
@@ -347,12 +352,13 @@ class ArtistService:
     def _categorize_lidarr_albums(
         self,
         lidarr_albums: list[dict[str, Any]],
-        library_album_mbids: set[str]
+        library_album_mbids: set[str],
+        requested_mbids: set[str] | None = None,
     ) -> tuple[list[ReleaseItem], list[ReleaseItem], list[ReleaseItem]]:
         prefs = self._preferences_service.get_preferences()
         included_primary_types = set(t.lower() for t in prefs.primary_types)
         included_secondary_types = set(t.lower() for t in prefs.secondary_types)
-        return categorize_lidarr_albums(lidarr_albums, included_primary_types, included_secondary_types, library_album_mbids)
+        return categorize_lidarr_albums(lidarr_albums, included_primary_types, included_secondary_types, library_album_mbids, requested_mbids=requested_mbids)
     
     async def _build_artist_from_musicbrainz(
         self,
@@ -507,7 +513,7 @@ class ArtistService:
             if in_library and offset == 0:
                 logger.debug(f"Using Lidarr for artist releases {artist_id[:8]}")
                 lidarr_albums = await self._lidarr_repo.get_artist_albums(artist_id)
-                albums, singles, eps = self._categorize_lidarr_albums(lidarr_albums, album_mbids)
+                albums, singles, eps = self._categorize_lidarr_albums(lidarr_albums, album_mbids, requested_mbids=requested_mbids)
 
                 total_count = len(albums) + len(singles) + len(eps)
 

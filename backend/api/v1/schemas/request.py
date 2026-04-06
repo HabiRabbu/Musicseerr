@@ -9,12 +9,15 @@ class AlbumRequest(AppStruct):
     year: int | None = None
 
 
-class RequestResponse(AppStruct):
+class RequestAcceptedResponse(AppStruct):
     success: bool
     message: str
-    lidarr_response: dict | None = None
+    musicbrainz_id: str
+    status: str = "pending"
 
 
 class QueueStatusResponse(AppStruct):
     queue_size: int
     processing: bool
+    active_workers: int = 0
+    max_workers: int = 1

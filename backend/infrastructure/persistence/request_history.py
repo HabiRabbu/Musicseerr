@@ -166,6 +166,17 @@ class RequestHistoryStore:
 
         return await self._read(operation)
 
+    async def async_get_active_mbids(self) -> set[str]:
+        """Return the set of MBIDs with active (pending/downloading) requests."""
+        def operation(conn: sqlite3.Connection) -> set[str]:
+            rows = conn.execute(
+                "SELECT musicbrainz_id_lower FROM request_history WHERE status IN (?, ?)",
+                self._ACTIVE_STATUSES,
+            ).fetchall()
+            return {row["musicbrainz_id_lower"] for row in rows}
+
+        return await self._read(operation)
+
     async def async_get_active_requests(self) -> list[RequestHistoryRecord]:
         def operation(conn: sqlite3.Connection) -> list[RequestHistoryRecord]:
             rows = conn.execute(
@@ -268,6 +279,18 @@ class RequestHistoryStore:
             conn.execute(
                 "UPDATE request_history SET lidarr_album_id = ? WHERE musicbrainz_id_lower = ?",
                 (lidarr_album_id, normalized_mbid),
+            )
+
+        await self._write(operation)
+
+    async def async_update_artist_mbid(self, musicbrainz_id: str, artist_mbid: str) -> None:
+        """Backfill the artist MBID without resetting other fields."""
+        normalized_mbid = musicbrainz_id.lower()
+
+        def operation(conn: sqlite3.Connection) -> None:
+            conn.execute(
+                "UPDATE request_history SET artist_mbid = ? WHERE musicbrainz_id_lower = ? AND (artist_mbid IS NULL OR artist_mbid = '')",
+                (artist_mbid, normalized_mbid),
             )
 
         await self._write(operation)

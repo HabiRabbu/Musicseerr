@@ -25,11 +25,14 @@ async def test_jobs_survive_restart(store: QueueStore):
     store.enqueue("job-1", "mbid-abc")
     store.mark_processing("job-1")
 
-    q1._processor_task.cancel()
-    try:
-        await q1._processor_task
-    except asyncio.CancelledError:
-        pass
+    for task in q1._worker_tasks:
+        task.cancel()
+    for task in q1._worker_tasks:
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+    q1._worker_tasks.clear()
 
     fast_processed = []
 

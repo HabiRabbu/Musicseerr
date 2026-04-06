@@ -159,11 +159,13 @@ def categorize_lidarr_albums(
     included_primary_types: set[str],
     included_secondary_types: set[str],
     library_cache_mbids: set[str] | None = None,
+    requested_mbids: set[str] | None = None,
 ) -> tuple[list[ReleaseItem], list[ReleaseItem], list[ReleaseItem]]:
     albums: list[ReleaseItem] = []
     singles: list[ReleaseItem] = []
     eps: list[ReleaseItem] = []
     _cache_mbids = library_cache_mbids or set()
+    _requested_mbids = requested_mbids or set()
     for album in lidarr_albums:
         album_type = (album.get("album_type") or "").lower()
         secondary_types = set(map(str.lower, album.get("secondary_types", []) or []))
@@ -178,9 +180,8 @@ def categorize_lidarr_albums(
         mbid = album.get("mbid", "")
         mbid_lower = mbid.lower() if mbid else ""
         track_file_count = album.get("track_file_count", 0)
-        monitored = album.get("monitored", False)
         in_library = track_file_count > 0 or (mbid_lower in _cache_mbids)
-        requested = monitored and not in_library
+        requested = mbid_lower in _requested_mbids and not in_library
         album_data = ReleaseItem(
             id=mbid,
             title=album.get("title"),

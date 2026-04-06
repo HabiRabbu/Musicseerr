@@ -1,5 +1,5 @@
 import httpx
-from typing import Any, Optional
+from typing import Any, Optional, TYPE_CHECKING
 from core.config import Settings
 from models.library import LibraryAlbum
 from models.request import QueueItem
@@ -10,6 +10,9 @@ from .artist import LidarrArtistRepository
 from .album import LidarrAlbumRepository
 from .config import LidarrConfigRepository
 from .queue import LidarrQueueRepository
+
+if TYPE_CHECKING:
+    from infrastructure.persistence.request_history import RequestHistoryStore
 
 
 class LidarrRepository(
@@ -23,9 +26,11 @@ class LidarrRepository(
         self,
         settings: Settings,
         http_client: httpx.AsyncClient,
-        cache: CacheInterface
+        cache: CacheInterface,
+        request_history_store: "RequestHistoryStore | None" = None,
     ):
         super().__init__(settings, http_client, cache)
+        self._request_history_store = request_history_store
 
     async def add_album(self, musicbrainz_id: str) -> dict:
         return await LidarrAlbumRepository.add_album(self, musicbrainz_id, self)

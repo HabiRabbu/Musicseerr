@@ -136,8 +136,25 @@ class LibraryService:
         if not self._lidarr_repo.is_configured():
             return []
         try:
-            mbids_set = await self._lidarr_repo.get_library_mbids(include_release_ids=False)
-            return list(mbids_set)
+            lidarr_mbids_coro = self._lidarr_repo.get_library_mbids(include_release_ids=False)
+            local_mbids_coro = self._library_db.get_all_album_mbids()
+            results = await asyncio.gather(
+                lidarr_mbids_coro, local_mbids_coro, return_exceptions=True,
+            )
+            lidarr_mbids = results[0] if not isinstance(results[0], BaseException) else set()
+            local_mbids = results[1] if not isinstance(results[1], BaseException) else []
+            if isinstance(results[0], BaseException):
+                logger.warning("Lidarr library mbids fetch failed, degrading: %s", results[0])
+            if isinstance(results[1], BaseException):
+                logger.warning("Local library_db mbids fetch failed, degrading: %s", results[1])
+            if isinstance(lidarr_mbids, BaseException) and isinstance(local_mbids, BaseException):
+                raise ExternalServiceError("Both library mbid sources failed")
+            # Union: Lidarr API + local library_db (catches recently-imported
+            # albums that Lidarr's cached response may not yet reflect).
+            merged = (lidarr_mbids if isinstance(lidarr_mbids, set) else set()) | {m.lower() for m in local_mbids}
+            return list(merged)
+        except ExternalServiceError:
+            raise
         except Exception as e:  # noqa: BLE001
             logger.error(f"Failed to fetch library mbids: {e}")
             raise ExternalServiceError(f"Failed to fetch library mbids: {e}")

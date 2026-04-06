@@ -3,7 +3,7 @@ import math
 import time as _time
 from collections.abc import Callable, Coroutine
 from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Any, Optional, TYPE_CHECKING
 
 from api.v1.schemas.requests_page import (
     ActiveRequestItem,
@@ -18,6 +18,9 @@ from infrastructure.cover_urls import prefer_release_group_cover_url
 from infrastructure.persistence.request_history import RequestHistoryRecord, RequestHistoryStore
 from repositories.protocols import LidarrRepositoryProtocol
 from services.request_utils import extract_cover_url, parse_eta, resolve_display_status
+
+if TYPE_CHECKING:
+    from infrastructure.queue.request_queue import RequestQueue
 
 logger = logging.getLogger(__name__)
 
@@ -36,11 +39,13 @@ class RequestsPageService:
         request_history: RequestHistoryStore,
         library_mbids_fn: Callable[..., Coroutine[Any, Any, set[str]]],
         on_import_callback: Callable[[RequestHistoryRecord], Coroutine[Any, Any, None]] | None = None,
+        request_queue: Optional["RequestQueue"] = None,
     ):
         self._lidarr_repo = lidarr_repo
         self._request_history = request_history
         self._library_mbids_fn = library_mbids_fn
         self._on_import_callback = on_import_callback
+        self._request_queue = request_queue
         self._queue_cache: list[dict] | None = None
         self._queue_cache_time: float = 0
         self._library_mbids_cache: set[str] | None = None
@@ -129,6 +134,11 @@ class RequestsPageService:
                 message=f"Cannot cancel request with status '{record.status}'",
             )
 
+        # Cancel from local queue first
+        queue_cancelled = False
+        if self._request_queue:
+            queue_cancelled = await self._request_queue.cancel(musicbrainz_id)
+
         try:
             queue_items = await self._get_cached_queue()
         except Exception as e:  # noqa: BLE001
@@ -151,7 +161,8 @@ class RequestsPageService:
                     success=False, message="Couldn't remove the item from the download queue"
                 )
             self._invalidate_queue_cache()
-        else:
+        elif not queue_cancelled:
+            # Not in the local queue or Lidarr's download queue
             library_mbids = await self._fetch_library_mbids()
             if musicbrainz_id.lower() in library_mbids:
                 return CancelRequestResponse(
@@ -184,6 +195,7 @@ class RequestsPageService:
                 message=f"Cannot retry request with status '{record.status}'",
             )
 
+        # If we have a Lidarr album ID, try a targeted search first
         if record.lidarr_album_id:
             result = await self._lidarr_repo.trigger_album_search(
                 [record.lidarr_album_id]
@@ -195,9 +207,27 @@ class RequestsPageService:
                     message=f"Retrying search for {record.album_title}",
                 )
 
-        # Search failed or no Lidarr album ID — fall through to add_album
-        # which handles the "album already exists" case gracefully via its
-        # action="exists" path.
+        # Route through queue for dedup, per-artist locking, and history callbacks
+        if self._request_queue:
+            try:
+                await self._request_history.async_update_status(musicbrainz_id, "pending")
+                enqueued = await self._request_queue.enqueue(musicbrainz_id)
+                if enqueued:
+                    return RetryRequestResponse(
+                        success=True,
+                        message=f"Re-requested {record.album_title}",
+                    )
+                return RetryRequestResponse(
+                    success=True,
+                    message=f"Request already in queue for {record.album_title}",
+                )
+            except Exception as e:  # noqa: BLE001
+                logger.error("Retry via queue failed for %s: %s", musicbrainz_id, e)
+                return RetryRequestResponse(
+                    success=False, message=f"Retry failed: {e}"
+                )
+
+        # Fallback: direct add_album (only if no queue available)
         try:
             add_result = await self._lidarr_repo.add_album(musicbrainz_id)
             payload = add_result.get("payload", {})

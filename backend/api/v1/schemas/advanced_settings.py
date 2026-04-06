@@ -106,6 +106,7 @@ class AdvancedSettings(AppStruct):
     audiodb_prewarm_concurrency: int = 4
     audiodb_prewarm_delay: float = 0.3
     genre_section_ttl: int = 21600
+    request_concurrency: int = 2
     request_history_retention_days: int = 180
     ignored_releases_retention_days: int = 365
     orphan_cover_demote_interval_hours: int = 24
@@ -158,6 +159,7 @@ class AdvancedSettings(AppStruct):
             "sync_stall_timeout_minutes": (2, 30),
             "sync_max_timeout_hours": (1, 48),
             "audiodb_prewarm_concurrency": (1, 8),
+            "request_concurrency": (1, 5),
             "audiodb_prewarm_delay": (0.0, 5.0),
             "discover_queue_size": (1, 20),
             "discover_queue_ttl": (3600, 604800),
@@ -282,6 +284,7 @@ class AdvancedSettingsFrontend(AppStruct):
     sync_max_timeout_hours: int = 8
     audiodb_prewarm_concurrency: int = 4
     audiodb_prewarm_delay: float = 0.3
+    request_concurrency: int = 2
     artist_discovery_precache_concurrency: int = 3
 
     def __post_init__(self) -> None:
@@ -389,6 +392,7 @@ class AdvancedSettingsFrontend(AppStruct):
             "sync_stall_timeout_minutes": (2, 30),
             "sync_max_timeout_hours": (1, 48),
             "audiodb_prewarm_concurrency": (1, 8),
+            "request_concurrency": (1, 5),
             "audiodb_prewarm_delay": (0.0, 5.0),
             "artist_discovery_precache_concurrency": (1, 8),
         }
@@ -474,6 +478,7 @@ class AdvancedSettingsFrontend(AppStruct):
             sync_max_timeout_hours=settings.sync_max_timeout_hours,
             audiodb_prewarm_concurrency=settings.audiodb_prewarm_concurrency,
             audiodb_prewarm_delay=settings.audiodb_prewarm_delay,
+            request_concurrency=settings.request_concurrency,
             artist_discovery_precache_concurrency=settings.artist_discovery_precache_concurrency,
         )
 
@@ -555,5 +560,6 @@ class AdvancedSettingsFrontend(AppStruct):
             sync_max_timeout_hours=self.sync_max_timeout_hours,
             audiodb_prewarm_concurrency=self.audiodb_prewarm_concurrency,
             audiodb_prewarm_delay=self.audiodb_prewarm_delay,
+            request_concurrency=self.request_concurrency,
             artist_discovery_precache_concurrency=self.artist_discovery_precache_concurrency,
         )

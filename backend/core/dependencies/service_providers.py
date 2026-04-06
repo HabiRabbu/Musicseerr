@@ -95,12 +95,43 @@ def get_album_service() -> "AlbumService":
 def get_request_queue() -> "RequestQueue":
     from infrastructure.queue.request_queue import RequestQueue
     from infrastructure.queue.queue_store import QueueStore
+    from infrastructure.persistence.request_history import RequestHistoryRecord
     from core.config import get_settings
     settings = get_settings()
 
     lidarr_repo = get_lidarr_repository()
     disk_cache = get_disk_cache()
     cover_repo = get_coverart_repository()
+    memory_cache = get_cache()
+    library_db = get_library_db()
+
+    async def on_queue_import(record: RequestHistoryRecord) -> None:
+        """Invalidate caches when the queue worker detects an already-imported album."""
+        invalidations = [
+            memory_cache.delete(lidarr_raw_albums_key()),
+            memory_cache.clear_prefix(f"{LIDARR_PREFIX}library:"),
+            memory_cache.delete(lidarr_requested_mbids_key()),
+            memory_cache.delete(f"{ALBUM_INFO_PREFIX}{record.musicbrainz_id}"),
+            memory_cache.delete(f"{LIDARR_ALBUM_DETAILS_PREFIX}{record.musicbrainz_id}"),
+        ]
+        if record.artist_mbid:
+            invalidations.append(
+                memory_cache.delete(f"{ARTIST_INFO_PREFIX}{record.artist_mbid}")
+            )
+        await asyncio.gather(*invalidations, return_exceptions=True)
+        try:
+            await library_db.upsert_album({
+                "mbid": record.musicbrainz_id,
+                "artist_mbid": record.artist_mbid or "",
+                "artist_name": record.artist_name or "",
+                "title": record.album_title or "",
+                "year": record.year,
+                "cover_url": record.cover_url or "",
+                "monitored": True,
+            })
+        except Exception as ex:  # noqa: BLE001
+            logger.warning("Queue import: failed to upsert album %s: %s", record.musicbrainz_id[:8], ex)
+        logger.info("Queue import: invalidated caches for album=%s", record.musicbrainz_id[:8])
 
     async def processor(album_mbid: str) -> dict:
         result = await lidarr_repo.add_album(album_mbid)
@@ -132,7 +163,21 @@ def get_request_queue() -> "RequestQueue":
         return result
 
     store = QueueStore(db_path=settings.queue_db_path)
-    return RequestQueue(processor, store=store)
+    request_history = get_request_history_store()
+
+    concurrency = 2
+    try:
+        from services.preferences_service import PreferencesService
+        prefs = PreferencesService(settings)
+        advanced = prefs.get_advanced_settings()
+        concurrency = advanced.request_concurrency
+    except Exception:  # noqa: BLE001
+        pass
+
+    return RequestQueue(
+        processor, store=store, request_history=request_history,
+        concurrency=concurrency, on_import_callback=on_queue_import,
+    )
 
 
 @singleton
@@ -202,11 +247,18 @@ def get_requests_page_service() -> "RequestsPageService":
             (record.artist_mbid or "?")[:8],
         )
 
+    request_queue = get_request_queue()
+    library_service = get_library_service()
+
+    async def merged_library_mbids() -> set[str]:
+        return set(await library_service.get_library_mbids())
+
     return RequestsPageService(
         lidarr_repo=lidarr_repo,
         request_history=request_history,
-        library_mbids_fn=lidarr_repo.get_library_mbids,
+        library_mbids_fn=merged_library_mbids,
         on_import_callback=on_import,
+        request_queue=request_queue,
     )
 
 

@@ -111,7 +111,7 @@ def build_album_basic_info(
     }
 
 
-def lidarr_to_basic_info(lidarr_album: dict, release_group_id: str, in_library: bool) -> dict:
+def lidarr_to_basic_info(lidarr_album: dict, release_group_id: str, in_library: bool, is_requested: bool = False) -> dict:
     year = None
     if release_date := lidarr_album.get("release_date"):
         try:
@@ -128,7 +128,7 @@ def lidarr_to_basic_info(lidarr_album: dict, release_group_id: str, in_library: 
         "type": lidarr_album.get("album_type"),
         "disambiguation": lidarr_album.get("disambiguation"),
         "in_library": in_library,
-        "requested": not in_library,
+        "requested": is_requested and not in_library,
         "cover_url": lidarr_album.get("cover_url"),
     }
 

@@ -11,9 +11,10 @@ def _make_service(queue_add_result: dict | None = None) -> tuple[RequestService,
     request_queue = MagicMock()
     request_history = MagicMock()
 
-    request_queue.add = AsyncMock(return_value=queue_add_result or {"message": "queued", "payload": {}})
+    request_queue.enqueue = AsyncMock(return_value=True)
     request_queue.get_status = MagicMock(return_value={"queue_size": 0, "processing": False})
     request_history.async_record_request = AsyncMock()
+    request_history.async_get_record = AsyncMock(return_value=None)
 
     service = RequestService(lidarr_repo, request_queue, request_history)
     return service, request_queue, request_history
@@ -21,37 +22,26 @@ def _make_service(queue_add_result: dict | None = None) -> tuple[RequestService,
 
 @pytest.mark.asyncio
 async def test_request_album_records_history_and_returns_response():
-    service, request_queue, request_history = _make_service(
-        {
-            "message": "Album queued",
-            "payload": {
-                "id": 42,
-                "title": "Album X",
-                "foreignAlbumId": "rg-123",
-                "artist": {"artistName": "Artist X", "foreignArtistId": "artist-123"},
-            },
-        }
-    )
+    service, request_queue, request_history = _make_service()
 
     response = await service.request_album("rg-123", artist="Fallback Artist", album="Fallback Album", year=2024)
 
     assert response.success is True
-    assert response.message == "Album queued"
-    assert isinstance(response.lidarr_response, dict)
-    assert response.lidarr_response["id"] == 42
+    assert response.message == "Request accepted"
+    assert response.musicbrainz_id == "rg-123"
+    assert response.status == "pending"
 
-    request_queue.add.assert_awaited_once_with("rg-123")
+    request_queue.enqueue.assert_awaited_once_with("rg-123")
     request_history.async_record_request.assert_awaited_once()
     kwargs = request_history.async_record_request.await_args.kwargs
-    assert kwargs["artist_name"] == "Artist X"
-    assert kwargs["album_title"] == "Album X"
-    assert kwargs["artist_mbid"] == "artist-123"
+    assert kwargs["artist_name"] == "Fallback Artist"
+    assert kwargs["album_title"] == "Fallback Album"
 
 
 @pytest.mark.asyncio
 async def test_request_album_wraps_errors():
     service, request_queue, _ = _make_service()
-    request_queue.add.side_effect = RuntimeError("boom")
+    request_queue.enqueue = AsyncMock(side_effect=RuntimeError("boom"))
 
     with pytest.raises(ExternalServiceError):
         await service.request_album("rg-123")

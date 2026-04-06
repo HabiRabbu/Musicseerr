@@ -38,7 +38,8 @@ def get_lidarr_repository() -> "LidarrRepository":
     settings = get_settings()
     cache = get_cache()
     http_client = _get_configured_http_client()
-    return LidarrRepository(settings, http_client, cache)
+    request_history_store = get_request_history_store()
+    return LidarrRepository(settings, http_client, cache, request_history_store=request_history_store)
 
 
 @singleton

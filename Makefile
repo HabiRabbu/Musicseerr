@@ -112,6 +112,21 @@ backend-test-sync-resume: $(BACKEND_VENV_STAMP) ## Run sync resume-on-failure te
 backend-test-audiodb-parallel: $(BACKEND_VENV_STAMP) ## Run AudioDB parallel prewarm tests
 	cd "$(BACKEND_DIR)" && .venv/bin/python -m pytest tests/test_audiodb_parallel.py -v
 
+backend-test-request-queue: $(BACKEND_VENV_STAMP) ## Run MUS-14 request queue tests (dedup, cancel, concurrency)
+	cd "$(BACKEND_DIR)" && .venv/bin/python -m pytest tests/infrastructure/test_request_queue_mus14.py tests/infrastructure/test_queue_persistence.py -v
+
+backend-test-artist-lock: $(BACKEND_VENV_STAMP) ## Run MUS-14 per-artist lock tests
+	cd "$(BACKEND_DIR)" && .venv/bin/python -m pytest tests/repositories/test_album_artist_lock.py -v
+
+backend-test-request-service: $(BACKEND_VENV_STAMP) ## Run request service tests
+	cd "$(BACKEND_DIR)" && .venv/bin/python -m pytest tests/services/test_request_service.py -v
+
+test-mus14-all: backend-test-request-queue backend-test-artist-lock backend-test-request-service ## Run all MUS-14 request system tests
+	cd "$(BACKEND_DIR)" && .venv/bin/python -m pytest tests/repositories/test_lidarr_library_cache.py -v
+
+backend-test-mus15-status-race: $(BACKEND_VENV_STAMP) ## Run MUS-15 status race condition tests
+	cd "$(BACKEND_DIR)" && .venv/bin/python -m pytest tests/test_mus15_status_race.py -v
+
 test-audiodb-all: backend-test-audiodb backend-test-audiodb-prewarm backend-test-audiodb-settings backend-test-coverart-audiodb backend-test-audiodb-phase8 backend-test-audiodb-phase9 frontend-test-audiodb-images ## Run every AudioDB test target
 
 test-sync-all: backend-test-sync-watchdog backend-test-sync-resume backend-test-audiodb-parallel ## Run all sync robustness tests

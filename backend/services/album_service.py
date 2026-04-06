@@ -295,7 +295,7 @@ class AlbumService:
             in_library = self._check_lidarr_in_library(lidarr_album)
             if lidarr_album and lidarr_album.get("monitored", False):
                 logger.info(f"[BASIC] Using Lidarr for album {release_group_id[:8]}")
-                basic = AlbumBasicInfo(**lidarr_to_basic_info(lidarr_album, release_group_id, in_library))
+                basic = AlbumBasicInfo(**lidarr_to_basic_info(lidarr_album, release_group_id, in_library, is_requested=is_requested))
                 if not basic.album_thumb_url:
                     basic.album_thumb_url = await self._get_audiodb_album_thumb(
                         release_group_id, basic.artist_name, basic.title,

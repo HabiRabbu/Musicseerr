@@ -2,9 +2,8 @@ import logging
 from repositories.protocols import LidarrRepositoryProtocol
 from infrastructure.queue.request_queue import RequestQueue
 from infrastructure.persistence.request_history import RequestHistoryStore
-from api.v1.schemas.request import QueueStatusResponse, RequestResponse
+from api.v1.schemas.request import QueueStatusResponse, RequestAcceptedResponse
 from core.exceptions import ExternalServiceError
-from services.request_utils import extract_cover_url
 
 logger = logging.getLogger(__name__)
 
@@ -20,54 +19,70 @@ class RequestService:
         self._request_queue = request_queue
         self._request_history = request_history
     
-    async def request_album(self, musicbrainz_id: str, artist: str | None = None, album: str | None = None, year: int | None = None) -> RequestResponse:
+    async def request_album(
+        self,
+        musicbrainz_id: str,
+        artist: str | None = None,
+        album: str | None = None,
+        year: int | None = None,
+    ) -> RequestAcceptedResponse:
         if not self._lidarr_repo.is_configured():
-            raise ExternalServiceError("Lidarr is not configured — set a Lidarr API key in Settings to request albums.")
+            raise ExternalServiceError("Lidarr isn't configured. Add an API key in Settings before requesting albums.")
+
         try:
-            result = await self._request_queue.add(musicbrainz_id)
-
-            payload = result.get("payload", {})
-            lidarr_album_id = None
-            cover_url = None
-            artist_mbid = None
-            resolved_artist = artist or "Unknown"
-            resolved_album = album or "Unknown"
-
-            if payload and isinstance(payload, dict):
-                lidarr_album_id = payload.get("id")
-                resolved_album = payload.get("title") or resolved_album
-                cover_url = extract_cover_url(payload)
-
-                artist_data = payload.get("artist", {})
-                if artist_data:
-                    resolved_artist = artist_data.get("artistName") or resolved_artist
-                    artist_mbid = artist_data.get("foreignArtistId")
-
-            try:
-                await self._request_history.async_record_request(
+            # Don't overwrite an active record (pending/downloading) — just re-check the queue.
+            existing = await self._request_history.async_get_record(musicbrainz_id)
+            if existing and existing.status in ("pending", "downloading"):
+                enqueued = await self._request_queue.enqueue(musicbrainz_id)
+                return RequestAcceptedResponse(
+                    success=True,
+                    message="Request already in progress",
                     musicbrainz_id=musicbrainz_id,
-                    artist_name=resolved_artist,
-                    album_title=resolved_album,
-                    year=year,
-                    cover_url=cover_url,
-                    artist_mbid=artist_mbid,
-                    lidarr_album_id=lidarr_album_id,
+                    status=existing.status,
                 )
-            except Exception as e:  # noqa: BLE001
-                logger.error("Failed to persist request history for %s: %s", musicbrainz_id, e)
-
-            return RequestResponse(
-                success=True,
-                message=result["message"],
-                lidarr_response=payload,
+            await self._request_history.async_record_request(
+                musicbrainz_id=musicbrainz_id,
+                artist_name=artist or "Unknown",
+                album_title=album or "Unknown",
+                year=year,
             )
         except Exception as e:  # noqa: BLE001
-            logger.error("Failed to request album %s: %s", musicbrainz_id, e)
-            raise ExternalServiceError(f"Failed to request album: {e}")
+            logger.error("Failed to record request history for %s: %s", musicbrainz_id, e)
+            raise ExternalServiceError(f"Failed to record request: {e}")
+
+        try:
+            enqueued = await self._request_queue.enqueue(musicbrainz_id)
+            if not enqueued:
+                return RequestAcceptedResponse(
+                    success=True,
+                    message="Request already in queue",
+                    musicbrainz_id=musicbrainz_id,
+                    status="pending",
+                )
+        except Exception as e:  # noqa: BLE001
+            logger.error("Failed to enqueue album %s: %s", musicbrainz_id, e)
+            try:
+                from datetime import datetime, timezone
+                await self._request_history.async_update_status(
+                    musicbrainz_id, "failed",
+                    completed_at=datetime.now(timezone.utc).isoformat(),
+                )
+            except Exception:  # noqa: BLE001
+                pass
+            raise ExternalServiceError(f"Failed to enqueue request: {e}")
+
+        return RequestAcceptedResponse(
+            success=True,
+            message="Request accepted",
+            musicbrainz_id=musicbrainz_id,
+            status="pending",
+        )
     
     def get_queue_status(self) -> QueueStatusResponse:
         status = self._request_queue.get_status()
         return QueueStatusResponse(
             queue_size=status["queue_size"],
-            processing=status["processing"]
+            processing=status["processing"],
+            active_workers=status.get("active_workers", 0),
+            max_workers=status.get("max_workers", 1),
         )

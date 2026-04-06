@@ -88,8 +88,20 @@ class QueueStore:
             finally:
                 conn.close()
 
+    def has_active_mbid(self, album_mbid: str) -> bool:
+        """Check if a pending or processing job already exists for this album MBID."""
+        conn = self._connect()
+        try:
+            row = conn.execute(
+                "SELECT 1 FROM pending_jobs WHERE album_mbid = ? AND status IN ('pending', 'processing') LIMIT 1",
+                (album_mbid,),
+            ).fetchone()
+            return row is not None
+        finally:
+            conn.close()
+
     def has_pending_mbid(self, album_mbid: str) -> bool:
-        """Check if a pending job already exists for this album MBID."""
+        """Check if a pending job exists for this album MBID (used by dead-letter retry)."""
         conn = self._connect()
         try:
             row = conn.execute(
@@ -99,6 +111,20 @@ class QueueStore:
             return row is not None
         finally:
             conn.close()
+
+    def remove_by_mbid(self, album_mbid: str) -> bool:
+        """Remove a pending job by album MBID. Returns True if a row was removed."""
+        with self._write_lock:
+            conn = self._connect()
+            try:
+                cursor = conn.execute(
+                    "DELETE FROM pending_jobs WHERE album_mbid = ? AND status = 'pending'",
+                    (album_mbid,),
+                )
+                conn.commit()
+                return cursor.rowcount > 0
+            finally:
+                conn.close()
 
     def get_pending(self) -> list[sqlite3.Row]:
         conn = self._connect()

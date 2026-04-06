@@ -1,6 +1,6 @@
 import logging
 from datetime import datetime
-from typing import Any
+from typing import Any, TYPE_CHECKING
 from models.library import LibraryAlbum, LibraryGroupedAlbum, LibraryGroupedArtist
 from infrastructure.cover_urls import prefer_release_group_cover_url
 from infrastructure.cache.cache_keys import (
@@ -13,10 +13,15 @@ from infrastructure.cache.cache_keys import (
 )
 from .base import LidarrBase
 
+if TYPE_CHECKING:
+    from infrastructure.persistence.request_history import RequestHistoryStore
+
 logger = logging.getLogger(__name__)
 
 
 class LidarrLibraryRepository(LidarrBase):
+    _request_history_store: "RequestHistoryStore | None" = None
+
     async def get_library(self, include_unmonitored: bool = False) -> list[LibraryAlbum]:
         cache_key = lidarr_library_albums_key(include_unmonitored)
         cached_result = await self._cache.get(cache_key)
@@ -226,6 +231,17 @@ class LidarrLibraryRepository(LidarrBase):
         return ids
 
     async def get_requested_mbids(self) -> set[str]:
+        """Return MBIDs of albums with active requests in MusicSeerr."""
+        if self._request_history_store is not None:
+            try:
+                return await self._request_history_store.async_get_active_mbids()
+            except Exception as e:  # noqa: BLE001
+                logger.warning("RequestHistoryStore unavailable, falling back to empty set: %s", e)
+                return set()
+        return set()
+
+    async def get_monitored_no_files_mbids(self) -> set[str]:
+        """Return monitored Lidarr albums that have no downloaded track files."""
         cache_key = lidarr_requested_mbids_key()
 
         cached_result = await self._cache.get(cache_key)

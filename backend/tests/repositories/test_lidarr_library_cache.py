@@ -166,14 +166,32 @@ class TestSharedRawAlbumCache:
                 },
             ]
 
-            library_mbids, requested_mbids = await asyncio.gather(
+            library_mbids, monitored_no_files = await asyncio.gather(
                 repo.get_library_mbids(include_release_ids=False),
-                repo.get_requested_mbids(),
+                repo.get_monitored_no_files_mbids(),
             )
 
             assert mock_get.await_count == 1
             assert library_mbids == {"aaaa"}
-            assert requested_mbids == {"bbbb"}
+            assert monitored_no_files == {"bbbb"}
+
+    @pytest.mark.asyncio
+    async def test_get_requested_mbids_uses_history_store(self, repo):
+        """get_requested_mbids delegates to RequestHistoryStore."""
+        mock_store = AsyncMock()
+        mock_store.async_get_active_mbids = AsyncMock(return_value={"cccc", "dddd"})
+        repo._request_history_store = mock_store
+
+        result = await repo.get_requested_mbids()
+        assert result == {"cccc", "dddd"}
+        mock_store.async_get_active_mbids.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_get_requested_mbids_returns_empty_without_store(self, repo):
+        """get_requested_mbids returns empty set when no history store."""
+        repo._request_history_store = None
+        result = await repo.get_requested_mbids()
+        assert result == set()
 
     @pytest.mark.asyncio
     async def test_explicit_album_cache_invalidation_forces_refetch(self, repo):
