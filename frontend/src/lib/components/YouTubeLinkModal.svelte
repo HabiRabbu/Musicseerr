@@ -31,7 +31,9 @@
 	let searchTimeout: ReturnType<typeof setTimeout> | null = null;
 
 	const isEditing = $derived(editLink !== null);
-	const isValid = $derived(albumName.trim() !== '' && artistName.trim() !== '' && youtubeUrl.trim() !== '');
+	const isValid = $derived(
+		albumName.trim() !== '' && artistName.trim() !== '' && youtubeUrl.trim() !== ''
+	);
 
 	$effect(() => {
 		if (open && editLink) {
@@ -66,9 +68,13 @@
 		searching = true;
 		searchTimeout = setTimeout(async () => {
 			try {
-				const data = await api.global.get<{ results?: Album[] }>(API.search.albums(searchQuery.trim()));
+				const data = await api.global.get<{ results?: Album[] }>(
+					API.search.albums(searchQuery.trim())
+				);
 				searchResults = data.results ?? [];
-			} catch {} finally {
+			} catch {
+				// Ignore errors
+			} finally {
 				searching = false;
 			}
 		}, 400);
@@ -136,7 +142,9 @@
 {#if open}
 	<dialog class="modal modal-open">
 		<div class="modal-box max-w-md">
-			<button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" onclick={handleClose}><X class="h-4 w-4" /></button>
+			<button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" onclick={handleClose}
+				><X class="h-4 w-4" /></button
+			>
 
 			<h3 class="text-lg font-bold flex items-center gap-2 mb-4">
 				<YouTubeIcon class="h-5 w-5 text-red-500" />
@@ -149,14 +157,18 @@
 						role="tab"
 						class="tab"
 						class:tab-active={mode === 'manual'}
-						onclick={() => { mode = 'manual'; }}
-					>Manual Entry</button>
+						onclick={() => {
+							mode = 'manual';
+						}}>Manual Entry</button
+					>
 					<button
 						role="tab"
 						class="tab"
 						class:tab-active={mode === 'search'}
-						onclick={() => { mode = 'search'; }}
-					>Search Album</button>
+						onclick={() => {
+							mode = 'search';
+						}}>Search Album</button
+					>
 				</div>
 			{/if}
 
@@ -179,7 +191,7 @@
 						</div>
 					{:else if searchResults.length > 0}
 						<div class="mt-2 max-h-48 overflow-y-auto rounded-box bg-base-200">
-							{#each searchResults as album}
+							{#each searchResults as album (album.musicbrainz_id)}
 								<button
 									class="flex items-center gap-3 w-full p-2 hover:bg-base-300 transition-colors text-left"
 									onclick={() => selectAlbum(album)}
@@ -193,7 +205,9 @@
 									/>
 									<div class="min-w-0 flex-1">
 										<p class="text-sm font-medium truncate">{album.title}</p>
-										<p class="text-xs opacity-60 truncate">{album.artist}{album.year ? ` (${album.year})` : ''}</p>
+										<p class="text-xs opacity-60 truncate">
+											{album.artist}{album.year ? ` (${album.year})` : ''}
+										</p>
 									</div>
 								</button>
 							{/each}
@@ -266,11 +280,7 @@
 
 			<div class="modal-action">
 				<button class="btn btn-ghost" onclick={handleClose}>Cancel</button>
-				<button
-					class="btn btn-accent"
-					onclick={handleSave}
-					disabled={!isValid || saving}
-				>
+				<button class="btn btn-accent" onclick={handleSave} disabled={!isValid || saving}>
 					{#if saving}
 						<span class="loading loading-spinner loading-xs"></span>
 					{/if}

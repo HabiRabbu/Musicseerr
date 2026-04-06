@@ -29,13 +29,21 @@
 	let showArtistRemovedModal = $state(false);
 	let removedArtistName = $state('');
 
-	const sizeClasses = $derived({
-		sm: { button: 'p-0.5', icon: 'w-2.5 h-2.5', strokeWidth: status === 'library' ? '3' : '2' },
-		md: { button: 'p-1.5', icon: 'h-4 w-4', strokeWidth: status === 'library' ? '3' : '2' },
-		lg: { button: 'p-0', icon: 'h-4 w-4 sm:h-5 sm:w-5', strokeWidth: status === 'library' ? '3' : '2' }
-	}[size]);
+	const sizeClasses = $derived(
+		{
+			sm: { button: 'p-0.5', icon: 'w-2.5 h-2.5', strokeWidth: status === 'library' ? '3' : '2' },
+			md: { button: 'p-1.5', icon: 'h-4 w-4', strokeWidth: status === 'library' ? '3' : '2' },
+			lg: {
+				button: 'p-0',
+				icon: 'h-4 w-4 sm:h-5 sm:w-5',
+				strokeWidth: status === 'library' ? '3' : '2'
+			}
+		}[size]
+	);
 
-	const lgButtonClass = $derived(size === 'lg' ? 'w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center' : '');
+	const lgButtonClass = $derived(
+		size === 'lg' ? 'w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center' : ''
+	);
 	const bgColor = $derived(status === 'library' ? colors.accent : STATUS_COLORS.REQUESTED);
 
 	function handleClick(e: Event) {
@@ -58,14 +66,26 @@
 	class="{positioning} rounded-full shadow-sm transition-colors duration-200 group/badge {sizeClasses.button} {lgButtonClass}"
 	style="background-color: {bgColor};"
 	onclick={handleClick}
-	onmouseenter={(e) => { e.currentTarget.style.backgroundColor = '#ef4444'; }}
-	onmouseleave={(e) => { e.currentTarget.style.backgroundColor = bgColor; }}
+	onmouseenter={(e) => {
+		e.currentTarget.style.backgroundColor = '#ef4444';
+	}}
+	onmouseleave={(e) => {
+		e.currentTarget.style.backgroundColor = bgColor;
+	}}
 	aria-label={status === 'library' ? 'Remove from library' : 'Remove request'}
 >
 	{#if status === 'library'}
-		<Check class="{sizeClasses.icon} group-hover/badge:hidden" color={colors.secondary} strokeWidth={Number(sizeClasses.strokeWidth)} />
+		<Check
+			class="{sizeClasses.icon} group-hover/badge:hidden"
+			color={colors.secondary}
+			strokeWidth={Number(sizeClasses.strokeWidth)}
+		/>
 	{:else}
-		<Clock class="{sizeClasses.icon} group-hover/badge:hidden" color={colors.secondary} strokeWidth={Number(sizeClasses.strokeWidth)} />
+		<Clock
+			class="{sizeClasses.icon} group-hover/badge:hidden"
+			color={colors.secondary}
+			strokeWidth={Number(sizeClasses.strokeWidth)}
+		/>
 	{/if}
 	<Trash2 class="{sizeClasses.icon} hidden group-hover/badge:block" color="white" strokeWidth={2} />
 </button>
@@ -74,15 +94,19 @@
 	<DeleteAlbumModal
 		{albumTitle}
 		{artistName}
-		musicbrainzId={musicbrainzId}
+		{musicbrainzId}
 		ondeleted={handleDeleted}
-		onclose={() => { showDeleteModal = false; }}
+		onclose={() => {
+			showDeleteModal = false;
+		}}
 	/>
 {/if}
 
 {#if showArtistRemovedModal}
 	<ArtistRemovedModal
 		artistName={removedArtistName}
-		onclose={() => { showArtistRemovedModal = false; }}
+		onclose={() => {
+			showArtistRemovedModal = false;
+		}}
 	/>
 {/if}

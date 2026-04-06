@@ -45,7 +45,7 @@
 		emptyDescription
 	}: Props = $props();
 
-	const a = ctrl.adapter;
+	const a = $derived(ctrl.adapter);
 
 	onMount(() => ctrl.init());
 	onDestroy(() => ctrl.cleanup());
@@ -72,7 +72,7 @@
 			<div class="flex gap-3 overflow-x-auto pb-2">
 				{#each ctrl.recentAlbums as album (a.getAlbumId(album))}
 					<button
-						class="flex-shrink-0 w-36 group cursor-pointer transition-transform hover:scale-105 active:scale-95"
+						class="shrink-0 w-36 group cursor-pointer transition-transform hover:scale-105 active:scale-95"
 						onclick={() => ctrl.openDetail(album)}
 					>
 						<div class="aspect-square rounded-lg overflow-hidden shadow-sm relative">
@@ -102,7 +102,7 @@
 			<div class="flex gap-3 overflow-x-auto pb-2">
 				{#each ctrl.favoriteAlbums as album (a.getAlbumId(album))}
 					<button
-						class="flex-shrink-0 w-36 group cursor-pointer transition-transform hover:scale-105 active:scale-95"
+						class="shrink-0 w-36 group cursor-pointer transition-transform hover:scale-105 active:scale-95"
 						onclick={() => ctrl.openDetail(album)}
 					>
 						<div class="aspect-square rounded-lg overflow-hidden shadow-sm">
@@ -156,10 +156,8 @@
 	{/if}
 
 	{#if ctrl.loading}
-		<div
-			class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4"
-		>
-			{#each Array(12) as _}
+		<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+			{#each Array(12) as _, i (i)}
 				<div class="card bg-base-100 shadow-sm animate-pulse">
 					<div class="aspect-square bg-base-300"></div>
 					<div class="card-body p-3">
@@ -170,16 +168,13 @@
 			{/each}
 		</div>
 	{:else}
-		<div
-			class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4"
-		>
+		<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
 			{#each ctrl.albums as album (a.getAlbumId(album))}
 				<div
 					class="card bg-base-100 w-full shadow-sm group relative cursor-pointer transition-transform hover:scale-105 hover:shadow-lg active:scale-95"
 					onclick={() => ctrl.openDetail(album)}
 					onkeydown={(e) =>
-						(e.key === 'Enter' || e.key === ' ') &&
-						(e.preventDefault(), ctrl.openDetail(album))}
+						(e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), ctrl.openDetail(album))}
 					role="button"
 					tabindex="0"
 				>
@@ -203,19 +198,11 @@
 							{/if}
 							{#if contextMenuBackdrop}
 								<div class="rounded-full bg-black/50 backdrop-blur-sm">
-									<ContextMenu
-										items={ctrl.getAlbumMenuItems(album)}
-										position="end"
-										size="xs"
-									/>
+									<ContextMenu items={ctrl.getAlbumMenuItems(album)} position="end" size="xs" />
 								</div>
 							{:else}
 								<div>
-									<ContextMenu
-										items={ctrl.getAlbumMenuItems(album)}
-										position="end"
-										size="xs"
-									/>
+									<ContextMenu items={ctrl.getAlbumMenuItems(album)} position="end" size="xs" />
 								</div>
 							{/if}
 						</div>
@@ -251,7 +238,7 @@
 					</figure>
 
 					<div class="card-body p-3">
-						<h2 class="card-title text-sm line-clamp-2 min-h-[2.5rem]">
+						<h2 class="card-title text-sm line-clamp-2 min-h-10">
 							{a.getAlbumName(album)}
 						</h2>
 						{#if cardBodyExtra}

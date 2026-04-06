@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { browser } from '$app/environment';
 	import { onDestroy, tick } from 'svelte';
-	import { playerStore } from '$lib/stores/player.svelte';
+	import { SvelteMap } from 'svelte/reactivity';
 
 	interface Props {
 		letters: string[];
@@ -15,7 +15,7 @@
 
 	let activeLetter = $state('');
 	let observer: IntersectionObserver | null = null;
-	let sectionRatios = new Map<string, number>();
+	let sectionRatios = new SvelteMap<string, number>();
 	let mobileNavEl: HTMLElement | null = $state(null);
 
 	const letterSet = $derived(new Set(letters));
@@ -57,7 +57,6 @@
 
 		observer?.disconnect();
 		observer = null;
-		sectionRatios = new Map<string, number>();
 
 		if (letters.length === 0) {
 			activeLetter = '';
@@ -99,8 +98,10 @@
 	}
 
 	$effect(() => {
-		letters;
-		sectionIdPrefix;
+		// eslint-disable-next-line @typescript-eslint/no-unused-expressions
+		sectionIdPrefix; // Track reactivity
+		// eslint-disable-next-line @typescript-eslint/no-unused-expressions
+		letters; // Track reactivity
 		if (!browser) return;
 
 		const timeoutId = window.setTimeout(setupObserver, 50);
@@ -131,7 +132,7 @@
 			py-2 px-1 shadow-lg border border-base-content/5"
 		aria-label="Jump to letter"
 	>
-		{#each ALL_LETTERS as letter}
+		{#each ALL_LETTERS as letter (letter)}
 			{@const available = letterSet.has(letter)}
 			{@const active = activeLetter === letter}
 			<button
@@ -159,13 +160,13 @@
 			bg-base-100/90 backdrop-blur-md border-b border-base-content/5 py-2"
 		aria-label="Jump to letter"
 	>
-		{#each ALL_LETTERS as letter}
+		{#each ALL_LETTERS as letter (letter)}
 			{@const available = letterSet.has(letter)}
 			{@const active = activeLetter === letter}
 			<button
 				onclick={() => jumpTo(letter)}
 				disabled={!available}
-				class="shrink-0 min-w-[28px] h-7 flex items-center justify-center text-xs font-medium
+				class="shrink-0 min-w-7 h-7 flex items-center justify-center text-xs font-medium
 					rounded-md transition-colors duration-100
 					{active
 					? 'text-primary-content bg-primary font-bold'

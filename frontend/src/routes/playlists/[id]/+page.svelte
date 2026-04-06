@@ -228,7 +228,7 @@
 		<div class="space-y-6 sm:space-y-8">
 			<div class="skeleton h-10 w-10 rounded-full"></div>
 			<div class="flex flex-col lg:flex-row gap-6 lg:gap-8">
-				<div class="skeleton w-full lg:w-64 xl:w-80 aspect-square rounded-box flex-shrink-0"></div>
+				<div class="skeleton w-full lg:w-64 xl:w-80 aspect-square rounded-box shrink-0"></div>
 				<div class="flex-1 flex flex-col justify-end space-y-4">
 					<div class="skeleton h-4 w-20"></div>
 					<div class="skeleton h-12 w-3/4"></div>
@@ -240,7 +240,7 @@
 				</div>
 			</div>
 			<div class="space-y-2">
-				{#each Array(4) as _}
+				{#each Array(4) as _, i (`loading-track-${i}`)}
 					<div class="skeleton h-14 w-full"></div>
 				{/each}
 			</div>
@@ -270,7 +270,7 @@
 				style="--hero-glow-color: var(--brand-hero);"
 			>
 				<div
-					class="absolute inset-0 bg-gradient-to-b {heroGradient} transition-all duration-1000 rounded-box"
+					class="absolute inset-0 bg-linear-to-b {heroGradient} transition-all duration-1000 rounded-box"
 				></div>
 				<HeroBackdrop
 					imageUrl={heroBgUrl}
@@ -281,7 +281,7 @@
 					position="full"
 				/>
 				<div
-					class="absolute inset-0 bg-gradient-to-b from-transparent via-base-100/50 to-base-100/80 rounded-box pointer-events-none"
+					class="absolute inset-0 bg-linear-to-b from-transparent via-base-100/50 to-base-100/80 rounded-box pointer-events-none"
 				></div>
 
 				<div class="relative z-10 p-4 sm:p-6 lg:p-8">

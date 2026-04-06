@@ -12,18 +12,32 @@
 	import LibraryBadge from './LibraryBadge.svelte';
 	import AlbumCardOverlay from './AlbumCardOverlay.svelte';
 
-	export let album: Album;
-	export let enrichmentSource: EnrichmentSource = 'none';
-	export let onadded: (() => void) | undefined = undefined;
-	export let onremoved: (() => void) | undefined = undefined;
+	interface Props {
+		album: Album;
+		enrichmentSource?: EnrichmentSource;
+		onadded?: (() => void) | undefined;
+		onremoved?: (() => void) | undefined;
+	}
 
-	$: listenTitle = getListenTitle(enrichmentSource, 'album');
+	let {
+		album = $bindable(),
+		enrichmentSource = 'none',
+		onadded = undefined,
+		onremoved = undefined
+	}: Props = $props();
 
-	let requesting = false;
+	let listenTitle = $derived(getListenTitle(enrichmentSource, 'album'));
 
-	$: inLibrary = libraryStore.isInLibrary(album.musicbrainz_id) || album.in_library || false;
-	$: isRequested =
-		!inLibrary && !album.in_library && (album.requested || libraryStore.isRequested(album.musicbrainz_id));
+	let requesting = $state(false);
+
+	let inLibrary = $derived(
+		libraryStore.isInLibrary(album.musicbrainz_id) || album.in_library || false
+	);
+	let isRequested = $derived(
+		!inLibrary &&
+			!album.in_library &&
+			(album.requested || libraryStore.isRequested(album.musicbrainz_id))
+	);
 
 	async function handleRequest(e: Event) {
 		e.stopPropagation();
@@ -59,7 +73,9 @@
 	}
 </script>
 
-<div class="card bg-base-100 w-full shadow-sm flex-shrink-0 group relative transition-all hover:scale-105 hover:shadow-[0_0_20px_rgba(174,213,242,0.15)]">
+<div
+	class="card bg-base-100 w-full shadow-sm shrink-0 group relative transition-all hover:scale-105 hover:shadow-[0_0_20px_rgba(174,213,242,0.15)]"
+>
 	<a
 		href={albumHref(album.musicbrainz_id)}
 		class="block h-full relative z-0 transition-transform active:scale-95"
@@ -97,27 +113,28 @@
 
 			{#if album.listen_count != null}
 				<div class="flex items-center gap-1 mt-1">
-				{#if enrichmentSource === 'lastfm'}
-					<span
-						class="badge badge-sm border-0"
-						style="background-color: rgb(var(--brand-lastfm) / 0.15); color: rgb(var(--brand-lastfm));"
-						title={listenTitle}
-					>
-						Last.fm {formatListenCount(album.listen_count, true)}
-					</span>
-				{:else if enrichmentSource === 'listenbrainz'}
-					<span
-						class="badge badge-sm border-0"
-						style="background-color: rgb(var(--brand-listenbrainz) / 0.15); color: rgb(var(--brand-listenbrainz));"
-						title={listenTitle}
-					>
-						LB {formatListenCount(album.listen_count, true)}
-					</span>
-				{:else}
-					<span class="badge badge-sm badge-ghost" title={listenTitle}>
-						<Music2 class="inline h-3 w-3" /> {formatListenCount(album.listen_count, true)}
-					</span>
-				{/if}
+					{#if enrichmentSource === 'lastfm'}
+						<span
+							class="badge badge-sm border-0"
+							style="background-color: rgb(var(--brand-lastfm) / 0.15); color: rgb(var(--brand-lastfm));"
+							title={listenTitle}
+						>
+							Last.fm {formatListenCount(album.listen_count, true)}
+						</span>
+					{:else if enrichmentSource === 'listenbrainz'}
+						<span
+							class="badge badge-sm border-0"
+							style="background-color: rgb(var(--brand-listenbrainz) / 0.15); color: rgb(var(--brand-listenbrainz));"
+							title={listenTitle}
+						>
+							LB {formatListenCount(album.listen_count, true)}
+						</span>
+					{:else}
+						<span class="badge badge-sm badge-ghost" title={listenTitle}>
+							<Music2 class="inline h-3 w-3" />
+							{formatListenCount(album.listen_count, true)}
+						</span>
+					{/if}
 				</div>
 			{/if}
 		</div>
@@ -164,4 +181,3 @@
 		</button>
 	{/if}
 </div>
-

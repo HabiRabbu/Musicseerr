@@ -40,9 +40,11 @@ function mockFetchSuccess(results: SuggestResult[] = mockResults) {
 }
 
 function mockFetchError() {
-	return vi.fn().mockImplementation(() =>
-		Promise.resolve(makeResponse({ error: 'Internal Server Error' }, 500))
-	);
+	return vi
+		.fn()
+		.mockImplementation(() =>
+			Promise.resolve(makeResponse({ error: 'Internal Server Error' }, 500))
+		);
 }
 
 function renderComponent(props: Record<string, unknown> = {}) {

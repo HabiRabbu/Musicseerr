@@ -28,6 +28,7 @@
 	} from '$lib/api/playlists';
 	import type { PlaylistSummary } from '$lib/api/playlists';
 	import PlaylistMosaic from './PlaylistMosaic.svelte';
+	import { SvelteSet } from 'svelte/reactivity';
 
 	let dialogEl: HTMLDialogElement | undefined = $state();
 	let pendingTracks: QueueItem[] = [];
@@ -35,8 +36,8 @@
 	let playlists = $state<PlaylistSummary[]>([]);
 	let loading = $state(true);
 	let fetchError = $state<string | null>(null);
-	let addedSet = $state(new Set<string>());
-	let addingSet = $state(new Set<string>());
+	let addedSet = new SvelteSet<string>();
+	let addingSet = new SvelteSet<string>();
 	let membership = $state<Record<string, number[]>>({});
 	let newName = $state('');
 	let creating = $state(false);
@@ -58,8 +59,8 @@
 	export function open(items: QueueItem[]) {
 		pendingTracks = items;
 		trackCount = items.length;
-		addedSet = new Set();
-		addingSet = new Set();
+		addedSet.clear();
+		addingSet.clear();
 		membership = {};
 		newName = '';
 		fetchError = null;
@@ -93,24 +94,26 @@
 
 	function showStatus(text: string, type: 'success' | 'error') {
 		statusMessage = { text, type };
-		setTimeout(() => { statusMessage = null; }, 3000);
+		setTimeout(() => {
+			statusMessage = null;
+		}, 3000);
 	}
 
 	async function handleAdd(playlist: PlaylistSummary) {
 		if (addedSet.has(playlist.id) || addingSet.has(playlist.id)) return;
 		if (allTracksExist(playlist.id)) return;
 		if (pendingTracks.length === 0) return;
-		addingSet = new Set([...addingSet, playlist.id]);
+		addingSet.add(playlist.id);
 		try {
 			const existingIndices = new Set(membership[playlist.id] ?? []);
 			const tracksToAdd = pendingTracks.filter((_, i) => !existingIndices.has(i));
 			if (tracksToAdd.length === 0) {
-				addedSet = new Set([...addedSet, playlist.id]);
+				addedSet.add(playlist.id);
 				return;
 			}
 			const trackData = tracksToAdd.map(queueItemToTrackData);
 			await addTracksToPlaylist(playlist.id, trackData);
-			addedSet = new Set([...addedSet, playlist.id]);
+			addedSet.add(playlist.id);
 			const allIndices = Array.from({ length: trackCount }, (_, i) => i);
 			membership = { ...membership, [playlist.id]: allIndices };
 			playlists = playlists.map((p) =>
@@ -118,16 +121,17 @@
 			);
 			const addedCount = trackData.length;
 			if (existingIndices.size > 0) {
-				showStatus(`Added ${addedCount} new track${addedCount === 1 ? '' : 's'} to '${playlist.name}' (${existingIndices.size} already existed)`, 'success');
+				showStatus(
+					`Added ${addedCount} new track${addedCount === 1 ? '' : 's'} to '${playlist.name}' (${existingIndices.size} already existed)`,
+					'success'
+				);
 			} else {
 				showStatus(`Added to '${playlist.name}'`, 'success');
 			}
 		} catch {
 			showStatus("Couldn't add those tracks", 'error');
 		} finally {
-			const next = new Set(addingSet);
-			next.delete(playlist.id);
-			addingSet = next;
+			addingSet.delete(playlist.id);
 		}
 	}
 
@@ -139,7 +143,7 @@
 			const detail = await createPlaylist(name);
 			const trackData = pendingTracks.map(queueItemToTrackData);
 			await addTracksToPlaylist(detail.id, trackData);
-			addedSet = new Set([...addedSet, detail.id]);
+			addedSet.add(detail.id);
 			const allIndices = Array.from({ length: trackCount }, (_, i) => i);
 			membership = { ...membership, [detail.id]: allIndices };
 			playlists = [
@@ -230,7 +234,11 @@
 						<span class="truncate flex-1">{playlist.name}</span>
 						<span class="text-sm text-base-content/60">{playlist.track_count}</span>
 						{#if addedSet.has(playlist.id) || allTracksExist(playlist.id)}
-							<button class="btn btn-ghost btn-sm btn-circle text-success" disabled aria-label="Already in playlist">
+							<button
+								class="btn btn-ghost btn-sm btn-circle text-success"
+								disabled
+								aria-label="Already in playlist"
+							>
 								<Check class="h-4 w-4" />
 							</button>
 						{:else if addingSet.has(playlist.id)}
@@ -265,7 +273,12 @@
 		<div class="modal-action">
 			{#if statusMessage}
 				<div class="flex-1">
-					<div role="alert" class="alert {statusMessage.type === 'success' ? 'alert-success' : 'alert-error'} alert-sm py-1 px-3">
+					<div
+						role="alert"
+						class="alert {statusMessage.type === 'success'
+							? 'alert-success'
+							: 'alert-error'} alert-sm py-1 px-3"
+					>
 						<span class="text-sm">{statusMessage.text}</span>
 					</div>
 				</div>

@@ -259,7 +259,7 @@
 				</tr>
 			</thead>
 			<tbody>
-				{#each types as type}
+				{#each types as type (type.id)}
 					{@const msEnabled = preferences[category].includes(type.id)}
 					{@const lrEnabled = isLidarrEnabled(category, type.id)}
 					{@const mismatch = lrEnabled !== null && msEnabled !== lrEnabled}
@@ -322,7 +322,7 @@
 								value={selectedProfileId}
 								onchange={onProfileChange}
 							>
-								{#each lidarrProfiles as profile}
+								{#each lidarrProfiles as profile (profile.id)}
 									<option value={profile.id}>{profile.name}</option>
 								{/each}
 							</select>

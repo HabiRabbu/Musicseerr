@@ -85,11 +85,11 @@
 							class="input input-bordered join-item flex-1"
 							placeholder="Your Jellyfin API key"
 						/>
-						<button type="button" class="btn join-item" onclick={() => showApiKey = !showApiKey}>
+						<button type="button" class="btn join-item" onclick={() => (showApiKey = !showApiKey)}>
 							{showApiKey ? 'Hide' : 'Show'}
 						</button>
 					</div>
-					<label class="label">
+					<label class="label" for="jellyfin-api-key">
 						<span class="label-text-alt text-base-content/50">Dashboard → API Keys → Create</span>
 					</label>
 				</div>
@@ -104,7 +104,7 @@
 							bind:value={form.data.user_id}
 							class="select select-bordered w-full"
 						>
-							{#each availableUsers as user}
+							{#each availableUsers as user (user.id)}
 								<option value={user.id}>{user.name}</option>
 							{/each}
 						</select>
@@ -121,14 +121,20 @@
 							class="input input-bordered w-full"
 							placeholder="Test connection to select user"
 						/>
-						<label class="label">
-							<span class="label-text-alt text-base-content/50">Test connection to load available users</span>
+						<label class="label" for="jellyfin-user-id">
+							<span class="label-text-alt text-base-content/50">
+								Test connection to load available users
+							</span>
 						</label>
 					</div>
 				{/if}
 
 				{#if form.testResult}
-					<div class="alert" class:alert-success={form.testResult.success} class:alert-error={!form.testResult.success}>
+					<div
+						class="alert"
+						class:alert-success={form.testResult.success}
+						class:alert-error={!form.testResult.success}
+					>
 						<span>{form.testResult.message}</span>
 					</div>
 				{/if}
@@ -155,13 +161,22 @@
 				</div>
 
 				{#if form.message}
-					<div class="alert" class:alert-success={form.messageType === 'success'} class:alert-error={form.messageType === 'error'}>
+					<div
+						class="alert"
+						class:alert-success={form.messageType === 'success'}
+						class:alert-error={form.messageType === 'error'}
+					>
 						<span>{form.message}</span>
 					</div>
 				{/if}
 
 				<div class="flex justify-end gap-2 pt-2">
-					<button type="button" class="btn btn-ghost" onclick={test} disabled={form.testing || !form.data.jellyfin_url || !form.data.api_key}>
+					<button
+						type="button"
+						class="btn btn-ghost"
+						onclick={test}
+						disabled={form.testing || !form.data.jellyfin_url || !form.data.api_key}
+					>
 						{#if form.testing}
 							<span class="loading loading-spinner loading-sm"></span>
 						{/if}

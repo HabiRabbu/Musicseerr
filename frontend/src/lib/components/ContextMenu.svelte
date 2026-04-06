@@ -43,7 +43,11 @@
 
 	function portal(node: HTMLElement) {
 		document.body.appendChild(node);
-		return { destroy() { node.remove(); } };
+		return {
+			destroy() {
+				node.remove();
+			}
+		};
 	}
 
 	function computeMenuPosition() {
@@ -134,9 +138,11 @@
 		style="position: fixed; top: {menuTop}px; left: {menuLeft}px; z-index: 9999;"
 		role="menu"
 		onclick={(e: MouseEvent) => e.stopPropagation()}
-		onkeydown={(e: KeyboardEvent) => { if (e.key === 'Escape' && detailsEl) detailsEl.open = false; }}
+		onkeydown={(e: KeyboardEvent) => {
+			if (e.key === 'Escape' && detailsEl) detailsEl.open = false;
+		}}
 	>
-		{#each items as item}
+		{#each items as item, i (`item-${i}`)}
 			<li>
 				<button
 					role="menuitem"

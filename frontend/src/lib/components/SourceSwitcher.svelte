@@ -1,5 +1,9 @@
 <script lang="ts">
-	import { musicSourceStore, type MusicSource, type MusicSourcePage } from '$lib/stores/musicSource';
+	import {
+		musicSourceStore,
+		type MusicSource,
+		type MusicSourcePage
+	} from '$lib/stores/musicSource';
 	import { integrationStore } from '$lib/stores/integration';
 	import { fromStore } from 'svelte/store';
 
@@ -21,7 +25,9 @@
 	let showSwitcher = $derived(lbEnabled && lfmEnabled);
 
 	$effect(() => {
-		sourceState.current.source;
+		// TODO should be refactored
+		// eslint-disable-next-line @typescript-eslint/no-unused-expressions
+		sourceState.current.source; // Reactivity
 		currentSource = musicSourceStore.getPageSource(pageKey);
 	});
 

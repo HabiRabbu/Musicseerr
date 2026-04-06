@@ -98,7 +98,7 @@
 					onchange={handleSortSelect}
 					aria-label="Sort by"
 				>
-					{#each sortOptions! as opt}
+					{#each sortOptions! as opt (opt.value)}
 						<option value={opt.value} selected={sortBy === opt.value}>{opt.label}</option>
 					{/each}
 				</select>
@@ -109,9 +109,7 @@
 					aria-label={isAscending ? 'Switch to descending sort' : 'Switch to ascending sort'}
 					title={isAscending ? 'Ascending' : 'Descending'}
 				>
-					<ArrowDown
-						class="h-4 w-4 transition-transform {isAscending ? '' : 'rotate-180'}"
-					/>
+					<ArrowDown class="h-4 w-4 transition-transform {isAscending ? '' : 'rotate-180'}" />
 				</button>
 			{/if}
 
@@ -123,7 +121,7 @@
 					aria-label="Filter by genre"
 				>
 					<option value="">All Genres</option>
-					{#each genres! as genre}
+					{#each genres! as genre (genre)}
 						<option value={genre} selected={selectedGenre === genre}>{genre}</option>
 					{/each}
 				</select>

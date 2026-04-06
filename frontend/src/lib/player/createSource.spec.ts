@@ -16,8 +16,8 @@ vi.mock('./audioElement', () => ({
 		load: vi.fn(),
 		addEventListener: vi.fn(),
 		removeEventListener: vi.fn(),
-		error: null,
-	})),
+		error: null
+	}))
 }));
 
 describe('createPlaybackSource', () => {
@@ -27,7 +27,10 @@ describe('createPlaybackSource', () => {
 	});
 
 	it('returns a NativeAudioSource for "jellyfin"', () => {
-		const source = createPlaybackSource('jellyfin', { url: 'https://example.test/audio', seekable: true });
+		const source = createPlaybackSource('jellyfin', {
+			url: 'https://example.test/audio',
+			seekable: true
+		});
 		expect(source).toBeInstanceOf(NativeAudioSource);
 		expect(source.type).toBe('jellyfin');
 	});

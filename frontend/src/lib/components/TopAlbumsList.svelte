@@ -9,6 +9,7 @@
 	import AlbumImage from './AlbumImage.svelte';
 	import LibraryBadge from './LibraryBadge.svelte';
 	import LastFmPlaceholder from './LastFmPlaceholder.svelte';
+	import { SvelteSet } from 'svelte/reactivity';
 
 	interface Props {
 		albums: TopAlbum[];
@@ -18,16 +19,17 @@
 	}
 
 	let { albums, loading = false, configured = true, source = '' }: Props = $props();
-	let requestingIds = $state(new Set<string>());
-	
-	let libraryMbids = $state(new Set<string>());
-	let requestedMbids = $state(new Set<string>());
+
+	let requestingIds = new SvelteSet<string>();
+
+	let libraryMbids = new SvelteSet<string>();
+	let requestedMbids = new SvelteSet<string>();
 	let storeInitialized = $state(false);
-	
+
 	onMount(() => {
-		const unsubscribe = libraryStore.subscribe(state => {
-			libraryMbids = new Set(state.mbidSet);
-			requestedMbids = new Set(state.requestedSet);
+		const unsubscribe = libraryStore.subscribe((state) => {
+			libraryMbids = new SvelteSet(state.mbidSet);
+			requestedMbids = new SvelteSet(state.requestedSet);
 			storeInitialized = state.initialized;
 		});
 		return unsubscribe;
@@ -52,10 +54,10 @@
 
 	async function handleRequest(album: TopAlbum) {
 		if (!album.release_group_mbid) return;
-		
+
 		const id = album.release_group_mbid;
-		requestingIds = new Set([...requestingIds, id]);
-		
+		requestingIds.add(id);
+
 		try {
 			await requestAlbum(id, {
 				artist: album.artist_name ?? undefined,
@@ -63,9 +65,7 @@
 				year: album.year ?? undefined
 			});
 		} finally {
-			const newSet = new Set(requestingIds);
-			newSet.delete(id);
-			requestingIds = newSet;
+			requestingIds.delete(id);
 		}
 	}
 </script>
@@ -75,7 +75,7 @@
 
 	{#if loading}
 		<div class="space-y-2">
-			{#each Array(10) as _}
+			{#each Array(10) as _, i (`skeleton-${i}`)}
 				<div class="flex items-center gap-3 p-2">
 					<div class="skeleton w-12 h-12 rounded"></div>
 					<div class="flex-1">
@@ -98,14 +98,19 @@
 		</div>
 	{:else}
 		<div class="space-y-1">
-			{#each albums as album}
+			{#each albums as album (album.title + album.artist_name)}
 				{#if album.release_group_mbid}
-				<a
-					href={albumHref(album.release_group_mbid)}
-					class="flex items-center gap-3 p-2 rounded-lg hover:bg-base-200 cursor-pointer transition-colors group"
-				>
-						<div class="w-12 h-12 flex-shrink-0 relative">
-							<AlbumImage mbid={album.release_group_mbid} alt={album.title} size="full" className="w-12 h-12 rounded" />
+					<a
+						href={albumHref(album.release_group_mbid)}
+						class="flex items-center gap-3 p-2 rounded-lg hover:bg-base-200 cursor-pointer transition-colors group"
+					>
+						<div class="w-12 h-12 shrink-0 relative">
+							<AlbumImage
+								mbid={album.release_group_mbid}
+								alt={album.title}
+								size="full"
+								className="w-12 h-12 rounded"
+							/>
 							{#if isInLibrary(album)}
 								<LibraryBadge
 									status="library"
@@ -127,57 +132,64 @@
 							{/if}
 						</div>
 
-					<div class="flex-1 min-w-0">
-						<p class="font-medium text-sm truncate">{album.title}</p>
-						<p class="text-xs text-base-content/50 truncate">
-							{#if album.year}{album.year}{/if}
-							{#if album.year && album.listen_count}<span class="mx-1">•</span>{/if}
-							{#if album.listen_count}
-								{album.listen_count.toLocaleString()} plays
-							{/if}
-						</p>
-					</div>
-
-					{#if !isInLibrary(album) && !isRequested(album)}
-						<button
-							type="button"
-							class="btn btn-circle btn-sm opacity-0 group-hover:opacity-100 transition-all flex-shrink-0 hover:scale-110 hover:brightness-110"
-							style="background-color: {colors.accent}; border: none;"
-							onclick={(e) => {
-								e.stopPropagation();
-								e.preventDefault();
-								handleRequest(album);
-							}}
-							disabled={isRequesting(album)}
-							aria-label="Request album"
-						>
-							{#if isRequesting(album)}
-								<span class="loading loading-spinner loading-xs" style="color: {colors.secondary};"></span>
-							{:else}
-								<Download class="h-4 w-4" color={colors.secondary} strokeWidth={2.5} />
-							{/if}
-						</button>
-					{/if}
-				</a>
-				{:else}
-				<div class="flex items-center gap-3 p-2 rounded-lg transition-colors {source === 'lastfm' ? 'opacity-75' : ''}">
-					{#if source === 'lastfm'}
-						<LastFmPlaceholder />
-					{:else}
-						<div class="w-12 h-12 flex-shrink-0 bg-base-300 rounded flex items-center justify-center">
-							<Music2 class="w-6 h-6 opacity-50" />
+						<div class="flex-1 min-w-0">
+							<p class="font-medium text-sm truncate">{album.title}</p>
+							<p class="text-xs text-base-content/50 truncate">
+								{#if album.year}{album.year}{/if}
+								{#if album.year && album.listen_count}<span class="mx-1">•</span>{/if}
+								{#if album.listen_count}
+									{album.listen_count.toLocaleString()} plays
+								{/if}
+							</p>
 						</div>
-					{/if}
 
-					<div class="flex-1 min-w-0">
-						<p class="font-medium text-sm truncate">{album.title}</p>
-						<p class="text-xs text-base-content/50 truncate">
-							{#if album.listen_count}
-								{album.listen_count.toLocaleString()} plays
-							{/if}
-						</p>
+						{#if !isInLibrary(album) && !isRequested(album)}
+							<button
+								type="button"
+								class="btn btn-circle btn-sm opacity-0 group-hover:opacity-100 transition-all shrink-0 hover:scale-110 hover:brightness-110"
+								style="background-color: {colors.accent}; border: none;"
+								onclick={(e) => {
+									e.stopPropagation();
+									e.preventDefault();
+									handleRequest(album);
+								}}
+								disabled={isRequesting(album)}
+								aria-label="Request album"
+							>
+								{#if isRequesting(album)}
+									<span
+										class="loading loading-spinner loading-xs"
+										style="color: {colors.secondary};"
+									></span>
+								{:else}
+									<Download class="h-4 w-4" color={colors.secondary} strokeWidth={2.5} />
+								{/if}
+							</button>
+						{/if}
+					</a>
+				{:else}
+					<div
+						class="flex items-center gap-3 p-2 rounded-lg transition-colors {source === 'lastfm'
+							? 'opacity-75'
+							: ''}"
+					>
+						{#if source === 'lastfm'}
+							<LastFmPlaceholder />
+						{:else}
+							<div class="w-12 h-12 shrink-0 bg-base-300 rounded flex items-center justify-center">
+								<Music2 class="w-6 h-6 opacity-50" />
+							</div>
+						{/if}
+
+						<div class="flex-1 min-w-0">
+							<p class="font-medium text-sm truncate">{album.title}</p>
+							<p class="text-xs text-base-content/50 truncate">
+								{#if album.listen_count}
+									{album.listen_count.toLocaleString()} plays
+								{/if}
+							</p>
+						</div>
 					</div>
-				</div>
 				{/if}
 			{/each}
 		</div>

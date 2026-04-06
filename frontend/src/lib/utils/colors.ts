@@ -52,7 +52,7 @@ export async function extractDominantColor(imgUrl: string): Promise<string> {
 				} else {
 					resolve(DEFAULT_GRADIENT);
 				}
-			} catch (e) {
+			} catch (_e) {
 				resolve(DEFAULT_GRADIENT);
 			}
 		};

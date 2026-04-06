@@ -54,7 +54,7 @@
 		</h3>
 		<HorizontalCarousel>
 			{#each libraryReleases as release (release.id)}
-				<div class="w-36 flex-shrink-0">
+				<div class="w-36 shrink-0">
 					<AlbumCard album={toAlbum(release)} />
 				</div>
 			{/each}

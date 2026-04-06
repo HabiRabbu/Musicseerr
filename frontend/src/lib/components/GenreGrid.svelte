@@ -3,10 +3,14 @@
 	import { imageSettingsStore } from '$lib/stores/imageSettings';
 	import { appendAudioDBSizeSuffix } from '$lib/utils/imageSuffix';
 
-	export let title: string;
-	export let genres: { name: string; listen_count?: number | null; artist_count?: number | null }[];
-	export let genreArtists: Record<string, string | null> | undefined = undefined;
-	export let genreArtistImages: Record<string, string | null> | undefined = undefined;
+	interface Props {
+		title: string;
+		genres: { name: string; listen_count?: number | null; artist_count?: number | null }[];
+		genreArtists?: Record<string, string | null> | undefined;
+		genreArtistImages?: Record<string, string | null> | undefined;
+	}
+
+	let { title, genres, genreArtists = undefined, genreArtistImages = undefined }: Props = $props();
 
 	const genreColors = [
 		'from-rose-500/90 to-pink-700',
@@ -35,8 +39,8 @@
 		return n.toString();
 	}
 
-	let cdnFailedSet = new Set<string>();
-	let loadedSet = new Set<string>();
+	let cdnFailedSet = $state(new Set<string>());
+	let loadedSet = $state(new Set<string>());
 
 	function onCdnError(genreName: string) {
 		cdnFailedSet.add(genreName);
@@ -54,7 +58,7 @@
 		<h2 class="text-lg font-bold sm:text-xl">{title}</h2>
 	</div>
 	<div class="grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-3 md:grid-cols-4 lg:grid-cols-5">
-		{#each genres.slice(0, 20) as genre}
+		{#each genres.slice(0, 20) as genre (genre.name)}
 			{@const artistMbid = genreArtists?.[genre.name]}
 			{@const cdnUrl = genreArtistImages?.[genre.name] ?? null}
 			{@const useCdn =
@@ -65,10 +69,10 @@
 				href="/genre?name={encodeURIComponent(genre.name)}"
 				class="group relative isolate overflow-hidden rounded-xl text-white shadow-md transition-all duration-300 hover:shadow-xl hover:ring-2 hover:ring-white/20 active:scale-[0.97]"
 			>
-				<div class="aspect-[16/10]"></div>
+				<div class="aspect-16/10"></div>
 
 				<div
-					class="absolute inset-0 bg-gradient-to-br {getGenreColor(genre.name)}"
+					class="absolute inset-0 bg-linear-to-br {getGenreColor(genre.name)}"
 					style="z-index: 1;"
 				></div>
 
@@ -86,8 +90,8 @@
 						style="z-index: 5;"
 						loading="lazy"
 						referrerpolicy="no-referrer"
-						on:error={() => onCdnError(genre.name)}
-						on:load={() => onImgLoad(genre.name)}
+						onerror={() => onCdnError(genre.name)}
+						onload={() => onImgLoad(genre.name)}
 					/>
 				{:else if artistMbid}
 					<img
@@ -98,12 +102,12 @@
 							: 'opacity-0'}"
 						style="z-index: 5;"
 						loading="lazy"
-						on:load={() => onImgLoad(genre.name)}
+						onload={() => onImgLoad(genre.name)}
 					/>
 				{/if}
 
 				<div
-					class="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent"
+					class="absolute inset-0 bg-linear-to-t from-black/60 via-black/20 to-transparent"
 					style="z-index: 6;"
 				></div>
 

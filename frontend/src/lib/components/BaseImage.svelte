@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { run } from 'svelte/legacy';
+
 	import { onDestroy } from 'svelte';
 	import { lazyImage, resetLazyImage } from '$lib/utils/lazyImage';
 	import { PLACEHOLDER_COLORS, API_SIZES } from '$lib/constants';
@@ -7,28 +9,43 @@
 	import { appendAudioDBSizeSuffix } from '$lib/utils/imageSuffix';
 	import { getApiUrl } from '$lib/utils/api';
 
-	export let mbid: string;
-	export let alt: string = 'Image';
-	export let size: 'xs' | 'sm' | 'md' | 'lg' | 'xl' | 'hero' | 'full' = 'md';
-	export let lazy: boolean = true;
-	export let showPlaceholder: boolean = true;
-	export let className: string = '';
-	export let rounded: 'none' | 'sm' | 'md' | 'lg' | 'xl' | 'full' = 'lg';
-	export let customUrl: string | null = null;
-	export let remoteUrl: string | null = null;
-	export let imageType: 'album' | 'artist' = 'album';
+	interface Props {
+		mbid: string;
+		alt?: string;
+		size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl' | 'hero' | 'full';
+		lazy?: boolean;
+		showPlaceholder?: boolean;
+		className?: string;
+		rounded?: 'none' | 'sm' | 'md' | 'lg' | 'xl' | 'full';
+		customUrl?: string | null;
+		remoteUrl?: string | null;
+		imageType?: 'album' | 'artist';
+	}
+
+	let {
+		mbid,
+		alt = 'Image',
+		size = 'md',
+		lazy = true,
+		showPlaceholder = true,
+		className = '',
+		rounded = 'lg',
+		customUrl = null,
+		remoteUrl = null,
+		imageType = 'album'
+	}: Props = $props();
 
 	const MAX_RETRIES = 3;
 	const RETRY_DELAYS = [2000, 4000, 8000];
 
-	let imgError = false;
-	let imgLoaded = false;
-	let remoteError = false;
-	let imgElement: HTMLImageElement | null = null;
-	let currentSource = '';
-	let retryCount = 0;
-	let retryTimer: ReturnType<typeof setTimeout> | null = null;
-	let retrySourceKey = '';
+	let imgError = $state(false);
+	let imgLoaded = $state(false);
+	let remoteError = $state(false);
+	let imgElement: HTMLImageElement | null = $state(null);
+	let currentSource = $state('');
+	let retryCount = $state(0);
+	let retryTimer: ReturnType<typeof setTimeout> | null = $state(null);
+	let retrySourceKey = $state('');
 
 	const albumSizeClasses: Record<typeof size, string> = {
 		xs: 'w-8 h-8',
@@ -69,32 +86,36 @@
 		full: API_SIZES.FULL
 	};
 
-	$: useRemoteUrl = remoteUrl && $imageSettingsStore.directRemoteImagesEnabled;
-	$: resolvedRemoteUrl = remoteUrl ? appendAudioDBSizeSuffix(remoteUrl, size) : null;
+	let useRemoteUrl = $derived(remoteUrl && $imageSettingsStore.directRemoteImagesEnabled);
+	let resolvedRemoteUrl = $derived(remoteUrl ? appendAudioDBSizeSuffix(remoteUrl, size) : null);
 
-	$: canonicalAlbumCoverUrl =
+	let canonicalAlbumCoverUrl = $derived(
 		imageType === 'album' && isValidMbid(mbid)
 			? getApiUrl(`/api/v1/covers/release-group/${mbid}?size=${apiSizes[size]}`)
-			: null;
-	$: validMbid = imageType === 'artist' ? isValidMbid(mbid) : true;
-	$: hasSource =
+			: null
+	);
+	let validMbid = $derived(imageType === 'artist' ? isValidMbid(mbid) : true);
+	let hasSource = $derived(
 		(useRemoteUrl && resolvedRemoteUrl) ||
-		(imageType === 'album' ? canonicalAlbumCoverUrl || customUrl || mbid : validMbid);
-	$: apiEndpoint = imageType === 'album' ? 'release-group' : 'artist';
-	$: fallbackCoverUrl = getApiUrl(`/api/v1/covers/${apiEndpoint}/${mbid}?size=${apiSizes[size]}`);
-	$: coverUrl =
+			(imageType === 'album' ? canonicalAlbumCoverUrl || customUrl || mbid : validMbid)
+	);
+	let apiEndpoint = $derived(imageType === 'album' ? 'release-group' : 'artist');
+	let fallbackCoverUrl = $derived(
+		getApiUrl(`/api/v1/covers/${apiEndpoint}/${mbid}?size=${apiSizes[size]}`)
+	);
+	let coverUrl = $derived(
 		imageType === 'album'
 			? (canonicalAlbumCoverUrl ?? customUrl ?? fallbackCoverUrl)
-			: fallbackCoverUrl;
-	$: retryCoverUrl =
-		retryCount > 0
-			? coverUrl + (coverUrl.includes('?') ? '&' : '?') + `_r=${retryCount}`
-			: coverUrl;
-	$: sizeClasses = imageType === 'album' ? albumSizeClasses : artistSizeClasses;
-	$: sizeClass = sizeClasses[size];
-	$: roundedClass = roundedClasses[rounded];
+			: fallbackCoverUrl
+	);
+	let retryCoverUrl = $derived(
+		retryCount > 0 ? coverUrl + (coverUrl.includes('?') ? '&' : '?') + `_r=${retryCount}` : coverUrl
+	);
+	let sizeClasses = $derived(imageType === 'album' ? albumSizeClasses : artistSizeClasses);
+	let sizeClass = $derived(sizeClasses[size]);
+	let roundedClass = $derived(roundedClasses[rounded]);
 
-	$: {
+	run(() => {
 		const newKey = coverUrl;
 		if (newKey !== retrySourceKey) {
 			retrySourceKey = newKey;
@@ -108,9 +129,9 @@
 				imgLoaded = false;
 			}
 		}
-	}
+	});
 
-	$: {
+	run(() => {
 		const source = imageType === 'album' ? (canonicalAlbumCoverUrl ?? customUrl ?? mbid) : mbid;
 		if (source && imgElement && source !== currentSource) {
 			currentSource = source;
@@ -118,12 +139,12 @@
 			imgLoaded = false;
 			resetLazyImage(imgElement, retryCoverUrl);
 		}
-	}
+	});
 
-	$: {
+	run(() => {
 		remoteError = false;
 		if (remoteUrl) imgLoaded = false;
-	}
+	});
 
 	function onRemoteError() {
 		remoteError = true;
@@ -167,7 +188,7 @@
 </script>
 
 <div
-	class="relative overflow-hidden flex-shrink-0 {sizeClass} {roundedClass} {className}"
+	class="relative overflow-hidden shrink-0 {sizeClass} {roundedClass} {className}"
 	style="background-color: {PLACEHOLDER_COLORS.DARK};"
 >
 	{#if showPlaceholder && (!imgLoaded || imgError || !hasSource)}
@@ -223,8 +244,8 @@
 			referrerpolicy="no-referrer"
 			loading={lazy ? 'lazy' : 'eager'}
 			decoding="async"
-			on:error={onRemoteError}
-			on:load={onImgLoad}
+			onerror={onRemoteError}
+			onload={onImgLoad}
 		/>
 	{:else if hasSource && !imgError}
 		{#if lazy}
@@ -237,8 +258,8 @@
 				decoding="async"
 				use:lazyImage
 				use:bindImgElement
-				on:error={onImgError}
-				on:load={onImgLoad}
+				onerror={onImgError}
+				onload={onImgLoad}
 			/>
 		{:else}
 			<img
@@ -248,8 +269,8 @@
 				class:opacity-0={!imgLoaded}
 				loading="lazy"
 				decoding="async"
-				on:error={onImgError}
-				on:load={onImgLoad}
+				onerror={onImgError}
+				onload={onImgLoad}
 			/>
 		{/if}
 	{/if}

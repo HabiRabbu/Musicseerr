@@ -24,7 +24,15 @@
 	import { getCoverUrl } from '$lib/utils/errorHandling';
 	import { api } from '$lib/api/client';
 	import NowPlayingIndicator from '$lib/components/NowPlayingIndicator.svelte';
-	import type { JellyfinTrackInfo, LocalTrackInfo, NavidromeTrackInfo, NavidromeAlbumDetail, JellyfinAlbumSummary, LocalAlbumSummary, NavidromeAlbumSummary } from '$lib/types';
+	import type {
+		JellyfinTrackInfo,
+		LocalTrackInfo,
+		NavidromeTrackInfo,
+		NavidromeAlbumDetail,
+		JellyfinAlbumSummary,
+		LocalAlbumSummary,
+		NavidromeAlbumSummary
+	} from '$lib/types';
 
 	type SourceType = 'jellyfin' | 'local' | 'navidrome';
 
@@ -55,9 +63,11 @@
 	let canNavigate = $derived(!!mbid || !!albumName);
 	let canNavigateArtist = $derived(!!artistMbid);
 	let trackCount = $derived(
-		sourceType === 'jellyfin' ? jellyfinTracks.length
-		: sourceType === 'navidrome' ? navidromeTracks.length
-		: localTracks.length
+		sourceType === 'jellyfin'
+			? jellyfinTracks.length
+			: sourceType === 'navidrome'
+				? navidromeTracks.length
+				: localTracks.length
 	);
 
 	function getAlbumCoverUrl(): string {
@@ -113,22 +123,29 @@
 		try {
 			if (sourceType === 'jellyfin') {
 				const jfAlbum = album as JellyfinAlbumSummary;
-				const data = await api.global.get<JellyfinTrackInfo[]>(API.jellyfinLibrary.albumTracks(jfAlbum.jellyfin_id));
+				const data = await api.global.get<JellyfinTrackInfo[]>(
+					API.jellyfinLibrary.albumTracks(jfAlbum.jellyfin_id)
+				);
 				if (id !== fetchId) return;
 				jellyfinTracks = data;
 			} else if (sourceType === 'navidrome') {
 				const ndAlbum = album as NavidromeAlbumSummary;
-				const detail = await api.global.get<NavidromeAlbumDetail>(API.navidromeLibrary.albumDetail(ndAlbum.navidrome_id));
+				const detail = await api.global.get<NavidromeAlbumDetail>(
+					API.navidromeLibrary.albumDetail(ndAlbum.navidrome_id)
+				);
 				if (id !== fetchId) return;
 				navidromeTracks = detail.tracks ?? [];
 			} else {
 				const localAlbum = album as LocalAlbumSummary;
-				const data = await api.global.get<LocalTrackInfo[]>(API.local.albumTracks(localAlbum.lidarr_album_id));
+				const data = await api.global.get<LocalTrackInfo[]>(
+					API.local.albumTracks(localAlbum.lidarr_album_id)
+				);
 				if (id !== fetchId) return;
 				localTracks = data;
 			}
 		} catch (e) {
-			if (id === fetchId) trackError = e instanceof Error ? e.message : "Couldn't load the track list";
+			if (id === fetchId)
+				trackError = e instanceof Error ? e.message : "Couldn't load the track list";
 		} finally {
 			if (id === fetchId) loadingTracks = false;
 		}
@@ -256,21 +273,12 @@
 	function buildAlbumQueueItems(): QueueItem[] {
 		const meta = getTrackMeta();
 		if (sourceType === 'jellyfin') {
-			return buildQueueItemsFromJellyfin(
-				[...jellyfinTracks].sort(compareDiscTrack),
-				meta
-			);
+			return buildQueueItemsFromJellyfin([...jellyfinTracks].sort(compareDiscTrack), meta);
 		}
 		if (sourceType === 'navidrome') {
-			return buildQueueItemsFromNavidrome(
-				[...navidromeTracks].sort(compareDiscTrack),
-				meta
-			);
+			return buildQueueItemsFromNavidrome([...navidromeTracks].sort(compareDiscTrack), meta);
 		}
-		return buildQueueItemsFromLocal(
-			[...localTracks].sort(compareDiscTrack),
-			meta
-		);
+		return buildQueueItemsFromLocal([...localTracks].sort(compareDiscTrack), meta);
 	}
 
 	function addAllToQueue(): void {
@@ -378,7 +386,7 @@
 	<dialog class="modal modal-open">
 		<div class="modal-box max-w-4xl p-0 overflow-hidden">
 			<div class="flex gap-5 p-6 pb-4">
-				<div class="flex-shrink-0">
+				<div class="shrink-0">
 					{#if canNavigate}
 						<button
 							onclick={goToAlbum}
@@ -444,7 +452,9 @@
 								<span class="badge badge-sm badge-ghost">{localAlbum.primary_format}</span>
 							{/if}
 							{#if localAlbum.total_size_bytes > 0}
-								<span class="badge badge-sm badge-ghost">{formatSize(localAlbum.total_size_bytes)}</span>
+								<span class="badge badge-sm badge-ghost"
+									>{formatSize(localAlbum.total_size_bytes)}</span
+								>
 							{/if}
 						{/if}
 						{#if !mbid && albumName}
@@ -453,9 +463,8 @@
 					</div>
 				</div>
 
-				<button
-					class="btn btn-sm btn-circle btn-ghost self-start -mr-2 -mt-2"
-					onclick={handleClose}><X class="h-4 w-4" /></button
+				<button class="btn btn-sm btn-circle btn-ghost self-start -mr-2 -mt-2" onclick={handleClose}
+					><X class="h-4 w-4" /></button
 				>
 			</div>
 
@@ -475,7 +484,7 @@
 
 			<div class="divider my-0 px-6"></div>
 
-			<div class="px-6 pt-3 pb-5 max-h-[28rem] overflow-y-auto">
+			<div class="px-6 pt-3 pb-5 max-h-112 overflow-y-auto">
 				{#if loadingTracks}
 					<div class="flex justify-center py-6">
 						<span class="loading loading-spinner loading-md"></span>
@@ -487,52 +496,57 @@
 					</div>
 				{:else if trackCount > 0}
 					<div class="flex flex-col">
-						{#each { length: trackCount } as _, i}
+						{#each { length: trackCount } as _, i (`track-${i}`)}
 							{@const trackNum = getTrackNumber(i)}
 							{@const discNum = getTrackDiscNumber(i)}
 							{@const playing = isTrackPlaying(trackNum, discNum)}
-							<div class="group/row flex items-center gap-2 w-full py-1 px-1 rounded-lg transition-colors {playing
-								? 'bg-accent/10'
-								: 'hover:bg-base-200'}">
+							<div
+								class="group/row flex items-center gap-2 w-full py-1 px-1 rounded-lg transition-colors {playing
+									? 'bg-accent/10'
+									: 'hover:bg-base-200'}"
+							>
 								<button
 									class="flex items-center gap-3 flex-1 py-1.5 px-1 rounded-lg text-left group/track"
 									onclick={() => playTrack(i)}
 								>
 									<span
-										class="font-mono w-6 text-right text-sm flex-shrink-0 {playing ? 'text-accent' : 'opacity-40'}"
-										>
+										class="font-mono w-6 text-right text-sm shrink-0 {playing
+											? 'text-accent'
+											: 'opacity-40'}"
+									>
 										{#if playing}
 											<NowPlayingIndicator />
 										{:else}
 											{trackNum}
 										{/if}
 									</span>
-									<span
-										class="text-sm truncate flex-1 {playing ? 'text-accent' : ''}"
+									<span class="text-sm truncate flex-1 {playing ? 'text-accent' : ''}"
 										>{getTrackName(i)}</span
 									>
 									{#if sourceType === 'jellyfin'}
 										{@const dur = jellyfinTracks[i]?.duration_seconds}
 										{#if dur}
-											<span class="text-xs opacity-40 flex-shrink-0">{formatDuration(dur)}</span>
+											<span class="text-xs opacity-40 shrink-0">{formatDuration(dur)}</span>
 										{/if}
 									{:else if sourceType === 'navidrome'}
 										{@const dur = navidromeTracks[i]?.duration_seconds}
 										{#if dur}
-											<span class="text-xs opacity-40 flex-shrink-0">{formatDuration(dur)}</span>
+											<span class="text-xs opacity-40 shrink-0">{formatDuration(dur)}</span>
 										{/if}
 									{:else}
 										{@const lt = localTracks[i]}
 										{#if lt?.duration_seconds}
-											<span class="text-xs opacity-40 flex-shrink-0"
+											<span class="text-xs opacity-40 shrink-0"
 												>{formatDuration(lt.duration_seconds)}</span
 											>
 										{/if}
 									{/if}
 									<span class={playing ? 'text-accent' : ''}>
-										<Play class="h-4 w-4 flex-shrink-0 transition-opacity {playing
+										<Play
+											class="h-4 w-4 shrink-0 transition-opacity {playing
 												? 'opacity-100'
-												: 'text-accent opacity-0 group-hover/track:opacity-100'} fill-current" />
+												: 'text-accent opacity-0 group-hover/track:opacity-100'} fill-current"
+										/>
 									</span>
 								</button>
 								<div>

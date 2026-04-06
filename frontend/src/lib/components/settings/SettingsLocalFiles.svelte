@@ -5,7 +5,9 @@
 	import type { LocalFilesConnectionSettings } from '$lib/types';
 
 	type LocalFilesTestResult = { success: boolean; message: string; track_count?: number };
-	type LocalFilesSettingsForm = ReturnType<typeof createSettingsForm<LocalFilesConnectionSettings>> & {
+	type LocalFilesSettingsForm = ReturnType<
+		typeof createSettingsForm<LocalFilesConnectionSettings>
+	> & {
 		testResult: LocalFilesTestResult | null;
 	};
 
@@ -89,8 +91,8 @@
 						oninput={resetVerification}
 					/>
 					<p class="text-xs text-base-content/50 mt-1 ml-1">
-						The root folder path as configured in Lidarr. Used to map Lidarr file paths to
-						local mount paths.
+						The root folder path as configured in Lidarr. Used to map Lidarr file paths to local
+						mount paths.
 					</p>
 				</div>
 

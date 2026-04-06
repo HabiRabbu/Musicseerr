@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Download , Play} from 'lucide-svelte';
+	import { Download, Play } from 'lucide-svelte';
 	import { API, TOAST_DURATION } from '$lib/constants';
 	import { toastStore } from '$lib/stores/toast';
 	import { launchTrackPlayback } from '$lib/player/launchTrackPlayback';
@@ -25,7 +25,21 @@
 		onQuotaUpdate: (quota: YouTubeQuotaStatus) => void;
 	}
 
-	let { trackNumber, discNumber = 1, trackName, trackLink, allTrackLinks, albumId, albumName, artistName, coverUrl, artistId, apiConfigured, onGenerated, onQuotaUpdate }: Props = $props();
+	let {
+		trackNumber,
+		discNumber = 1,
+		trackName,
+		trackLink,
+		allTrackLinks,
+		albumId,
+		albumName,
+		artistName,
+		coverUrl,
+		artistId,
+		apiConfigured,
+		onGenerated,
+		onQuotaUpdate
+	}: Props = $props();
 
 	let generating = $state(false);
 
@@ -38,7 +52,13 @@
 		const currentKey = getDiscTrackKey({ disc_number: discNumber, track_number: trackNumber });
 		const idx = sortedTrackLinks.findIndex((tl) => getDiscTrackKey(tl) === currentKey);
 		if (idx === -1) return;
-		launchTrackPlayback(sortedTrackLinks, idx, false, { albumId, albumName, artistName, coverUrl: playerCoverUrl, artistId });
+		launchTrackPlayback(sortedTrackLinks, idx, false, {
+			albumId,
+			albumName,
+			artistName,
+			coverUrl: playerCoverUrl,
+			artistId
+		});
 	}
 
 	async function generateLink(): Promise<void> {
@@ -81,15 +101,18 @@
 	}
 </script>
 
-{#if !hasLink && !apiConfigured}
-{:else if generating}
-	<button class="btn btn-sm btn-ghost rounded-lg gap-1.5 flex-shrink-0" disabled aria-label="Generating link">
+{#if !hasLink && !apiConfigured}{:else if generating}
+	<button
+		class="btn btn-sm btn-ghost rounded-lg gap-1.5 shrink-0"
+		disabled
+		aria-label="Generating link"
+	>
 		<span class="loading loading-spinner loading-xs"></span>
 		<YouTubeIcon class="h-4 w-4" />
 	</button>
 {:else}
 	<button
-		class="btn btn-sm rounded-lg gap-1.5 flex-shrink-0"
+		class="btn btn-sm rounded-lg gap-1.5 shrink-0"
 		class:btn-error={hasLink}
 		class:btn-ghost={!hasLink}
 		onclick={handleClick}
@@ -98,7 +121,7 @@
 		{#if hasLink}
 			<Play class="h-4 w-4 fill-current" />
 		{:else}
-		<Download class="h-4 w-4" />
+			<Download class="h-4 w-4" />
 		{/if}
 		<YouTubeIcon class="h-4 w-4" />
 	</button>

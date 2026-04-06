@@ -21,7 +21,7 @@ function createErrorModalStore() {
 			set({ show: true, title, message, details });
 		},
 		hide: () => {
-			update(state => ({ ...state, show: false }));
+			update((state) => ({ ...state, show: false }));
 		},
 		reset: () => {
 			set({ show: false, title: '', message: '', details: '' });

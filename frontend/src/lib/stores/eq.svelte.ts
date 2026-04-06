@@ -1,4 +1,10 @@
-import { EQ_BAND_COUNT, EQ_MIN_GAIN, EQ_MAX_GAIN, EQ_PRESETS, type EqPresetName } from '$lib/stores/eqPresets';
+import {
+	EQ_BAND_COUNT,
+	EQ_MIN_GAIN,
+	EQ_MAX_GAIN,
+	EQ_PRESETS,
+	type EqPresetName
+} from '$lib/stores/eqPresets';
 import { tryGetAudioEngine } from '$lib/player/audioElement';
 
 const STORAGE_KEY = 'musicseerr_eq_settings';
@@ -63,10 +69,7 @@ function createEqStore() {
 		if (persistTimer) clearTimeout(persistTimer);
 		persistTimer = setTimeout(() => {
 			persistTimer = null;
-			localStorage.setItem(
-				STORAGE_KEY,
-				JSON.stringify({ enabled, gains, activePreset })
-			);
+			localStorage.setItem(STORAGE_KEY, JSON.stringify({ enabled, gains, activePreset }));
 		}, PERSIST_DEBOUNCE_MS);
 	}
 

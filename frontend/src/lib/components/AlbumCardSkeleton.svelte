@@ -1,7 +1,7 @@
 <script lang="ts">
 </script>
 
-<div class="card bg-base-100 w-full shadow-sm flex-shrink-0">
+<div class="card bg-base-100 w-full shadow-sm shrink-0">
 	<figure class="aspect-square overflow-hidden relative">
 		<div class="skeleton skeleton-shimmer w-full h-full absolute inset-0"></div>
 	</figure>

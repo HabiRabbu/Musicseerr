@@ -3,16 +3,26 @@
 	import { artistHref } from '$lib/utils/entityRoutes';
 	import ArtistImage from './ArtistImage.svelte';
 
-	export let artist: Artist;
+	interface Props {
+		artist: Artist;
+	}
+
+	let { artist }: Props = $props();
 </script>
 
 <a
 	href={artistHref(artist.musicbrainz_id)}
-	class="card bg-base-100 w-full shadow-sm flex-shrink-0 transition-all hover:scale-105 hover:shadow-[0_0_20px_rgba(174,213,242,0.15)]"
+	class="card bg-base-100 w-full shadow-sm shrink-0 transition-all hover:scale-105 hover:shadow-[0_0_20px_rgba(174,213,242,0.15)]"
 	aria-label="Open {artist.title}"
 >
 	<figure class="aspect-square p-3">
-		<ArtistImage mbid={artist.musicbrainz_id} alt={artist.title} size="full" remoteUrl={artist.thumb_url ?? null} className="w-full h-full" />
+		<ArtistImage
+			mbid={artist.musicbrainz_id}
+			alt={artist.title}
+			size="full"
+			remoteUrl={artist.thumb_url ?? null}
+			className="w-full h-full"
+		/>
 	</figure>
 
 	<div class="card-body p-2 pt-0 items-center text-center">

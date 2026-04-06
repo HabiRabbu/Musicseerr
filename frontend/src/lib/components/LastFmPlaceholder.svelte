@@ -7,7 +7,7 @@
 </script>
 
 <div
-	class="tooltip tooltip-right flex-shrink-0 {size} rounded flex items-center justify-center"
+	class="tooltip tooltip-right shrink-0 {size} rounded flex items-center justify-center"
 	style="background-color: rgb(var(--brand-lastfm) / 0.12);"
 	data-tip="Album info unavailable from Last.fm"
 >

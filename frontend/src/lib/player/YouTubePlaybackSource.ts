@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-namespace */
 import type { PlaybackSource, PlaybackState } from './types';
 
 declare global {
@@ -49,7 +50,11 @@ const apiReadyQueue: { resolve: () => void; reject: (err: Error) => void }[] = [
 function flushQueue(error?: Error): void {
 	const pending = apiReadyQueue.splice(0);
 	for (const { resolve, reject } of pending) {
-		error ? reject(error) : resolve();
+		if (error) {
+			reject(error);
+		} else {
+			resolve();
+		}
 	}
 }
 
@@ -111,7 +116,12 @@ export class YouTubePlaybackSource implements PlaybackSource {
 		this.elementId = elementId;
 	}
 
-	async load(info: { trackSourceId?: string; url?: string; token?: string; format?: string }): Promise<void> {
+	async load(info: {
+		trackSourceId?: string;
+		url?: string;
+		token?: string;
+		format?: string;
+	}): Promise<void> {
 		if (!info.trackSourceId) throw new Error('trackSourceId is required for YouTube source');
 
 		await loadYouTubeAPI();

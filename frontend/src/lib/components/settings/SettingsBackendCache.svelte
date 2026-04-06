@@ -7,8 +7,8 @@
 
 <div class="alert alert-info alert-soft mb-4">
 	<span class="text-sm"
-		>Server-side TTLs control API/data cache freshness for all clients. Lower values fetch
-		from upstream services more often; higher values reduce backend/API load.</span
+		>Server-side TTLs control API/data cache freshness for all clients. Lower values fetch from
+		upstream services more often; higher values reduce backend/API load.</span
 	>
 </div>
 <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 pt-2">

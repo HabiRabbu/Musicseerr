@@ -1,5 +1,6 @@
+/* eslint-disable @typescript-eslint/no-unsafe-function-type */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import type { QueueItem, SourceType } from '$lib/player/types';
+import type { QueueItem } from '$lib/player/types';
 
 type StateCallback = (state: import('$lib/player/types').PlaybackState) => void;
 type ProgressCallback = (currentTime: number, duration: number) => void;
@@ -25,18 +26,24 @@ vi.mock('$lib/player/createSource', () => ({
 			getDuration: vi.fn(() => 180),
 			isSeekable: vi.fn(() => true),
 			destroy: vi.fn(),
-			onStateChange: vi.fn((cb: StateCallback) => { capturedStateCallbacks.push(cb); }),
+			onStateChange: vi.fn((cb: StateCallback) => {
+				capturedStateCallbacks.push(cb);
+			}),
 			onReady: vi.fn(),
-			onError: vi.fn((cb: ErrorCallback) => { capturedErrorCallbacks.push(cb); }),
-			onProgress: vi.fn((cb: ProgressCallback) => { capturedProgressCallbacks.push(cb); }),
+			onError: vi.fn((cb: ErrorCallback) => {
+				capturedErrorCallbacks.push(cb);
+			}),
+			onProgress: vi.fn((cb: ProgressCallback) => {
+				capturedProgressCallbacks.push(cb);
+			})
 		};
-	}),
+	})
 }));
 
 vi.mock('$lib/player/jellyfinPlaybackApi', () => ({
 	startSession: vi.fn(async (_itemId: string, playSessionId?: string) => playSessionId ?? ''),
 	reportProgress: vi.fn(async () => true),
-	reportStop: vi.fn(async () => true),
+	reportStop: vi.fn(async () => true)
 }));
 
 const storage = new Map<string, string>();
@@ -50,17 +57,23 @@ vi.stubGlobal('localStorage', {
 	}),
 	clear: vi.fn(() => {
 		storage.clear();
-	}),
+	})
 });
 
 vi.mock('$lib/stores/playbackToast.svelte', () => ({
 	playbackToast: {
 		show: vi.fn(),
 		dismiss: vi.fn(),
-		get visible() { return false; },
-		get message() { return ''; },
-		get type() { return 'info' as const; },
-	},
+		get visible() {
+			return false;
+		},
+		get message() {
+			return '';
+		},
+		get type() {
+			return 'info' as const;
+		}
+	}
 }));
 
 const mockApiGet = vi.fn();
@@ -69,17 +82,20 @@ vi.mock('$lib/api/client', () => ({
 	api: {
 		global: {
 			get: (...args: unknown[]) => mockApiGet(...args),
-			head: (...args: unknown[]) => mockApiHead(...args),
-		},
+			head: (...args: unknown[]) => mockApiHead(...args)
+		}
 	},
 	ApiError: class extends Error {
 		status: number;
 		code: string;
 		details: unknown;
 		constructor(s: number, c: string, m: string, d?: unknown) {
-			super(m); this.status = s; this.code = c; this.details = d;
+			super(m);
+			this.status = s;
+			this.code = c;
+			this.details = d;
 		}
-	},
+	}
 }));
 
 import { playerStore } from './player.svelte';
@@ -100,7 +116,7 @@ function makeItem(overrides: Partial<QueueItem> = {}): QueueItem {
 		availableSources: overrides.availableSources ?? ['local', 'jellyfin'],
 		sourceIds: overrides.sourceIds ?? { local: id, jellyfin: id },
 		duration: overrides.duration,
-		...overrides,
+		...overrides
 	};
 }
 
@@ -239,14 +255,18 @@ describe('playerStore queue methods', () => {
 			playerStore.playQueue(makeItems(3));
 			const before = [...playerStore.queue];
 			playerStore.reorderQueue(0, 0);
-			expect(playerStore.queue.map((i) => i.trackSourceId)).toEqual(before.map((i) => i.trackSourceId));
+			expect(playerStore.queue.map((i) => i.trackSourceId)).toEqual(
+				before.map((i) => i.trackSourceId)
+			);
 		});
 
 		it('does nothing for out-of-bounds indices', () => {
 			playerStore.playQueue(makeItems(3));
 			const before = [...playerStore.queue];
 			playerStore.reorderQueue(-1, 2);
-			expect(playerStore.queue.map((i) => i.trackSourceId)).toEqual(before.map((i) => i.trackSourceId));
+			expect(playerStore.queue.map((i) => i.trackSourceId)).toEqual(
+				before.map((i) => i.trackSourceId)
+			);
 		});
 
 		it('moves an item forward', () => {
@@ -306,7 +326,12 @@ describe('playerStore queue methods', () => {
 		it('counts remaining tracks in shuffle order', () => {
 			playerStore.playQueue(makeItems(4), 0, true);
 			playerStore.jumpToTrack(2);
-			const expectedRemaining = Math.max(0, playerStore.shuffleOrder.length - playerStore.shuffleOrder.indexOf(playerStore.currentIndex) - 1);
+			const expectedRemaining = Math.max(
+				0,
+				playerStore.shuffleOrder.length -
+					playerStore.shuffleOrder.indexOf(playerStore.currentIndex) -
+					1
+			);
 			expect(playerStore.upcomingQueueLength).toBe(expectedRemaining);
 		});
 	});
@@ -390,7 +415,7 @@ describe('playerStore queue methods', () => {
 					coverUrl: null,
 					sourceType: 'howler',
 					trackSourceId: '1',
-					trackName: 'Track',
+					trackName: 'Track'
 				},
 				queue: [
 					{
@@ -403,13 +428,13 @@ describe('playerStore queue methods', () => {
 						coverUrl: null,
 						sourceType: 'howler',
 						streamUrl: '/api/v1/stream/local/1',
-						availableSources: ['howler', 'jellyfin'],
-					},
+						availableSources: ['howler', 'jellyfin']
+					}
 				],
 				currentIndex: 0,
 				progress: 0,
 				shuffleEnabled: false,
-				shuffleOrder: [],
+				shuffleOrder: []
 			};
 
 			localStorage.setItem('musicseerr_player_session', JSON.stringify(legacySession));
@@ -551,13 +576,21 @@ describe('playerStore queue methods', () => {
 			playerStore.playQueue(makeItems(6));
 
 			playerStore.nextTrack();
-			await vi.waitFor(() => { expect(playerStore.currentIndex).toBeGreaterThan(0); });
+			await vi.waitFor(() => {
+				expect(playerStore.currentIndex).toBeGreaterThan(0);
+			});
 			playerStore.nextTrack();
-			await vi.waitFor(() => { expect(playerStore.currentIndex).toBeGreaterThan(0); });
+			await vi.waitFor(() => {
+				expect(playerStore.currentIndex).toBeGreaterThan(0);
+			});
 			playerStore.nextTrack();
-			await vi.waitFor(() => { expect(playerStore.currentIndex).toBeGreaterThan(0); });
+			await vi.waitFor(() => {
+				expect(playerStore.currentIndex).toBeGreaterThan(0);
+			});
 			playerStore.nextTrack();
-			await vi.waitFor(() => { expect(playerStore.currentIndex).toBeGreaterThan(0); });
+			await vi.waitFor(() => {
+				expect(playerStore.currentIndex).toBeGreaterThan(0);
+			});
 			playerStore.nextTrack();
 			await vi.waitFor(() => {
 				const playedCount = playerStore.currentIndex;
@@ -570,7 +603,9 @@ describe('playerStore queue methods', () => {
 
 			for (let i = 0; i < 6; i++) {
 				playerStore.nextTrack();
-				await vi.waitFor(() => { expect(playerStore.currentIndex).toBeGreaterThan(0); });
+				await vi.waitFor(() => {
+					expect(playerStore.currentIndex).toBeGreaterThan(0);
+				});
 			}
 
 			const historyBehind = playerStore.currentIndex;
@@ -597,7 +632,7 @@ describe('playerStore queue methods', () => {
 					coverUrl: null,
 					sourceType: 'local',
 					trackSourceId: '1',
-					trackName: 'Track',
+					trackName: 'Track'
 				},
 				queue: [
 					{
@@ -610,13 +645,13 @@ describe('playerStore queue methods', () => {
 						coverUrl: null,
 						sourceType: 'local',
 						streamUrl: '/api/v1/stream/local/1',
-						availableSources: ['local'],
-					},
+						availableSources: ['local']
+					}
 				],
 				currentIndex: 0,
 				progress: 0,
 				shuffleEnabled: false,
-				shuffleOrder: [],
+				shuffleOrder: []
 			};
 
 			localStorage.setItem('musicseerr_player_session', JSON.stringify(session));
@@ -634,7 +669,7 @@ describe('playerStore queue methods', () => {
 					coverUrl: null,
 					sourceType: 'local',
 					trackSourceId: '1',
-					trackName: 'Track',
+					trackName: 'Track'
 				},
 				queue: [
 					{
@@ -648,13 +683,13 @@ describe('playerStore queue methods', () => {
 						sourceType: 'local',
 						streamUrl: '/api/v1/stream/local/1',
 						availableSources: ['local'],
-						queueOrigin: 'manual',
-					},
+						queueOrigin: 'manual'
+					}
 				],
 				currentIndex: 0,
 				progress: 0,
 				shuffleEnabled: false,
-				shuffleOrder: [],
+				shuffleOrder: []
 			};
 
 			localStorage.setItem('musicseerr_player_session', JSON.stringify(session));
@@ -681,7 +716,11 @@ describe('playerStore queue methods', () => {
 });
 
 describe('Jellyfin session lifecycle', () => {
-	let jellyfinApi: { startSession: ReturnType<typeof vi.fn>; reportProgress: ReturnType<typeof vi.fn>; reportStop: ReturnType<typeof vi.fn> };
+	let jellyfinApi: {
+		startSession: ReturnType<typeof vi.fn>;
+		reportProgress: ReturnType<typeof vi.fn>;
+		reportStop: ReturnType<typeof vi.fn>;
+	};
 
 	beforeEach(async () => {
 		localStorage.clear();
@@ -689,9 +728,14 @@ describe('Jellyfin session lifecycle', () => {
 		vi.clearAllMocks();
 		vi.useFakeTimers();
 
-		jellyfinApi = await import('$lib/player/jellyfinPlaybackApi') as unknown as typeof jellyfinApi;
+		jellyfinApi =
+			(await import('$lib/player/jellyfinPlaybackApi')) as unknown as typeof jellyfinApi;
 
-		mockApiGet.mockResolvedValue({ url: 'http://jf/Audio/1/stream?static=true', seekable: true, playSessionId: 'ps-123' });
+		mockApiGet.mockResolvedValue({
+			url: 'http://jf/Audio/1/stream?static=true',
+			seekable: true,
+			playSessionId: 'ps-123'
+		});
 		mockApiHead.mockResolvedValue(new Response(null, { status: 200 }));
 	});
 
@@ -700,14 +744,25 @@ describe('Jellyfin session lifecycle', () => {
 		vi.unstubAllGlobals();
 		vi.stubGlobal('localStorage', {
 			getItem: vi.fn((key: string) => (storage.has(key) ? storage.get(key)! : null)),
-			setItem: vi.fn((key: string, value: string) => { storage.set(key, value); }),
-			removeItem: vi.fn((key: string) => { storage.delete(key); }),
-			clear: vi.fn(() => { storage.clear(); }),
+			setItem: vi.fn((key: string, value: string) => {
+				storage.set(key, value);
+			}),
+			removeItem: vi.fn((key: string) => {
+				storage.delete(key);
+			}),
+			clear: vi.fn(() => {
+				storage.clear();
+			})
 		});
 	});
 
 	function makeJellyfinItem(overrides: Partial<QueueItem> = {}): QueueItem {
-		return makeItem({ sourceType: 'jellyfin', trackSourceId: 'jf-1', streamUrl: undefined, ...overrides });
+		return makeItem({
+			sourceType: 'jellyfin',
+			trackSourceId: 'jf-1',
+			streamUrl: undefined,
+			...overrides
+		});
 	}
 
 	it('calls startSession when a Jellyfin track is loaded', async () => {
@@ -718,7 +773,10 @@ describe('Jellyfin session lifecycle', () => {
 	});
 
 	it('calls reportStop when switching tracks', async () => {
-		playerStore.playQueue([makeJellyfinItem({ trackSourceId: 'jf-1' }), makeItem({ trackSourceId: 'loc-2' })]);
+		playerStore.playQueue([
+			makeJellyfinItem({ trackSourceId: 'jf-1' }),
+			makeItem({ trackSourceId: 'loc-2' })
+		]);
 		await vi.advanceTimersByTimeAsync(0);
 
 		capturedStateCallbacks.forEach((cb) => cb('playing'));
@@ -752,7 +810,10 @@ describe('Jellyfin session lifecycle', () => {
 		vi.advanceTimersByTime(10_000);
 
 		expect(jellyfinApi.reportProgress).toHaveBeenCalledWith(
-			'jf-1', 'ps-123', expect.any(Number), false
+			'jf-1',
+			'ps-123',
+			expect.any(Number),
+			false
 		);
 	});
 });
@@ -761,7 +822,12 @@ describe('beforeunload beacon', () => {
 	let addEventListenerSpy: ReturnType<typeof vi.fn>;
 	let removeEventListenerSpy: ReturnType<typeof vi.fn>;
 	let sendBeaconMock: ReturnType<typeof vi.fn>;
-	let jellyfinApi: { startSession: ReturnType<typeof vi.fn>; reportProgress: ReturnType<typeof vi.fn>; reportStop: ReturnType<typeof vi.fn> };
+	// eslint-disable-next-line @typescript-eslint/no-unused-vars
+	let jellyfinApi: {
+		startSession: ReturnType<typeof vi.fn>;
+		reportProgress: ReturnType<typeof vi.fn>;
+		reportStop: ReturnType<typeof vi.fn>;
+	};
 
 	beforeEach(async () => {
 		localStorage.clear();
@@ -769,9 +835,14 @@ describe('beforeunload beacon', () => {
 		vi.clearAllMocks();
 		vi.useFakeTimers();
 
-		jellyfinApi = await import('$lib/player/jellyfinPlaybackApi') as unknown as typeof jellyfinApi;
+		jellyfinApi =
+			(await import('$lib/player/jellyfinPlaybackApi')) as unknown as typeof jellyfinApi;
 
-		mockApiGet.mockResolvedValue({ url: 'http://jf/Audio/1/stream?static=true', seekable: true, playSessionId: 'ps-beacon' });
+		mockApiGet.mockResolvedValue({
+			url: 'http://jf/Audio/1/stream?static=true',
+			seekable: true,
+			playSessionId: 'ps-beacon'
+		});
 		mockApiHead.mockResolvedValue(new Response(null, { status: 200 }));
 
 		const listeners = new Map<string, Set<Function>>();
@@ -783,7 +854,7 @@ describe('beforeunload beacon', () => {
 			}),
 			removeEventListener: vi.fn((event: string, handler: Function) => {
 				listeners.get(event)?.delete(handler);
-			}),
+			})
 		};
 		vi.stubGlobal('window', windowStub);
 		addEventListenerSpy = windowStub.addEventListener;
@@ -798,14 +869,25 @@ describe('beforeunload beacon', () => {
 		vi.unstubAllGlobals();
 		vi.stubGlobal('localStorage', {
 			getItem: vi.fn((key: string) => (storage.has(key) ? storage.get(key)! : null)),
-			setItem: vi.fn((key: string, value: string) => { storage.set(key, value); }),
-			removeItem: vi.fn((key: string) => { storage.delete(key); }),
-			clear: vi.fn(() => { storage.clear(); }),
+			setItem: vi.fn((key: string, value: string) => {
+				storage.set(key, value);
+			}),
+			removeItem: vi.fn((key: string) => {
+				storage.delete(key);
+			}),
+			clear: vi.fn(() => {
+				storage.clear();
+			})
 		});
 	});
 
 	function makeJellyfinItem(overrides: Partial<QueueItem> = {}): QueueItem {
-		return makeItem({ sourceType: 'jellyfin', trackSourceId: 'jf-beacon', streamUrl: undefined, ...overrides });
+		return makeItem({
+			sourceType: 'jellyfin',
+			trackSourceId: 'jf-beacon',
+			streamUrl: undefined,
+			...overrides
+		});
 	}
 
 	it('registers beforeunload listener when a Jellyfin track starts', async () => {
@@ -858,7 +940,11 @@ describe('non-seekable state propagation', () => {
 		vi.clearAllMocks();
 		vi.useFakeTimers();
 
-		mockApiGet.mockResolvedValue({ url: 'http://jf/Audio/1/universal?transcode', seekable: false, playSessionId: 'ps-ns' });
+		mockApiGet.mockResolvedValue({
+			url: 'http://jf/Audio/1/universal?transcode',
+			seekable: false,
+			playSessionId: 'ps-ns'
+		});
 		mockApiHead.mockResolvedValue(new Response(null, { status: 200 }));
 	});
 
@@ -867,9 +953,15 @@ describe('non-seekable state propagation', () => {
 		vi.unstubAllGlobals();
 		vi.stubGlobal('localStorage', {
 			getItem: vi.fn((key: string) => (storage.has(key) ? storage.get(key)! : null)),
-			setItem: vi.fn((key: string, value: string) => { storage.set(key, value); }),
-			removeItem: vi.fn((key: string) => { storage.delete(key); }),
-			clear: vi.fn(() => { storage.clear(); }),
+			setItem: vi.fn((key: string, value: string) => {
+				storage.set(key, value);
+			}),
+			removeItem: vi.fn((key: string) => {
+				storage.delete(key);
+			}),
+			clear: vi.fn(() => {
+				storage.clear();
+			})
 		});
 	});
 

@@ -34,10 +34,21 @@ vi.mock('$app/stores', () => ({
 	}
 }));
 vi.mock('$lib/stores/errorModal', () => ({
-	errorModal: { subscribe: vi.fn((cb: (v: unknown) => void) => { cb({ show: false }); return () => {}; }) }
+	errorModal: {
+		subscribe: vi.fn((cb: (v: unknown) => void) => {
+			cb({ show: false });
+			return () => {};
+		})
+	}
 }));
 vi.mock('$lib/stores/library', () => ({
-	libraryStore: { subscribe: vi.fn((cb: (v: unknown) => void) => { cb({}); return () => {}; }), initialize: vi.fn() }
+	libraryStore: {
+		subscribe: vi.fn((cb: (v: unknown) => void) => {
+			cb({});
+			return () => {};
+		}),
+		initialize: vi.fn()
+	}
 }));
 vi.mock('$lib/stores/integration', () => ({
 	integrationStore: {
@@ -72,7 +83,9 @@ vi.mock('$lib/stores/scrobble.svelte', () => ({
 	scrobbleManager: { init: vi.fn().mockResolvedValue(undefined) }
 }));
 vi.mock('$lib/utils/lazyImage', () => ({ cancelPendingImages: vi.fn() }));
-vi.mock('$lib/utils/requestsApi', () => ({ fetchActiveRequestCount: vi.fn().mockResolvedValue(0) }));
+vi.mock('$lib/utils/requestsApi', () => ({
+	fetchActiveRequestCount: vi.fn().mockResolvedValue(0)
+}));
 vi.mock('$lib/utils/navigationProgress', () => ({
 	createNavigationProgressController: vi.fn(() => ({
 		start: vi.fn(),
@@ -81,17 +94,17 @@ vi.mock('$lib/utils/navigationProgress', () => ({
 	}))
 }));
 vi.mock('$lib/components/Player.svelte', () => {
-	const Comp = function() {};
+	const Comp = function () {};
 	Comp.prototype = {};
 	return { default: Comp };
 });
 vi.mock('$lib/components/SearchSuggestions.svelte', () => {
-	const Comp = function() {};
+	const Comp = function () {};
 	Comp.prototype = {};
 	return { default: Comp };
 });
 vi.mock('$lib/components/YouTubeIcon.svelte', () => {
-	const Comp = function() {};
+	const Comp = function () {};
 	Comp.prototype = {};
 	return { default: Comp };
 });

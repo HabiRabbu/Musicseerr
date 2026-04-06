@@ -6,7 +6,17 @@
 		HomeTrack,
 		HomeGenre
 	} from '$lib/types';
-	import { ArrowRight, X, Check, Music2, Tv, Sparkles, Search, Radio, Headphones } from 'lucide-svelte';
+	import {
+		ArrowRight,
+		X,
+		Check,
+		Music2,
+		Tv,
+		Sparkles,
+		Search,
+		Radio,
+		Headphones
+	} from 'lucide-svelte';
 	import { goto } from '$app/navigation';
 	import { albumHrefOrNull, artistHrefOrNull } from '$lib/utils/entityRoutes';
 	import { formatListenCount, formatListenedAt } from '$lib/utils/formatting';
@@ -35,7 +45,10 @@
 	}
 
 	function handleTrackAlbumSearch(track: HomeTrack) {
-		const query = [track.artist_name, track.album_name || track.name].filter(Boolean).join(' ').trim();
+		const query = [track.artist_name, track.album_name || track.name]
+			.filter(Boolean)
+			.join(' ')
+			.trim();
 		if (query) {
 			goto(`/search/albums?q=${encodeURIComponent(query)}`);
 		}
@@ -132,7 +145,7 @@
 		</div>
 	{:else if section.type === 'genres'}
 		<div class="flex flex-wrap gap-2">
-			{#each section.items as item}
+			{#each section.items as item, i (`${item.name}-${i}`)}
 				{#if isGenre(item)}
 					<a href={getGenreHref(item)} class="btn btn-sm btn-outline">
 						{item.name}
@@ -147,10 +160,10 @@
 		</div>
 	{:else}
 		<HorizontalCarousel class="-mx-4 px-4 sm:mx-0 sm:px-0 pb-2">
-			{#each section.items as item}
+			{#each section.items as item, i (`${item.name}-${i}`)}
 				{#if isArtist(item)}
 					{@const artistHref = artistHrefOrNull(item.mbid)}
-					<div class="w-32 sm:w-36 md:w-44 flex-shrink-0">
+					<div class="w-32 sm:w-36 md:w-44 shrink-0">
 						<svelte:element
 							this={artistHref ? 'a' : 'div'}
 							href={artistHref ?? undefined}
@@ -184,7 +197,7 @@
 					</div>
 				{:else if isAlbum(item)}
 					{@const albumHref = albumHrefOrNull(item.mbid)}
-					<div class="w-32 sm:w-36 md:w-44 flex-shrink-0">
+					<div class="w-32 sm:w-36 md:w-44 shrink-0">
 						<svelte:element
 							this={albumHref ? 'a' : 'div'}
 							href={albumHref ?? undefined}
@@ -239,7 +252,7 @@
 					</div>
 				{:else if isTrack(item)}
 					{@const trackArtistHref = artistHrefOrNull(item.artist_mbid)}
-					<div class="w-56 sm:w-64 md:w-72 flex-shrink-0">
+					<div class="w-56 sm:w-64 md:w-72 shrink-0">
 						<svelte:element
 							this={trackArtistHref ? 'a' : 'div'}
 							href={trackArtistHref ?? undefined}
@@ -247,9 +260,13 @@
 								? 'cursor-pointer hover:shadow-[0_0_20px_rgba(174,213,242,0.15)] active:scale-95'
 								: 'cursor-default opacity-90'}"
 						>
-							<figure class="w-16 h-16 flex-shrink-0">
+							<figure class="w-16 h-16 shrink-0">
 								{#if item.image_url}
-									<img src={item.image_url} alt={item.album_name || item.name} class="w-full h-full object-cover" />
+									<img
+										src={item.image_url}
+										alt={item.album_name || item.name}
+										class="w-full h-full object-cover"
+									/>
 								{:else}
 									<div class="w-full h-full flex items-center justify-center text-2xl bg-base-200">
 										<Music2 class="h-6 w-6 text-base-content/40" />

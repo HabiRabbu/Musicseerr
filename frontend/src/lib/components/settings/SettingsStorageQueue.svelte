@@ -69,7 +69,8 @@
 <h4 class="font-medium text-sm text-base-content/70 mb-3">Discover Queue</h4>
 <div class="alert alert-info alert-soft mb-4">
 	<span class="text-sm"
-		>These settings control how Discover Queue is prepared in the background so it is ready when you open Discover.</span
+		>These settings control how Discover Queue is prepared in the background so it is ready when you
+		open Discover.</span
 	>
 </div>
 <h4 class="font-medium text-sm text-base-content/70 mb-3">Background Generation</h4>

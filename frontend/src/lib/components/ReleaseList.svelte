@@ -19,15 +19,29 @@
 		artist_name?: string | null;
 	}
 
-	export let title: string;
-	export let releases: Release[];
-	export let collapsed: boolean = false;
-	export let requestingIds: Set<string>;
-	export let showLoadingIndicator: boolean = false;
-	export let artistName: string = 'Unknown';
-	export let onRequest: (id: string, title?: string) => void;
-	export let onToggleCollapse: () => void;
-	export let onRemoved: ((result: RemoveResult) => void) | undefined = undefined;
+	interface Props {
+		title: string;
+		releases: Release[];
+		collapsed?: boolean;
+		requestingIds: Set<string>;
+		showLoadingIndicator?: boolean;
+		artistName?: string;
+		onRequest: (id: string, title?: string) => void;
+		onToggleCollapse: () => void;
+		onRemoved?: ((result: RemoveResult) => void) | undefined;
+	}
+
+	let {
+		title,
+		releases = $bindable(),
+		collapsed = false,
+		requestingIds,
+		showLoadingIndicator = false,
+		artistName = 'Unknown',
+		onRequest,
+		onToggleCollapse,
+		onRemoved = undefined
+	}: Props = $props();
 
 	function handleDeleted(rg: Release, result: RemoveResult) {
 		rg.in_library = false;
@@ -41,16 +55,18 @@
 	<div class="bg-base-300 rounded-t-box">
 		<button
 			class="w-full flex items-center justify-between px-4 py-3 hover:bg-base-content/5 transition-colors rounded-t-box"
-			on:click={onToggleCollapse}
+			onclick={onToggleCollapse}
 		>
 			<span class="text-xl sm:text-2xl font-bold">{title} ({releases.length})</span>
-			<ChevronDown class="h-6 w-6 transition-transform duration-200 {collapsed ? '' : 'rotate-180'}" />
+			<ChevronDown
+				class="h-6 w-6 transition-transform duration-200 {collapsed ? '' : 'rotate-180'}"
+			/>
 		</button>
 	</div>
 	{#if !collapsed}
 		<div class="border border-base-300 border-t-0 rounded-b-box bg-base-200/30">
 			<div class="list" role="list">
-				{#each releases as rg}
+				{#each releases as rg (rg.id)}
 					<div class="list-row group hover:bg-base-200 transition-colors p-0" role="listitem">
 						<a
 							href={albumHref(rg.id)}
@@ -70,7 +86,7 @@
 								</div>
 							</div>
 						</a>
-						<div class="flex items-center flex-shrink-0 ml-auto mr-3 sm:mr-4">
+						<div class="flex items-center shrink-0 ml-auto mr-3 sm:mr-4">
 							{#if libraryStore.isInLibrary(rg.id) || rg.in_library}
 								<LibraryBadge
 									status="library"
@@ -93,7 +109,7 @@
 								<button
 									class="w-8 h-8 sm:w-10 sm:h-10 rounded-full opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity duration-200 border-none flex items-center justify-center shadow-sm"
 									style="background-color: {colors.accent};"
-									on:click={(e) => {
+									onclick={(e) => {
 										e.stopPropagation();
 										onRequest(rg.id, rg.title);
 									}}
@@ -106,7 +122,11 @@
 											style="color: {colors.secondary};"
 										></span>
 									{:else}
-										<Download class="h-4 w-4 sm:h-5 sm:w-5" color={colors.secondary} strokeWidth={2.5} />
+										<Download
+											class="h-4 w-4 sm:h-5 sm:w-5"
+											color={colors.secondary}
+											strokeWidth={2.5}
+										/>
 									{/if}
 								</button>
 							{/if}

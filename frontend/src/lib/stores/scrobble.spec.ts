@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const mockGet = vi.fn();
 const mockPost = vi.fn();
@@ -6,17 +6,20 @@ vi.mock('$lib/api/client', () => ({
 	api: {
 		global: {
 			get: (...args: unknown[]) => mockGet(...args),
-			post: (...args: unknown[]) => mockPost(...args),
-		},
+			post: (...args: unknown[]) => mockPost(...args)
+		}
 	},
 	ApiError: class extends Error {
 		status: number;
 		code: string;
 		details: unknown;
 		constructor(s: number, c: string, m: string, d?: unknown) {
-			super(m); this.status = s; this.code = c; this.details = d;
+			super(m);
+			this.status = s;
+			this.code = c;
+			this.details = d;
 		}
-	},
+	}
 }));
 
 import { scrobbleManager, formatServiceTooltip } from './scrobble.svelte';
@@ -31,7 +34,7 @@ import {
 	SCROBBLE_TIME_THRESHOLD_MS,
 	NOW_PLAYING_DEBOUNCE_MS,
 	MIN_TRACK_DURATION_MS,
-	LOOP_RESET_TOLERANCE_S,
+	LOOP_RESET_TOLERANCE_S
 } from './scrobbleHelpers';
 
 describe('formatServiceTooltip', () => {
@@ -50,14 +53,14 @@ describe('formatServiceTooltip', () => {
 	it('lists successful services', () => {
 		const detail = {
 			lastfm: { success: true },
-			listenbrainz: { success: true },
+			listenbrainz: { success: true }
 		};
 		expect(formatServiceTooltip('scrobbled', detail)).toBe('Scrobbled to Last.fm, ListenBrainz');
 	});
 
 	it('lists failed services', () => {
 		const detail = {
-			lastfm: { success: false },
+			lastfm: { success: false }
 		};
 		expect(formatServiceTooltip('error', detail)).toBe('Failed: Last.fm');
 	});
@@ -65,7 +68,7 @@ describe('formatServiceTooltip', () => {
 	it('shows mixed results with separator', () => {
 		const detail = {
 			lastfm: { success: true },
-			listenbrainz: { success: false },
+			listenbrainz: { success: false }
 		};
 		const result = formatServiceTooltip('scrobbled', detail);
 		expect(result).toContain('Scrobbled to Last.fm');

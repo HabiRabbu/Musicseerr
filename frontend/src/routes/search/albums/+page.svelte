@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { run } from 'svelte/legacy';
+
 	import { onDestroy, onMount } from 'svelte';
 	import { browser } from '$app/environment';
 	import { goto } from '$app/navigation';
@@ -13,20 +15,24 @@
 	import { api } from '$lib/api/client';
 	import { Check } from 'lucide-svelte';
 
-	export let data: { query: string };
+	interface Props {
+		data: { query: string };
+	}
 
-	let albums: Album[] = [];
-	let topAlbum: Album | null = null;
-	let loading = false;
-	let hasMore = true;
+	let { data }: Props = $props();
+
+	let albums: Album[] = $state([]);
+	let topAlbum: Album | null = $state(null);
+	let loading = $state(false);
+	let hasMore = $state(true);
 	let offset = 0;
 	const limit = 24;
-	let sentinel: HTMLElement;
-	let showToast = false;
+	let sentinel = $state<HTMLElement>();
+	let showToast = $state(false);
 	let abortController: AbortController | null = null;
 	let enrichmentController: AbortController | null = null;
-	let observer: IntersectionObserver | null = null;
-	let enrichmentSource: EnrichmentSource = 'none';
+	let observer: IntersectionObserver | null = $state(null);
+	let enrichmentSource: EnrichmentSource = $state('none');
 
 	function navigateBack() {
 		if (data.query) {
@@ -99,12 +105,11 @@
 				hasMore = false;
 			}
 
-			const newMbids: Set<string> = new Set();
+			// eslint-disable-next-line svelte/prefer-svelte-reactivity
+			const newMbids = new Set<string>();
 			if (offset === 0 && albums.length > 0) {
 				const existingIds = new Set(albums.map((a) => a.musicbrainz_id));
-				const uniqueNewAlbums = newAlbums.filter(
-					(a: Album) => !existingIds.has(a.musicbrainz_id)
-				);
+				const uniqueNewAlbums = newAlbums.filter((a: Album) => !existingIds.has(a.musicbrainz_id));
 				albums = [...albums, ...uniqueNewAlbums];
 				offset = albums.length;
 				uniqueNewAlbums.forEach((a) => newMbids.add(a.musicbrainz_id));
@@ -171,22 +176,26 @@
 		}
 	}
 
-	$: if (browser && data.query) {
-		resetAndLoad();
-	}
+	run(() => {
+		if (browser && data.query) {
+			resetAndLoad();
+		}
+	});
 
-	$: if (browser && sentinel && !observer) {
-		observer = new IntersectionObserver(
-			(entries) => {
-				if (entries[0].isIntersecting && hasMore && !loading) {
-					loadMore();
-				}
-			},
-			{ threshold: 0.1 }
-		);
+	run(() => {
+		if (browser && sentinel && !observer) {
+			observer = new IntersectionObserver(
+				(entries) => {
+					if (entries[0].isIntersecting && hasMore && !loading) {
+						loadMore();
+					}
+				},
+				{ threshold: 0.1 }
+			);
 
-		observer.observe(sentinel);
-	}
+			observer.observe(sentinel);
+		}
+	});
 
 	onMount(() => {
 		if (browser) {
@@ -220,14 +229,14 @@
 		<button
 			class="badge badge-lg cursor-pointer transition-colors"
 			style="background-color: {colors.secondary}; color: {colors.primary};"
-			on:click={navigateBack}
+			onclick={navigateBack}
 		>
 			All
 		</button>
 		<button
 			class="badge badge-lg cursor-pointer transition-colors"
 			style="background-color: {colors.secondary}; color: {colors.primary};"
-			on:click={() => navigateToBucket('artists')}
+			onclick={() => navigateToBucket('artists')}
 		>
 			Artists
 		</button>
@@ -248,7 +257,7 @@
 			<div
 				class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4"
 			>
-				{#each Array(12) as _, i}
+				{#each Array(12) as _, i (`loading-album-${i}`)}
 					<AlbumCardSkeleton />
 				{/each}
 			</div>
@@ -258,7 +267,7 @@
 	{:else}
 		{#if topAlbum}
 			<div class="mb-4">
-				<SearchTopResult album={topAlbum} {enrichmentSource} />
+				<SearchTopResult album={topAlbum} />
 			</div>
 		{/if}
 		<div class="bg-base-200 rounded-box p-4">

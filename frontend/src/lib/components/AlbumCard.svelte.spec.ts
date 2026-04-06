@@ -10,15 +10,17 @@ const baseAlbum: Album = {
 	year: 1997,
 	musicbrainz_id: 'b1392450-e666-3926-a536-22c65f834433',
 	in_library: false,
-	listen_count: 1200000,
+	listen_count: 1200000
 };
 
-function renderComponent(overrides: Partial<{ album: Album; enrichmentSource: EnrichmentSource }> = {}) {
+function renderComponent(
+	overrides: Partial<{ album: Album; enrichmentSource: EnrichmentSource }> = {}
+) {
 	return render(AlbumCard, {
 		props: {
 			album: overrides.album ?? baseAlbum,
-			enrichmentSource: overrides.enrichmentSource ?? 'none',
-		},
+			enrichmentSource: overrides.enrichmentSource ?? 'none'
+		}
 	} as Parameters<typeof render<typeof AlbumCard>>[1]);
 }
 
@@ -63,18 +65,16 @@ describe('AlbumCard.svelte', () => {
 	it('should not render listen count badge when listen_count is null', async () => {
 		renderComponent({
 			album: { ...baseAlbum, listen_count: null },
-			enrichmentSource: 'lastfm',
+			enrichmentSource: 'lastfm'
 		});
 
-		await expect
-			.element(page.getByTitle('Last.fm plays'))
-			.not.toBeInTheDocument();
+		await expect.element(page.getByTitle('Last.fm plays')).not.toBeInTheDocument();
 	});
 
 	it('should render zero listen count as "0"', async () => {
 		renderComponent({
 			album: { ...baseAlbum, listen_count: 0 },
-			enrichmentSource: 'lastfm',
+			enrichmentSource: 'lastfm'
 		});
 
 		const badge = page.getByTitle('Last.fm plays');

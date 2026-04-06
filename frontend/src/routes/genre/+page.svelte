@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { getApiUrl } from '$lib/utils/api';
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
 	import { onMount, onDestroy } from 'svelte';
 	import { beforeNavigate } from '$app/navigation';
 	import GenreArtistCard from '$lib/components/GenreArtistCard.svelte';
@@ -14,7 +14,7 @@
 	import { createLocalStorageCache } from '$lib/utils/localStorageCache';
 	import { ArrowLeft, BookOpen, Music2, CircleAlert, Mic, Disc3, ChevronDown } from 'lucide-svelte';
 
-	let genreName = $state('');
+	let genreName = $derived(page.url.searchParams.get('name') || '');
 	let genreData: GenreDetailResponse | null = $state(null);
 	let loading = $state(true);
 	let error = $state('');
@@ -42,10 +42,6 @@
 		if (!genreData || !genreName) return;
 		genreDetailCache.set(genreData, getGenreCacheSuffix());
 	}
-
-	$effect(() => {
-		genreName = $page.url.searchParams.get('name') || '';
-	});
 
 	async function loadHeroArtist() {
 		if (!genreName) return;
@@ -202,7 +198,7 @@
 				onload={() => (heroImageLoaded = true)}
 			/>
 			<div
-				class="absolute inset-0 bg-gradient-to-b from-base-100/30 via-base-100/70 to-base-100"
+				class="absolute inset-0 bg-linear-to-b from-base-100/30 via-base-100/70 to-base-100"
 			></div>
 		</div>
 	{/if}
@@ -215,7 +211,7 @@
 			</a>
 			<div class="flex items-center gap-5">
 				<div
-					class="w-20 h-20 rounded-2xl bg-gradient-to-br from-primary/30 to-secondary/30 flex items-center justify-center shrink-0"
+					class="w-20 h-20 rounded-2xl bg-linear-to-br from-primary/30 to-secondary/30 flex items-center justify-center shrink-0"
 				>
 					<Music2 class="h-10 w-10 text-primary" />
 				</div>
@@ -249,7 +245,7 @@
 				<div
 					class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4"
 				>
-					{#each Array(12) as _}
+					{#each Array(12) as _, i (`genre-artist-skeleton-${i}`)}
 						<div class="card bg-base-200/50">
 							<div class="skeleton aspect-square rounded-t-2xl"></div>
 							<div class="p-3">
@@ -272,7 +268,7 @@
 				<div
 					class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4"
 				>
-					{#each Array(6) as _}
+					{#each Array(6) as _, i (`genre-album-skeleton-${i}`)}
 						<div class="card bg-base-200/50">
 							<div class="skeleton aspect-square rounded-t-2xl"></div>
 							<div class="p-3">

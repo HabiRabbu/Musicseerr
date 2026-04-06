@@ -88,15 +88,15 @@
 
 {#if open}
 	<button
-		class="fixed inset-0 z-[60] bg-transparent"
+		class="fixed inset-0 z-60 bg-transparent"
 		onclick={handleClose}
 		aria-label="Close equalizer"
 		tabindex="-1"
 	></button>
 
-	<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+	<!-- svelte-ignore a11y_no_static_element_interactions -->
 	<div
-		class="fixed bottom-[98px] right-4 z-[70] w-[480px] max-w-[calc(100vw-2rem)]
+		class="fixed bottom-24.5 right-4 z-70 w-120 max-w-[calc(100vw-2rem)]
 			   rounded-box bg-base-300 shadow-[0_-8px_40px_rgba(0,0,0,0.45)] border border-base-content/5"
 		transition:fly={{ y: 20, duration: 200 }}
 		onkeydown={handleKeydown}
@@ -138,7 +138,7 @@
 				{#if eqStore.activePreset === null}
 					<option value="" disabled>Custom</option>
 				{/if}
-				{#each EQ_PRESET_NAMES as name}
+				{#each EQ_PRESET_NAMES as name (name)}
 					<option value={name}>{name}</option>
 				{/each}
 			</select>
@@ -160,8 +160,11 @@
 			class:pointer-events-none={isYouTube || !eqStore.enabled}
 		>
 			<div class="flex">
-				<div class="flex flex-col justify-between pr-2 select-none" style="height: {TRACK_HEIGHT}px;">
-					{#each DB_TICKS as tick}
+				<div
+					class="flex flex-col justify-between pr-2 select-none"
+					style="height: {TRACK_HEIGHT}px;"
+				>
+					{#each DB_TICKS as tick (tick)}
 						<span class="text-[9px] tabular-nums opacity-40 leading-none text-right w-5">
 							{tick > 0 ? '+' : ''}{tick}
 						</span>
@@ -169,14 +172,21 @@
 				</div>
 
 				<div class="flex flex-1 gap-0">
-					{#each { length: EQ_BAND_COUNT } as _, i}
-						<div class="flex flex-col items-center flex-1 min-w-[28px]">
-							<span class="text-[10px] tabular-nums font-semibold mb-1.5 select-none h-3 leading-none"
-								style="color: oklch(var(--a) / {Math.min(1, 0.5 + Math.abs(eqStore.gains[i]) / EQ_MAX_GAIN * 0.5)})"
+					{#each { length: EQ_BAND_COUNT } as _, i (i)}
+						<div class="flex flex-col items-center flex-1 min-w-7">
+							<span
+								class="text-[10px] tabular-nums font-semibold mb-1.5 select-none h-3 leading-none"
+								style="color: oklch(var(--a) / {Math.min(
+									1,
+									0.5 + (Math.abs(eqStore.gains[i]) / EQ_MAX_GAIN) * 0.5
+								)})"
 							>
-								{eqStore.gains[i] > 0 ? '+' : ''}{eqStore.gains[i].toFixed(eqStore.gains[i] % 1 === 0 ? 0 : 1)}
+								{eqStore.gains[i] > 0 ? '+' : ''}{eqStore.gains[i].toFixed(
+									eqStore.gains[i] % 1 === 0 ? 0 : 1
+								)}
 							</span>
 
+							<!-- svelte-ignore a11y_interactive_supports_focus -->
 							<div
 								class="relative w-full cursor-pointer touch-none"
 								style="height: {TRACK_HEIGHT}px;"
@@ -191,7 +201,9 @@
 								aria-valuemax={EQ_MAX_GAIN}
 								aria-valuenow={eqStore.gains[i]}
 							>
-								<div class="absolute left-1/2 -translate-x-1/2 w-[3px] h-full rounded-full bg-base-content/8"></div>
+								<div
+									class="absolute left-1/2 -translate-x-1/2 w-0.75 h-full rounded-full bg-base-content/8"
+								></div>
 
 								<div
 									class="absolute left-0 right-0 h-px bg-base-content/15"
@@ -199,12 +211,13 @@
 								></div>
 
 								<div
-									class="absolute left-1/2 -translate-x-1/2 w-[7px] rounded-full transition-[height,top] duration-75"
-									style="top: {barStyle(eqStore.gains[i]).top}; height: {barStyle(eqStore.gains[i]).height}; background: oklch(var(--a) / 0.7);"
+									class="absolute left-1/2 -translate-x-1/2 w-1.75 rounded-full transition-[height,top] duration-75"
+									style="top: {barStyle(eqStore.gains[i]).top}; height: {barStyle(eqStore.gains[i])
+										.height}; background: oklch(var(--a) / 0.7);"
 								></div>
 
 								<div
-									class="absolute left-1/2 -translate-x-1/2 w-[14px] h-[14px] rounded-full
+									class="absolute left-1/2 -translate-x-1/2 w-3.5 h-3.5 rounded-full
 										   border-2 transition-transform duration-75
 										   {draggingIndex === i ? 'scale-125' : 'hover:scale-110'}"
 									style="top: {gainToY(eqStore.gains[i]) - 7}px;

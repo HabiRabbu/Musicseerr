@@ -3,22 +3,16 @@ import type {
 	NowPlayingSubmission,
 	ScrobbleSubmission,
 	ScrobbleSettings,
-	ScrobbleResponse,
+	ScrobbleResponse
 } from '$lib/types';
 import { api } from '$lib/api/client';
 import {
-	SCROBBLE_PERCENT_THRESHOLD,
-	SCROBBLE_TIME_THRESHOLD_MS,
-	NOW_PLAYING_DEBOUNCE_MS,
-	SEEK_TOLERANCE_S,
-	MIN_TRACK_DURATION_MS,
-	LOOP_RESET_TOLERANCE_S,
 	makeTrackKey,
 	shouldAccumulate,
 	isLoopReset,
 	shouldSendNowPlaying,
 	shouldScrobble,
-	formatServiceTooltip,
+	formatServiceTooltip
 } from '$lib/stores/scrobbleHelpers';
 
 type ScrobbleStatus = 'idle' | 'tracking' | 'scrobbled' | 'error';
@@ -70,7 +64,7 @@ function createScrobbleManager() {
 				track_name: trackName,
 				artist_name: artistName,
 				album_name: albumName,
-				duration_ms: durationMs,
+				duration_ms: durationMs
 			};
 			await api.global.post('/api/v1/scrobble/now-playing', body);
 		} catch {
@@ -91,7 +85,7 @@ function createScrobbleManager() {
 				artist_name: artistName,
 				album_name: albumName,
 				duration_ms: durationMs,
-				timestamp,
+				timestamp
 			};
 			const data = await api.global.post<ScrobbleResponse>('/api/v1/scrobble/submit', body);
 			lastServiceDetail = Object.fromEntries(
@@ -115,120 +109,120 @@ function createScrobbleManager() {
 			const np = playerStore.nowPlaying;
 			const isPlaying = playerStore.isPlaying;
 
-		if (!enabled) {
-			if (status !== 'idle') status = 'idle';
-			if (progressInterval) {
-				clearInterval(progressInterval);
-				progressInterval = null;
-			}
-			return;
-		}
-
-		if (!np || !np.trackName || !np.artistName) {
-			if (!np || !np.trackName) {
-				track = null;
-				if (status !== 'idle') {
-					status = 'idle';
-					lastServiceDetail = null;
+			if (!enabled) {
+				if (status !== 'idle') status = 'idle';
+				if (progressInterval) {
+					clearInterval(progressInterval);
+					progressInterval = null;
 				}
-			}
-			if (progressInterval) {
-				clearInterval(progressInterval);
-				progressInterval = null;
-			}
-			return;
-		}
-
-		if (!isPlaying) {
-			if (progressInterval) {
-				clearInterval(progressInterval);
-				progressInterval = null;
-			}
-			return;
-		}
-
-		const currentKey = makeTrackKey(np.artistName, np.trackName);
-		const durationMs = Math.round(playerStore.duration * 1000);
-
-		if (!track || track.trackKey !== currentKey) {
-			track = {
-				trackKey: currentKey,
-				accumulatedMs: 0,
-				lastProgressS: playerStore.progress,
-				nowPlayingSent: false,
-				scrobbled: false,
-				startedAt: Math.floor(Date.now() / 1000),
-				durationMs,
-			};
-			status = 'tracking';
-			lastServiceDetail = null;
-		}
-
-		if (progressInterval) {
-			clearInterval(progressInterval);
-		}
-
-		progressInterval = setInterval(() => {
-			if (!track) return;
-			const progressS = playerStore.progress;
-			const currentDurationMs = Math.round(playerStore.duration * 1000);
-			const currentNp = playerStore.nowPlaying;
-
-			if (!currentNp || !currentNp.trackName || !playerStore.isPlaying) return;
-
-			if (currentDurationMs > 0 && track.durationMs === 0) {
-				track.durationMs = currentDurationMs;
-			}
-
-			const deltaS = progressS - track.lastProgressS;
-			const prevProgressS = track.lastProgressS;
-			track.lastProgressS = progressS;
-
-			if (isLoopReset(prevProgressS, progressS, track.durationMs)) {
-				track.accumulatedMs = 0;
-				track.scrobbled = false;
-				track.nowPlayingSent = false;
-				track.startedAt = Math.floor(Date.now() / 1000);
-				status = 'tracking';
-				lastServiceDetail = null;
 				return;
 			}
 
-			if (shouldAccumulate(deltaS)) {
-				track.accumulatedMs += deltaS * 1000;
+			if (!np || !np.trackName || !np.artistName) {
+				if (!np || !np.trackName) {
+					track = null;
+					if (status !== 'idle') {
+						status = 'idle';
+						lastServiceDetail = null;
+					}
+				}
+				if (progressInterval) {
+					clearInterval(progressInterval);
+					progressInterval = null;
+				}
+				return;
 			}
 
-			if (shouldSendNowPlaying(track.accumulatedMs, track.nowPlayingSent)) {
-				track.nowPlayingSent = true;
-				sendNowPlaying(
-					currentNp.artistName,
-					currentNp.trackName,
-					currentNp.albumName,
-					track.durationMs
-				);
+			if (!isPlaying) {
+				if (progressInterval) {
+					clearInterval(progressInterval);
+					progressInterval = null;
+				}
+				return;
 			}
 
-			if (shouldScrobble(track.accumulatedMs, track.durationMs, track.scrobbled)) {
-				track.scrobbled = true;
-				const t = track;
-				sendScrobble(
-					currentNp.artistName,
-					currentNp.trackName,
-					currentNp.albumName,
-					t.durationMs,
-					t.startedAt
-				).catch(() => {
-					t.scrobbled = false;
-				});
-			}
-		}, 1000);
+			const currentKey = makeTrackKey(np.artistName, np.trackName);
+			const durationMs = Math.round(playerStore.duration * 1000);
 
-		return () => {
+			if (!track || track.trackKey !== currentKey) {
+				track = {
+					trackKey: currentKey,
+					accumulatedMs: 0,
+					lastProgressS: playerStore.progress,
+					nowPlayingSent: false,
+					scrobbled: false,
+					startedAt: Math.floor(Date.now() / 1000),
+					durationMs
+				};
+				status = 'tracking';
+				lastServiceDetail = null;
+			}
+
 			if (progressInterval) {
 				clearInterval(progressInterval);
-				progressInterval = null;
 			}
-		};
+
+			progressInterval = setInterval(() => {
+				if (!track) return;
+				const progressS = playerStore.progress;
+				const currentDurationMs = Math.round(playerStore.duration * 1000);
+				const currentNp = playerStore.nowPlaying;
+
+				if (!currentNp || !currentNp.trackName || !playerStore.isPlaying) return;
+
+				if (currentDurationMs > 0 && track.durationMs === 0) {
+					track.durationMs = currentDurationMs;
+				}
+
+				const deltaS = progressS - track.lastProgressS;
+				const prevProgressS = track.lastProgressS;
+				track.lastProgressS = progressS;
+
+				if (isLoopReset(prevProgressS, progressS, track.durationMs)) {
+					track.accumulatedMs = 0;
+					track.scrobbled = false;
+					track.nowPlayingSent = false;
+					track.startedAt = Math.floor(Date.now() / 1000);
+					status = 'tracking';
+					lastServiceDetail = null;
+					return;
+				}
+
+				if (shouldAccumulate(deltaS)) {
+					track.accumulatedMs += deltaS * 1000;
+				}
+
+				if (shouldSendNowPlaying(track.accumulatedMs, track.nowPlayingSent)) {
+					track.nowPlayingSent = true;
+					sendNowPlaying(
+						currentNp.artistName,
+						currentNp.trackName,
+						currentNp.albumName,
+						track.durationMs
+					);
+				}
+
+				if (shouldScrobble(track.accumulatedMs, track.durationMs, track.scrobbled)) {
+					track.scrobbled = true;
+					const t = track;
+					sendScrobble(
+						currentNp.artistName,
+						currentNp.trackName,
+						currentNp.albumName,
+						t.durationMs,
+						t.startedAt
+					).catch(() => {
+						t.scrobbled = false;
+					});
+				}
+			}, 1000);
+
+			return () => {
+				if (progressInterval) {
+					clearInterval(progressInterval);
+					progressInterval = null;
+				}
+			};
 		});
 	});
 
@@ -246,7 +240,7 @@ function createScrobbleManager() {
 		async refreshSettings(): Promise<void> {
 			settingsCache = null;
 			await init();
-		},
+		}
 	};
 }
 

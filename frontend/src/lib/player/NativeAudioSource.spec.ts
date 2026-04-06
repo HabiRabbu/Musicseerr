@@ -19,7 +19,7 @@ const hoisted = vi.hoisted(() => {
 		}),
 		removeEventListener: vi.fn((event: string, handler: EventListener) => {
 			listeners.get(event)?.delete(handler);
-		}),
+		})
 	};
 
 	const dispatch = (event: string): void => {
@@ -48,12 +48,12 @@ const hoisted = vi.hoisted(() => {
 		audio,
 		dispatch,
 		reset,
-		getAudioElement: vi.fn(() => audio as unknown as HTMLAudioElement),
+		getAudioElement: vi.fn(() => audio as unknown as HTMLAudioElement)
 	};
 });
 
 vi.mock('./audioElement', () => ({
-	getAudioElement: hoisted.getAudioElement,
+	getAudioElement: hoisted.getAudioElement
 }));
 
 import { NativeAudioSource } from './NativeAudioSource';
@@ -98,9 +98,7 @@ describe('NativeAudioSource', () => {
 		hoisted.dispatch('stalled');
 		vi.advanceTimersByTime(15_000);
 
-		expect(onError).toHaveBeenCalledWith(
-			expect.objectContaining({ code: 'NETWORK_STALL' })
-		);
+		expect(onError).toHaveBeenCalledWith(expect.objectContaining({ code: 'NETWORK_STALL' }));
 	});
 
 	it('reports autoplay blocked when play promise rejects', async () => {
@@ -112,9 +110,7 @@ describe('NativeAudioSource', () => {
 		source.play();
 		await Promise.resolve();
 
-		expect(onError).toHaveBeenCalledWith(
-			expect.objectContaining({ code: 'AUTOPLAY_BLOCKED' })
-		);
+		expect(onError).toHaveBeenCalledWith(expect.objectContaining({ code: 'AUTOPLAY_BLOCKED' }));
 	});
 
 	it('seekTo updates currentTime when stream is seekable', () => {
@@ -183,9 +179,7 @@ describe('NativeAudioSource', () => {
 		hoisted.dispatch('error');
 
 		await expect(loadPromise).rejects.toThrow('MEDIA_ERR_SRC_NOT_SUPPORTED');
-		expect(onError).toHaveBeenCalledWith(
-			expect.objectContaining({ code: 'LOAD_ERROR' })
-		);
+		expect(onError).toHaveBeenCalledWith(expect.objectContaining({ code: 'LOAD_ERROR' }));
 	});
 
 	it('transitions from buffering back to playing after seek via playing event', async () => {

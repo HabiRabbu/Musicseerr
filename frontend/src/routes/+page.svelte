@@ -28,12 +28,12 @@
 	import { removeQueueCachedData } from '$lib/utils/discoverQueueCache';
 	import { isDismissed } from '$lib/utils/dismissedPrompts';
 
-	let homeData: HomeResponse | null = null;
-	let loading = true;
-	let refreshing = false;
-	let isUpdating = false;
-	let error = '';
-	let lastUpdated: Date | null = null;
+	let homeData = $state<HomeResponse | null>(null);
+	let loading = $state(true);
+	let refreshing = $state(false);
+	let isUpdating = $state(false);
+	let error = $state('');
+	let lastUpdated = $state<Date | null>(null);
 	let abortController: AbortController | null = null;
 	let activeSource: MusicSource = 'listenbrainz';
 
@@ -66,9 +66,12 @@
 		error = '';
 
 		try {
-			const data = await api.get<HomeResponse>(`/api/v1/home?source=${encodeURIComponent(source)}`, {
-				signal: abortController.signal
-			});
+			const data = await api.get<HomeResponse>(
+				`/api/v1/home?source=${encodeURIComponent(source)}`,
+				{
+					signal: abortController.signal
+				}
+			);
 			homeData = data;
 			lastUpdated = new Date();
 			setHomeCachedData(data, source);
@@ -99,9 +102,12 @@
 		const source = resolveHomeSource(sourceOverride);
 
 		try {
-			const data = await api.get<HomeResponse>(`/api/v1/home?source=${encodeURIComponent(source)}`, {
-				signal: abortController.signal
-			});
+			const data = await api.get<HomeResponse>(
+				`/api/v1/home?source=${encodeURIComponent(source)}`,
+				{
+					signal: abortController.signal
+				}
+			);
 			homeData = data;
 			lastUpdated = new Date();
 			setHomeCachedData(data, source);
@@ -250,25 +256,30 @@
 		}
 		return sections;
 	}
-	$: preGenreBlocks = homeData ? getPreGenreBlocks() : [];
-	$: postGenreSections = homeData ? getPostGenreSections() : [];
+	let preGenreBlocks = $derived(homeData ? getPreGenreBlocks() : []);
+	let postGenreSections = $derived(homeData ? getPostGenreSections() : []);
 
 	const whatsHotKeys = new Set(['popular_albums', 'trending_artists']);
-	$: whatsHotBlocks = preGenreBlocks.filter((b) => whatsHotKeys.has(b.key));
-	$: forYouBlocks = preGenreBlocks.filter((b) => !whatsHotKeys.has(b.key));
-	$: hasContent =
+	let whatsHotBlocks = $derived(preGenreBlocks.filter((b) => whatsHotKeys.has(b.key)));
+	let forYouBlocks = $derived(preGenreBlocks.filter((b) => !whatsHotKeys.has(b.key)));
+	let hasContent = $derived(
 		preGenreBlocks.length > 0 ||
-		postGenreSections.length > 0 ||
-		(homeData?.genre_list?.items?.length ?? 0) > 0;
-	$: servicePrompts = homeData?.service_prompts || [];
-	$: lidarrConfigured = homeData?.integration_status?.lidarr ?? true;
-	$: lidarrPrompt = servicePrompts.find((p) => p.service === 'lidarr-connection');
-	$: otherPrompts = servicePrompts.filter((p) => p.service !== 'lidarr-connection' && !isDismissed(p.service));
+			postGenreSections.length > 0 ||
+			(homeData?.genre_list?.items?.length ?? 0) > 0
+	);
+	let servicePrompts = $derived(homeData?.service_prompts || []);
+	let lidarrConfigured = $derived(homeData?.integration_status?.lidarr ?? true);
+	let lidarrPrompt = $derived(servicePrompts.find((p) => p.service === 'lidarr-connection'));
 
-	let dismissedVersion = 0;
+	const getOtherPrompts = () => {
+		return servicePrompts.filter(
+			(p) => p.service !== 'lidarr-connection' && !isDismissed(p.service)
+		);
+	};
+	let otherPrompts = $derived(getOtherPrompts());
+
 	function handlePromptDismiss(_service: string) {
-		dismissedVersion++;
-		otherPrompts = servicePrompts.filter((p) => p.service !== 'lidarr-connection' && !isDismissed(p.service));
+		otherPrompts = getOtherPrompts();
 	}
 </script>
 
@@ -299,29 +310,42 @@
 		<div class="mt-16 flex flex-col items-center justify-center px-4">
 			<CircleAlert class="mb-4 h-10 w-10 text-base-content/50" />
 			<p class="text-base-content/70">{error}</p>
-			<button class="btn btn-primary mt-4" on:click={() => loadHomeData(true)}>Try Again</button>
+			<button class="btn btn-primary mt-4" onclick={() => loadHomeData(true)}>Try Again</button>
 		</div>
 	{:else}
 		<div class="space-y-10 px-4 sm:space-y-12 sm:px-6 lg:px-8">
 			{#if !lidarrConfigured && lidarrPrompt}
 				<div
-					class="card bg-gradient-to-br from-accent/20 via-accent/10 to-base-200 border-2 border-accent/40 shadow-xl relative overflow-hidden"
+					class="card bg-linear-to-br from-accent/20 via-accent/10 to-base-200 border-2 border-accent/40 shadow-xl relative overflow-hidden"
 				>
 					<div class="absolute inset-0 pointer-events-none overflow-hidden" aria-hidden="true">
-						<span class="absolute left-[15%] bottom-4 text-accent/10 text-2xl animate-note-float">♪</span>
-						<span class="absolute left-[40%] bottom-8 text-primary/10 text-lg animate-note-float" style="animation-delay: 2s;">♫</span>
-						<span class="absolute right-[20%] bottom-2 text-accent/10 text-xl animate-note-float" style="animation-delay: 4s;">♪</span>
-						<span class="absolute right-[35%] bottom-6 text-primary/10 text-2xl animate-note-float" style="animation-delay: 1s;">♩</span>
+						<span class="absolute left-[15%] bottom-4 text-accent/10 text-2xl animate-note-float"
+							>♪</span
+						>
+						<span
+							class="absolute left-[40%] bottom-8 text-primary/10 text-lg animate-note-float"
+							style="animation-delay: 2s;">♫</span
+						>
+						<span
+							class="absolute right-[20%] bottom-2 text-accent/10 text-xl animate-note-float"
+							style="animation-delay: 4s;">♪</span
+						>
+						<span
+							class="absolute right-[35%] bottom-6 text-primary/10 text-2xl animate-note-float"
+							style="animation-delay: 1s;">♩</span
+						>
 					</div>
 					<div class="card-body items-center text-center py-12 stagger-fade-in">
 						<Music class="h-16 w-16 mb-4 animate-float text-accent" />
-						<h2 class="card-title text-3xl sm:text-4xl lg:text-5xl font-bold mb-2">Welcome to <span class="text-primary">Musicseerr</span>!</h2>
+						<h2 class="card-title text-3xl sm:text-4xl lg:text-5xl font-bold mb-2">
+							Welcome to <span class="text-primary">Musicseerr</span>!
+						</h2>
 						<p class="text-base-content/70 max-w-lg mb-6">
 							To get started, connect your Lidarr server. This is required to manage your music
 							library, request albums, and track your collection.
 						</p>
 						<div class="flex flex-wrap justify-center gap-2 mb-6">
-							{#each lidarrPrompt.features as feature}
+							{#each lidarrPrompt.features as feature (feature)}
 								<span class="badge badge-accent badge-lg">{feature}</span>
 							{/each}
 						</div>
@@ -335,7 +359,7 @@
 
 			{#if otherPrompts.length > 0 && lidarrConfigured}
 				<div class="space-y-3">
-					{#each otherPrompts as prompt}
+					{#each otherPrompts as prompt, i (`prompt-${i}`)}
 						<ServicePromptCard {prompt} ondismiss={handlePromptDismiss} />
 					{/each}
 				</div>
@@ -396,7 +420,7 @@
 				<section>
 					<div class="skeleton skeleton-shimmer mb-4 h-6 w-36"></div>
 					<div class="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 md:grid-cols-4 lg:grid-cols-5">
-						{#each Array(10) as _}
+						{#each Array(10) as _, i (`genre-skeleton-${i}`)}
 							<div class="skeleton skeleton-shimmer h-20 rounded-lg sm:h-24"></div>
 						{/each}
 					</div>
@@ -413,7 +437,7 @@
 			{/if}
 
 			{#if loading && !homeData}
-				{#each Array(4) as _}
+				{#each Array(4) as _, i (`post-genre-skeleton-${i}`)}
 					<section>
 						<div class="skeleton skeleton-shimmer mb-4 h-6 w-32"></div>
 						<CarouselSkeleton showSubtitle={false} />
@@ -437,7 +461,9 @@
 			{#if !loading && !hasContent && servicePrompts.length === 0}
 				<div class="flex flex-col items-center justify-center py-12 sm:py-16">
 					<Music class="h-12 w-12 sm:h-16 sm:w-16 mb-4 sm:mb-6" />
-					<h2 class="mb-2 text-center text-3xl font-bold sm:text-4xl lg:text-5xl">Welcome to <span class="text-primary">Musicseerr</span></h2>
+					<h2 class="mb-2 text-center text-3xl font-bold sm:text-4xl lg:text-5xl">
+						Welcome to <span class="text-primary">Musicseerr</span>
+					</h2>
 					<p class="mb-6 max-w-md px-4 text-center text-sm text-base-content/70 sm:text-base">
 						Your music library appears to be empty. Add some albums in Lidarr to get started, or
 						connect additional services for personalized recommendations.

@@ -13,17 +13,17 @@ vi.mock('$lib/api/playlists', () => ({
 	createPlaylist: (...args: unknown[]) => mockCreatePlaylist(...args),
 	fetchPlaylist: (...args: unknown[]) => mockFetchPlaylist(...args),
 	deletePlaylist: (...args: unknown[]) => mockDeletePlaylist(...args),
-	resolvePlaylistSources: vi.fn().mockResolvedValue({}),
+	resolvePlaylistSources: vi.fn().mockResolvedValue({})
 }));
 
 const mockToastShow = vi.fn();
 vi.mock('$lib/stores/toast', () => ({
-	toastStore: { show: (...args: unknown[]) => mockToastShow(...args) },
+	toastStore: { show: (...args: unknown[]) => mockToastShow(...args) }
 }));
 
 const mockGoto = vi.fn();
 vi.mock('$app/navigation', () => ({
-	goto: (...args: unknown[]) => mockGoto(...args),
+	goto: (...args: unknown[]) => mockGoto(...args)
 }));
 
 import PlaylistsPage from './+page.svelte';
@@ -38,7 +38,7 @@ function makePlaylist(overrides: Partial<PlaylistSummary> = {}): PlaylistSummary
 		custom_cover_url: null,
 		created_at: '2026-01-01T00:00:00Z',
 		updated_at: '2026-01-02T00:00:00Z',
-		...overrides,
+		...overrides
 	};
 }
 
@@ -54,7 +54,7 @@ describe('Playlists list page', () => {
 		expect.assertions(3);
 		mockFetchPlaylists.mockResolvedValue([
 			makePlaylist({ id: 'pl-1', name: 'Rock Mix', track_count: 10 }),
-			makePlaylist({ id: 'pl-2', name: 'Chill Vibes', track_count: 3 }),
+			makePlaylist({ id: 'pl-2', name: 'Chill Vibes', track_count: 3 })
 		]);
 
 		render(PlaylistsPage);

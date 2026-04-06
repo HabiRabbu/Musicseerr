@@ -60,34 +60,43 @@
 	const ARTIST_CAROUSEL_LIMIT = 50;
 	const SEARCH_DEBOUNCE_MS = 300;
 
-	let albums: LibraryAlbum[] = [];
-	let albumsTotal = 0;
-	let artists: LibraryArtist[] = [];
-	let stats: LibraryStats = { artist_count: 0, album_count: 0, last_sync: null, db_size_mb: 0 };
+	let albums: LibraryAlbum[] = $state([]);
+	let albumsTotal = $state(0);
+	let artists: LibraryArtist[] = $state([]);
+	let stats: LibraryStats = $state({
+		artist_count: 0,
+		album_count: 0,
+		last_sync: null,
+		db_size_mb: 0
+	});
 
-	let loadingArtists = true;
-	let loadingAlbums = true;
-	let loadingStats = true;
-	let syncing = false;
-	let error: string | null = null;
-	let errorCode: string | null = null;
-	let syncFrequencyLabel: string | null = null;
+	let loadingArtists = $state(true);
+	let loadingAlbums = $state(true);
+	let loadingStats = $state(true);
+	let syncing = $state(false);
+	let error: string | null = $state(null);
+	let errorCode: string | null = $state(null);
+	let syncFrequencyLabel: string | null = $state(null);
 
-	let currentAlbumPage = 1;
-	let sortBy = 'date_added';
-	let sortOrder = 'desc';
-	let searchQuery = '';
+	let currentAlbumPage = $state(1);
+	let sortBy = $state('date_added');
+	let sortOrder = $state('desc');
+	let searchQuery = $state('');
 	let searchTimeout: ReturnType<typeof setTimeout> | null = null;
 	let albumsFetchId = 0;
 	let albumsAbort: AbortController | null = null;
 
-	$: recentlyAdded = $recentlyAddedStore.data ?? { artists: [], albums: [] };
-	$: loadingRecentlyAdded = $recentlyAddedStore.loading && !$recentlyAddedStore.data;
-	$: isSearching = searchQuery.trim().length > 0;
-	$: totalAlbumPages = Math.ceil(albumsTotal / ALBUMS_PER_PAGE);
-	$: lastSyncText = stats.last_sync ? new Date(stats.last_sync * 1000).toLocaleString() : 'Never';
-	$: isConnectionError = errorCode === CIRCUIT_BREAKER_CODE ||
-		(error != null && /connection|DNS|not configured/i.test(error));
+	let recentlyAdded = $derived($recentlyAddedStore.data ?? { artists: [], albums: [] });
+	let loadingRecentlyAdded = $derived($recentlyAddedStore.loading && !$recentlyAddedStore.data);
+	let isSearching = $derived(searchQuery.trim().length > 0);
+	let totalAlbumPages = $derived(Math.ceil(albumsTotal / ALBUMS_PER_PAGE));
+	let lastSyncText = $derived(
+		stats.last_sync ? new Date(stats.last_sync * 1000).toLocaleString() : 'Never'
+	);
+	let isConnectionError = $derived(
+		errorCode === CIRCUIT_BREAKER_CODE ||
+			(error != null && /connection|DNS|not configured/i.test(error))
+	);
 
 	const FREQ_LABELS: Record<string, string> = {
 		manual: 'Manual sync only',
@@ -271,7 +280,10 @@
 				>
 				<button
 					class="btn btn-sm btn-circle btn-ghost"
-					onclick={() => { error = null; errorCode = null; }}
+					onclick={() => {
+						error = null;
+						errorCode = null;
+					}}
 					aria-label="Dismiss"
 				>
 					<X class="h-4 w-4" />
@@ -324,16 +336,24 @@
 			<h2 class="text-2xl font-semibold mb-4">Recently Added</h2>
 			{#if loadingRecentlyAdded}
 				<div class="flex gap-4 p-4 bg-base-200 rounded-box overflow-x-auto scrollbar-hide">
-					{#each Array(6) as _}<div class="w-48 flex-shrink-0"><AlbumCardSkeleton /></div>{/each}
+					{#each Array(6) as _, i (`recently-added-skeleton-${i}`)}
+						<div class="w-48 shrink-0">
+							<AlbumCardSkeleton />
+						</div>
+					{/each}
 				</div>
 			{:else if recentlyAdded.artists.length > 0 || recentlyAdded.albums.length > 0}
 				<div in:fade={{ duration: 300 }}>
 					<HorizontalCarousel class="p-4 bg-base-200 rounded-box">
-						{#each recentlyAdded.artists as artist}
-							<div class="w-48 flex-shrink-0"><ArtistCard artist={convertToArtist(artist)} /></div>
+						{#each recentlyAdded.artists as artist (artist.mbid)}
+							<div class="w-48 shrink-0">
+								<ArtistCard artist={convertToArtist(artist)} />
+							</div>
 						{/each}
-						{#each recentlyAdded.albums as album}
-							<div class="w-48 flex-shrink-0"><AlbumCard album={convertToAlbum(album)} /></div>
+						{#each recentlyAdded.albums as album (album.album + album.artist)}
+							<div class="w-48 shrink-0">
+								<AlbumCard album={convertToAlbum(album)} />
+							</div>
 						{/each}
 					</HorizontalCarousel>
 				</div>
@@ -391,7 +411,8 @@
 	</div>
 	{#if isSearching && !loadingAlbums}
 		<p class="text-sm text-base-content/50 mb-4 ml-4">
-			{albumsTotal} {albumsTotal === 1 ? 'album' : 'albums'} found
+			{albumsTotal}
+			{albumsTotal === 1 ? 'album' : 'albums'} found
 		</p>
 	{/if}
 
@@ -408,15 +429,17 @@
 			</div>
 			{#if loadingArtists}
 				<div class="flex gap-4 overflow-x-auto scrollbar-hide pb-2">
-					{#each Array(8) as _}<div class="w-32 sm:w-36 md:w-44 flex-shrink-0">
+					{#each Array(8) as _, i (`artist-skeleton-${i}`)}
+						<div class="w-32 sm:w-36 md:w-44 shrink-0">
 							<ArtistCardSkeleton />
-						</div>{/each}
+						</div>
+					{/each}
 				</div>
 			{:else if artists.length > 0}
 				<div in:fade={{ duration: 300 }}>
 					<HorizontalCarousel class="pb-2">
 						{#each artists as artist (artist.mbid)}
-							<div class="w-32 sm:w-36 md:w-44 flex-shrink-0">
+							<div class="w-32 sm:w-36 md:w-44 shrink-0">
 								<ArtistCard artist={convertToArtist(artist)} />
 							</div>
 						{/each}
@@ -451,7 +474,9 @@
 			<div
 				class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4"
 			>
-				{#each Array(12) as _}<AlbumCardSkeleton />{/each}
+				{#each Array(12) as _, i (`album-skeleton-${i}`)}
+					<AlbumCardSkeleton />
+				{/each}
 			</div>
 		{:else if albums.length > 0}
 			<div
@@ -479,7 +504,7 @@
 	</section>
 
 	{#if !isSearching && !loadingArtists && !loadingAlbums && artists.length === 0 && albums.length === 0}
-		<div class="flex flex-col items-center justify-center min-h-[200px] text-center mt-8">
+		<div class="flex flex-col items-center justify-center min-h-50 text-center mt-8">
 			<div class="text-6xl mb-4">📚</div>
 			<h2 class="text-2xl font-semibold mb-2">No items in library</h2>
 			<p class="text-base-content/70 mb-4">

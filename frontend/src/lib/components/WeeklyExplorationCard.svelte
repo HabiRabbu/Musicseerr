@@ -20,7 +20,7 @@
 		ytConfigured = false,
 		initialCached = null,
 		showQuota = false,
-		quotaInfo = null,
+		quotaInfo = null
 	}: Props = $props();
 
 	const albumHref = $derived(albumHrefOrNull(track.release_group_mbid));
@@ -42,8 +42,10 @@
 	let imgError = $state(false);
 </script>
 
-<div class="flex w-44 flex-shrink-0 flex-col rounded-xl bg-base-100 shadow-sm
-	transition-all duration-200 hover:shadow-[0_0_24px_rgba(174,213,242,0.12)]">
+<div
+	class="flex w-44 shrink-0 flex-col rounded-xl bg-base-100 shadow-sm
+	transition-all duration-200 hover:shadow-[0_0_24px_rgba(174,213,242,0.12)]"
+>
 	{#if albumHref}
 		<a
 			href={albumHref}
@@ -55,7 +57,9 @@
 					alt={track.album_name || track.title}
 					class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
 					loading="lazy"
-					onerror={() => { imgError = true; }}
+					onerror={() => {
+						imgError = true;
+					}}
 				/>
 			{:else}
 				<div class="flex h-full w-full items-center justify-center">
@@ -64,8 +68,10 @@
 			{/if}
 
 			{#if track.duration_ms}
-				<span class="absolute bottom-1.5 right-1.5 rounded bg-black/70 px-1.5 py-0.5 text-[10px]
-					font-medium text-white/90 backdrop-blur-sm">
+				<span
+					class="absolute bottom-1.5 right-1.5 rounded bg-black/70 px-1.5 py-0.5 text-[10px]
+					font-medium text-white/90 backdrop-blur-sm"
+				>
 					{formatDuration(track.duration_ms)}
 				</span>
 			{/if}
@@ -78,7 +84,9 @@
 					alt={track.album_name || track.title}
 					class="h-full w-full object-cover"
 					loading="lazy"
-					onerror={() => { imgError = true; }}
+					onerror={() => {
+						imgError = true;
+					}}
 				/>
 			{:else}
 				<div class="flex h-full w-full items-center justify-center">
@@ -87,8 +95,10 @@
 			{/if}
 
 			{#if track.duration_ms}
-				<span class="absolute bottom-1.5 right-1.5 rounded bg-black/70 px-1.5 py-0.5 text-[10px]
-					font-medium text-white/90 backdrop-blur-sm">
+				<span
+					class="absolute bottom-1.5 right-1.5 rounded bg-black/70 px-1.5 py-0.5 text-[10px]
+					font-medium text-white/90 backdrop-blur-sm"
+				>
 					{formatDuration(track.duration_ms)}
 				</span>
 			{/if}
@@ -116,12 +126,12 @@
 					class="text-[11px] text-base-content/40 line-clamp-1 flex items-center gap-1
 						hover:text-primary transition-colors"
 				>
-					<Music2 class="h-2.5 w-2.5 flex-shrink-0" />
+					<Music2 class="h-2.5 w-2.5 shrink-0" />
 					{track.album_name}
 				</a>
 			{:else}
 				<p class="text-[11px] text-base-content/40 line-clamp-1 flex items-center gap-1">
-					<Music2 class="h-2.5 w-2.5 flex-shrink-0" />
+					<Music2 class="h-2.5 w-2.5 shrink-0" />
 					{track.album_name}
 				</p>
 			{/if}

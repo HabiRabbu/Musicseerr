@@ -1,7 +1,17 @@
 <script lang="ts">
+	import { run } from 'svelte/legacy';
+
 	import { onMount, onDestroy } from 'svelte';
 	import { browser } from '$app/environment';
-	import type { ArtistInfo, ArtistReleases, SimilarArtistsResponse, TopSongsResponse, TopAlbumsResponse, LastFmArtistEnrichment, ReleaseGroup } from '$lib/types';
+	import type {
+		ArtistInfo,
+		ArtistReleases,
+		SimilarArtistsResponse,
+		TopSongsResponse,
+		TopAlbumsResponse,
+		LastFmArtistEnrichment,
+		ReleaseGroup
+	} from '$lib/types';
 	import { colors } from '$lib/colors';
 	import ArtistHeaderSkeleton from '$lib/components/ArtistHeaderSkeleton.svelte';
 	import AlbumGridSkeleton from '$lib/components/AlbumGridSkeleton.svelte';
@@ -31,38 +41,42 @@
 	import { api } from '$lib/api/client';
 	import { extractServiceStatus } from '$lib/utils/serviceStatus';
 
-	export let data: { artistId: string };
+	interface Props {
+		data: { artistId: string };
+	}
 
-	let artist: ArtistInfo | null = null;
-	let loadingBasic = true;
-	let loadingExtended = true;
-	let error: string | null = null;
-	let showToast = false;
+	let { data }: Props = $props();
+
+	let artist: ArtistInfo | null = $state(null);
+	let loadingBasic = $state(true);
+	let loadingExtended = $state(true);
+	let error: string | null = $state(null);
+	let showToast = $state(false);
 	let toastMessage = 'Added to Library';
-	let showArtistRemovedModal = false;
-	let removedArtistName = '';
-	let requestingAlbums = new Set<string>();
+	let showArtistRemovedModal = $state(false);
+	let removedArtistName = $state('');
+	let requestingAlbums = $state(new Set<string>());
 	let abortController: AbortController | null = null;
-	let albumsCollapsed = false;
-	let epsCollapsed = false;
-	let singlesCollapsed = false;
-	let loadingMoreReleases = false;
+	let albumsCollapsed = $state(false);
+	let epsCollapsed = $state(false);
+	let singlesCollapsed = $state(false);
+	let loadingMoreReleases = $state(false);
 	let currentOffset = 50;
-	let hasMoreReleases = false;
-	let totalReleaseCount = 0;
-	let loadedReleaseCount = 0;
+	let hasMoreReleases = $state(false);
+	let totalReleaseCount = $state(0);
+	let loadedReleaseCount = $state(0);
 	const BATCH_SIZE = 50;
 	let fetchMoreTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
-	let similarArtists: SimilarArtistsResponse | null = null;
-	let topSongs: TopSongsResponse | null = null;
-	let topAlbums: TopAlbumsResponse | null = null;
-	let loadingSimilar = true;
-	let loadingTopSongs = true;
-	let loadingTopAlbums = true;
+	let similarArtists: SimilarArtistsResponse | null = $state(null);
+	let topSongs: TopSongsResponse | null = $state(null);
+	let topAlbums: TopAlbumsResponse | null = $state(null);
+	let loadingSimilar = $state(true);
+	let loadingTopSongs = $state(true);
+	let loadingTopAlbums = $state(true);
 
-	let lastfmEnrichment: LastFmArtistEnrichment | null = null;
-	let loadingLastfm = true;
+	let lastfmEnrichment: LastFmArtistEnrichment | null = $state(null);
+	let loadingLastfm = $state(true);
 
 	type ArtistReleasePaginationState = {
 		loadedReleaseCount: number;
@@ -81,18 +95,7 @@
 		label: string;
 	};
 
-	let tocSections: ArtistTocSection[] = [];
-
-	$: tocSections = artist
-		? [
-				{ id: 'section-overview', label: 'Overview' },
-				{ id: 'section-about', label: 'About' },
-				{ id: 'section-similar', label: 'Similar Artists' },
-				...(artist.albums.length > 0 ? [{ id: 'section-albums', label: 'Albums' }] : []),
-				...(artist.eps.length > 0 ? [{ id: 'section-eps', label: 'EPs' }] : []),
-				...(artist.singles.length > 0 ? [{ id: 'section-singles', label: 'Singles' }] : [])
-			]
-		: [];
+	let tocSections: ArtistTocSection[] = $state([]);
 
 	function sortReleasesByYear(releases: ArtistInfo['albums']) {
 		return [...releases].sort((a, b) => {
@@ -121,7 +124,7 @@
 			releaseGroupCount > nextLoadedReleaseCount ||
 			(releaseGroupCount === 0 && nextLoadedReleaseCount >= BATCH_SIZE);
 		const nextTotalReleaseCount = nextHasMoreReleases
-			? (releaseGroupCount || nextLoadedReleaseCount)
+			? releaseGroupCount || nextLoadedReleaseCount
 			: nextLoadedReleaseCount;
 		const nextOffset = nextHasMoreReleases ? BATCH_SIZE : 0;
 
@@ -200,7 +203,7 @@
 			loadingTopAlbums = true;
 		}
 		error = null;
-		
+
 		if (abortController) {
 			abortController.abort();
 		}
@@ -232,16 +235,19 @@
 			}
 		}
 	}
-	
+
 	async function fetchBasicInfo(force = false) {
 		try {
 			const now = Date.now();
 			const cacheBuster = force ? `?t=${now}` : '';
-			const artistData: ArtistInfo = await api.get(`/api/v1/artists/${data.artistId}${cacheBuster}`, {
-				signal: abortController?.signal,
-				cache: force ? 'no-cache' : 'default'
-			});
-			
+			const artistData: ArtistInfo = await api.get(
+				`/api/v1/artists/${data.artistId}${cacheBuster}`,
+				{
+					signal: abortController?.signal,
+					cache: force ? 'no-cache' : 'default'
+				}
+			);
+
 			if (artistData) {
 				extractServiceStatus(artistData);
 				const sortedResult = applyArtistReleaseSorting(artistData);
@@ -258,15 +264,18 @@
 			loadingBasic = false;
 		}
 	}
-	
+
 	async function fetchExtendedInfo(force = false, artistRef: ArtistInfo) {
 		try {
 			const now = Date.now();
 			const cacheBuster = force ? `?t=${now}` : '';
-			const extendedInfo = await api.get<{ description?: string; image?: string }>(`/api/v1/artists/${data.artistId}/extended${cacheBuster}`, {
-				signal: abortController?.signal,
-				cache: force ? 'no-cache' : 'default'
-			});
+			const extendedInfo = await api.get<{ description?: string; image?: string }>(
+				`/api/v1/artists/${data.artistId}/extended${cacheBuster}`,
+				{
+					signal: abortController?.signal,
+					cache: force ? 'no-cache' : 'default'
+				}
+			);
 
 			if (artist && artist === artistRef) {
 				artist.description = extendedInfo.description;
@@ -313,27 +322,63 @@
 
 		const signal = abortController?.signal;
 
-		const similarPromise = api.get<SimilarArtistsResponse>(`/api/v1/artists/${data.artistId}/similar?count=15&source=${activeSource}`, { signal })
-			.then((data) => { similarArtists = data; })
-			.catch((e) => { if (!isAbortError(e)) { /* ignore */ } })
-			.finally(() => { loadingSimilar = false; });
+		const similarPromise = api
+			.get<SimilarArtistsResponse>(
+				`/api/v1/artists/${data.artistId}/similar?count=15&source=${activeSource}`,
+				{ signal }
+			)
+			.then((data) => {
+				similarArtists = data;
+			})
+			.catch((e) => {
+				if (!isAbortError(e)) {
+					/* ignore */
+				}
+			})
+			.finally(() => {
+				loadingSimilar = false;
+			});
 
-		const songsPromise = api.get<TopSongsResponse>(`/api/v1/artists/${data.artistId}/top-songs?count=10&source=${activeSource}`, { signal })
-			.then((data) => { topSongs = data; })
-			.catch((e) => { if (!isAbortError(e)) { /* ignore */ } })
-			.finally(() => { loadingTopSongs = false; });
+		const songsPromise = api
+			.get<TopSongsResponse>(
+				`/api/v1/artists/${data.artistId}/top-songs?count=10&source=${activeSource}`,
+				{ signal }
+			)
+			.then((data) => {
+				topSongs = data;
+			})
+			.catch((e) => {
+				if (!isAbortError(e)) {
+					/* ignore */
+				}
+			})
+			.finally(() => {
+				loadingTopSongs = false;
+			});
 
-		const albumsPromise = api.get<TopAlbumsResponse>(`/api/v1/artists/${data.artistId}/top-albums?count=10&source=${activeSource}`, { signal })
-			.then((data) => { topAlbums = data; })
-			.catch((e) => { if (!isAbortError(e)) { /* ignore */ } })
-			.finally(() => { loadingTopAlbums = false; });
+		const albumsPromise = api
+			.get<TopAlbumsResponse>(
+				`/api/v1/artists/${data.artistId}/top-albums?count=10&source=${activeSource}`,
+				{ signal }
+			)
+			.then((data) => {
+				topAlbums = data;
+			})
+			.catch((e) => {
+				if (!isAbortError(e)) {
+					/* ignore */
+				}
+			})
+			.finally(() => {
+				loadingTopAlbums = false;
+			});
 
 		await Promise.all([similarPromise, songsPromise, albumsPromise]);
 
 		const sa = similarArtists as SimilarArtistsResponse | null;
 		const ts = topSongs as TopSongsResponse | null;
 		const ta = topAlbums as TopAlbumsResponse | null;
-		if ((sa?.similar_artists?.length) || (ts?.songs?.length) || (ta?.albums?.length)) {
+		if (sa?.similar_artists?.length || ts?.songs?.length || ta?.albums?.length) {
 			setArtistDiscoveryCache(cacheKey, { similarArtists, topSongs, topAlbums });
 		}
 	}
@@ -374,38 +419,40 @@
 		loadingTopAlbums = true;
 		fetchDiscoveryData(source);
 	}
-	
+
 	async function fetchMoreReleases() {
 		if (!artist || loadingMoreReleases || !hasMoreReleases) {
 			return;
 		}
-		
+
 		loadingMoreReleases = true;
-		
+
 		try {
 			const url = `/api/v1/artists/${data.artistId}/releases?offset=${currentOffset}&limit=${BATCH_SIZE}`;
 			const moreReleases: ArtistReleases = await api.get(url, { signal: abortController?.signal });
 
 			if (artist) {
 				const newAlbums = moreReleases.albums.filter(
-					(a: ReleaseGroup) => !artist!.albums.some((existing: ReleaseGroup) => existing.id === a.id)
+					(a: ReleaseGroup) =>
+						!artist!.albums.some((existing: ReleaseGroup) => existing.id === a.id)
 				);
 				const newSingles = moreReleases.singles.filter(
-					(s: ReleaseGroup) => !artist!.singles.some((existing: ReleaseGroup) => existing.id === s.id)
+					(s: ReleaseGroup) =>
+						!artist!.singles.some((existing: ReleaseGroup) => existing.id === s.id)
 				);
 				const newEps = moreReleases.eps.filter(
 					(e: ReleaseGroup) => !artist!.eps.some((existing: ReleaseGroup) => existing.id === e.id)
 				);
-				
+
 				artist.albums = sortReleasesByYear([...artist.albums, ...newAlbums]);
 				artist.singles = sortReleasesByYear([...artist.singles, ...newSingles]);
 				artist.eps = sortReleasesByYear([...artist.eps, ...newEps]);
 				artist = artist;
-				
+
 				currentOffset += BATCH_SIZE;
 				hasMoreReleases = moreReleases.has_more;
 				loadedReleaseCount = artist.albums.length + artist.singles.length + artist.eps.length;
-				
+
 				if (hasMoreReleases) {
 					if (fetchMoreTimeoutId) clearTimeout(fetchMoreTimeoutId);
 					fetchMoreTimeoutId = setTimeout(() => fetchMoreReleases(), 500);
@@ -421,13 +468,7 @@
 		}
 	}
 
-	let currentArtistId: string | null = null;
-
-	$: if (browser && data.artistId && data.artistId !== currentArtistId) {
-		currentArtistId = data.artistId;
-		resetState();
-		fetchArtist();
-	}
+	let currentArtistId: string | null = $state(null);
 
 	function resetState() {
 		artist = null;
@@ -455,7 +496,7 @@
 		if (browser) {
 			const handleRefresh = () => fetchArtist(true);
 			window.addEventListener('artist-refresh', handleRefresh);
-			
+
 			return () => {
 				window.removeEventListener('artist-refresh', handleRefresh);
 			};
@@ -511,10 +552,28 @@
 		artist = artist;
 		artistBasicCache.set(artist, data.artistId);
 	}
+	run(() => {
+		tocSections = artist
+			? [
+					{ id: 'section-overview', label: 'Overview' },
+					{ id: 'section-about', label: 'About' },
+					{ id: 'section-similar', label: 'Similar Artists' },
+					...(artist.albums.length > 0 ? [{ id: 'section-albums', label: 'Albums' }] : []),
+					...(artist.eps.length > 0 ? [{ id: 'section-eps', label: 'EPs' }] : []),
+					...(artist.singles.length > 0 ? [{ id: 'section-singles', label: 'Singles' }] : [])
+				]
+			: [];
+	});
+	run(() => {
+		if (browser && data.artistId && data.artistId !== currentArtistId) {
+			currentArtistId = data.artistId;
+			resetState();
+			fetchArtist();
+		}
+	});
 </script>
 
 <div class="w-full px-2 sm:px-4 lg:px-8 py-4 sm:py-8 max-w-7xl mx-auto">
-
 	{#if error}
 		<div class="flex items-center justify-center min-h-[50vh]">
 			<div class="alert alert-error">
@@ -537,29 +596,33 @@
 					<div class="flex flex-wrap items-center gap-x-4 gap-y-2 justify-center sm:justify-start">
 						{#if artist.country}
 							<span class="text-sm text-base-content/80 flex items-center gap-1.5">
-								<span>🌍</span> {artist.country}
+								<span>🌍</span>
+								{artist.country}
 							</span>
 						{/if}
 						{#if artist.life_span?.begin}
 							<span class="text-sm text-base-content/80 flex items-center gap-1.5">
-								<span>📅</span> {artist.life_span.begin}{#if artist.life_span.end}&nbsp;–&nbsp;{artist.life_span.end}{/if}
+								<span>📅</span>
+								{artist.life_span.begin}{#if artist.life_span.end}&nbsp;–&nbsp;{artist.life_span
+										.end}{/if}
 							</span>
 						{/if}
 						{#if artist.albums.length + artist.eps.length + artist.singles.length > 0}
 							<span class="text-sm text-base-content/80 flex items-center gap-1.5">
-								<span>💿</span> {artist.albums.length + artist.eps.length + artist.singles.length} releases
+								<span>💿</span>
+								{artist.albums.length + artist.eps.length + artist.singles.length} releases
 							</span>
 						{/if}
 					</div>
 
 					{#if artist.tags.length > 0}
 						<div class="flex flex-wrap gap-2 justify-center sm:justify-start -mt-2">
-							{#each artist.tags.slice(0, 10) as tag}
+							{#each artist.tags.slice(0, 10) as tag (tag)}
 								<a
 									href="/genre?name={encodeURIComponent(tag)}"
 									class="badge badge-lg cursor-pointer hover:opacity-80 transition-opacity"
-									style="background-color: {colors.primary}; color: {colors.secondary};"
-								>{tag}</a>
+									style="background-color: {colors.primary}; color: {colors.secondary};">{tag}</a
+								>
 							{/each}
 						</div>
 					{/if}
@@ -586,10 +649,7 @@
 				/>
 
 				<div class="flex items-center justify-end mt-8 mb-4">
-					<SourceSwitcher
-						pageKey="artist"
-						onSourceChange={handleSourceChange}
-					/>
+					<SourceSwitcher pageKey="artist" onSourceChange={handleSourceChange} />
 				</div>
 
 				<div class="flex flex-col md:flex-row gap-6 md:items-stretch">
@@ -601,7 +661,10 @@
 							source={topAlbums?.source || ''}
 						/>
 					</div>
-					<div class="shrink-0 bg-base-content/25 h-px w-full md:w-px md:h-auto md:self-stretch" aria-hidden="true"></div>
+					<div
+						class="shrink-0 bg-base-content/25 h-px w-full md:w-px md:h-auto md:self-stretch"
+						aria-hidden="true"
+					></div>
 					<div class="flex-1 min-w-0">
 						<TopSongsList
 							songs={topSongs?.songs || []}
@@ -622,11 +685,18 @@
 				</section>
 
 				{#if hasMoreReleases || loadingMoreReleases}
-					<div class="flex items-center justify-center gap-3 p-4 bg-base-300 rounded-box mb-6" style="border: 2px solid {colors.accent};">
+					<div
+						class="flex items-center justify-center gap-3 p-4 bg-base-300 rounded-box mb-6"
+						style="border: 2px solid {colors.accent};"
+					>
 						<span class="loading loading-spinner loading-md" style="color: {colors.accent};"></span>
 						<div class="flex flex-col items-start">
-							<span class="font-semibold text-base" style="color: {colors.accent};">Loading all releases...</span>
-							<span class="text-sm text-base-content/70">Loaded {loadedReleaseCount} of {totalReleaseCount} releases</span>
+							<span class="font-semibold text-base" style="color: {colors.accent};"
+								>Loading all releases...</span
+							>
+							<span class="text-sm text-base-content/70"
+								>Loaded {loadedReleaseCount} of {totalReleaseCount} releases</span
+							>
 						</div>
 					</div>
 				{/if}
@@ -686,7 +756,6 @@
 		</div>
 	{/if}
 </div>
-
 
 <Toast bind:show={showToast} message={toastMessage} />
 

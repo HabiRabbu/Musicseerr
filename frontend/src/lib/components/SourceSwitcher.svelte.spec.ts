@@ -13,7 +13,7 @@ describe('SourceSwitcher.svelte', () => {
 		originalFetch = globalThis.fetch;
 		globalThis.fetch = vi.fn().mockResolvedValue({
 			ok: true,
-			json: () => Promise.resolve({ source: 'listenbrainz' }),
+			json: () => Promise.resolve({ source: 'listenbrainz' })
 		});
 		integrationStore.reset();
 	});
@@ -27,7 +27,7 @@ describe('SourceSwitcher.svelte', () => {
 	it('renders nothing when only ListenBrainz is enabled', async () => {
 		integrationStore.setStatus({ listenbrainz: true, lastfm: false });
 		const { container } = render(SourceSwitcher, {
-			props: { pageKey: 'home' },
+			props: { pageKey: 'home' }
 		} as Parameters<typeof render<typeof SourceSwitcher>>[1]);
 		await vi.waitFor(() => {
 			const buttons = container.querySelectorAll('button');
@@ -38,7 +38,7 @@ describe('SourceSwitcher.svelte', () => {
 	it('renders nothing when only Last.fm is enabled', async () => {
 		integrationStore.setStatus({ listenbrainz: false, lastfm: true });
 		const { container } = render(SourceSwitcher, {
-			props: { pageKey: 'home' },
+			props: { pageKey: 'home' }
 		} as Parameters<typeof render<typeof SourceSwitcher>>[1]);
 		await vi.waitFor(() => {
 			const buttons = container.querySelectorAll('button');
@@ -49,7 +49,7 @@ describe('SourceSwitcher.svelte', () => {
 	it('renders nothing when neither service is enabled', async () => {
 		integrationStore.setStatus({ listenbrainz: false, lastfm: false });
 		const { container } = render(SourceSwitcher, {
-			props: { pageKey: 'home' },
+			props: { pageKey: 'home' }
 		} as Parameters<typeof render<typeof SourceSwitcher>>[1]);
 		await vi.waitFor(() => {
 			const buttons = container.querySelectorAll('button');
@@ -60,7 +60,7 @@ describe('SourceSwitcher.svelte', () => {
 	it('renders switcher buttons when both services are enabled', async () => {
 		integrationStore.setStatus({ listenbrainz: true, lastfm: true });
 		render(SourceSwitcher, {
-			props: { pageKey: 'home' },
+			props: { pageKey: 'home' }
 		} as Parameters<typeof render<typeof SourceSwitcher>>[1]);
 
 		const lbBtn = page.getByRole('button', { name: 'ListenBrainz' });
@@ -73,7 +73,7 @@ describe('SourceSwitcher.svelte', () => {
 	it('defaults to ListenBrainz as active source', async () => {
 		integrationStore.setStatus({ listenbrainz: true, lastfm: true });
 		render(SourceSwitcher, {
-			props: { pageKey: 'home' },
+			props: { pageKey: 'home' }
 		} as Parameters<typeof render<typeof SourceSwitcher>>[1]);
 
 		const lbBtn = page.getByRole('button', { name: 'ListenBrainz' });
@@ -87,7 +87,7 @@ describe('SourceSwitcher.svelte', () => {
 		integrationStore.setStatus({ listenbrainz: true, lastfm: true });
 		const onSourceChange = vi.fn<(source: MusicSource) => void>();
 		render(SourceSwitcher, {
-			props: { pageKey: 'home', onSourceChange },
+			props: { pageKey: 'home', onSourceChange }
 		} as unknown as Parameters<typeof render<typeof SourceSwitcher>>[1]);
 
 		const lfmBtn = page.getByRole('button', { name: 'Last.fm' });
@@ -102,7 +102,7 @@ describe('SourceSwitcher.svelte', () => {
 		integrationStore.setStatus({ listenbrainz: true, lastfm: true });
 
 		render(SourceSwitcher, {
-			props: { pageKey: 'home' },
+			props: { pageKey: 'home' }
 		} as Parameters<typeof render<typeof SourceSwitcher>>[1]);
 
 		const lfmBtn = page.getByRole('button', { name: 'Last.fm' });

@@ -21,8 +21,7 @@ export function isLoopReset(
 	if (durationMs <= 0 || prevProgressS <= 0) return false;
 	const durationS = durationMs / 1000;
 	return (
-		prevProgressS >= durationS - LOOP_RESET_TOLERANCE_S &&
-		currentProgressS < LOOP_RESET_TOLERANCE_S
+		prevProgressS >= durationS - LOOP_RESET_TOLERANCE_S && currentProgressS < LOOP_RESET_TOLERANCE_S
 	);
 }
 

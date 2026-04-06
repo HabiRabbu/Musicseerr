@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
 	import { onMount } from 'svelte';
 	import { fromStore } from 'svelte/store';
 	import { integrationStore } from '$lib/stores/integration';
@@ -33,7 +33,10 @@
 
 	const integration = fromStore(integrationStore);
 
-	const connectionMap: Record<string, 'lastfm' | 'listenbrainz' | 'jellyfin' | 'navidrome' | 'youtube' | 'localfiles' | 'lidarr'> = {
+	const connectionMap: Record<
+		string,
+		'lastfm' | 'listenbrainz' | 'jellyfin' | 'navidrome' | 'youtube' | 'localfiles' | 'lidarr'
+	> = {
 		lastfm: 'lastfm',
 		listenbrainz: 'listenbrainz',
 		jellyfin: 'jellyfin',
@@ -53,7 +56,12 @@
 		{ id: 'music-source', label: 'Music Source', group: 'Music Tracking', icon: BarChart3 },
 		{ id: 'jellyfin', label: 'Jellyfin', group: 'Media Servers', icon: JellyfinIcon },
 		{ id: 'navidrome', label: 'Navidrome', group: 'Media Servers', icon: NavidromeIcon },
-		{ id: 'lidarr-connection', label: 'Lidarr Connection', group: 'Library & Sources', icon: Shield },
+		{
+			id: 'lidarr-connection',
+			label: 'Lidarr Connection',
+			group: 'Library & Sources',
+			icon: Shield
+		},
 		{ id: 'lidarr', label: 'Library Sync', group: 'Library & Sources', icon: Music },
 		{ id: 'youtube', label: 'YouTube', group: 'Library & Sources', icon: Youtube },
 		{ id: 'local-files', label: 'Local Files', group: 'Library & Sources', icon: Headphones },
@@ -72,7 +80,7 @@
 	});
 
 	$effect(() => {
-		const tabParam = $page.url.searchParams.get('tab');
+		const tabParam = page.url.searchParams.get('tab');
 		if (tabParam && tabs.some((t) => t.id === tabParam)) {
 			activeTab = tabParam;
 		}
@@ -87,8 +95,10 @@
 		</div>
 
 		<div class="flex flex-col lg:flex-row gap-6">
-			<aside class="w-full lg:w-80 space-y-4 lg:sticky lg:top-20 lg:self-start lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto">
-				{#each groups as group}
+			<aside
+				class="w-full lg:w-80 space-y-4 lg:sticky lg:top-20 lg:self-start lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto"
+			>
+				{#each groups as group, i (`group-${i}`)}
 					<div class="bg-base-200 rounded-box p-2">
 						<div class="px-4 py-2">
 							<h3 class="text-xs font-semibold text-base-content/50 uppercase tracking-wider">
@@ -96,7 +106,7 @@
 							</h3>
 						</div>
 						<ul class="menu p-0">
-							{#each getTabsByGroup(group) as tab}
+							{#each getTabsByGroup(group) as tab (tab.id)}
 								{@const Icon = tab.icon}
 								<li>
 									<button
@@ -110,7 +120,9 @@
 											{@const storeKey = connectionMap[tab.id]}
 											{@const connected = integration.current[storeKey]}
 											<span
-												class="w-2 h-2 rounded-full ml-auto {connected ? 'bg-success' : 'bg-base-content/20'}"
+												class="w-2 h-2 rounded-full ml-auto {connected
+													? 'bg-success'
+													: 'bg-base-content/20'}"
 											>
 												<span class="sr-only">{connected ? 'Connected' : 'Not connected'}</span>
 											</span>

@@ -3,6 +3,7 @@
 	import { onDestroy } from 'svelte';
 	import { List } from 'lucide-svelte';
 	import { playerStore } from '$lib/stores/player.svelte';
+	import { SvelteMap } from 'svelte/reactivity';
 
 	type ArtistPageTocSection = {
 		id: string;
@@ -17,7 +18,7 @@
 
 	let activeSectionId = $state('');
 	let observer: IntersectionObserver | null = null;
-	let sectionRatios = new Map<string, number>();
+	let sectionRatios = new SvelteMap<string, number>();
 	let mobileMenu = $state<HTMLDetailsElement | null>(null);
 
 	function getFallbackActiveSection(): string {
@@ -61,7 +62,6 @@
 
 		observer?.disconnect();
 		observer = null;
-		sectionRatios = new Map<string, number>();
 
 		if (sections.length === 0) {
 			activeSectionId = '';
@@ -106,7 +106,8 @@
 	}
 
 	$effect(() => {
-		sections;
+		// eslint-disable-next-line @typescript-eslint/no-unused-expressions
+		sections; // Track reactivity
 		if (!browser) return;
 
 		const timeoutId = window.setTimeout(setupObserver, 0);
@@ -130,15 +131,15 @@
 				On this page
 			</p>
 			<ul class="flex flex-col border-l border-base-content/10">
-				{#each sections as section}
+				{#each sections as section (section.id)}
 					<li>
 						<a
 							href={`#${section.id}`}
 							onclick={(event) => scrollToSection(event, section.id)}
 							class="block py-1.5 pl-3 text-xs transition-colors duration-150 -ml-px border-l-2
 								{activeSectionId === section.id
-									? 'border-primary text-primary font-semibold'
-									: 'border-transparent text-base-content/50 hover:text-base-content/80 hover:border-base-content/30'}"
+								? 'border-primary text-primary font-semibold'
+								: 'border-transparent text-base-content/50 hover:text-base-content/80 hover:border-base-content/30'}"
 							aria-current={activeSectionId === section.id ? 'true' : undefined}
 						>
 							{section.label}
@@ -158,20 +159,22 @@
 			<summary class="btn btn-circle btn-primary shadow-lg" aria-label="Open section navigation">
 				<List class="h-5 w-5" />
 			</summary>
-			<div class="dropdown-content z-[1] w-52 mb-2 rounded-box bg-base-200/95 backdrop-blur-md shadow-xl border border-base-content/10 p-3">
+			<div
+				class="dropdown-content z-[1] w-52 mb-2 rounded-box bg-base-200/95 backdrop-blur-md shadow-xl border border-base-content/10 p-3"
+			>
 				<p class="text-[10px] font-semibold uppercase tracking-widest text-base-content/40 mb-2">
 					Jump to
 				</p>
 				<ul class="flex flex-col border-l border-base-content/10">
-					{#each sections as section}
+					{#each sections as section (section.id)}
 						<li>
 							<a
 								href={`#${section.id}`}
 								onclick={(event) => scrollToSection(event, section.id)}
 								class="block py-1.5 pl-3 text-sm transition-colors duration-150 -ml-px border-l-2
 									{activeSectionId === section.id
-										? 'border-primary text-primary font-semibold'
-										: 'border-transparent text-base-content/60 hover:text-base-content hover:border-base-content/30'}"
+									? 'border-primary text-primary font-semibold'
+									: 'border-transparent text-base-content/60 hover:text-base-content hover:border-base-content/30'}"
 								aria-current={activeSectionId === section.id ? 'true' : undefined}
 							>
 								{section.label}

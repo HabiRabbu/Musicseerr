@@ -9,7 +9,7 @@ const defaultResponse: LastFmConnectionSettingsResponse = {
 	shared_secret: '••••••••alue',
 	session_key: '',
 	username: '',
-	enabled: false,
+	enabled: false
 };
 
 function mockLoadSuccess(data: LastFmConnectionSettingsResponse = defaultResponse) {
@@ -18,7 +18,9 @@ function mockLoadSuccess(data: LastFmConnectionSettingsResponse = defaultRespons
 
 function mockLoadFailure() {
 	return vi.fn().mockResolvedValue(
-		new Response(JSON.stringify({ error: { message: 'Failed to load Last.fm settings' } }), { status: 500 })
+		new Response(JSON.stringify({ error: { message: 'Failed to load Last.fm settings' } }), {
+			status: 500
+		})
 	);
 }
 
@@ -72,7 +74,7 @@ describe('SettingsLastFm.svelte', () => {
 		globalThis.fetch = mockLoadSuccess({
 			...defaultResponse,
 			api_key: '',
-			shared_secret: '',
+			shared_secret: ''
 		});
 		render(SettingsLastFm);
 
@@ -84,7 +86,7 @@ describe('SettingsLastFm.svelte', () => {
 		globalThis.fetch = mockLoadSuccess({
 			...defaultResponse,
 			api_key: 'valid-key',
-			shared_secret: '••••••••cret',
+			shared_secret: '••••••••cret'
 		});
 		render(SettingsLastFm);
 
@@ -96,7 +98,7 @@ describe('SettingsLastFm.svelte', () => {
 		globalThis.fetch = mockLoadSuccess({
 			...defaultResponse,
 			username: 'myuser',
-			session_key: '••••••••skey',
+			session_key: '••••••••skey'
 		});
 		render(SettingsLastFm);
 

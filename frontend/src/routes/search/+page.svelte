@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { run } from 'svelte/legacy';
+
 	import { onMount, onDestroy } from 'svelte';
 	import { browser } from '$app/environment';
 	import { goto } from '$app/navigation';
@@ -21,29 +23,33 @@
 	import { Check, ArrowRight } from 'lucide-svelte';
 	import SearchTopResult from '$lib/components/SearchTopResult.svelte';
 
-	export let data: { query: string };
+	interface Props {
+		data: { query: string };
+	}
 
-	let artists: Artist[] = [];
-	let albums: Album[] = [];
-	let topArtist: Artist | null = null;
-	let topAlbum: Album | null = null;
-	let loadingArtists = false;
-	let loadingAlbums = false;
-	let hasSearched = false;
-	let showToast = false;
+	let { data }: Props = $props();
+
+	let artists: Artist[] = $state([]);
+	let albums: Album[] = $state([]);
+	let topArtist: Artist | null = $state(null);
+	let topAlbum: Album | null = $state(null);
+	let loadingArtists = $state(false);
+	let loadingAlbums = $state(false);
+	let hasSearched = $state(false);
+	let showToast = $state(false);
 	let abortController: AbortController | null = null;
 	let enrichmentController: AbortController | null = null;
-	let enrichmentSource: EnrichmentSource = 'none';
+	let enrichmentSource: EnrichmentSource = $state('none');
 
-	$: isSearching = loadingArtists || loadingAlbums;
-	$: hasResults = artists.length > 0 || albums.length > 0;
-	$: hasTopResult = topArtist != null || topAlbum != null;
-	$: displayedArtists = topArtist
-		? artists.filter((a) => a.musicbrainz_id !== topArtist?.musicbrainz_id)
-		: artists;
-	$: displayedAlbums = topAlbum
-		? albums.filter((a) => a.musicbrainz_id !== topAlbum?.musicbrainz_id)
-		: albums;
+	let isSearching = $derived(loadingArtists || loadingAlbums);
+	let hasResults = $derived(artists.length > 0 || albums.length > 0);
+	let hasTopResult = $derived(topArtist != null || topAlbum != null);
+	let displayedArtists = $derived(
+		topArtist ? artists.filter((a) => a.musicbrainz_id !== topArtist?.musicbrainz_id) : artists
+	);
+	let displayedAlbums = $derived(
+		topAlbum ? albums.filter((a) => a.musicbrainz_id !== topAlbum?.musicbrainz_id) : albums
+	);
 
 	function navigateToBucket(bucket: 'artists' | 'albums') {
 		if (data.query) {
@@ -176,20 +182,22 @@
 		void fetchEnrichment();
 	}
 
-	let lastQuery = '';
+	let lastQuery = $state('');
 
-	$: if (browser && data.query && data.query !== lastQuery) {
-		lastQuery = data.query;
-		performSearch(data.query);
-	} else if (browser && !data.query) {
-		artists = [];
-		albums = [];
-		topArtist = null;
-		topAlbum = null;
-		hasSearched = false;
-		lastQuery = '';
-		searchStore.clear();
-	}
+	run(() => {
+		if (browser && data.query && data.query !== lastQuery) {
+			lastQuery = data.query;
+			performSearch(data.query);
+		} else if (browser && !data.query) {
+			artists = [];
+			albums = [];
+			topArtist = null;
+			topAlbum = null;
+			hasSearched = false;
+			lastQuery = '';
+			searchStore.clear();
+		}
+	});
 
 	onMount(() => {
 		if (browser) {
@@ -230,14 +238,14 @@
 			<button
 				class="badge badge-lg cursor-pointer transition-colors"
 				style="background-color: {colors.secondary}; color: {colors.primary};"
-				on:click={() => navigateToBucket('artists')}
+				onclick={() => navigateToBucket('artists')}
 			>
 				Artists
 			</button>
 			<button
 				class="badge badge-lg cursor-pointer transition-colors"
 				style="background-color: {colors.secondary}; color: {colors.primary};"
-				on:click={() => navigateToBucket('albums')}
+				onclick={() => navigateToBucket('albums')}
 			>
 				Albums
 			</button>
@@ -253,7 +261,7 @@
 				<div
 					class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4"
 				>
-					{#each Array(6) as _, i}
+					{#each Array(6) as _, i (`artist-skeleton-${i}`)}
 						<ArtistCardSkeleton variant="detailed" />
 					{/each}
 				</div>
@@ -268,7 +276,7 @@
 				<div
 					class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4"
 				>
-					{#each Array(6) as _, i}
+					{#each Array(6) as _, i (`album-skeleton-${i}`)}
 						<AlbumCardSkeleton />
 					{/each}
 				</div>
@@ -280,10 +288,10 @@
 		{#if hasTopResult && !isSearching}
 			<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
 				{#if topArtist}
-					<SearchTopResult artist={topArtist} {enrichmentSource} />
+					<SearchTopResult artist={topArtist} />
 				{/if}
 				{#if topAlbum}
-					<SearchTopResult album={topAlbum} {enrichmentSource} />
+					<SearchTopResult album={topAlbum} />
 				{/if}
 			</div>
 		{/if}
@@ -295,7 +303,7 @@
 					<div
 						class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4"
 					>
-						{#each Array(6) as _, i}
+						{#each Array(6) as _, i (`artist-skeleton-${i}`)}
 							<ArtistCardSkeleton variant="detailed" />
 						{/each}
 					</div>
@@ -333,7 +341,7 @@
 					<div
 						class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4"
 					>
-						{#each Array(6) as _, i}
+						{#each Array(6) as _, i (`album-skeleton-${i}`)}
 							<AlbumCardSkeleton />
 						{/each}
 					</div>

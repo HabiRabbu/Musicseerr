@@ -53,12 +53,10 @@
 				api.get<LocalAlbumSummary[]>(API.local.recent(), { signal }),
 				api.get<LocalStorageStats>(API.local.stats(), { signal })
 			]);
-			const hasFreshData =
-				recentRes.status === 'fulfilled' || statsRes.status === 'fulfilled';
+			const hasFreshData = recentRes.status === 'fulfilled' || statsRes.status === 'fulfilled';
 			return {
 				data: {
-					recentAlbums:
-						recentRes.status === 'fulfilled' ? recentRes.value : current.recentAlbums,
+					recentAlbums: recentRes.status === 'fulfilled' ? recentRes.value : current.recentAlbums,
 					favoriteAlbums: [],
 					genres: [],
 					stats:
@@ -71,9 +69,7 @@
 		},
 
 		async fetchAlbumQueueItems(album) {
-			const tracks: LocalTrackInfo[] = await api.get(
-				API.local.albumTracks(album.lidarr_album_id)
-			);
+			const tracks: LocalTrackInfo[] = await api.get(API.local.albumTracks(album.lidarr_album_id));
 			if (tracks.length === 0) return [];
 			const sorted = [...tracks].sort((a, b) => a.track_number - b.track_number);
 			return buildQueueItemsFromLocal(sorted, {
@@ -86,9 +82,7 @@
 		},
 
 		async launchPlayback(album, shuffle) {
-			const tracks: LocalTrackInfo[] = await api.get(
-				API.local.albumTracks(album.lidarr_album_id)
-			);
+			const tracks: LocalTrackInfo[] = await api.get(API.local.albumTracks(album.lidarr_album_id));
 			if (tracks.length === 0) return;
 			launchLocalPlayback(tracks, 0, shuffle, {
 				albumId: album.musicbrainz_id || String(album.lidarr_album_id),
@@ -178,7 +172,7 @@
 					<div class="stat px-4 py-3">
 						<div class="stat-title text-xs">Formats</div>
 						<div class="flex gap-1 mt-1 flex-wrap">
-							{#each Object.entries(typedStats.format_breakdown) as [fmt, info]}
+							{#each Object.entries(typedStats.format_breakdown) as [fmt, info] (fmt)}
 								<span class="badge badge-xs badge-ghost">{fmt}: {info.count}</span>
 							{/each}
 						</div>
@@ -218,9 +212,7 @@
 		<div class="flex items-center justify-between">
 			<p class="text-xs opacity-70 line-clamp-1 flex-1">{album.artist_name}</p>
 			{#if album.total_size_bytes > 0}
-				<span class="text-xs opacity-40 flex-shrink-0 ml-1"
-					>{formatSize(album.total_size_bytes)}</span
-				>
+				<span class="text-xs opacity-40 shrink-0 ml-1">{formatSize(album.total_size_bytes)}</span>
 			{/if}
 		</div>
 	{/snippet}

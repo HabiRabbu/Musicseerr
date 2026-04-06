@@ -10,13 +10,13 @@ type ReportProgressFn = (
 	trackSourceId: string,
 	playSessionId: string,
 	progress: number,
-	isPaused: boolean,
+	isPaused: boolean
 ) => Promise<boolean>;
 
 export function createProgressReporter(
 	reportProgress: ReportProgressFn,
 	intervalMs: number,
-	maxFailures: number,
+	maxFailures: number
 ) {
 	let interval: ReturnType<typeof setInterval> | null = null;
 	let consecutiveFailures = 0;
@@ -37,7 +37,7 @@ export function createProgressReporter(
 					jellyfinItem.trackSourceId,
 					jellyfinItem.playSessionId,
 					progress,
-					isPaused,
+					isPaused
 				);
 				if (ok) {
 					consecutiveFailures = 0;
@@ -45,7 +45,9 @@ export function createProgressReporter(
 				}
 				consecutiveFailures += 1;
 				if (consecutiveFailures >= maxFailures) stop();
-			} catch {}
+			} catch {
+				// Ignore errors
+			}
 		}, intervalMs);
 	}
 
@@ -62,7 +64,7 @@ export function createProgressReporter(
 
 export function buildStopSessionPayload(
 	playSessionId: string,
-	positionSeconds: number,
+	positionSeconds: number
 ): { play_session_id: string; position_seconds: number } {
 	return { play_session_id: playSessionId, position_seconds: positionSeconds };
 }
@@ -74,7 +76,7 @@ export function createBeforeUnloadHandler(
 		progress: number;
 	},
 	jellyfinStopUrl: (trackSourceId: string) => string,
-	navidromeScrobbleUrl: (trackSourceId: string) => string,
+	navidromeScrobbleUrl: (trackSourceId: string) => string
 ): () => void {
 	return () => {
 		if (typeof navigator === 'undefined' || typeof navigator.sendBeacon !== 'function') return;
@@ -83,7 +85,7 @@ export function createBeforeUnloadHandler(
 		if (jellyfinItem?.playSessionId) {
 			const payload = new Blob(
 				[JSON.stringify(buildStopSessionPayload(jellyfinItem.playSessionId, progress))],
-				{ type: 'application/json' },
+				{ type: 'application/json' }
 			);
 			navigator.sendBeacon(jellyfinStopUrl(jellyfinItem.trackSourceId), payload);
 		}
@@ -91,7 +93,7 @@ export function createBeforeUnloadHandler(
 		if (currentItem?.sourceType === 'navidrome' && progress > 30) {
 			navigator.sendBeacon(
 				navidromeScrobbleUrl(currentItem.trackSourceId),
-				new Blob([], { type: 'application/json' }),
+				new Blob([], { type: 'application/json' })
 			);
 		}
 	};

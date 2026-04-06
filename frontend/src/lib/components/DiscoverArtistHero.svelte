@@ -17,18 +17,16 @@
 			!!(entry.banner_url || entry.wide_thumb_url || entry.fanart_url)
 	);
 
-	let backdropUrl = $derived(
-		(() => {
-			if ($imageSettingsStore.directRemoteImagesEnabled) {
-				if (entry.banner_url) return entry.banner_url;
-				if (entry.wide_thumb_url) return entry.wide_thumb_url;
-				if (entry.fanart_url) return entry.fanart_url;
-			}
-			return entry.seed_artist_mbid
-				? getApiUrl(`/api/v1/covers/artist/${entry.seed_artist_mbid}?size=500`)
-				: null;
-		})()
-	);
+	let backdropUrl = $derived.by(() => {
+		if ($imageSettingsStore.directRemoteImagesEnabled) {
+			if (entry.banner_url) return entry.banner_url;
+			if (entry.wide_thumb_url) return entry.wide_thumb_url;
+			if (entry.fanart_url) return entry.fanart_url;
+		}
+		return entry.seed_artist_mbid
+			? getApiUrl(`/api/v1/covers/artist/${entry.seed_artist_mbid}?size=500`)
+			: null;
+	});
 </script>
 
 <article

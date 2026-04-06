@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { run } from 'svelte/legacy';
+
 	import { Check } from 'lucide-svelte';
 	import type { ArtistInfo } from '$lib/types';
 	import { extractDominantColor, DEFAULT_GRADIENT } from '$lib/utils/colors';
@@ -10,22 +12,28 @@
 	import HeroBackdrop from './HeroBackdrop.svelte';
 	import { getApiUrl } from '$lib/utils/api';
 
-	export let artist: ArtistInfo;
-	export let showBackButton: boolean = false;
-
-	let heroGradient = DEFAULT_GRADIENT;
-	let heroImageLoaded = false;
-	let avatarRemoteError = false;
-
-	$: useRemoteAvatar = artist.thumb_url && $imageSettingsStore.directRemoteImagesEnabled;
-	$: resolvedRemoteAvatar = artist.thumb_url
-		? appendAudioDBSizeSuffix(artist.thumb_url, 'hero')
-		: null;
-	$: if (artist.musicbrainz_id) {
-		avatarRemoteError = false;
+	interface Props {
+		artist: ArtistInfo;
+		showBackButton?: boolean;
 	}
 
-	$: resolvedBackdropUrl = (() => {
+	let { artist, showBackButton = false }: Props = $props();
+
+	let heroGradient = $state(DEFAULT_GRADIENT);
+	let heroImageLoaded = $state(false);
+	let avatarRemoteError = $state(false);
+
+	let useRemoteAvatar = $derived(artist.thumb_url && $imageSettingsStore.directRemoteImagesEnabled);
+	let resolvedRemoteAvatar = $derived(
+		artist.thumb_url ? appendAudioDBSizeSuffix(artist.thumb_url, 'hero') : null
+	);
+	run(() => {
+		if (artist.musicbrainz_id) {
+			avatarRemoteError = false;
+		}
+	});
+
+	let resolvedBackdropUrl = $derived.by(() => {
 		if ($imageSettingsStore.directRemoteImagesEnabled) {
 			if (artist.banner_url) return artist.banner_url;
 			if (artist.wide_thumb_url) return artist.wide_thumb_url;
@@ -34,11 +42,12 @@
 		if (heroImageLoaded)
 			return getApiUrl(`/api/v1/covers/artist/${artist.musicbrainz_id}?size=500`);
 		return null;
-	})();
+	});
 
-	$: hasDistinctBackdrop =
+	let hasDistinctBackdrop = $derived(
 		$imageSettingsStore.directRemoteImagesEnabled &&
-		!!(artist.banner_url || artist.wide_thumb_url || artist.fanart_url);
+			!!(artist.banner_url || artist.wide_thumb_url || artist.fanart_url)
+	);
 
 	function onHeroImageLoad() {
 		heroImageLoaded = true;
@@ -47,7 +56,9 @@
 		);
 	}
 
-	$: validLinks = artist.external_links.filter((link) => link.url && link.url.trim() !== '');
+	let validLinks = $derived(
+		artist.external_links.filter((link) => link.url && link.url.trim() !== '')
+	);
 </script>
 
 <div
@@ -72,7 +83,7 @@
 				</div>
 			{/if}
 			<div class="flex flex-col sm:flex-row items-center sm:items-end gap-6 sm:gap-8">
-				<div class="flex-shrink-0">
+				<div class="shrink-0">
 					<div class="relative">
 						<div
 							class="w-40 h-40 sm:w-52 sm:h-52 lg:w-64 lg:h-64 rounded-full overflow-hidden shadow-2xl ring-4 ring-base-100/20 bg-neutral"
@@ -103,8 +114,8 @@
 									loading="lazy"
 									decoding="async"
 									referrerpolicy="no-referrer"
-									on:load={onHeroImageLoad}
-									on:error={() => {
+									onload={onHeroImageLoad}
+									onerror={() => {
 										avatarRemoteError = true;
 										heroImageLoaded = false;
 									}}
@@ -118,8 +129,8 @@
 										: 'opacity-0'}"
 									loading="lazy"
 									decoding="async"
-									on:load={onHeroImageLoad}
-									on:error={(e) => {
+									onload={onHeroImageLoad}
+									onerror={(e) => {
 										const target = e.currentTarget as HTMLImageElement;
 										target.style.display = 'none';
 									}}

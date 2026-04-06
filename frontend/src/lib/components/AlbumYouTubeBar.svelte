@@ -7,8 +7,15 @@
 	import YouTubeIcon from '$lib/components/YouTubeIcon.svelte';
 	import { getCoverUrl } from '$lib/utils/errorHandling';
 	import { api } from '$lib/api/client';
-	import { Link, Download, Search , Play} from 'lucide-svelte';
-	import type { Track, YouTubeLink, YouTubeLinkResponse, YouTubeTrackLink, YouTubeTrackLinkBatchResponse, YouTubeQuotaStatus } from '$lib/types';
+	import { Link, Download, Search, Play } from 'lucide-svelte';
+	import type {
+		Track,
+		YouTubeLink,
+		YouTubeLinkResponse,
+		YouTubeTrackLink,
+		YouTubeTrackLinkBatchResponse,
+		YouTubeQuotaStatus
+	} from '$lib/types';
 
 	interface Props {
 		albumId: string;
@@ -25,7 +32,20 @@
 		onQuotaUpdate: (quota: YouTubeQuotaStatus) => void;
 	}
 
-	let { albumId, albumName, artistName, artistId, coverUrl, tracks, trackLinks, albumLink, apiConfigured, onTrackLinksUpdate, onAlbumLinkUpdate, onQuotaUpdate }: Props = $props();
+	let {
+		albumId,
+		albumName,
+		artistName,
+		artistId,
+		coverUrl,
+		tracks,
+		trackLinks,
+		albumLink,
+		apiConfigured,
+		onTrackLinksUpdate,
+		onAlbumLinkUpdate,
+		onQuotaUpdate
+	}: Props = $props();
 
 	let batchGenerating = $state(false);
 	let generatingAlbumLink = $state(false);
@@ -40,7 +60,13 @@
 
 	function playAll(): void {
 		if (trackLinks.length === 0) return;
-		launchTrackPlayback([...trackLinks].sort(compareDiscTrack), 0, false, { albumId, albumName, artistName, coverUrl, artistId });
+		launchTrackPlayback([...trackLinks].sort(compareDiscTrack), 0, false, {
+			albumId,
+			albumName,
+			artistName,
+			coverUrl,
+			artistId
+		});
 	}
 
 	async function generateAlbumLink(): Promise<void> {
@@ -55,7 +81,11 @@
 			});
 			onAlbumLinkUpdate(data.link);
 			onQuotaUpdate(data.quota);
-			toastStore.show({ message: 'Album link generated', type: 'success', duration: TOAST_DURATION });
+			toastStore.show({
+				message: 'Album link generated',
+				type: 'success',
+				duration: TOAST_DURATION
+			});
 		} catch (e) {
 			toastStore.show({
 				message: e instanceof Error ? e.message : "Couldn't build the album link",
@@ -74,21 +104,25 @@
 		if (ungeneratedTracks.length === 0) return;
 
 		const cost = ungeneratedTracks.length;
-		if (!confirm(`This will use ${cost} YouTube API quota unit${cost > 1 ? 's' : ''}. Continue?`)) return;
+		if (!confirm(`This will use ${cost} YouTube API quota unit${cost > 1 ? 's' : ''}. Continue?`))
+			return;
 
 		batchGenerating = true;
 		try {
-			const data = await api.global.post<YouTubeTrackLinkBatchResponse>(API.youtube.generateTracks(), {
-				album_id: albumId,
-				album_name: albumName,
-				artist_name: artistName,
-				cover_url: getCoverUrl(coverUrl, albumId),
-				tracks: ungeneratedTracks.map((t) => ({
-					track_name: t.title,
-					track_number: t.position,
-					disc_number: normalizeDiscNumber(t.disc_number)
-				}))
-			});
+			const data = await api.global.post<YouTubeTrackLinkBatchResponse>(
+				API.youtube.generateTracks(),
+				{
+					album_id: albumId,
+					album_name: albumName,
+					artist_name: artistName,
+					cover_url: getCoverUrl(coverUrl, albumId),
+					tracks: ungeneratedTracks.map((t) => ({
+						track_name: t.title,
+						track_number: t.position,
+						disc_number: normalizeDiscNumber(t.disc_number)
+					}))
+				}
+			);
 			const existing = trackLinks.filter(
 				(tl) => !data.track_links.some((nl) => getDiscTrackKey(nl) === getDiscTrackKey(tl))
 			);
@@ -102,7 +136,11 @@
 					duration: TOAST_DURATION
 				});
 			} else {
-				toastStore.show({ message: 'All tracks generated', type: 'success', duration: TOAST_DURATION });
+				toastStore.show({
+					message: 'All tracks generated',
+					type: 'success',
+					duration: TOAST_DURATION
+				});
 			}
 		} catch (e) {
 			toastStore.show({
@@ -130,12 +168,20 @@
 				},
 				{
 					onLoadError: () => {
-						toastStore.show({ message: "Couldn't load the video", type: 'error', duration: TOAST_DURATION });
+						toastStore.show({
+							message: "Couldn't load the video",
+							type: 'error',
+							duration: TOAST_DURATION
+						});
 					}
 				}
 			);
-		} catch (e) {
-			toastStore.show({ message: "Couldn't play the album video", type: 'error', duration: TOAST_DURATION });
+		} catch (_e) {
+			toastStore.show({
+				message: "Couldn't play the album video",
+				type: 'error',
+				duration: TOAST_DURATION
+			});
 		}
 	}
 </script>
@@ -164,7 +210,11 @@
 					Full Album
 				</button>
 			{:else if apiConfigured}
-				<button class="btn btn-sm gap-1.5" onclick={generateAlbumLink} disabled={generatingAlbumLink}>
+				<button
+					class="btn btn-sm gap-1.5"
+					onclick={generateAlbumLink}
+					disabled={generatingAlbumLink}
+				>
 					{#if generatingAlbumLink}
 						<span class="loading loading-spinner loading-sm"></span>
 					{:else}
@@ -173,7 +223,10 @@
 					Album Link
 				</button>
 			{:else}
-				<div class="tooltip tooltip-bottom" data-tip="Enable YouTube API in settings for auto-generation">
+				<div
+					class="tooltip tooltip-bottom"
+					data-tip="Enable YouTube API in settings for auto-generation"
+				>
 					<button class="btn btn-sm gap-1.5" disabled aria-disabled="true">
 						<Link class="h-4 w-4" />
 						Album Link
@@ -192,7 +245,10 @@
 						All Tracks
 					</button>
 				{:else}
-					<div class="tooltip tooltip-bottom" data-tip="Enable YouTube API in settings for auto-generation">
+					<div
+						class="tooltip tooltip-bottom"
+						data-tip="Enable YouTube API in settings for auto-generation"
+					>
 						<button class="btn btn-sm gap-1.5" disabled aria-disabled="true">
 							<Download class="h-4 w-4" />
 							All Tracks

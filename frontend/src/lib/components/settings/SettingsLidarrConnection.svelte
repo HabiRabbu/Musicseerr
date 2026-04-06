@@ -47,7 +47,9 @@
 			return;
 		}
 		form.showMessage(
-			result.message.toLowerCase().includes('failed') ? result.message : `Connection failed: ${result.message}`,
+			result.message.toLowerCase().includes('failed')
+				? result.message
+				: `Connection failed: ${result.message}`,
 			'error',
 			false
 		);
@@ -98,11 +100,11 @@
 							class="input input-bordered join-item flex-1"
 							placeholder="Your Lidarr API key"
 						/>
-						<button type="button" class="btn join-item" onclick={() => showApiKey = !showApiKey}>
+						<button type="button" class="btn join-item" onclick={() => (showApiKey = !showApiKey)}>
 							{showApiKey ? 'Hide' : 'Show'}
 						</button>
 					</div>
-					<label class="label">
+					<label class="label" for="lidarr-api-key">
 						<span class="label-text-alt text-base-content/50">Settings → General → API Key</span>
 					</label>
 				</div>
@@ -117,7 +119,7 @@
 							bind:value={form.data.quality_profile_id}
 							class="select select-bordered w-full"
 						>
-							{#each verifyResult.quality_profiles as profile}
+							{#each verifyResult.quality_profiles as profile (profile.id)}
 								<option value={profile.id}>{profile.name}</option>
 							{/each}
 						</select>
@@ -132,7 +134,7 @@
 							bind:value={form.data.metadata_profile_id}
 							class="select select-bordered w-full"
 						>
-							{#each verifyResult.metadata_profiles as profile}
+							{#each verifyResult.metadata_profiles as profile (profile.id)}
 								<option value={profile.id}>{profile.name}</option>
 							{/each}
 						</select>
@@ -147,7 +149,7 @@
 							bind:value={form.data.root_folder_path}
 							class="select select-bordered w-full"
 						>
-							{#each verifyResult.root_folders as folder}
+							{#each verifyResult.root_folders as folder (folder.path)}
 								<option value={folder.path}>{folder.path}</option>
 							{/each}
 						</select>
@@ -155,13 +157,22 @@
 				{/if}
 
 				{#if form.message}
-					<div class="alert" class:alert-success={form.messageType === 'success'} class:alert-error={form.messageType === 'error'}>
+					<div
+						class="alert"
+						class:alert-success={form.messageType === 'success'}
+						class:alert-error={form.messageType === 'error'}
+					>
 						<span>{form.message}</span>
 					</div>
 				{/if}
 
 				<div class="flex justify-end gap-2 pt-2">
-					<button type="button" class="btn btn-ghost" onclick={verify} disabled={form.testing || !form.data.lidarr_url || !form.data.lidarr_api_key}>
+					<button
+						type="button"
+						class="btn btn-ghost"
+						onclick={verify}
+						disabled={form.testing || !form.data.lidarr_url || !form.data.lidarr_api_key}
+					>
 						{#if form.testing}
 							<span class="loading loading-spinner loading-sm"></span>
 						{/if}

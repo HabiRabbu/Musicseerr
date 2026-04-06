@@ -6,18 +6,27 @@
 	import { Music2 } from 'lucide-svelte';
 	import ArtistImage from './ArtistImage.svelte';
 
-	export let artist: Artist;
-	export let enrichmentSource: EnrichmentSource = 'none';
+	interface Props {
+		artist: Artist;
+		enrichmentSource?: EnrichmentSource;
+	}
 
-	$: listenTitle = getListenTitle(enrichmentSource, 'artist');
+	let { artist, enrichmentSource = 'none' }: Props = $props();
+
+	let listenTitle = $derived(getListenTitle(enrichmentSource, 'artist'));
 </script>
 
 <a
 	href={artistHref(artist.musicbrainz_id)}
-	class="card bg-base-100 w-full shadow-sm flex-shrink-0 cursor-pointer transition-all hover:scale-105 hover:shadow-[0_0_20px_rgba(174,213,242,0.15)]"
+	class="card bg-base-100 w-full shadow-sm shrink-0 cursor-pointer transition-all hover:scale-105 hover:shadow-[0_0_20px_rgba(174,213,242,0.15)]"
 >
 	<figure class="flex justify-center pt-4">
-		<ArtistImage mbid={artist.musicbrainz_id} alt={artist.title} size="lg" remoteUrl={artist.thumb_url ?? null} />
+		<ArtistImage
+			mbid={artist.musicbrainz_id}
+			alt={artist.title}
+			size="lg"
+			remoteUrl={artist.thumb_url ?? null}
+		/>
 	</figure>
 
 	<div class="card-body p-3 pt-2 items-center text-center gap-0.5">
@@ -33,7 +42,7 @@
 					{artist.release_group_count} release{artist.release_group_count !== 1 ? 's' : ''}
 				</span>
 			{/if}
-				{#if artist.listen_count != null}
+			{#if artist.listen_count != null}
 				{#if enrichmentSource === 'lastfm'}
 					<span
 						class="badge badge-sm border-0"
@@ -52,7 +61,8 @@
 					</span>
 				{:else}
 					<span class="badge badge-sm badge-ghost" title={listenTitle}>
-						<Music2 class="inline h-3 w-3" /> {formatListenCount(artist.listen_count, true)}
+						<Music2 class="inline h-3 w-3" />
+						{formatListenCount(artist.listen_count, true)}
 					</span>
 				{/if}
 			{/if}

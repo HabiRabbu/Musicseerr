@@ -57,7 +57,7 @@ function getInitialState(): RecentlyAddedState {
 }
 
 function createRecentlyAddedStore() {
-	const { subscribe, set, update } = writable<RecentlyAddedState>(getInitialState());
+	const { subscribe, update } = writable<RecentlyAddedState>(getInitialState());
 
 	async function initialize() {
 		const state = get({ subscribe });
@@ -90,7 +90,7 @@ function createRecentlyAddedStore() {
 			}));
 
 			cache.set(data);
-		} catch (e) {
+		} catch (_e) {
 			if (!background) {
 				update((s) => ({ ...s, loading: false, initialized: true }));
 			}

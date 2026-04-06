@@ -43,7 +43,7 @@
 			newName = '';
 			showNewInput = false;
 			await goto(`/playlists/${created.id}`);
-		} catch (e) {
+		} catch (_e) {
 			toastStore.show({ message: "Couldn't create the playlist", type: 'error' });
 		} finally {
 			creating = false;
@@ -119,10 +119,8 @@
 	{/if}
 
 	{#if loading}
-		<div
-			class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4"
-		>
-			{#each Array(8) as _}
+		<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+			{#each Array(8) as _, i (`skeleton-${i}`)}
 				<PlaylistCardSkeleton />
 			{/each}
 		</div>
@@ -146,9 +144,7 @@
 			</button>
 		</div>
 	{:else}
-		<div
-			class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4"
-		>
+		<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
 			{#each playlists as playlist (playlist.id)}
 				<PlaylistCard {playlist} ondelete={handleCardDelete} />
 			{/each}

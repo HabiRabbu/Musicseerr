@@ -4,7 +4,9 @@
 	import type { NavidromeConnectionSettings } from '$lib/types';
 
 	type NavidromeTestResult = { valid: boolean; message: string };
-	type NavidromeSettingsForm = ReturnType<typeof createSettingsForm<NavidromeConnectionSettings>> & {
+	type NavidromeSettingsForm = ReturnType<
+		typeof createSettingsForm<NavidromeConnectionSettings>
+	> & {
 		testResult: NavidromeTestResult | null;
 	};
 
@@ -88,14 +90,22 @@
 							class="input input-bordered join-item flex-1"
 							placeholder="Your Navidrome password"
 						/>
-						<button type="button" class="btn join-item" onclick={() => showPassword = !showPassword}>
+						<button
+							type="button"
+							class="btn join-item"
+							onclick={() => (showPassword = !showPassword)}
+						>
 							{showPassword ? 'Hide' : 'Show'}
 						</button>
 					</div>
 				</div>
 
 				{#if form.testResult}
-					<div class="alert" class:alert-success={form.testResult.valid} class:alert-error={!form.testResult.valid}>
+					<div
+						class="alert"
+						class:alert-success={form.testResult.valid}
+						class:alert-error={!form.testResult.valid}
+					>
 						<span>{form.testResult.message}</span>
 					</div>
 				{/if}
@@ -122,13 +132,25 @@
 				</div>
 
 				{#if form.message}
-					<div class="alert" class:alert-success={form.messageType === 'success'} class:alert-error={form.messageType === 'error'}>
+					<div
+						class="alert"
+						class:alert-success={form.messageType === 'success'}
+						class:alert-error={form.messageType === 'error'}
+					>
 						<span>{form.message}</span>
 					</div>
 				{/if}
 
 				<div class="flex justify-end gap-2 pt-2">
-					<button type="button" class="btn btn-ghost" onclick={test} disabled={form.testing || !form.data.navidrome_url || !form.data.username || !form.data.password}>
+					<button
+						type="button"
+						class="btn btn-ghost"
+						onclick={test}
+						disabled={form.testing ||
+							!form.data.navidrome_url ||
+							!form.data.username ||
+							!form.data.password}
+					>
 						{#if form.testing}
 							<span class="loading loading-spinner loading-sm"></span>
 						{/if}

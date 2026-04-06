@@ -1,4 +1,4 @@
-import { writable, get } from 'svelte/store';
+import { writable } from 'svelte/store';
 import { browser } from '$app/environment';
 import { API } from '$lib/constants';
 import { musicSourceStore, type MusicSource } from '$lib/stores/musicSource';
@@ -27,7 +27,7 @@ type QueueStatusPayload = {
 const INITIAL: DiscoverQueueStatusState = {
 	status: 'unknown',
 	source: 'listenbrainz',
-	lastChecked: 0,
+	lastChecked: 0
 };
 
 function createDiscoverQueueStatusStore() {
@@ -44,16 +44,14 @@ function createDiscoverQueueStatusStore() {
 		return getCacheTTLs().discoverQueueAutoGenerate;
 	}
 
-	function applyStatusData(
-		data: QueueStatusPayload
-	): void {
+	function applyStatusData(data: QueueStatusPayload): void {
 		set({
 			status: data.status,
 			source: data.source,
 			queueId: data.queue_id,
 			itemCount: data.item_count,
 			error: data.error,
-			lastChecked: Date.now(),
+			lastChecked: Date.now()
 		});
 	}
 
@@ -78,7 +76,10 @@ function createDiscoverQueueStatusStore() {
 		try {
 			const activeSource = resolveSource(source);
 			update((s) => ({ ...s, status: 'building', source: activeSource }));
-			const data = await api.global.post<QueueStatusPayload>(API.discoverQueueGenerate(), { source: activeSource, force });
+			const data = await api.global.post<QueueStatusPayload>(API.discoverQueueGenerate(), {
+				source: activeSource,
+				force
+			});
 			applyStatusData(data);
 			if (data.status === 'building') {
 				startPolling(activeSource);
@@ -88,7 +89,7 @@ function createDiscoverQueueStatusStore() {
 				update((s) => ({
 					...s,
 					status: 'error',
-					error: `Server responded with ${e.status}`,
+					error: `Server responded with ${e.status}`
 				}));
 			} else {
 				update((s) => ({ ...s, status: 'error', error: 'Failed to trigger generation' }));
@@ -149,7 +150,7 @@ function createDiscoverQueueStatusStore() {
 		markConsumed,
 		get isPolling() {
 			return isPolling;
-		},
+		}
 	};
 }
 

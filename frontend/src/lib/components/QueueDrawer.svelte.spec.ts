@@ -18,8 +18,8 @@ vi.mock('$lib/player/createSource', () => ({
 		onStateChange: vi.fn(),
 		onReady: vi.fn(),
 		onError: vi.fn(),
-		onProgress: vi.fn(),
-	})),
+		onProgress: vi.fn()
+	}))
 }));
 
 import { playerStore } from '$lib/stores/player.svelte';
@@ -44,15 +44,27 @@ describe('QueueDrawer.svelte', () => {
 	it('shows upcoming-only queue count when items exist', async () => {
 		playerStore.playQueue([
 			{
-				trackSourceId: 'v1', trackName: 'Track A', artistName: 'Artist',
-				trackNumber: 1, albumId: 'a1', albumName: 'Album',
-				coverUrl: null, sourceType: 'local', streamUrl: 'http://test/1.mp3',
+				trackSourceId: 'v1',
+				trackName: 'Track A',
+				artistName: 'Artist',
+				trackNumber: 1,
+				albumId: 'a1',
+				albumName: 'Album',
+				coverUrl: null,
+				sourceType: 'local',
+				streamUrl: 'http://test/1.mp3'
 			},
 			{
-				trackSourceId: 'v2', trackName: 'Track B', artistName: 'Artist',
-				trackNumber: 2, albumId: 'a1', albumName: 'Album',
-				coverUrl: null, sourceType: 'local', streamUrl: 'http://test/2.mp3',
-			},
+				trackSourceId: 'v2',
+				trackName: 'Track B',
+				artistName: 'Artist',
+				trackNumber: 2,
+				albumId: 'a1',
+				albumName: 'Album',
+				coverUrl: null,
+				sourceType: 'local',
+				streamUrl: 'http://test/2.mp3'
+			}
 		]);
 		const onclose = vi.fn();
 		renderDrawer(true, onclose);
@@ -71,15 +83,27 @@ describe('QueueDrawer.svelte', () => {
 	it('clears upcoming tracks on clear click but keeps current track', async () => {
 		playerStore.playQueue([
 			{
-				trackSourceId: 'v1', trackName: 'Track A', artistName: 'Artist',
-				trackNumber: 1, albumId: 'a1', albumName: 'Album',
-				coverUrl: null, sourceType: 'local', streamUrl: 'http://test/1.mp3',
+				trackSourceId: 'v1',
+				trackName: 'Track A',
+				artistName: 'Artist',
+				trackNumber: 1,
+				albumId: 'a1',
+				albumName: 'Album',
+				coverUrl: null,
+				sourceType: 'local',
+				streamUrl: 'http://test/1.mp3'
 			},
 			{
-				trackSourceId: 'v2', trackName: 'Track B', artistName: 'Artist',
-				trackNumber: 2, albumId: 'a1', albumName: 'Album',
-				coverUrl: null, sourceType: 'local', streamUrl: 'http://test/2.mp3',
-			},
+				trackSourceId: 'v2',
+				trackName: 'Track B',
+				artistName: 'Artist',
+				trackNumber: 2,
+				albumId: 'a1',
+				albumName: 'Album',
+				coverUrl: null,
+				sourceType: 'local',
+				streamUrl: 'http://test/2.mp3'
+			}
 		]);
 		const onclose = vi.fn();
 		renderDrawer(true, onclose);
@@ -95,15 +119,27 @@ describe('QueueDrawer.svelte', () => {
 	it('has remove buttons for queue items', async () => {
 		playerStore.playQueue([
 			{
-				trackSourceId: 'v1', trackName: 'Track A', artistName: 'Artist',
-				trackNumber: 1, albumId: 'a1', albumName: 'Album',
-				coverUrl: null, sourceType: 'local', streamUrl: 'http://test/1.mp3',
+				trackSourceId: 'v1',
+				trackName: 'Track A',
+				artistName: 'Artist',
+				trackNumber: 1,
+				albumId: 'a1',
+				albumName: 'Album',
+				coverUrl: null,
+				sourceType: 'local',
+				streamUrl: 'http://test/1.mp3'
 			},
 			{
-				trackSourceId: 'v2', trackName: 'Track B', artistName: 'Artist',
-				trackNumber: 2, albumId: 'a1', albumName: 'Album',
-				coverUrl: null, sourceType: 'local', streamUrl: 'http://test/2.mp3',
-			},
+				trackSourceId: 'v2',
+				trackName: 'Track B',
+				artistName: 'Artist',
+				trackNumber: 2,
+				albumId: 'a1',
+				albumName: 'Album',
+				coverUrl: null,
+				sourceType: 'local',
+				streamUrl: 'http://test/2.mp3'
+			}
 		]);
 		const onclose = vi.fn();
 		renderDrawer(true, onclose);
@@ -112,28 +148,51 @@ describe('QueueDrawer.svelte', () => {
 	});
 
 	it('only allows reordering upcoming tracks', async () => {
-		playerStore.playQueue([
-			{
-				trackSourceId: 'v1', trackName: 'Track A', artistName: 'Artist',
-				trackNumber: 1, albumId: 'a1', albumName: 'Album',
-				coverUrl: null, sourceType: 'local', streamUrl: 'http://test/1.mp3',
-			},
-			{
-				trackSourceId: 'v2', trackName: 'Track B', artistName: 'Artist',
-				trackNumber: 2, albumId: 'a1', albumName: 'Album',
-				coverUrl: null, sourceType: 'local', streamUrl: 'http://test/2.mp3',
-			},
-			{
-				trackSourceId: 'v3', trackName: 'Track C', artistName: 'Artist',
-				trackNumber: 3, albumId: 'a1', albumName: 'Album',
-				coverUrl: null, sourceType: 'local', streamUrl: 'http://test/3.mp3',
-			},
-		], 1);
+		playerStore.playQueue(
+			[
+				{
+					trackSourceId: 'v1',
+					trackName: 'Track A',
+					artistName: 'Artist',
+					trackNumber: 1,
+					albumId: 'a1',
+					albumName: 'Album',
+					coverUrl: null,
+					sourceType: 'local',
+					streamUrl: 'http://test/1.mp3'
+				},
+				{
+					trackSourceId: 'v2',
+					trackName: 'Track B',
+					artistName: 'Artist',
+					trackNumber: 2,
+					albumId: 'a1',
+					albumName: 'Album',
+					coverUrl: null,
+					sourceType: 'local',
+					streamUrl: 'http://test/2.mp3'
+				},
+				{
+					trackSourceId: 'v3',
+					trackName: 'Track C',
+					artistName: 'Artist',
+					trackNumber: 3,
+					albumId: 'a1',
+					albumName: 'Album',
+					coverUrl: null,
+					sourceType: 'local',
+					streamUrl: 'http://test/3.mp3'
+				}
+			],
+			1
+		);
 		const onclose = vi.fn();
 		const view = renderDrawer(true, onclose);
 		await expect.element(page.getByText('Track C')).toBeVisible();
 
-		const enabledHandles = view.container.querySelectorAll('button[aria-label="Drag to reorder"]:not([disabled])');
+		const enabledHandles = view.container.querySelectorAll(
+			'button[aria-label="Drag to reorder"]:not([disabled])'
+		);
 		expect(enabledHandles).toHaveLength(1);
 	});
 });

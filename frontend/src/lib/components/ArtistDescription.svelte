@@ -1,14 +1,20 @@
 <script lang="ts">
+	import { run } from 'svelte/legacy';
+
 	import { ChevronUp, ChevronDown } from 'lucide-svelte';
 	import { colors } from '$lib/colors';
 	import { onMount } from 'svelte';
 
-	export let description: string | null | undefined;
-	export let loading = false;
+	interface Props {
+		description: string | null | undefined;
+		loading?: boolean;
+	}
 
-	let descriptionExpanded = false;
-	let descriptionElement: HTMLElement;
-	let showViewMore = false;
+	let { description, loading = false }: Props = $props();
+
+	let descriptionExpanded = $state(false);
+	let descriptionElement = $state<HTMLElement | null>(null);
+	let showViewMore = $state(false);
 
 	function checkDescriptionHeight() {
 		if (descriptionElement && !descriptionExpanded) {
@@ -23,9 +29,11 @@
 		setTimeout(() => checkDescriptionHeight(), 50);
 	});
 
-	$: if (description && !loading) {
-		setTimeout(() => checkDescriptionHeight(), 50);
-	}
+	run(() => {
+		if (description && !loading) {
+			setTimeout(() => checkDescriptionHeight(), 50);
+		}
+	});
 </script>
 
 <div class="bg-base-200/50 rounded-box p-4 sm:p-6">
@@ -39,12 +47,13 @@
 		<div class="text-sm sm:text-base text-base-content/80 leading-relaxed">
 			{#if descriptionExpanded}
 				<div>
+					<!-- eslint-disable-next-line svelte/no-at-html-tags -->
 					{@html description.replace(/\n\n/g, '<br><br>').replace(/\n/g, '<br>')}
 				</div>
 				<button
 					class="btn btn-sm mt-3 gap-2"
 					style="background-color: {colors.accent}; color: {colors.secondary};"
-					on:click={() => (descriptionExpanded = false)}
+					onclick={() => (descriptionExpanded = false)}
 				>
 					Show Less
 					<ChevronUp class="h-4 w-4" />
@@ -55,13 +64,14 @@
 					class="line-clamp-4 overflow-hidden"
 					style="display: -webkit-box; -webkit-box-orient: vertical;"
 				>
+					<!-- eslint-disable-next-line svelte/no-at-html-tags -->
 					{@html description.replace(/\n\n/g, '<br><br>').replace(/\n/g, '<br>')}
 				</div>
 				{#if showViewMore}
 					<button
 						class="btn btn-sm mt-3 gap-2"
 						style="background-color: {colors.accent}; color: {colors.secondary};"
-						on:click={() => (descriptionExpanded = true)}
+						onclick={() => (descriptionExpanded = true)}
 					>
 						Read More
 						<ChevronDown class="h-4 w-4" />

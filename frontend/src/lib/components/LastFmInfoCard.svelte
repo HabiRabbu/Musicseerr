@@ -58,12 +58,14 @@
 			<div class="skeleton h-6 w-14 rounded-full"></div>
 		</div>
 	</div>
-{:else if !enabled}
-{:else if hasContent}
+{:else if !enabled}{:else if hasContent}
 	<div class="bg-base-200/50 rounded-box p-4 sm:p-6 space-y-4">
 		<div class="flex items-center justify-between">
 			<div class="flex items-center gap-2">
-				<span class="badge badge-sm" style="background-color: rgb(var(--brand-lastfm) / 0.15); color: rgb(var(--brand-lastfm));">
+				<span
+					class="badge badge-sm"
+					style="background-color: rgb(var(--brand-lastfm) / 0.15); color: rgb(var(--brand-lastfm));"
+				>
 					Last.fm
 				</span>
 			</div>
@@ -131,7 +133,7 @@
 
 		{#if hasTags}
 			<div class="flex flex-wrap gap-2">
-				{#each tags.slice(0, 10) as tag}
+				{#each tags.slice(0, 10) as tag (tag.name)}
 					<a
 						href="/genre?name={encodeURIComponent(tag.name)}"
 						class="badge badge-outline badge-sm cursor-pointer hover:badge-primary transition-colors"

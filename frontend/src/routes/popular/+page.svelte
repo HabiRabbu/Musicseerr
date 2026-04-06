@@ -5,7 +5,7 @@
 	import { musicSourceStore, type MusicSource } from '$lib/stores/musicSource';
 	import { Disc3 } from 'lucide-svelte';
 
-	let source: MusicSource | null = null;
+	let source: MusicSource | null = $state(null);
 
 	onMount(async () => {
 		await musicSourceStore.load();
@@ -16,7 +16,7 @@
 		source = nextSource;
 	}
 
-	$: sourceLabel = source === 'lastfm' ? 'Last.fm' : 'ListenBrainz';
+	let sourceLabel = $derived(source === 'lastfm' ? 'Last.fm' : 'ListenBrainz');
 </script>
 
 <svelte:head>
@@ -32,8 +32,7 @@
 		endpoint="/api/v1/home/popular/albums"
 		title="Popular Right Now"
 		subtitle={`Most listened albums on ${sourceLabel}`}
-		source={source}
-		errorEmoji="💿"
+		{source}
 		errorIcon={Disc3}
 	/>
 </div>

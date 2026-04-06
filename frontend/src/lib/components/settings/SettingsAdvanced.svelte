@@ -52,7 +52,9 @@
 <div class="space-y-6">
 	<div>
 		<h2 class="text-2xl font-bold">Advanced Settings</h2>
-		<p class="text-base-content/60 mt-1">Control cache freshness, background work, and image loading.</p>
+		<p class="text-base-content/60 mt-1">
+			Control cache freshness, background work, and image loading.
+		</p>
 	</div>
 
 	{#if form.loading}
@@ -61,7 +63,9 @@
 		</div>
 	{:else if form.data}
 		{#if form.message}
-			<div class="alert {form.messageType === 'success' ? 'alert-success' : 'alert-error'} alert-soft">
+			<div
+				class="alert {form.messageType === 'success' ? 'alert-success' : 'alert-error'} alert-soft"
+			>
 				{#if form.messageType === 'success'}
 					<CircleCheck class="w-5 h-5 shrink-0" />
 				{:else}
@@ -77,7 +81,6 @@
 			icon={Clock}
 			iconBgClass="bg-primary/10"
 			iconTextClass="text-primary"
-			sectionId="frontend-cache"
 			bind:isOpen={openFrontendCache}
 			name="advanced-settings"
 		>
@@ -90,7 +93,6 @@
 			icon={Archive}
 			iconBgClass="bg-secondary/10"
 			iconTextClass="text-secondary"
-			sectionId="backend-cache"
 			bind:isOpen={openBackendCache}
 			name="advanced-settings"
 		>
@@ -103,7 +105,6 @@
 			icon={Globe}
 			iconBgClass="bg-accent/10"
 			iconTextClass="text-accent"
-			sectionId="network-batch"
 			bind:isOpen={openNetworkBatch}
 			name="advanced-settings"
 		>
@@ -116,7 +117,6 @@
 			icon={Database}
 			iconBgClass="bg-warning/10"
 			iconTextClass="text-warning"
-			sectionId="storage-queue"
 			bind:isOpen={openStorageQueue}
 			name="advanced-settings"
 		>
@@ -129,7 +129,6 @@
 			icon={ImageIcon}
 			iconBgClass="bg-primary/10"
 			iconTextClass="text-primary"
-			sectionId="audiodb"
 			bind:isOpen={openAudioDB}
 			name="advanced-settings"
 		>

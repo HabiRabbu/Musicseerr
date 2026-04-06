@@ -26,7 +26,7 @@
 
 {#snippet gridFallback()}
 	<div
-		class="bg-gradient-to-br from-base-300 to-base-200 w-full h-full flex items-center justify-center"
+		class="bg-linear-to-br from-base-300 to-base-200 w-full h-full flex items-center justify-center"
 	>
 		<Music class="w-1/3 h-1/3 text-base-content/30" />
 	</div>
@@ -42,7 +42,7 @@
 		/>
 	{:else if urls.length >= 4}
 		<div class="grid grid-cols-2 grid-rows-2 w-full h-full gap-0">
-			{#each urls as url, i}
+			{#each urls as url, i (`${url}-${i}`)}
 				{#if imageErrors[i]}
 					{@render gridFallback()}
 				{:else}
@@ -58,7 +58,7 @@
 		</div>
 	{:else if urls.length === 3}
 		<div class="grid grid-cols-2 grid-rows-2 w-full h-full gap-0">
-			{#each urls as url, i}
+			{#each urls as url, i (`${url}-${i}`)}
 				{#if imageErrors[i]}
 					{@render gridFallback()}
 				{:else}
@@ -75,7 +75,7 @@
 		</div>
 	{:else if urls.length === 2}
 		<div class="grid grid-cols-2 w-full h-full gap-0">
-			{#each urls as url, i}
+			{#each urls as url, i (`${url}-${i}`)}
 				{#if imageErrors[i]}
 					{@render gridFallback()}
 				{:else}
@@ -92,7 +92,7 @@
 	{:else if urls.length === 1}
 		{#if imageErrors[0]}
 			<div
-				class="bg-gradient-to-br from-base-300 to-base-200 w-full h-full flex items-center justify-center"
+				class="bg-linear-to-br from-base-300 to-base-200 w-full h-full flex items-center justify-center"
 			>
 				<Music class="w-1/3 h-1/3 text-base-content/30" />
 			</div>
@@ -107,7 +107,7 @@
 		{/if}
 	{:else}
 		<div
-			class="bg-gradient-to-br from-base-300 to-base-200 w-full h-full flex items-center justify-center"
+			class="bg-linear-to-br from-base-300 to-base-200 w-full h-full flex items-center justify-center"
 		>
 			<Music class="w-1/3 h-1/3 text-base-content/30" />
 		</div>

@@ -49,8 +49,8 @@
 		</div>
 	{:else}
 		<HorizontalCarousel>
-			{#each albums as album}
-				<div class="w-36 flex-shrink-0">
+			{#each albums as album (album.musicbrainz_id)}
+				<div class="w-36 shrink-0">
 					<AlbumCard album={toAlbum(album)} />
 				</div>
 			{/each}

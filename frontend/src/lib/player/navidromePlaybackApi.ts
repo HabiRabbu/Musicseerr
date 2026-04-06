@@ -3,9 +3,7 @@ import { api, ApiError } from '$lib/api/client';
 
 export async function reportNavidromeScrobble(itemId: string): Promise<void> {
 	try {
-		const body = await api.global.post<{ status: string }>(
-			API.stream.navidromeScrobble(itemId)
-		);
+		const body = await api.global.post<{ status: string }>(API.stream.navidromeScrobble(itemId));
 		if (body.status !== 'ok') {
 			console.warn('[Navidrome] scrobble reported error');
 		}

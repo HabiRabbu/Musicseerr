@@ -58,6 +58,8 @@ function createSyncStatusStore() {
 	let hideTimeout: ReturnType<typeof setTimeout> | null = null;
 	let reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
 	let reconnectAttempts = 0;
+	// TODO: do we need this?
+	// eslint-disable-next-line @typescript-eslint/no-unused-vars
 	let statusVersion = 0;
 	let connected = false;
 

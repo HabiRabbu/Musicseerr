@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { Music, ArrowLeft } from 'lucide-svelte';
-
-	let { status, error }: { status: number; error: { message?: string } } = $props();
+	import { page } from '$app/state';
 </script>
 
 <svelte:head>
@@ -13,9 +12,9 @@
 		<Music class="h-16 w-16 text-base-content/20" />
 		<h1 class="text-lg font-semibold text-base-content/80">Couldn't load this playlist</h1>
 		<p class="text-sm text-base-content/60">
-			{error?.message ?? 'Please try again'}
-			{#if status}
-				({status})
+			{page.error?.message ?? 'Please try again'}
+			{#if page.error && 'status' in page.error && page.error.status}
+				({page.error.status})
 			{/if}
 		</p>
 		<div class="flex items-center gap-2">
@@ -23,9 +22,7 @@
 				<ArrowLeft class="h-4 w-4" />
 				Back to Playlists
 			</a>
-			<button class="btn btn-accent btn-sm" onclick={() => location.reload()}>
-				Retry
-			</button>
+			<button class="btn btn-accent btn-sm" onclick={() => location.reload()}> Retry </button>
 		</div>
 	</div>
 </div>

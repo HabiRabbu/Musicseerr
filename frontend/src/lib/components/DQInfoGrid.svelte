@@ -19,7 +19,9 @@
 				<Calendar class="w-4 h-4" />
 			</span>
 			<div class="flex flex-col gap-px">
-				<span class="text-[0.6rem] uppercase tracking-wider font-bold text-base-content/35">Released</span>
+				<span class="text-[0.6rem] uppercase tracking-wider font-bold text-base-content/35">
+					Released
+				</span>
 				<span class="text-sm font-semibold text-base-content/80">{enrichment.release_date}</span>
 			</div>
 		</div>
@@ -30,8 +32,13 @@
 				<Globe class="w-4 h-4" />
 			</span>
 			<div class="flex flex-col gap-px">
-				<span class="text-[0.6rem] uppercase tracking-wider font-bold text-base-content/35">Origin</span>
-				<span class="text-sm font-semibold text-base-content/80">{countryToFlag(enrichment.country)} {enrichment.country}</span>
+				<span class="text-[0.6rem] uppercase tracking-wider font-bold text-base-content/35">
+					Origin
+				</span>
+				<span class="text-sm font-semibold text-base-content/80">
+					{countryToFlag(enrichment.country)}
+					{enrichment.country}
+				</span>
 			</div>
 		</div>
 	{/if}
@@ -41,8 +48,12 @@
 				<Volume2 class="w-4 h-4" />
 			</span>
 			<div class="flex flex-col gap-px">
-				<span class="text-[0.6rem] uppercase tracking-wider font-bold text-base-content/35">Plays</span>
-				<span class="text-sm font-semibold text-base-content/80">{enrichment.listen_count.toLocaleString()}</span>
+				<span class="text-[0.6rem] uppercase tracking-wider font-bold text-base-content/35">
+					Plays
+				</span>
+				<span class="text-sm font-semibold text-base-content/80">
+					{enrichment.listen_count.toLocaleString()}
+				</span>
 			</div>
 		</div>
 	{/if}
@@ -52,7 +63,9 @@
 				<CircleCheck class="w-4 h-4 text-success" />
 			</span>
 			<div class="flex flex-col gap-px">
-				<span class="text-[0.6rem] uppercase tracking-wider font-bold text-base-content/35">Library</span>
+				<span class="text-[0.6rem] uppercase tracking-wider font-bold text-base-content/35">
+					Library
+				</span>
 				<span class="text-sm font-semibold text-success">In Library</span>
 			</div>
 		</div>
@@ -60,7 +73,7 @@
 </div>
 {#if showTags && enrichment.tags.length > 0}
 	<div class="flex flex-wrap gap-1 mt-2">
-		{#each enrichment.tags.slice(0, 6) as tag}
+		{#each enrichment.tags.slice(0, 6) as tag, i (`tag-${i}`)}
 			<span class="dq-tag">{tag}</span>
 		{/each}
 	</div>

@@ -202,7 +202,12 @@ describe('album detail page track rendering', () => {
 			if (cache === mockAlbumTracksCache) {
 				onHydrate({
 					tracks: [
-						{ position: 1, disc_number: 1, title: 'Infinite ❤️ Without Fulfillment', length: 95327 },
+						{
+							position: 1,
+							disc_number: 1,
+							title: 'Infinite ❤️ Without Fulfillment',
+							length: 95327
+						},
 						{ position: 5, disc_number: 1, title: 'Circumambient', length: 223280 },
 						{ position: 1, disc_number: 2, title: 'Ambrosia', length: 213093 },
 						{ position: 5, disc_number: 2, title: 'Be a Body (Baarsden rework)', length: 204626 }
@@ -247,7 +252,12 @@ describe('album detail page track rendering', () => {
 				return Promise.resolve(
 					jsonResponse({
 						tracks: [
-							{ position: 1, disc_number: 1, title: 'Infinite ❤️ Without Fulfillment', length: 95327 },
+							{
+								position: 1,
+								disc_number: 1,
+								title: 'Infinite ❤️ Without Fulfillment',
+								length: 95327
+							},
 							{ position: 5, disc_number: 1, title: 'Circumambient', length: 223280 },
 							{ position: 1, disc_number: 2, title: 'Ambrosia', length: 213093 },
 							{ position: 5, disc_number: 2, title: 'Be a Body (Baarsden rework)', length: 204626 }
@@ -286,10 +296,42 @@ describe('album detail page track rendering', () => {
 					jsonResponse({
 						found: true,
 						tracks: [
-							{ track_file_id: 1, title: 'Infinite ❤️ Without Fulfillment', track_number: 1, disc_number: 1, duration_seconds: 95, size_bytes: 1, format: 'flac' },
-							{ track_file_id: 2, title: 'Circumambient', track_number: 5, disc_number: 1, duration_seconds: 223, size_bytes: 1, format: 'flac' },
-							{ track_file_id: 3, title: 'Ambrosia', track_number: 1, disc_number: 2, duration_seconds: 213, size_bytes: 1, format: 'flac' },
-							{ track_file_id: 4, title: 'Be a Body (Baarsden rework)', track_number: 5, disc_number: 2, duration_seconds: 204, size_bytes: 1, format: 'flac' }
+							{
+								track_file_id: 1,
+								title: 'Infinite ❤️ Without Fulfillment',
+								track_number: 1,
+								disc_number: 1,
+								duration_seconds: 95,
+								size_bytes: 1,
+								format: 'flac'
+							},
+							{
+								track_file_id: 2,
+								title: 'Circumambient',
+								track_number: 5,
+								disc_number: 1,
+								duration_seconds: 223,
+								size_bytes: 1,
+								format: 'flac'
+							},
+							{
+								track_file_id: 3,
+								title: 'Ambrosia',
+								track_number: 1,
+								disc_number: 2,
+								duration_seconds: 213,
+								size_bytes: 1,
+								format: 'flac'
+							},
+							{
+								track_file_id: 4,
+								title: 'Be a Body (Baarsden rework)',
+								track_number: 5,
+								disc_number: 2,
+								duration_seconds: 204,
+								size_bytes: 1,
+								format: 'flac'
+							}
 						],
 						total_size_bytes: 4,
 						primary_format: 'flac'
@@ -303,10 +345,50 @@ describe('album detail page track rendering', () => {
 						found: true,
 						navidrome_album_id: 'nav-1',
 						tracks: [
-							{ navidrome_id: 'n1', title: 'Infinite ❤️ Without Fulfillment', track_number: 1, disc_number: 1, duration_seconds: 95, codec: 'flac', bitrate: 800, album_name: 'Visions', artist_name: 'Grimes' },
-							{ navidrome_id: 'n2', title: 'Circumambient', track_number: 5, disc_number: 1, duration_seconds: 223, codec: 'flac', bitrate: 800, album_name: 'Visions', artist_name: 'Grimes' },
-							{ navidrome_id: 'n3', title: 'Ambrosia', track_number: 1, disc_number: 2, duration_seconds: 213, codec: 'flac', bitrate: 800, album_name: 'Visions', artist_name: 'Grimes' },
-							{ navidrome_id: 'n4', title: 'Be a Body (Baarsden rework)', track_number: 5, disc_number: 2, duration_seconds: 204, codec: 'flac', bitrate: 800, album_name: 'Visions', artist_name: 'Grimes' }
+							{
+								navidrome_id: 'n1',
+								title: 'Infinite ❤️ Without Fulfillment',
+								track_number: 1,
+								disc_number: 1,
+								duration_seconds: 95,
+								codec: 'flac',
+								bitrate: 800,
+								album_name: 'Visions',
+								artist_name: 'Grimes'
+							},
+							{
+								navidrome_id: 'n2',
+								title: 'Circumambient',
+								track_number: 5,
+								disc_number: 1,
+								duration_seconds: 223,
+								codec: 'flac',
+								bitrate: 800,
+								album_name: 'Visions',
+								artist_name: 'Grimes'
+							},
+							{
+								navidrome_id: 'n3',
+								title: 'Ambrosia',
+								track_number: 1,
+								disc_number: 2,
+								duration_seconds: 213,
+								codec: 'flac',
+								bitrate: 800,
+								album_name: 'Visions',
+								artist_name: 'Grimes'
+							},
+							{
+								navidrome_id: 'n4',
+								title: 'Be a Body (Baarsden rework)',
+								track_number: 5,
+								disc_number: 2,
+								duration_seconds: 204,
+								codec: 'flac',
+								bitrate: 800,
+								album_name: 'Visions',
+								artist_name: 'Grimes'
+							}
 						]
 					})
 				);

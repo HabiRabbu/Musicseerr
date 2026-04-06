@@ -1,6 +1,10 @@
 <script lang="ts">
-	export let title: string = "Albums";
-	export let count: number = 12;
+	interface Props {
+		title?: string;
+		count?: number;
+	}
+
+	let { title = 'Albums', count = 12 }: Props = $props();
 </script>
 
 <div class="mb-8">
@@ -8,9 +12,9 @@
 		<h2 class="text-2xl font-bold">{title}</h2>
 		<div class="skeleton skeleton-shimmer h-6 w-24"></div>
 	</div>
-	
+
 	<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-		{#each Array(count) as _}
+		{#each Array(count) as _, i (i)}
 			<div class="card bg-base-100 w-full shadow-sm">
 				<figure class="aspect-square overflow-hidden relative">
 					<div class="skeleton skeleton-shimmer w-full h-full absolute inset-0"></div>

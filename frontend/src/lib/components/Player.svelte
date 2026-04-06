@@ -9,7 +9,22 @@
 	import EqPanel from '$lib/components/EqPanel.svelte';
 	import NowPlayingIndicator from '$lib/components/NowPlayingIndicator.svelte';
 	import { getCoverUrl } from '$lib/utils/errorHandling';
-	import { X, Music, Shuffle, SkipBack, AlertCircle, Pause, Play, SkipForward, Volume2, ExternalLink, Check, CircleX, ListMusic, SlidersHorizontal } from 'lucide-svelte';
+	import {
+		X,
+		Music,
+		Shuffle,
+		SkipBack,
+		AlertCircle,
+		Pause,
+		Play,
+		SkipForward,
+		Volume2,
+		ExternalLink,
+		Check,
+		CircleX,
+		ListMusic,
+		SlidersHorizontal
+	} from 'lucide-svelte';
 
 	let coverImgError = $state(false);
 	let lastCoverKey = '';
@@ -82,11 +97,15 @@
 					<img
 						src={nowPlayingCoverUrl}
 						alt={playerStore.nowPlaying.albumName}
-						class="w-[60px] h-[60px] rounded-lg shadow-lg ring-1 ring-base-content/10 object-cover flex-shrink-0"
-						onerror={() => { coverImgError = true; }}
+						class="w-15 h-15 rounded-lg shadow-lg ring-1 ring-base-content/10 object-cover shrink-0"
+						onerror={() => {
+							coverImgError = true;
+						}}
 					/>
 				{:else}
-					<div class="w-[60px] h-[60px] rounded-lg shadow-lg bg-base-200 flex items-center justify-center flex-shrink-0">
+					<div
+						class="w-15 h-15 rounded-lg shadow-lg bg-base-200 flex items-center justify-center shrink-0"
+					>
 						<Music class="h-6 w-6 opacity-40" />
 					</div>
 				{/if}
@@ -98,13 +117,17 @@
 						<p class="text-sm font-semibold truncate">{playerStore.nowPlaying.trackName}</p>
 						<p class="text-xs opacity-60 truncate">
 							{#if isAlbumLinkable(playerStore.nowPlaying.albumId)}
-								<a href="/album/{playerStore.nowPlaying.albumId}" class="hover:underline">{playerStore.nowPlaying.albumName}</a>
+								<a href="/album/{playerStore.nowPlaying.albumId}" class="hover:underline"
+									>{playerStore.nowPlaying.albumName}</a
+								>
 							{:else}
 								{playerStore.nowPlaying.albumName}
 							{/if}
-							{' — '}
+							—
 							{#if playerStore.nowPlaying.artistId}
-								<a href="/artist/{playerStore.nowPlaying.artistId}" class="hover:underline">{playerStore.nowPlaying.artistName}</a>
+								<a href="/artist/{playerStore.nowPlaying.artistId}" class="hover:underline"
+									>{playerStore.nowPlaying.artistName}</a
+								>
 							{:else}
 								{playerStore.nowPlaying.artistName}
 							{/if}
@@ -112,21 +135,27 @@
 					{:else}
 						<p class="text-sm font-semibold truncate">
 							{#if isAlbumLinkable(playerStore.nowPlaying.albumId)}
-								<a href="/album/{playerStore.nowPlaying.albumId}" class="hover:underline">{playerStore.nowPlaying.albumName}</a>
+								<a href="/album/{playerStore.nowPlaying.albumId}" class="hover:underline"
+									>{playerStore.nowPlaying.albumName}</a
+								>
 							{:else}
 								{playerStore.nowPlaying.albumName}
 							{/if}
 						</p>
 						<p class="text-xs opacity-60 truncate">
 							{#if playerStore.nowPlaying.artistId}
-								<a href="/artist/{playerStore.nowPlaying.artistId}" class="hover:underline">{playerStore.nowPlaying.artistName}</a>
+								<a href="/artist/{playerStore.nowPlaying.artistId}" class="hover:underline"
+									>{playerStore.nowPlaying.artistName}</a
+								>
 							{:else}
 								{playerStore.nowPlaying.artistName}
 							{/if}
 						</p>
 					{/if}
 					{#if playerStore.hasQueue}
-						<p class="text-xs opacity-40 truncate">Track {playerStore.currentTrackNumber} of {playerStore.queueLength}</p>
+						<p class="text-xs opacity-40 truncate">
+							Track {playerStore.currentTrackNumber} of {playerStore.queueLength}
+						</p>
 					{/if}
 					{#if playerStore.playbackState === 'error'}
 						<p class="text-xs text-error truncate">Track unavailable</p>
@@ -161,8 +190,13 @@
 
 					<button
 						class="btn btn-circle btn-accent shadow-md w-10 h-10"
-						onclick={() => playerStore.playbackState === 'error' ? playerStore.stop() : playerStore.togglePlay()}
-						aria-label={playerStore.playbackState === 'error' ? 'Close' : playerStore.isPlaying ? 'Pause' : 'Play'}
+						onclick={() =>
+							playerStore.playbackState === 'error' ? playerStore.stop() : playerStore.togglePlay()}
+						aria-label={playerStore.playbackState === 'error'
+							? 'Close'
+							: playerStore.isPlaying
+								? 'Pause'
+								: 'Play'}
 					>
 						{#if playerStore.playbackState === 'error'}
 							<AlertCircle class="h-5 w-5" />
@@ -188,7 +222,9 @@
 				</div>
 
 				<div class="flex items-center gap-2 w-full max-w-lg">
-					<span class="text-xs opacity-60 w-10 text-right tabular-nums">{formatTime(playerStore.progress)}</span>
+					<span class="text-xs opacity-60 w-10 text-right tabular-nums"
+						>{formatTime(playerStore.progress)}</span
+					>
 					<input
 						type="range"
 						class="range range-xs range-accent flex-1"
@@ -200,7 +236,9 @@
 						disabled={!playerStore.isSeekable}
 						oninput={handleSeek}
 					/>
-					<span class="text-xs opacity-60 w-10 tabular-nums">{formatTime(playerStore.duration)}</span>
+					<span class="text-xs opacity-60 w-10 tabular-nums"
+						>{formatTime(playerStore.duration)}</span
+					>
 				</div>
 				{#if !playerStore.isSeekable}
 					<p class="text-[10px] text-base-content/60">Seeking unavailable for this stream format</p>
@@ -217,12 +255,19 @@
 					>
 						<ListMusic class="h-4 w-4" />
 						{#if playerStore.upcomingQueueLength > 0}
-							<span class="badge badge-xs badge-accent absolute -top-1 -right-1">{playerStore.upcomingQueueLength}</span>
+							<span class="badge badge-xs badge-accent absolute -top-1 -right-1"
+								>{playerStore.upcomingQueueLength}</span
+							>
 						{/if}
 					</button>
 				</div>
 
-				<div class="tooltip tooltip-left" data-tip={playerStore.nowPlaying?.sourceType === 'youtube' ? 'EQ unavailable for YouTube' : 'Equalizer'}>
+				<div
+					class="tooltip tooltip-left"
+					data-tip={playerStore.nowPlaying?.sourceType === 'youtube'
+						? 'EQ unavailable for YouTube'
+						: 'Equalizer'}
+				>
 					<button
 						class="btn btn-ghost btn-sm btn-circle"
 						class:text-accent={eqStore.enabled && playerStore.nowPlaying?.sourceType !== 'youtube'}
@@ -235,7 +280,7 @@
 				</div>
 
 				<div class="hidden sm:flex items-center gap-1.5">
-					<Volume2 class="h-4 w-4 opacity-60 flex-shrink-0" />
+					<Volume2 class="h-4 w-4 opacity-60 shrink-0" />
 					<input
 						type="range"
 						class="range range-xs w-20"
@@ -267,7 +312,11 @@
 					</div>
 
 					<div class="tooltip tooltip-left" data-tip="Open in YouTube">
-						<button class="btn btn-ghost btn-sm btn-circle" onclick={openInYouTube} aria-label="Open in YouTube">
+						<button
+							class="btn btn-ghost btn-sm btn-circle"
+							onclick={openInYouTube}
+							aria-label="Open in YouTube"
+						>
 							<ExternalLink class="h-4 w-4" />
 						</button>
 					</div>
@@ -282,9 +331,17 @@
 						<span class="text-sm font-medium">Navidrome</span>
 					</div>
 				{:else if playerStore.nowPlaying.sourceType === 'local'}
-					<div class="hidden sm:flex items-center gap-2" style="color: rgb(var(--brand-localfiles))">
+					<div
+						class="hidden sm:flex items-center gap-2"
+						style="color: rgb(var(--brand-localfiles))"
+					>
 						<Music class="h-5 w-5" />
-						<span class="text-sm font-medium">Local{#if playerStore.currentQueueItem?.format}<span class="badge badge-xs badge-ghost ml-1 uppercase">{playerStore.currentQueueItem.format}</span>{/if}</span>
+						<span class="text-sm font-medium"
+							>Local{#if playerStore.currentQueueItem?.format}<span
+									class="badge badge-xs badge-ghost ml-1 uppercase"
+									>{playerStore.currentQueueItem.format}</span
+								>{/if}</span
+						>
 					</div>
 				{/if}
 			</div>

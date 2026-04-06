@@ -53,7 +53,10 @@ describe('api client', () => {
 		it('calls pageFetch with GET and returns parsed JSON', async () => {
 			mockPageFetch.mockResolvedValue(jsonResponse({ name: 'test' }));
 			const result = await api.get<{ name: string }>('/api/v1/test');
-			expect(mockPageFetch).toHaveBeenCalledWith('/api/v1/test', expect.objectContaining({ method: 'GET' }));
+			expect(mockPageFetch).toHaveBeenCalledWith(
+				'/api/v1/test',
+				expect.objectContaining({ method: 'GET' })
+			);
 			expect(result).toEqual({ name: 'test' });
 		});
 
@@ -81,7 +84,10 @@ describe('api client', () => {
 		it('calls globalThis.fetch instead of pageFetch', async () => {
 			mockGlobalFetch.mockResolvedValue(jsonResponse({ name: 'global' }));
 			const result = await api.global.get<{ name: string }>('/api/v1/global');
-			expect(mockGlobalFetch).toHaveBeenCalledWith('/api/v1/global', expect.objectContaining({ method: 'GET' }));
+			expect(mockGlobalFetch).toHaveBeenCalledWith(
+				'/api/v1/global',
+				expect.objectContaining({ method: 'GET' })
+			);
 			expect(mockPageFetch).not.toHaveBeenCalled();
 			expect(result).toEqual({ name: 'global' });
 		});
@@ -155,7 +161,9 @@ describe('api client', () => {
 
 		it('returns typed JSON for 200 DELETE responses', async () => {
 			mockPageFetch.mockResolvedValue(jsonResponse({ success: true, artist_removed: true }));
-			const data = await api.delete<{ success: boolean; artist_removed: boolean }>('/api/v1/items/1');
+			const data = await api.delete<{ success: boolean; artist_removed: boolean }>(
+				'/api/v1/items/1'
+			);
 			expect(data).toEqual({ success: true, artist_removed: true });
 		});
 	});

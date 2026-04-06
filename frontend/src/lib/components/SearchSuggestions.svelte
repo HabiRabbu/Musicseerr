@@ -192,6 +192,7 @@
 	<form onsubmit={handleSubmit}>
 		<label class="input input-bordered flex items-center gap-2 w-full {inputClass}">
 			<Search class="h-[1em] opacity-50" strokeWidth={2.5} />
+			<!-- svelte-ignore a11y_autofocus -->
 			<input
 				type="search"
 				{placeholder}
@@ -215,7 +216,7 @@
 		<ul
 			role="listbox"
 			id={listboxId}
-			class="absolute top-full left-0 right-0 z-[60] mt-1 rounded-box bg-base-200 shadow-xl"
+			class="absolute top-full left-0 right-0 z-60 mt-1 rounded-box bg-base-200 shadow-xl"
 		>
 			{#each suggestions as result, i (result.musicbrainz_id)}
 				<li

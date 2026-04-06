@@ -1,5 +1,9 @@
 <script lang="ts">
-	import type { DiscoverQueueEnrichment, YouTubeSearchResponse, YouTubeQuotaStatus } from '$lib/types';
+	import type {
+		DiscoverQueueEnrichment,
+		YouTubeSearchResponse,
+		YouTubeQuotaStatus
+	} from '$lib/types';
 	import YouTubeIcon from './YouTubeIcon.svelte';
 	import { Settings, ExternalLink } from 'lucide-svelte';
 
@@ -99,10 +103,7 @@
 		</button>
 		{#if quota}
 			<div class="flex flex-col items-center gap-1 w-full max-w-64 mt-3">
-				<progress
-					class="progress progress-primary w-full"
-					value={quota.used}
-					max={quota.limit}
+				<progress class="progress progress-primary w-full" value={quota.used} max={quota.limit}
 				></progress>
 				<span class="text-xs text-base-content/40">
 					{quota.remaining} / {quota.limit} lookups remaining today

@@ -13,25 +13,28 @@
 	import type { DiscoverResponse } from '$lib/types';
 	import CarouselSkeleton from '$lib/components/CarouselSkeleton.svelte';
 	import PageHeader from '$lib/components/PageHeader.svelte';
-	import { getDiscoverCachedData, setDiscoverCachedData, isDiscoverCacheStale } from '$lib/utils/discoverCache';
+	import {
+		getDiscoverCachedData,
+		setDiscoverCachedData,
+		isDiscoverCacheStale
+	} from '$lib/utils/discoverCache';
 	import { removeAllQueueCachedData } from '$lib/utils/discoverQueueCache';
 	import { isAbortError } from '$lib/utils/errorHandling';
 	import { api } from '$lib/api/client';
 	import { isDismissed } from '$lib/utils/dismissedPrompts';
-	import { formatLastUpdated } from '$lib/utils/formatting';
 	import { musicSourceStore, type MusicSource } from '$lib/stores/musicSource';
 	import { discoverQueueStatusStore } from '$lib/stores/discoverQueueStatus';
 	import { Compass, CircleAlert, Sparkles, Music, BarChart3 } from 'lucide-svelte';
 
-	let discoverData: DiscoverResponse | null = null;
-	let loading = true;
-	let refreshing = false;
-	let isUpdating = false;
-	let error = '';
-	let lastUpdated: Date | null = null;
+	let discoverData = $state<DiscoverResponse | null>(null);
+	let loading = $state(true);
+	let refreshing = $state(false);
+	let isUpdating = $state(false);
+	let error = $state('');
+	let lastUpdated = $state<Date | null>(null);
 	let abortController: AbortController | null = null;
-	let queueModalOpen = false;
-	let activeSource: MusicSource = 'listenbrainz';
+	let queueModalOpen = $state(false);
+	let activeSource: MusicSource = $state('listenbrainz');
 	let pollRunId = 0;
 
 	function resolveDiscoverSource(source?: MusicSource): MusicSource {
@@ -77,9 +80,12 @@
 		error = '';
 
 		try {
-			const data: DiscoverResponse = await api.get(`/api/v1/discover?source=${encodeURIComponent(source)}`, {
-				signal: abortController.signal
-			});
+			const data: DiscoverResponse = await api.get(
+				`/api/v1/discover?source=${encodeURIComponent(source)}`,
+				{
+					signal: abortController.signal
+				}
+			);
 			discoverData = data;
 			lastUpdated = new Date();
 			const dataHasContent =
@@ -111,9 +117,12 @@
 		const source = resolveDiscoverSource(sourceOverride);
 
 		try {
-			const data: DiscoverResponse = await api.get(`/api/v1/discover?source=${encodeURIComponent(source)}`, {
-				signal: abortController.signal
-			});
+			const data: DiscoverResponse = await api.get(
+				`/api/v1/discover?source=${encodeURIComponent(source)}`,
+				{
+					signal: abortController.signal
+				}
+			);
 			const hasContent =
 				(data.because_you_listen_to?.length ?? 0) > 0 ||
 				data.fresh_releases != null ||
@@ -141,7 +150,9 @@
 				await new Promise((r) => setTimeout(r, 3000));
 				if (runId !== pollRunId) return;
 				try {
-					const data: DiscoverResponse = await api.get(`/api/v1/discover?source=${encodeURIComponent(source)}`);
+					const data: DiscoverResponse = await api.get(
+						`/api/v1/discover?source=${encodeURIComponent(source)}`
+					);
 					const ready =
 						(data.because_you_listen_to?.length ?? 0) > 0 ||
 						data.fresh_releases != null ||
@@ -172,7 +183,9 @@
 		isUpdating = true;
 		try {
 			await api.global.post('/api/v1/discover/refresh');
-		} catch {}
+		} catch {
+			// Ignore errors
+		}
 
 		try {
 			const maxPolls = 30;
@@ -181,7 +194,9 @@
 				await new Promise((r) => setTimeout(r, 2000));
 				if (runId !== pollRunId) return;
 				try {
-					const data: DiscoverResponse = await api.get(`/api/v1/discover?source=${encodeURIComponent(source)}`);
+					const data: DiscoverResponse = await api.get(
+						`/api/v1/discover?source=${encodeURIComponent(source)}`
+					);
 					if (!data.refreshing) {
 						discoverData = data;
 						lastUpdated = new Date();
@@ -229,38 +244,46 @@
 		discoverQueueStatusStore.init(source);
 	}
 
-	$: hasContent =
+	let hasContent = $derived(
 		(discoverData?.because_you_listen_to?.length ?? 0) > 0 ||
-		discoverData?.fresh_releases != null ||
-		discoverData?.missing_essentials != null ||
-		discoverData?.rediscover != null ||
-		discoverData?.artists_you_might_like != null ||
-		discoverData?.popular_in_your_genres != null ||
-		discoverData?.globally_trending != null ||
-		discoverData?.lastfm_weekly_artist_chart != null ||
-		discoverData?.lastfm_weekly_album_chart != null ||
-		discoverData?.lastfm_recent_scrobbles != null ||
-		(discoverData?.genre_list?.items?.length ?? 0) > 0;
-	$: servicePrompts = (discoverData?.service_prompts ?? []).filter((p) => !isDismissed(p.service));
+			discoverData?.fresh_releases != null ||
+			discoverData?.missing_essentials != null ||
+			discoverData?.rediscover != null ||
+			discoverData?.artists_you_might_like != null ||
+			discoverData?.popular_in_your_genres != null ||
+			discoverData?.globally_trending != null ||
+			discoverData?.lastfm_weekly_artist_chart != null ||
+			discoverData?.lastfm_weekly_album_chart != null ||
+			discoverData?.lastfm_recent_scrobbles != null ||
+			(discoverData?.genre_list?.items?.length ?? 0) > 0
+	);
+	let servicePrompts = $derived(
+		(discoverData?.service_prompts ?? []).filter((p) => !isDismissed(p.service))
+	);
 
-	$: hasCuratedGroup =
+	let hasCuratedGroup = $derived(
 		(discoverData?.because_you_listen_to?.length ?? 0) > 0 ||
-		discoverData?.discover_queue_enabled ||
-		(activeSource === 'listenbrainz' && discoverData?.weekly_exploration && discoverData.weekly_exploration.tracks.length > 0);
+			discoverData?.discover_queue_enabled ||
+			(activeSource === 'listenbrainz' &&
+				discoverData?.weekly_exploration &&
+				discoverData.weekly_exploration.tracks.length > 0)
+	);
 
-	$: hasExploreGroup =
+	let hasExploreGroup = $derived(
 		(discoverData?.fresh_releases?.items?.length ?? 0) > 0 ||
-		(discoverData?.missing_essentials?.items?.length ?? 0) > 0 ||
-		(discoverData?.rediscover?.items?.length ?? 0) > 0 ||
-		(discoverData?.artists_you_might_like?.items?.length ?? 0) > 0 ||
-		(discoverData?.popular_in_your_genres?.items?.length ?? 0) > 0;
+			(discoverData?.missing_essentials?.items?.length ?? 0) > 0 ||
+			(discoverData?.rediscover?.items?.length ?? 0) > 0 ||
+			(discoverData?.artists_you_might_like?.items?.length ?? 0) > 0 ||
+			(discoverData?.popular_in_your_genres?.items?.length ?? 0) > 0
+	);
 
-	$: hasChartsGroup =
+	let hasChartsGroup = $derived(
 		(discoverData?.globally_trending?.items?.length ?? 0) > 0 ||
-		(discoverData?.lastfm_recent_scrobbles?.items?.length ?? 0) > 0 ||
-		(discoverData?.lastfm_weekly_artist_chart?.items?.length ?? 0) > 0 ||
-		(discoverData?.lastfm_weekly_album_chart?.items?.length ?? 0) > 0 ||
-		(discoverData?.genre_list?.items?.length ?? 0) > 0;
+			(discoverData?.lastfm_recent_scrobbles?.items?.length ?? 0) > 0 ||
+			(discoverData?.lastfm_weekly_artist_chart?.items?.length ?? 0) > 0 ||
+			(discoverData?.lastfm_weekly_album_chart?.items?.length ?? 0) > 0 ||
+			(discoverData?.genre_list?.items?.length ?? 0) > 0
+	);
 
 	function handlePromptDismiss(_service: string) {
 		servicePrompts = (discoverData?.service_prompts ?? []).filter((p) => !isDismissed(p.service));
@@ -296,14 +319,15 @@
 		<div class="mt-16 flex flex-col items-center justify-center px-4">
 			<CircleAlert class="mb-4 h-10 w-10 text-base-content/50" />
 			<p class="text-base-content/70">{error}</p>
-			<button class="btn btn-primary mt-4" on:click={() => loadDiscoverData(true, activeSource)}>Try Again</button
+			<button class="btn btn-primary mt-4" onclick={() => loadDiscoverData(true, activeSource)}
+				>Try Again</button
 			>
 		</div>
 	{:else}
 		<div class="px-4 sm:px-6 lg:px-8">
 			{#if servicePrompts.length > 0}
 				<div class="space-y-3 mb-6">
-					{#each servicePrompts as prompt}
+					{#each servicePrompts as prompt, i (`service-prompt-${prompt.service}-${i}`)}
 						<ServicePromptCard {prompt} ondismiss={handlePromptDismiss} />
 					{/each}
 				</div>
@@ -311,7 +335,7 @@
 
 			{#if loading && !discoverData}
 				<div class="space-y-8">
-					{#each Array(3) as _}
+					{#each Array(3) as _, i (`loading-section-${i}`)}
 						<section>
 							<div class="skeleton skeleton-shimmer mb-4 h-6 w-48"></div>
 							<CarouselSkeleton />
@@ -320,7 +344,6 @@
 				</div>
 			{:else if discoverData}
 				<div class="space-y-10 sm:space-y-12">
-
 					{#if hasCuratedGroup}
 						<div>
 							<SectionDivider label="Curated For You">
@@ -337,12 +360,18 @@
 								{/if}
 
 								<div>
-									<DiscoverQueueCard source={activeSource} onLaunch={() => (queueModalOpen = true)} />
+									<DiscoverQueueCard
+										source={activeSource}
+										onLaunch={() => (queueModalOpen = true)}
+									/>
 								</div>
 
 								{#if activeSource === 'listenbrainz' && discoverData.weekly_exploration && discoverData.weekly_exploration.tracks.length > 0}
 									<div>
-										<WeeklyExploration section={discoverData.weekly_exploration} ytConfigured={discoverData.integration_status?.youtube ?? false} />
+										<WeeklyExploration
+											section={discoverData.weekly_exploration}
+											ytConfigured={discoverData.integration_status?.youtube ?? false}
+										/>
 									</div>
 								{/if}
 							</div>
@@ -443,7 +472,7 @@
 								</p>
 								<button
 									class="btn btn-primary"
-									on:click={() => void handleRefresh()}
+									onclick={() => void handleRefresh()}
 									disabled={refreshing}
 								>
 									{#if refreshing}
@@ -456,15 +485,16 @@
 					{:else if !hasContent && servicePrompts.length > 0}
 						<div class="flex flex-col items-center justify-center py-12 sm:py-16">
 							<Compass class="mb-4 h-12 w-12 sm:mb-6 sm:h-14 sm:w-14 text-base-content/50" />
-							<h2 class="mb-2 text-center text-xl font-bold sm:text-2xl">Nothing to Discover Yet</h2>
+							<h2 class="mb-2 text-center text-xl font-bold sm:text-2xl">
+								Nothing to Discover Yet
+							</h2>
 							<p class="mb-6 max-w-md px-4 text-center text-sm text-base-content/70 sm:text-base">
-								Connect your music services to get personalized recommendations. The more services you
-								connect, the better your recommendations will be.
+								Connect your music services to get personalized recommendations. The more services
+								you connect, the better your recommendations will be.
 							</p>
 							<a href="/settings" class="btn btn-primary">Connect Services</a>
 						</div>
 					{/if}
-
 				</div>
 			{/if}
 		</div>

@@ -1,5 +1,16 @@
 <script lang="ts">
-	import { Shuffle, Pencil, Trash2, Play, X, ExternalLink, ListPlus, ListStart, ListMusic, Search } from 'lucide-svelte';
+	import {
+		Shuffle,
+		Pencil,
+		Trash2,
+		Play,
+		X,
+		ExternalLink,
+		ListPlus,
+		ListStart,
+		ListMusic,
+		Search
+	} from 'lucide-svelte';
 	import { goto } from '$app/navigation';
 	import { API, TOAST_DURATION } from '$lib/constants';
 	import { colors } from '$lib/colors';
@@ -50,6 +61,7 @@
 	}
 
 	function getTrackSections(): Array<{ discNumber: number; tracks: YouTubeTrackLink[] }> {
+		// eslint-disable-next-line svelte/prefer-svelte-reactivity
 		const sections = new Map<number, YouTubeTrackLink[]>();
 		for (const track of getSortedTracks()) {
 			const discNumber = normalizeDiscNumber(track.disc_number);
@@ -60,7 +72,10 @@
 				sections.set(discNumber, [track]);
 			}
 		}
-		return Array.from(sections.entries()).map(([discNumber, discTracks]) => ({ discNumber, tracks: discTracks }));
+		return Array.from(sections.entries()).map(([discNumber, discTracks]) => ({
+			discNumber,
+			tracks: discTracks
+		}));
 	}
 
 	function getTrackMeta(): TrackMeta | null {
@@ -134,12 +149,20 @@
 				},
 				{
 					onLoadError: () => {
-						toastStore.show({ message: "Couldn't load the video", type: 'error', duration: TOAST_DURATION });
+						toastStore.show({
+							message: "Couldn't load the video",
+							type: 'error',
+							duration: TOAST_DURATION
+						});
 					}
 				}
 			);
 		} catch {
-			toastStore.show({ message: "Couldn't play the album video", type: 'error', duration: TOAST_DURATION });
+			toastStore.show({
+				message: "Couldn't play the album video",
+				type: 'error',
+				duration: TOAST_DURATION
+			});
 		}
 	}
 
@@ -257,7 +280,11 @@
 			open = false;
 			ondelete(link.album_id);
 		} catch {
-			toastStore.show({ message: 'Failed to delete link', type: 'error', duration: TOAST_DURATION });
+			toastStore.show({
+				message: 'Failed to delete link',
+				type: 'error',
+				duration: TOAST_DURATION
+			});
 		} finally {
 			deleting = false;
 			confirmingDelete = false;
@@ -265,7 +292,11 @@
 	}
 
 	function formatDate(iso: string): string {
-		return new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+		return new Date(iso).toLocaleDateString(undefined, {
+			year: 'numeric',
+			month: 'short',
+			day: 'numeric'
+		});
 	}
 </script>
 
@@ -273,9 +304,13 @@
 	<dialog class="modal modal-open">
 		<div class="modal-box max-w-5xl p-0 overflow-hidden">
 			<div class="flex gap-6 p-6 pb-4">
-				<div class="flex-shrink-0">
+				<div class="shrink-0">
 					{#if canNavigate}
-						<button onclick={goToAlbum} class="block rounded-xl overflow-hidden shadow-lg hover:shadow-xl transition-shadow cursor-pointer ring-1 ring-base-content/10" aria-label="Go to album">
+						<button
+							onclick={goToAlbum}
+							class="block rounded-xl overflow-hidden shadow-lg hover:shadow-xl transition-shadow cursor-pointer ring-1 ring-base-content/10"
+							aria-label="Go to album"
+						>
 							<AlbumImage
 								mbid={link.album_id}
 								customUrl={link.cover_url}
@@ -302,13 +337,19 @@
 				<div class="flex flex-col justify-between min-w-0 flex-1 py-1">
 					<div class="flex-1 min-w-0">
 						{#if canNavigate}
-							<button onclick={goToAlbum} class="text-2xl font-bold truncate text-left hover:text-accent transition-colors cursor-pointer block max-w-full">
+							<button
+								onclick={goToAlbum}
+								class="text-2xl font-bold truncate text-left hover:text-accent transition-colors cursor-pointer block max-w-full"
+							>
 								{link.album_name}
 							</button>
 						{:else}
 							<h3 class="text-2xl font-bold truncate">{link.album_name}</h3>
 						{/if}
-						<button onclick={searchArtist} class="text-base opacity-70 truncate hover:text-accent transition-colors cursor-pointer flex items-center gap-1.5 mt-0.5 group/artist">
+						<button
+							onclick={searchArtist}
+							class="text-base opacity-70 truncate hover:text-accent transition-colors cursor-pointer flex items-center gap-1.5 mt-0.5 group/artist"
+						>
 							{link.artist_name}
 							<Search class="h-3 w-3 opacity-0 group-hover/artist:opacity-100 transition-opacity" />
 						</button>
@@ -361,7 +402,12 @@
 									Confirm
 								{/if}
 							</button>
-							<button class="btn btn-sm btn-ghost" onclick={() => { confirmingDelete = false; }}>Cancel</button>
+							<button
+								class="btn btn-sm btn-ghost"
+								onclick={() => {
+									confirmingDelete = false;
+								}}>Cancel</button
+							>
 						{:else}
 							<button class="btn btn-sm btn-ghost text-error gap-1" onclick={handleDelete}>
 								<Trash2 class="h-3.5 w-3.5" />
@@ -370,12 +416,14 @@
 					</div>
 				</div>
 
-				<button class="btn btn-sm btn-circle btn-ghost self-start -mr-2 -mt-2" onclick={handleClose}><X class="h-4 w-4" /></button>
+				<button class="btn btn-sm btn-circle btn-ghost self-start -mr-2 -mt-2" onclick={handleClose}
+					><X class="h-4 w-4" /></button
+				>
 			</div>
 
 			<div class="divider my-0 mx-6"></div>
 
-			<div class="px-6 pt-3 pb-5 max-h-[32rem] overflow-y-auto">
+			<div class="px-6 pt-3 pb-5 max-h-128 overflow-y-auto">
 				{#if loadingTracks}
 					<div class="flex justify-center py-8">
 						<span class="loading loading-spinner loading-md"></span>
@@ -384,42 +432,71 @@
 					<div class="text-center py-10">
 						<div class="alert alert-error max-w-sm mx-auto">
 							<span class="text-sm">Couldn't load the track list</span>
-							<button class="btn btn-sm btn-ghost" onclick={() => link && fetchTracks(link.album_id)}>Retry</button>
+							<button
+								class="btn btn-sm btn-ghost"
+								onclick={() => link && fetchTracks(link.album_id)}>Retry</button
+							>
 						</div>
 					</div>
 				{:else if tracks.length > 0}
 					<div class="flex flex-col gap-0.5">
-						{#each trackSections as section}
+						{#each trackSections as section (section.discNumber)}
 							{#if trackSections.length > 1}
 								<div class="px-3 pt-3 pb-1">
-									<div class="inline-flex items-center gap-2 rounded-full border border-base-content/10 bg-base-200 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] opacity-70">
+									<div
+										class="inline-flex items-center gap-2 rounded-full border border-base-content/10 bg-base-200 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] opacity-70"
+									>
 										<span class="h-1.5 w-1.5 rounded-full bg-accent"></span>
 										Disc {section.discNumber}
 									</div>
 								</div>
 							{/if}
-							{#each section.tracks as track}
-								{@const isCurrentlyPlaying = playerStore.nowPlaying?.albumId === link.album_id && (playerStore.currentQueueItem?.discNumber ?? 1) === normalizeDiscNumber(track.disc_number) && playerStore.currentQueueItem?.trackNumber === track.track_number && playerStore.isPlaying}
+							{#each section.tracks as track (track.track_name + track.disc_number + track.track_number)}
+								{@const isCurrentlyPlaying =
+									playerStore.nowPlaying?.albumId === link.album_id &&
+									(playerStore.currentQueueItem?.discNumber ?? 1) ===
+										normalizeDiscNumber(track.disc_number) &&
+									playerStore.currentQueueItem?.trackNumber === track.track_number &&
+									playerStore.isPlaying}
 								<div
-									class="flex items-center gap-3 w-full py-2.5 px-3 rounded-lg transition-colors group/track {isCurrentlyPlaying ? '' : 'hover:bg-base-200'}"
+									class={[
+										'flex items-center gap-3 w-full py-2.5 px-3 rounded-lg transition-colors group/track',
+										!isCurrentlyPlaying && 'hover:bg-base-200'
+									]}
 									style={isCurrentlyPlaying ? `background-color: ${colors.accent}15;` : ''}
 								>
 									<button
 										class="flex items-center gap-3 flex-1 min-w-0 text-left cursor-pointer"
 										onclick={() => playTrack(track)}
 									>
-										<span class="font-mono w-7 text-right text-sm flex-shrink-0 {isCurrentlyPlaying ? '' : 'opacity-40'}" style={isCurrentlyPlaying ? `color: ${colors.accent};` : ''}>
+										<span
+											class="font-mono w-7 text-right text-sm shrink-0 {isCurrentlyPlaying
+												? ''
+												: 'opacity-40'}"
+											style={isCurrentlyPlaying ? `color: ${colors.accent};` : ''}
+										>
 											{#if isCurrentlyPlaying}
 												<NowPlayingIndicator />
 											{:else}
 												{track.track_number}
 											{/if}
 										</span>
-										<span class="text-sm truncate flex-1" style={isCurrentlyPlaying ? `color: ${colors.accent};` : ''}>{track.track_name}</span>
-										<Play class="h-4 w-4 flex-shrink-0 transition-opacity {isCurrentlyPlaying ? 'opacity-100' : 'opacity-0 group-hover/track:opacity-100'} fill-current" style={isCurrentlyPlaying ? `color: ${colors.accent};` : `color: ${colors.accent};`} />
+										<span
+											class="text-sm truncate flex-1"
+											style={isCurrentlyPlaying ? `color: ${colors.accent};` : ''}
+											>{track.track_name}</span
+										>
+										<Play
+											class="h-4 w-4 shrink-0 transition-opacity {isCurrentlyPlaying
+												? 'opacity-100'
+												: 'opacity-0 group-hover/track:opacity-100'} fill-current"
+											style={isCurrentlyPlaying
+												? `color: ${colors.accent};`
+												: `color: ${colors.accent};`}
+										/>
 									</button>
 
-									<div class="flex-shrink-0">
+									<div class="shrink-0">
 										<ContextMenu items={getTrackMenuItems(track)} position="end" size="xs" />
 									</div>
 								</div>

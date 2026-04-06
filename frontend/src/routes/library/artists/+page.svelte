@@ -127,7 +127,8 @@
 		<div>
 			<h1 class="text-3xl font-bold">All Artists</h1>
 			<p class="text-base-content/70 text-sm mt-1">
-				{total} {total === 1 ? 'artist' : 'artists'}
+				{total}
+				{total === 1 ? 'artist' : 'artists'}
 			</p>
 		</div>
 	</div>
@@ -177,34 +178,30 @@
 			<button class="btn btn-sm btn-ghost" onclick={() => fetchArtists(true)}>Retry</button>
 		</div>
 	{:else if loading}
-		<div
-			class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4"
-		>
-			{#each Array(12) as _}<ArtistCardSkeleton />{/each}
+		<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+			{#each Array(12) as _, i (`skeleton-${i}`)}
+				<ArtistCardSkeleton />
+			{/each}
 		</div>
 	{:else if artists.length === 0}
-		<div class="flex flex-col items-center justify-center min-h-[400px] text-center">
+		<div class="flex flex-col items-center justify-center min-h-100 text-center">
 			<Mic class="h-12 w-12 text-base-content/40 mb-4" strokeWidth={1.5} />
 			<h2 class="text-2xl font-semibold mb-2">No artists found</h2>
 			<p class="text-base-content/70 mb-4">
-				{searchQuery ? 'Try a different search term.' : "Your library doesn't contain any artists yet."}
+				{searchQuery
+					? 'Try a different search term.'
+					: "Your library doesn't contain any artists yet."}
 			</p>
 		</div>
 	{:else}
-		<div
-			class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4"
-		>
+		<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
 			{#each artists as artist (artist.mbid)}
 				<ArtistCard artist={convertToArtist(artist)} />
 			{/each}
 		</div>
 		{#if hasMore}
 			<div class="flex justify-center mt-6">
-				<button
-					class="btn btn-primary btn-outline"
-					onclick={loadMore}
-					disabled={loadingMore}
-				>
+				<button class="btn btn-primary btn-outline" onclick={loadMore} disabled={loadingMore}>
 					{#if loadingMore}
 						<span class="loading loading-spinner loading-sm"></span>
 					{/if}

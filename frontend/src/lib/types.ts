@@ -693,10 +693,14 @@ export type YouTubeTrackLinkResponse = {
 
 export type YouTubeTrackLinkBatchResponse = {
 	track_links: YouTubeTrackLink[];
-	failed: { track_number: number; disc_number?: number | null; track_name: string; reason: string }[];
+	failed: {
+		track_number: number;
+		disc_number?: number | null;
+		track_name: string;
+		reason: string;
+	}[];
 	quota: YouTubeQuotaStatus;
 };
-
 
 export type StatusMessage = {
 	title?: string | null;
@@ -751,7 +755,6 @@ export type RequestHistoryResponse = {
 	page_size: number;
 	total_pages: number;
 };
-
 
 export type JellyfinTrackInfo = {
 	jellyfin_id: string;
@@ -808,7 +811,6 @@ export type JellyfinArtistSummary = {
 	album_count: number;
 	musicbrainz_id?: string | null;
 };
-
 
 export type NavidromeConnectionSettings = {
 	navidrome_url: string;
@@ -874,7 +876,6 @@ export type NavidromePaginatedResponse = {
 	items: NavidromeAlbumSummary[];
 	total: number;
 };
-
 
 export type LocalTrackInfo = {
 	track_file_id: number;

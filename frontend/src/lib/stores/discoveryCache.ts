@@ -1,4 +1,10 @@
-import type { SimilarArtistsResponse, TopSongsResponse, TopAlbumsResponse, SimilarAlbumsResponse, MoreByArtistResponse } from '$lib/types';
+import type {
+	SimilarArtistsResponse,
+	TopSongsResponse,
+	TopAlbumsResponse,
+	SimilarAlbumsResponse,
+	MoreByArtistResponse
+} from '$lib/types';
 
 interface ArtistDiscoveryCache {
 	similarArtists: SimilarArtistsResponse | null;
@@ -30,7 +36,10 @@ export function getArtistDiscoveryCache(artistId: string): ArtistDiscoveryCache 
 	return null;
 }
 
-export function setArtistDiscoveryCache(artistId: string, data: Omit<ArtistDiscoveryCache, 'timestamp'>) {
+export function setArtistDiscoveryCache(
+	artistId: string,
+	data: Omit<ArtistDiscoveryCache, 'timestamp'>
+) {
 	artistCache.set(artistId, { ...data, timestamp: Date.now() });
 }
 
@@ -42,6 +51,9 @@ export function getAlbumDiscoveryCache(albumId: string): AlbumDiscoveryCache | n
 	return null;
 }
 
-export function setAlbumDiscoveryCache(albumId: string, data: Omit<AlbumDiscoveryCache, 'timestamp'>) {
+export function setAlbumDiscoveryCache(
+	albumId: string,
+	data: Omit<AlbumDiscoveryCache, 'timestamp'>
+) {
 	albumCache.set(albumId, { ...data, timestamp: Date.now() });
 }

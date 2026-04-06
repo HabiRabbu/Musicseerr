@@ -53,8 +53,8 @@
 	<div class="card-body">
 		<h2 class="card-title text-2xl">YouTube</h2>
 		<p class="text-base-content/70 mb-4">
-			Enable YouTube features across the app — manage album links, search YouTube, and
-			optionally enable the API for automatic link generation.
+			Enable YouTube features across the app — manage album links, search YouTube, and optionally
+			enable the API for automatic link generation.
 		</p>
 
 		{#if form.loading}
@@ -74,8 +74,8 @@
 							<div>
 								<span class="label-text font-medium">Enable YouTube</span>
 								<p class="text-xs text-base-content/50">
-									Show YouTube features in the sidebar, album pages, and YouTube links page.
-									Manual links and YouTube search work without an API key.
+									Show YouTube features in the sidebar, album pages, and YouTube links page. Manual
+									links and YouTube search work without an API key.
 								</p>
 							</div>
 						</label>
@@ -84,7 +84,11 @@
 
 				<div class="divider my-1"></div>
 
-				<fieldset disabled={!form.data.enabled} class="space-y-4" class:opacity-50={!form.data.enabled}>
+				<fieldset
+					disabled={!form.data.enabled}
+					class="space-y-4"
+					class:opacity-50={!form.data.enabled}
+				>
 					<div class="flex items-center gap-2">
 						<h3 class="text-lg font-semibold">YouTube API</h3>
 						<div class="badge badge-sm badge-ghost">Optional</div>
@@ -111,15 +115,11 @@
 								class="input input-bordered join-item flex-1"
 								placeholder="Your YouTube Data API v3 key"
 							/>
-							<button
-								type="button"
-								class="btn join-item"
-								onclick={() => (showKey = !showKey)}
-							>
+							<button type="button" class="btn join-item" onclick={() => (showKey = !showKey)}>
 								{showKey ? 'Hide' : 'Show'}
 							</button>
 						</div>
-						<label class="label">
+						<label class="label" for="yt-api-key">
 							<span class="label-text-alt text-base-content/50"
 								>Enable YouTube Data API v3, then create an API key in Credentials</span
 							>
@@ -150,7 +150,8 @@
 									{#if !form.testResult?.valid && !wasApiAlreadyEnabled}
 										Test connection first to enable the API
 									{:else}
-										Auto-generate album and track links using the YouTube Data API (~100 searches/day free quota)
+										Auto-generate album and track links using the YouTube Data API (~100
+										searches/day free quota)
 									{/if}
 								</p>
 							</div>

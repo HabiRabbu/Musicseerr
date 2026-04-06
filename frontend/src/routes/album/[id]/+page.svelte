@@ -31,7 +31,7 @@
 	{:else if state.loadingBasic || !state.album}
 		<div class="space-y-6 sm:space-y-8">
 			<div class="flex flex-col lg:flex-row gap-6 lg:gap-8">
-				<div class="skeleton w-full lg:w-64 xl:w-80 aspect-square rounded-box flex-shrink-0"></div>
+				<div class="skeleton w-full lg:w-64 xl:w-80 aspect-square rounded-box shrink-0"></div>
 				<div class="flex-1 flex flex-col justify-end space-y-4">
 					<div class="skeleton h-4 w-20"></div>
 					<div class="skeleton h-12 w-3/4"></div>
@@ -45,7 +45,7 @@
 
 			<div class="space-y-2">
 				<div class="skeleton h-8 w-32 mb-4"></div>
-				{#each Array(8) as _}
+				{#each Array(8) as _, i (`skeleton-${i}`)}
 					<div class="skeleton h-12 w-full"></div>
 				{/each}
 			</div>
@@ -75,7 +75,7 @@
 					<h2 class="text-xl sm:text-2xl font-bold">Tracks</h2>
 					<div class="bg-base-200 rounded-box overflow-hidden">
 						<ul class="list">
-							{#each Array(8) as _}
+							{#each Array(8) as _, i (`track-skeleton-${i}`)}
 								<li class="list-row p-3 sm:p-4">
 									<div class="flex items-center gap-4 w-full">
 										<div class="skeleton w-8 h-4"></div>
@@ -93,7 +93,11 @@
 						<h2 class="text-xl sm:text-2xl font-bold">Tracks</h2>
 						{#if state.quota}
 							<div class="flex items-center gap-2">
-								<progress class="progress progress-accent w-20 h-1.5" value={state.quota.used} max={state.quota.limit}></progress>
+								<progress
+									class="progress progress-accent w-20 h-1.5"
+									value={state.quota.used}
+									max={state.quota.limit}
+								></progress>
 								<span class="text-xs opacity-60">{state.quota.remaining}/{state.quota.limit}</span>
 							</div>
 						{/if}
@@ -155,9 +159,7 @@
 					<h2 class="text-xl sm:text-2xl font-bold">Tracks</h2>
 					<div class="alert alert-warning">
 						<span>Couldn't load the track list.</span>
-						<button class="btn btn-sm btn-ghost" onclick={state.retryTracks}>
-							Retry
-						</button>
+						<button class="btn btn-sm btn-ghost" onclick={state.retryTracks}> Retry </button>
 					</div>
 				</div>
 			{:else}
@@ -165,16 +167,15 @@
 					<h2 class="text-xl sm:text-2xl font-bold">Tracks</h2>
 					<div class="alert alert-warning">
 						<span>No tracks available.</span>
-						<button class="btn btn-sm btn-ghost" onclick={state.retryTracks}>
-							Retry
-						</button>
+						<button class="btn btn-sm btn-ghost" onclick={state.retryTracks}> Retry </button>
 					</div>
 				</div>
 			{/if}
 
 			{#if album.release_date}
 				<div class="text-xs opacity-60">
-					<span class="font-semibold">Release Date:</span> {album.release_date}
+					<span class="font-semibold">Release Date:</span>
+					{album.release_date}
 				</div>
 			{/if}
 
@@ -208,13 +209,17 @@
 		artistName={state.album.artist_name}
 		musicbrainzId={state.album.musicbrainz_id}
 		ondeleted={state.handleDeleted}
-		onclose={() => { state.showDeleteModal = false; }}
+		onclose={() => {
+			state.showDeleteModal = false;
+		}}
 	/>
 {/if}
 
 {#if state.showArtistRemovedModal}
 	<ArtistRemovedModal
 		artistName={state.removedArtistName}
-		onclose={() => { state.showArtistRemovedModal = false; }}
+		onclose={() => {
+			state.showArtistRemovedModal = false;
+		}}
 	/>
 {/if}

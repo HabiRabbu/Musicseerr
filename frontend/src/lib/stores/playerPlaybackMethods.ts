@@ -13,7 +13,7 @@ export interface PlayQueueResult {
 export function buildPlayQueueState(
 	items: QueueItem[],
 	startIndex: number,
-	shuffle: boolean,
+	shuffle: boolean
 ): PlayQueueResult {
 	const queue = stampOrigin(items, 'context');
 	const shuffleOrder = shuffle ? shuffleArray(items.length) : [];
@@ -23,7 +23,7 @@ export function buildPlayQueueState(
 		shuffleEnabled: shuffle,
 		shuffleOrder,
 		isPlayerVisible: true,
-		startIndex: actualStart,
+		startIndex: actualStart
 	};
 }
 
@@ -41,7 +41,7 @@ export function buildPlayAlbumState(): {
 		isPlayerVisible: true,
 		queue: [],
 		currentIndex: 0,
-		shuffleOrder: [],
+		shuffleOrder: []
 	};
 }
 
@@ -53,7 +53,7 @@ export interface ToggleShuffleResult {
 export function computeToggleShuffle(
 	queueLength: number,
 	currentIndex: number,
-	currentlyEnabled: boolean,
+	currentlyEnabled: boolean
 ): ToggleShuffleResult {
 	if (!currentlyEnabled) {
 		const allIndices = Array.from({ length: queueLength }, (_, i) => i);
@@ -67,7 +67,7 @@ export function computeToggleShuffle(
 
 		return {
 			shuffleEnabled: true,
-			shuffleOrder: [...played, currentIndex, ...upcoming],
+			shuffleOrder: [...played, currentIndex, ...upcoming]
 		};
 	}
 	return { shuffleEnabled: false, shuffleOrder: [] };
@@ -84,14 +84,14 @@ export function buildResetState() {
 		queue: [] as QueueItem[],
 		currentIndex: 0,
 		shuffleOrder: [] as number[],
-		shuffleEnabled: false,
+		shuffleEnabled: false
 	};
 }
 
 export function changeItemSource(
 	queue: QueueItem[],
 	index: number,
-	newSourceType: SourceType,
+	newSourceType: SourceType
 ): { newQueue: QueueItem[]; error?: string } {
 	if (index < 0 || index >= queue.length) return { newQueue: queue };
 
@@ -108,7 +108,7 @@ export function changeItemSource(
 		sourceType: newSourceType,
 		trackSourceId: resolvedId,
 		streamUrl,
-		playSessionId: undefined,
+		playSessionId: undefined
 	};
 	return { newQueue };
 }
@@ -119,7 +119,7 @@ export function updateItemByPlaylistTrackId(
 	currentIndex: number,
 	newSourceType: SourceType,
 	newTrackSourceId: string,
-	newFormat?: string,
+	newFormat?: string
 ): QueueItem[] | null {
 	const index = queue.findIndex((item) => item.playlistTrackId === playlistTrackId);
 	if (index < 0 || index === currentIndex) return null;
@@ -132,7 +132,7 @@ export function updateItemByPlaylistTrackId(
 		trackSourceId: newTrackSourceId,
 		streamUrl,
 		format: newFormat,
-		playSessionId: undefined,
+		playSessionId: undefined
 	};
 	return newQueue;
 }

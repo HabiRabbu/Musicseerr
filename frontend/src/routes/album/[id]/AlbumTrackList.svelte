@@ -91,7 +91,9 @@
 		{#each renderedTrackSections as section (section.discNumber)}
 			{#if renderedTrackSections.length > 1}
 				<li class="list-row min-h-0 cursor-default px-3 sm:px-4 pt-4 pb-2">
-					<div class="inline-flex items-center gap-2 rounded-full border border-base-content/10 bg-base-100/80 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] opacity-70">
+					<div
+						class="inline-flex items-center gap-2 rounded-full border border-base-content/10 bg-base-100/80 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] opacity-70"
+					>
 						<span class="h-1.5 w-1.5 rounded-full bg-accent"></span>
 						Disc {section.discNumber}
 					</div>
@@ -101,10 +103,32 @@
 				{@const track = row.track}
 				{@const trackDiscNumber = normalizeDiscNumber(track.disc_number)}
 				{@const tl = trackLinkMap.get(getDiscTrackKey(track)) ?? null}
-				{@const jellyfinTrack = resolveSourceTrack(trackDiscNumber, track.position, row.globalIndex, jellyfinTrackMap, jellyfinTracks)}
-				{@const localTrack = resolveSourceTrack(trackDiscNumber, track.position, row.globalIndex, localTrackMap, localTracks)}
-				{@const navidromeTrack = resolveSourceTrack(trackDiscNumber, track.position, row.globalIndex, navidromeTrackMap, navidromeTracks)}
-				{@const isCurrentlyPlaying = playerStore.nowPlaying?.albumId === album.musicbrainz_id && (playerStore.currentQueueItem?.discNumber ?? 1) === trackDiscNumber && playerStore.currentQueueItem?.trackNumber === track.position && playerStore.isPlaying}
+				{@const jellyfinTrack = resolveSourceTrack(
+					trackDiscNumber,
+					track.position,
+					row.globalIndex,
+					jellyfinTrackMap,
+					jellyfinTracks
+				)}
+				{@const localTrack = resolveSourceTrack(
+					trackDiscNumber,
+					track.position,
+					row.globalIndex,
+					localTrackMap,
+					localTracks
+				)}
+				{@const navidromeTrack = resolveSourceTrack(
+					trackDiscNumber,
+					track.position,
+					row.globalIndex,
+					navidromeTrackMap,
+					navidromeTracks
+				)}
+				{@const isCurrentlyPlaying =
+					playerStore.nowPlaying?.albumId === album.musicbrainz_id &&
+					(playerStore.currentQueueItem?.discNumber ?? 1) === trackDiscNumber &&
+					playerStore.currentQueueItem?.trackNumber === track.position &&
+					playerStore.isPlaying}
 				{@const showJellyfinBtn = jellyfinEnabled && jellyfinMatch?.found}
 				{@const showLocalBtn = localfilesEnabled && localMatch?.found}
 				{@const showNavidromeBtn = navidromeEnabled && navidromeMatch?.found}
@@ -113,7 +137,12 @@
 					style={isCurrentlyPlaying ? `background-color: ${colors.accent}20;` : ''}
 				>
 					<div class="list-col-grow flex items-center gap-4 w-full">
-						<div class="font-medium w-8 text-center flex-shrink-0 {isCurrentlyPlaying ? '' : 'text-base-content/60'}" style={isCurrentlyPlaying ? `color: ${colors.accent};` : ''}>
+						<div
+							class="font-medium w-8 text-center shrink-0 {isCurrentlyPlaying
+								? ''
+								: 'text-base-content/60'}"
+							style={isCurrentlyPlaying ? `color: ${colors.accent};` : ''}
+						>
 							{#if isCurrentlyPlaying}
 								<NowPlayingIndicator />
 							{:else}
@@ -122,17 +151,20 @@
 						</div>
 
 						<div class="flex-1 min-w-0">
-							<div class="font-medium truncate" style={isCurrentlyPlaying ? `color: ${colors.accent};` : ''}>
+							<div
+								class="font-medium truncate"
+								style={isCurrentlyPlaying ? `color: ${colors.accent};` : ''}
+							>
 								{track.title}
 							</div>
 						</div>
 
-						<div class="text-base-content/60 text-sm flex-shrink-0">
+						<div class="text-base-content/60 text-sm shrink-0">
 							{formatDuration(track.length)}
 						</div>
 
 						{#if youtubeEnabled || showJellyfinBtn || showLocalBtn || showNavidromeBtn}
-							<div class="flex items-center gap-1.5 flex-shrink-0 ml-auto">
+							<div class="flex items-center gap-1.5 shrink-0 ml-auto">
 								{#if youtubeEnabled}
 									<TrackPlayButton
 										trackNumber={track.position}
@@ -147,7 +179,7 @@
 										artistId={album.artist_id}
 										apiConfigured={youtubeApiConfigured}
 										onGenerated={onTrackGenerated}
-										onQuotaUpdate={onQuotaUpdate}
+										{onQuotaUpdate}
 									/>
 								{/if}
 
@@ -155,7 +187,8 @@
 									<TrackSourceButton
 										available={jellyfinTrack !== null}
 										sourceColor="rgb(var(--brand-jellyfin))"
-										onclick={() => onPlaySourceTrack('jellyfin', track.position, trackDiscNumber, track.title)}
+										onclick={() =>
+											onPlaySourceTrack('jellyfin', track.position, trackDiscNumber, track.title)}
 										ariaLabel={jellyfinTrack ? 'Play on Jellyfin' : 'Not available on Jellyfin'}
 									>
 										{#snippet icon()}
@@ -168,7 +201,8 @@
 									<TrackSourceButton
 										available={localTrack !== null}
 										sourceColor="rgb(var(--brand-localfiles))"
-										onclick={() => onPlaySourceTrack('local', track.position, trackDiscNumber, track.title)}
+										onclick={() =>
+											onPlaySourceTrack('local', track.position, trackDiscNumber, track.title)}
 										ariaLabel={localTrack ? 'Play local file' : 'Not available locally'}
 									>
 										{#snippet icon()}
@@ -181,7 +215,8 @@
 									<TrackSourceButton
 										available={navidromeTrack !== null}
 										sourceColor="rgb(var(--brand-navidrome))"
-										onclick={() => onPlaySourceTrack('navidrome', track.position, trackDiscNumber, track.title)}
+										onclick={() =>
+											onPlaySourceTrack('navidrome', track.position, trackDiscNumber, track.title)}
 										ariaLabel={navidromeTrack ? 'Play on Navidrome' : 'Not available on Navidrome'}
 									>
 										{#snippet icon()}
@@ -191,7 +226,16 @@
 								{/if}
 
 								<div>
-									<ContextMenu items={getTrackContextMenuItems(track, localTrack, jellyfinTrack, navidromeTrack)} position="end" size="xs" />
+									<ContextMenu
+										items={getTrackContextMenuItems(
+											track,
+											localTrack,
+											jellyfinTrack,
+											navidromeTrack
+										)}
+										position="end"
+										size="xs"
+									/>
 								</div>
 							</div>
 						{/if}

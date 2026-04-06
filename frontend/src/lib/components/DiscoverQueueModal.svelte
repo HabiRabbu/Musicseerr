@@ -25,6 +25,7 @@
 		YouTubeSearchResponse,
 		YouTubeQuotaStatus
 	} from '$lib/types';
+	import { SvelteMap } from 'svelte/reactivity';
 
 	let { open = $bindable(false), source }: { open: boolean; source: MusicSource } = $props();
 
@@ -54,9 +55,9 @@
 	let ytSearchResult: YouTubeSearchResponse | null = $state(null);
 	let ytQuota: YouTubeQuotaStatus | null = $state(null);
 
-	let enrichmentCache = new Map<string, DiscoverQueueEnrichment>();
-	let inFlightEnrich = new Map<string, Promise<DiscoverQueueEnrichment | null>>();
-	let ytSearchCache = new Map<string, YouTubeSearchResponse>();
+	let enrichmentCache = new SvelteMap<string, DiscoverQueueEnrichment>();
+	let inFlightEnrich = new SvelteMap<string, Promise<DiscoverQueueEnrichment | null>>();
+	let ytSearchCache = new SvelteMap<string, YouTubeSearchResponse>();
 	let abortController: AbortController | null = null;
 
 	let currentItem: DiscoverQueueItemFull | undefined = $derived(queue[currentIndex]);
@@ -119,7 +120,6 @@
 		goto(path);
 	}
 
-
 	async function loadQueue() {
 		const cached = loadQueueFromStorage();
 		if (cached) {
@@ -137,7 +137,9 @@
 		if (loading) return;
 		loading = true;
 		try {
-			const data = await api.get<DiscoverQueueResponse>(API.discoverQueue(source), { signal: abortController?.signal });
+			const data = await api.get<DiscoverQueueResponse>(API.discoverQueue(source), {
+				signal: abortController?.signal
+			});
 			queue = data.items.map((item) => ({ ...item }));
 			queueId = data.queue_id;
 			currentIndex = 0;
@@ -179,7 +181,6 @@
 		}
 	}
 
-
 	async function enrichCurrentAndNext() {
 		if (queue.length === 0) return;
 		await enrichItem(currentIndex);
@@ -213,7 +214,9 @@
 		const signal = abortController?.signal;
 		const promise = (async (): Promise<DiscoverQueueEnrichment | null> => {
 			try {
-				const data = await api.get<DiscoverQueueEnrichment>(API.discoverQueueEnrich(mbid), { signal });
+				const data = await api.get<DiscoverQueueEnrichment>(API.discoverQueueEnrich(mbid), {
+					signal
+				});
 				enrichmentCache.set(mbid, data);
 				if (queue[index]?.release_group_mbid === mbid) {
 					queue[index] = { ...queue[index], enrichment: data };
@@ -235,7 +238,6 @@
 		await promise;
 	}
 
-
 	function handleNext() {
 		if (nextDebounce) return;
 		nextDebounce = setTimeout(() => {
@@ -256,12 +258,16 @@
 		if (!item) return;
 
 		try {
-			await api.global.post(API.discoverQueueIgnore(), {
-				release_group_mbid: item.release_group_mbid,
-				artist_mbid: item.artist_mbid,
-				release_name: item.album_name,
-				artist_name: item.artist_name
-			}, { signal: abortController?.signal });
+			await api.global.post(
+				API.discoverQueueIgnore(),
+				{
+					release_group_mbid: item.release_group_mbid,
+					artist_mbid: item.artist_mbid,
+					release_name: item.album_name,
+					artist_name: item.artist_name
+				},
+				{ signal: abortController?.signal }
+			);
 		} catch {
 			/* continue regardless */
 		}
@@ -287,7 +293,6 @@
 		}
 		open = false;
 	}
-
 
 	function saveQueueToStorage() {
 		setQueueCachedData(
@@ -354,8 +359,12 @@
 </script>
 
 <dialog bind:this={dialogEl} class="modal" onclose={handleClose}>
-	<div class="modal-box w-[92vw] max-w-4xl max-h-[80vh] sm:max-w-4xl max-sm:w-screen max-sm:max-w-full max-sm:max-h-screen max-sm:rounded-none flex flex-col p-0! overflow-hidden rounded-2xl bg-base-100 shadow-2xl relative">
-		<div class="absolute top-0 inset-x-0 h-0.5 bg-gradient-to-r from-primary via-secondary to-primary z-10 rounded-t-2xl"></div>
+	<div
+		class="modal-box w-[92vw] max-w-4xl max-h-[80vh] sm:max-w-4xl max-sm:w-screen max-sm:max-w-full max-sm:max-h-screen max-sm:rounded-none flex flex-col p-0! overflow-hidden rounded-2xl bg-base-100 shadow-2xl relative"
+	>
+		<div
+			class="absolute top-0 inset-x-0 h-0.5 bg-linear-to-r from-primary via-secondary to-primary z-10 rounded-t-2xl"
+		></div>
 
 		{#if loading}
 			<div class="flex flex-col items-center justify-center py-16 px-8">
@@ -373,7 +382,10 @@
 					<div class="flex justify-between items-start pt-5 px-6 max-sm:pt-4 max-sm:px-4 shrink-0">
 						<div class="flex flex-col gap-0.5 min-w-0">
 							{#if currentItem.recommendation_reason}
-								<span class="text-[0.65rem] font-semibold uppercase tracking-widest text-primary/70 font-mono mb-1">{currentItem.recommendation_reason}</span>
+								<span
+									class="text-[0.65rem] font-semibold uppercase tracking-widest text-primary/70 font-mono mb-1"
+									>{currentItem.recommendation_reason}</span
+								>
 							{/if}
 							<div class="flex items-center gap-2">
 								<button
@@ -394,19 +406,31 @@
 									{currentItem.artist_name}
 								</button>
 							{:else}
-								<span class="text-sm text-base-content/60 uppercase tracking-wide font-semibold">{currentItem.artist_name}</span>
+								<span class="text-sm text-base-content/60 uppercase tracking-wide font-semibold"
+									>{currentItem.artist_name}</span
+								>
 							{/if}
 						</div>
 						<div class="flex items-center gap-2 shrink-0">
 							<div class="w-18 h-1 rounded-full bg-base-content/20 overflow-hidden">
-								<div class="h-full rounded-full bg-gradient-to-r from-primary to-secondary transition-all duration-400" style="width: {progressFraction * 100}%"></div>
+								<div
+									class="h-full rounded-full `bg-linear-to-r from-primary to-secondary transition-all duration-400"
+									style="width: {progressFraction * 100}%"
+								></div>
 							</div>
-							<span class="text-xs text-base-content/45 whitespace-nowrap font-mono px-2 py-0.5 rounded-full bg-base-content/5 border border-base-content/5">{progressText}</span>
-							<button class="btn btn-sm btn-circle btn-ghost" onclick={handleClose}><X class="h-4 w-4" /></button>
+							<span
+								class="text-xs text-base-content/45 whitespace-nowrap font-mono px-2 py-0.5 rounded-full bg-base-content/5 border border-base-content/5"
+								>{progressText}</span
+							>
+							<button class="btn btn-sm btn-circle btn-ghost" onclick={handleClose}
+								><X class="h-4 w-4" /></button
+							>
 						</div>
 					</div>
 
-					<div class="flex-1 overflow-y-auto min-h-0 p-4 px-6 max-sm:py-3 max-sm:px-4 hidden lg:block">
+					<div
+						class="flex-1 overflow-y-auto min-h-0 p-4 px-6 max-sm:py-3 max-sm:px-4 hidden lg:block"
+					>
 						<div class="grid grid-cols-[260px_1fr] gap-6 items-start">
 							<div class="flex flex-col">
 								<button
@@ -419,11 +443,13 @@
 										size="full"
 										lazy={false}
 										rounded="none"
-										className="w-[260px] h-[260px] object-cover block"
+										className="w-65 `h-65 object-cover block"
 									/>
 								</button>
 
-								<div class="mt-3 p-3 bg-base-100/30 backdrop-blur-md rounded-xl border border-base-content/5 shadow-sm">
+								<div
+									class="mt-3 p-3 bg-base-100/30 backdrop-blur-md rounded-xl border border-base-content/5 shadow-sm"
+								>
 									{#if enriching}
 										<div class="flex flex-col gap-2">
 											<div class="skeleton h-4 w-3/4 rounded"></div>
@@ -461,7 +487,10 @@
 									{/if}
 								</p>
 								{#if enrichment.artist_description.length > 300}
-									<button class="text-xs text-primary bg-transparent border-none p-0 mt-1 cursor-pointer hover:underline" onclick={() => (bioExpanded = !bioExpanded)}>
+									<button
+										class="text-xs text-primary bg-transparent border-none p-0 mt-1 cursor-pointer hover:underline"
+										onclick={() => (bioExpanded = !bioExpanded)}
+									>
 										{bioExpanded ? 'Show less' : 'Read more'}
 									</button>
 								{/if}
@@ -469,7 +498,9 @@
 						{/if}
 					</div>
 
-					<div class="flex-1 overflow-y-auto min-h-0 p-4 px-6 max-sm:py-3 max-sm:px-4 flex flex-col gap-3 items-center lg:hidden">
+					<div
+						class="flex-1 overflow-y-auto min-h-0 p-4 px-6 max-sm:py-3 max-sm:px-4 flex flex-col gap-3 items-center lg:hidden"
+					>
 						<button
 							class="bg-transparent border-none p-0 cursor-pointer rounded-xl overflow-hidden shadow-xl"
 							onclick={() => navigateTo(`/album/${currentItem.release_group_mbid}`)}
@@ -480,7 +511,7 @@
 								size="full"
 								lazy={false}
 								rounded="none"
-								className="w-full max-w-[220px] aspect-square object-cover block"
+								className="w-full max-w-55 aspect-square object-cover block"
 							/>
 						</button>
 
@@ -511,7 +542,7 @@
 							</button>
 						</div>
 
-						<div class="min-h-[120px] w-full">
+						<div class="min-h-30 w-full">
 							{#if enriching}
 								<div class="skeleton h-40 w-full rounded-lg"></div>
 							{:else if mobileTab === 'video'}
@@ -537,7 +568,9 @@
 						</div>
 					</div>
 
-					<div class="flex justify-between items-center shrink-0 py-3 px-6 max-sm:py-3 max-sm:px-4 max-sm:flex-col max-sm:gap-2 border-t border-base-content/5 bg-base-content/[0.02]">
+					<div
+						class="flex justify-between items-center shrink-0 py-3 px-6 max-sm:py-3 max-sm:px-4 max-sm:flex-col max-sm:gap-2 border-t border-base-content/5 bg-base-content/"
+					>
 						<button class="btn btn-sm btn-soft btn-error" onclick={handleIgnore}>
 							<X class="h-4 w-4" />
 							Not for me
@@ -550,9 +583,11 @@
 								View Album
 							</button>
 							{#if isLastItem}
-							<button class="btn btn-primary" onclick={handleEndQueue}> End Queue </button>
+								<button class="btn btn-primary" onclick={handleEndQueue}> End Queue </button>
 							{:else}
-								<button class="btn btn-primary" onclick={handleNext}>Next <ArrowRight class="h-4 w-4" /></button>
+								<button class="btn btn-primary" onclick={handleNext}
+									>Next <ArrowRight class="h-4 w-4" /></button
+								>
 							{/if}
 						</div>
 					</div>

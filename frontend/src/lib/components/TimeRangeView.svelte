@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { run } from 'svelte/legacy';
+
 	import { onDestroy, onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { CACHE_KEYS, CACHE_TTL } from '$lib/constants';
@@ -34,13 +36,16 @@
 		has_more: boolean;
 	}
 
-	export let itemType: ItemType;
-	export let endpoint: string;
-	export let title: string;
-	export let subtitle: string;
-	export let errorEmoji = '💿';
-	export let errorIcon: ComponentType | null = null;
-	export let source: 'listenbrainz' | 'lastfm' | null = null;
+	interface Props {
+		itemType: ItemType;
+		endpoint: string;
+		title: string;
+		subtitle: string;
+		errorIcon?: ComponentType | null;
+		source?: 'listenbrainz' | 'lastfm' | null;
+	}
+
+	let { itemType, endpoint, title, subtitle, errorIcon = null, source = null }: Props = $props();
 
 	const timeRanges: { key: TimeRangeKey; label: string }[] = [
 		{ key: 'this_week', label: 'This Week' },
@@ -49,14 +54,14 @@
 		{ key: 'all_time', label: 'All Time' }
 	];
 
-	let overviewData: OverviewData | null = null;
-	let expandedRange: TimeRangeKey | null = null;
-	let expandedData: RangeResponse | null = null;
-	let loading = true;
-	let loadingMore = false;
-	let paginationError: string | null = null;
-	let mounted = false;
-	let lastSourceKey = '';
+	let overviewData: OverviewData | null = $state(null);
+	let expandedRange: TimeRangeKey | null = $state(null);
+	let expandedData: RangeResponse | null = $state(null);
+	let loading = $state(true);
+	let loadingMore = $state(false);
+	let paginationError: string | null = $state(null);
+	let mounted = $state(false);
+	let lastSourceKey = $state('');
 	let overviewAbortController: AbortController | null = null;
 	let expandAbortController: AbortController | null = null;
 	let loadMoreAbortController: AbortController | null = null;
@@ -92,14 +97,6 @@
 		abortInFlightRequests();
 	});
 
-	$: if (mounted && (source ?? '') !== lastSourceKey) {
-		abortInFlightRequests();
-		lastSourceKey = source ?? '';
-		expandedRange = null;
-		expandedData = null;
-		loadOverview();
-	}
-
 	function withSource(url: string): string {
 		if (!source) return url;
 		const separator = url.includes('?') ? '&' : '?';
@@ -130,7 +127,9 @@
 		overviewAbortController = controller;
 
 		try {
-			const data = await api.get<OverviewData>(withSource(`${endpoint}?limit=10`), { signal: controller.signal });
+			const data = await api.get<OverviewData>(withSource(`${endpoint}?limit=10`), {
+				signal: controller.signal
+			});
 			if (controller.signal.aborted) {
 				return;
 			}
@@ -165,9 +164,12 @@
 		const controller = new AbortController();
 		expandAbortController = controller;
 		try {
-			const data = await api.get<RangeResponse>(withSource(`${endpoint}/${rangeKey}?limit=25&offset=0`), {
-				signal: controller.signal
-			});
+			const data = await api.get<RangeResponse>(
+				withSource(`${endpoint}/${rangeKey}?limit=25&offset=0`),
+				{
+					signal: controller.signal
+				}
+			);
 			if (controller.signal.aborted) {
 				return;
 			}
@@ -196,9 +198,12 @@
 		loadMoreAbortController = controller;
 		try {
 			const newOffset = expandedData.offset + expandedData.limit;
-			const moreData = await api.get<RangeResponse>(withSource(`${endpoint}/${expandedRange}?limit=25&offset=${newOffset}`), {
-				signal: controller.signal
-			});
+			const moreData = await api.get<RangeResponse>(
+				withSource(`${endpoint}/${expandedRange}?limit=25&offset=${newOffset}`),
+				{
+					signal: controller.signal
+				}
+			);
 			if (controller.signal.aborted) {
 				return;
 			}
@@ -249,6 +254,15 @@
 		if (!overviewData) return null;
 		return overviewData[rangeKey]?.featured || null;
 	}
+	run(() => {
+		if (mounted && (source ?? '') !== lastSourceKey) {
+			abortInFlightRequests();
+			lastSourceKey = source ?? '';
+			expandedRange = null;
+			expandedData = null;
+			loadOverview();
+		}
+	});
 </script>
 
 <div class="container mx-auto p-4 md:p-6 lg:p-8">
@@ -263,13 +277,14 @@
 	</div>
 
 	{#if loading}
-		<div class="flex min-h-[400px] items-center justify-center">
+		<div class="flex min-h-100 items-center justify-center">
 			<span class="loading loading-spinner loading-lg"></span>
 		</div>
 	{:else if !overviewData}
-		<div class="flex min-h-[400px] flex-col items-center justify-center text-center">
+		<div class="flex min-h-100 flex-col items-center justify-center text-center">
 			{#if errorIcon}
-				<svelte:component this={errorIcon} class="h-12 w-12 text-base-content/40 mb-4" strokeWidth={1.5} />
+				{@const SvelteComponent = errorIcon}
+				<SvelteComponent class="h-12 w-12 text-base-content/40 mb-4" strokeWidth={1.5} />
 			{:else}
 				<CircleAlert class="h-12 w-12 text-base-content/40 mb-4" strokeWidth={1.5} />
 			{/if}
@@ -279,7 +294,7 @@
 		</div>
 	{:else}
 		<div class="space-y-8">
-			{#each timeRanges as range}
+			{#each timeRanges as range (range.key)}
 				{@const featured = getFeaturedForRange(range.key)}
 				{@const items = getItemsForRange(range.key)}
 				{@const isExpanded = expandedRange === range.key}
@@ -305,7 +320,7 @@
 								{@const featuredHref = getItemHref(featured)}
 								<TimeRangeCard
 									item={featured}
-									itemType={itemType}
+									{itemType}
 									href={featuredHref}
 									rank={1}
 									variant="featured"
@@ -315,14 +330,14 @@
 							{/if}
 
 							<div class="grid-cards-overview lg:col-span-2">
-								{#each items.slice(0, 8) as item, idx}
+								{#each items.slice(0, 8) as item, idx (item.mbid)}
 									{@const rank = idx + 2}
 									{@const itemHref = getItemHref(item)}
 									<TimeRangeCard
-										item={item}
-										itemType={itemType}
+										{item}
+										{itemType}
 										href={itemHref}
-										rank={rank}
+										{rank}
 										variant="overview"
 										className="bg-base-100 shadow-sm transition-all hover:scale-105 hover:shadow-lg active:scale-95"
 										onFallbackClick={handleItemClick}
@@ -330,41 +345,39 @@
 								{/each}
 							</div>
 						</div>
-					{:else}
-						{#if loadingMore && !expandedData}
-							<div class="flex justify-center py-8">
-								<span class="loading loading-spinner loading-lg"></span>
-							</div>
-						{:else if expandedData}
-							<div class="grid-cards">
-								{#each expandedData.items as item, idx}
-									{@const rank = idx + 1}
-									{@const itemHref = getItemHref(item)}
-									<TimeRangeCard
-										item={item}
-										itemType={itemType}
-										href={itemHref}
-										rank={rank}
-										variant="expanded"
-										className="bg-base-100 shadow-sm transition-all hover:scale-105 hover:shadow-lg active:scale-95"
-										onFallbackClick={handleItemClick}
-									/>
-								{/each}
-							</div>
+					{:else if loadingMore && !expandedData}
+						<div class="flex justify-center py-8">
+							<span class="loading loading-spinner loading-lg"></span>
+						</div>
+					{:else if expandedData}
+						<div class="grid-cards">
+							{#each expandedData.items as item, idx (item.mbid)}
+								{@const rank = idx + 1}
+								{@const itemHref = getItemHref(item)}
+								<TimeRangeCard
+									{item}
+									{itemType}
+									href={itemHref}
+									{rank}
+									variant="expanded"
+									className="bg-base-100 shadow-sm transition-all hover:scale-105 hover:shadow-lg active:scale-95"
+									onFallbackClick={handleItemClick}
+								/>
+							{/each}
+						</div>
 
-							{#if expandedData.has_more}
-								<div class="mt-6 flex justify-center">
-									<button class="btn btn-outline btn-wide" onclick={loadMore} disabled={loadingMore}>
-										{#if loadingMore}
-											<span class="loading loading-spinner loading-sm"></span>
-										{:else}
-											Load More
-										{/if}
-									</button>
-								</div>
-								{#if paginationError}
-									<p class="mt-2 text-center text-sm text-error">{paginationError}</p>
-								{/if}
+						{#if expandedData.has_more}
+							<div class="mt-6 flex justify-center">
+								<button class="btn btn-outline btn-wide" onclick={loadMore} disabled={loadingMore}>
+									{#if loadingMore}
+										<span class="loading loading-spinner loading-sm"></span>
+									{:else}
+										Load More
+									{/if}
+								</button>
+							</div>
+							{#if paginationError}
+								<p class="mt-2 text-center text-sm text-error">{paginationError}</p>
 							{/if}
 						{/if}
 					{/if}

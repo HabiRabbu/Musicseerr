@@ -113,7 +113,7 @@
 </script>
 
 <div
-	class="card card-sm bg-base-100 w-full shadow-sm flex-shrink-0 group relative transition-all hover:shadow-[0_0_20px_rgba(174,213,242,0.15)]"
+	class="card card-sm bg-base-100 w-full shadow-sm shrink-0 group relative transition-all hover:shadow-[0_0_20px_rgba(174,213,242,0.15)]"
 >
 	<a
 		href="/playlists/{playlist.id}"
@@ -121,13 +121,15 @@
 		aria-label="Open {playlist.name}"
 	>
 		<figure class="aspect-square overflow-hidden relative">
-			<div class="w-full h-full transition-transform duration-200 group-hover:scale-105 transform-gpu">
-			<PlaylistMosaic
-				coverUrls={playlist.cover_urls}
-				customCoverUrl={playlist.custom_cover_url}
-				size="w-full h-full"
-				rounded="none"
-			/>
+			<div
+				class="w-full h-full transition-transform duration-200 group-hover:scale-105 transform-gpu"
+			>
+				<PlaylistMosaic
+					coverUrls={playlist.cover_urls}
+					customCoverUrl={playlist.custom_cover_url}
+					size="w-full h-full"
+					rounded="none"
+				/>
 			</div>
 		</figure>
 		<div class="px-3 pt-3 pb-1">

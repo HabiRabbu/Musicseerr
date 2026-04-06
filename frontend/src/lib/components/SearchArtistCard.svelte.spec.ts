@@ -10,15 +10,17 @@ const baseArtist: Artist = {
 	in_library: false,
 	disambiguation: 'English rock band',
 	release_group_count: 9,
-	listen_count: 2500000,
+	listen_count: 2500000
 };
 
-function renderComponent(overrides: Partial<{ artist: Artist; enrichmentSource: EnrichmentSource }> = {}) {
+function renderComponent(
+	overrides: Partial<{ artist: Artist; enrichmentSource: EnrichmentSource }> = {}
+) {
 	return render(SearchArtistCard, {
 		props: {
 			artist: overrides.artist ?? baseArtist,
-			enrichmentSource: overrides.enrichmentSource ?? 'none',
-		},
+			enrichmentSource: overrides.enrichmentSource ?? 'none'
+		}
 	} as Parameters<typeof render<typeof SearchArtistCard>>[1]);
 }
 
@@ -62,18 +64,16 @@ describe('SearchArtistCard.svelte', () => {
 	it('should not render listen count badge when listen_count is null', async () => {
 		renderComponent({
 			artist: { ...baseArtist, listen_count: null },
-			enrichmentSource: 'lastfm',
+			enrichmentSource: 'lastfm'
 		});
 
-		await expect
-			.element(page.getByTitle('Last.fm listeners'))
-			.not.toBeInTheDocument();
+		await expect.element(page.getByTitle('Last.fm listeners')).not.toBeInTheDocument();
 	});
 
 	it('should render zero listen count as "0"', async () => {
 		renderComponent({
 			artist: { ...baseArtist, listen_count: 0 },
-			enrichmentSource: 'lastfm',
+			enrichmentSource: 'lastfm'
 		});
 
 		const badge = page.getByTitle('Last.fm listeners');
@@ -94,7 +94,7 @@ describe('SearchArtistCard.svelte', () => {
 
 	it('should singular release for count of 1', async () => {
 		renderComponent({
-			artist: { ...baseArtist, release_group_count: 1 },
+			artist: { ...baseArtist, release_group_count: 1 }
 		});
 		await expect.element(page.getByText('1 release')).toBeInTheDocument();
 	});
