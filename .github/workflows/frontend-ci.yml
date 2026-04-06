@@ -20,14 +20,13 @@ jobs:
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
-        with:
-          version: 10
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '25'
           cache: 'pnpm'
+          cache-dependency-path: frontend
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -52,6 +51,7 @@ jobs:
         with:
           node-version: '25'
           cache: 'pnpm'
+          cache-dependency-path: frontend
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -76,6 +76,7 @@ jobs:
         with:
           node-version: '25'
           cache: 'pnpm'
+          cache-dependency-path: frontend
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
