@@ -1,42 +1,34 @@
 <script lang="ts">
 	import {
-		musicSourceStore,
-		type MusicSource,
+		MusicSource,
+		type MusicSourceType,
 		type MusicSourcePage
-	} from '$lib/stores/musicSource';
+	} from '$lib/stores/musicSource.svelte';
 	import { integrationStore } from '$lib/stores/integration';
 	import { fromStore } from 'svelte/store';
 
 	interface Props {
 		pageKey: MusicSourcePage;
-		onSourceChange?: (source: MusicSource) => void;
+		onSourceChange?: (source: MusicSourceType) => void;
 	}
 
 	let { pageKey, onSourceChange }: Props = $props();
 
-	const sourceState = fromStore(musicSourceStore);
 	const integrationState = fromStore(integrationStore);
+	const pageMusicSourceState = new MusicSource(() => pageKey);
 
 	let switching = $state(false);
-	let currentSource = $state<MusicSource>('listenbrainz');
+	let currentSource = $derived(pageMusicSourceState.current);
 
 	let lbEnabled = $derived(integrationState.current.listenbrainz);
 	let lfmEnabled = $derived(integrationState.current.lastfm);
 	let showSwitcher = $derived(lbEnabled && lfmEnabled);
 
-	$effect(() => {
-		// TODO should be refactored
-		// eslint-disable-next-line @typescript-eslint/no-unused-expressions
-		sourceState.current.source; // Reactivity
-		currentSource = musicSourceStore.getPageSource(pageKey);
-	});
-
-	async function handleSwitch(source: MusicSource) {
+	async function handleSwitch(source: MusicSourceType) {
 		if (source === currentSource || switching) return;
 		switching = true;
 		try {
-			musicSourceStore.setPageSource(pageKey, source);
-			currentSource = source;
+			pageMusicSourceState.current = source;
 			onSourceChange?.(source);
 		} finally {
 			switching = false;

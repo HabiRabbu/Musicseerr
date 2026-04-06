@@ -22,7 +22,7 @@
 	import { isAbortError } from '$lib/utils/errorHandling';
 	import { api } from '$lib/api/client';
 	import { isDismissed } from '$lib/utils/dismissedPrompts';
-	import { musicSourceStore, type MusicSource } from '$lib/stores/musicSource';
+	import { MusicSource, type MusicSourceType } from '$lib/stores/musicSource.svelte';
 	import { discoverQueueStatusStore } from '$lib/stores/discoverQueueStatus';
 	import { Compass, CircleAlert, Sparkles, Music, BarChart3 } from 'lucide-svelte';
 
@@ -34,18 +34,18 @@
 	let lastUpdated = $state<Date | null>(null);
 	let abortController: AbortController | null = null;
 	let queueModalOpen = $state(false);
-	let activeSource: MusicSource = $state('listenbrainz');
+	const pageMusicSourceState = new MusicSource(() => 'discover');
 	let pollRunId = 0;
 
-	function resolveDiscoverSource(source?: MusicSource): MusicSource {
-		return source ?? activeSource;
+	function resolveDiscoverSource(sourceOverride?: MusicSourceType): MusicSourceType {
+		return sourceOverride ?? pageMusicSourceState.current;
 	}
 
 	function cancelDiscoverPolling(): void {
 		pollRunId += 1;
 	}
 
-	async function loadDiscoverData(forceRefresh = false, sourceOverride?: MusicSource) {
+	async function loadDiscoverData(forceRefresh = false, sourceOverride?: MusicSourceType) {
 		const source = resolveDiscoverSource(sourceOverride);
 		const cached = getDiscoverCachedData(source);
 		if (cached && !forceRefresh) {
@@ -108,7 +108,7 @@
 		}
 	}
 
-	async function refreshInBackground(sourceOverride?: MusicSource) {
+	async function refreshInBackground(sourceOverride?: MusicSourceType) {
 		if (refreshing) return;
 		if (abortController) abortController.abort();
 		abortController = new AbortController();
@@ -141,7 +141,7 @@
 		}
 	}
 
-	async function pollForReady(source: MusicSource) {
+	async function pollForReady(source: MusicSourceType) {
 		const runId = ++pollRunId;
 		isUpdating = true;
 		try {
@@ -176,7 +176,7 @@
 		}
 	}
 
-	async function handleRefresh(sourceOverride?: MusicSource) {
+	async function handleRefresh(sourceOverride?: MusicSourceType) {
 		const source = resolveDiscoverSource(sourceOverride);
 		const runId = ++pollRunId;
 		refreshing = true;
@@ -225,19 +225,18 @@
 	}
 
 	onMount(async () => {
-		await musicSourceStore.load();
-		activeSource = musicSourceStore.getPageSource('discover');
-		loadDiscoverData(false, activeSource);
-		discoverQueueStatusStore.init(activeSource);
+		loadDiscoverData(false, pageMusicSourceState.current);
+		discoverQueueStatusStore.init(pageMusicSourceState.current);
 	});
+
 	onDestroy(() => {
 		cleanup();
 		discoverQueueStatusStore.stopPolling();
 	});
 	beforeNavigate(cleanup);
 
-	function handleSourceChange(source: MusicSource) {
-		activeSource = source;
+	function handleSourceChange(source: MusicSourceType) {
+		pageMusicSourceState.current = source;
 		removeAllQueueCachedData();
 		loadDiscoverData(true, source);
 		discoverQueueStatusStore.reset();
@@ -264,7 +263,7 @@
 	let hasCuratedGroup = $derived(
 		(discoverData?.because_you_listen_to?.length ?? 0) > 0 ||
 			discoverData?.discover_queue_enabled ||
-			(activeSource === 'listenbrainz' &&
+			(pageMusicSourceState.current === 'listenbrainz' &&
 				discoverData?.weekly_exploration &&
 				discoverData.weekly_exploration.tracks.length > 0)
 	);
@@ -319,9 +318,12 @@
 		<div class="mt-16 flex flex-col items-center justify-center px-4">
 			<CircleAlert class="mb-4 h-10 w-10 text-base-content/50" />
 			<p class="text-base-content/70">{error}</p>
-			<button class="btn btn-primary mt-4" onclick={() => loadDiscoverData(true, activeSource)}
-				>Try Again</button
+			<button
+				class="btn btn-primary mt-4"
+				onclick={() => loadDiscoverData(true, pageMusicSourceState.current)}
 			>
+				Try Again
+			</button>
 		</div>
 	{:else}
 		<div class="px-4 sm:px-6 lg:px-8">
@@ -361,12 +363,12 @@
 
 								<div>
 									<DiscoverQueueCard
-										source={activeSource}
+										source={pageMusicSourceState.current}
 										onLaunch={() => (queueModalOpen = true)}
 									/>
 								</div>
 
-								{#if activeSource === 'listenbrainz' && discoverData.weekly_exploration && discoverData.weekly_exploration.tracks.length > 0}
+								{#if pageMusicSourceState.current === 'listenbrainz' && discoverData.weekly_exploration && discoverData.weekly_exploration.tracks.length > 0}
 									<div>
 										<WeeklyExploration
 											section={discoverData.weekly_exploration}
@@ -378,7 +380,10 @@
 						</div>
 					{:else}
 						<div>
-							<DiscoverQueueCard source={activeSource} onLaunch={() => (queueModalOpen = true)} />
+							<DiscoverQueueCard
+								source={pageMusicSourceState.current}
+								onLaunch={() => (queueModalOpen = true)}
+							/>
 						</div>
 					{/if}
 
@@ -501,4 +506,4 @@
 	{/if}
 </div>
 
-<DiscoverQueueModal bind:open={queueModalOpen} source={activeSource} />
+<DiscoverQueueModal bind:open={queueModalOpen} source={pageMusicSourceState.current} />

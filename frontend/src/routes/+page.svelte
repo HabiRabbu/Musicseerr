@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { Shield, Music, CircleAlert, TrendingUp, Sparkles, Library } from 'lucide-svelte';
-	import { onMount, onDestroy } from 'svelte';
+	import { onDestroy } from 'svelte';
 	import { beforeNavigate } from '$app/navigation';
 	import HomeSection from '$lib/components/HomeSection.svelte';
 	import WeeklyExploration from '$lib/components/WeeklyExploration.svelte';
@@ -14,7 +14,7 @@
 		WeeklyExplorationSection as WeeklyExplorationSectionType
 	} from '$lib/types';
 	import { integrationStore } from '$lib/stores/integration';
-	import { musicSourceStore, type MusicSource } from '$lib/stores/musicSource';
+	import { MusicSource, type MusicSourceType } from '$lib/stores/musicSource.svelte';
 	import CarouselSkeleton from '$lib/components/CarouselSkeleton.svelte';
 	import PageHeader from '$lib/components/PageHeader.svelte';
 	import {
@@ -35,13 +35,13 @@
 	let error = $state('');
 	let lastUpdated = $state<Date | null>(null);
 	let abortController: AbortController | null = null;
-	let activeSource: MusicSource = 'listenbrainz';
+	const homeMusicSource = new MusicSource(() => 'home');
 
-	function resolveHomeSource(source?: MusicSource): MusicSource {
-		return source ?? activeSource;
+	function resolveHomeSource(sourceOverride?: MusicSourceType): MusicSourceType {
+		return sourceOverride ?? homeMusicSource.current;
 	}
 
-	async function loadHomeData(forceRefresh = false, sourceOverride?: MusicSource) {
+	async function loadHomeData(forceRefresh = false, sourceOverride?: MusicSourceType) {
 		const source = resolveHomeSource(sourceOverride);
 		const cached = getHomeCachedData(source);
 		if (cached && !forceRefresh) {
@@ -90,7 +90,7 @@
 		}
 	}
 
-	async function refreshInBackground(sourceOverride?: MusicSource) {
+	async function refreshInBackground(sourceOverride?: MusicSourceType) {
 		if (refreshing) return;
 
 		if (abortController) {
@@ -129,7 +129,7 @@
 		isUpdating = true;
 		const minDelay = new Promise((r) => setTimeout(r, 500));
 		try {
-			await loadHomeData(true, activeSource);
+			await loadHomeData(true, homeMusicSource.current);
 		} finally {
 			await minDelay;
 			refreshing = false;
@@ -145,28 +145,16 @@
 		}
 	}
 
-	onMount(() => {
-		activeSource = musicSourceStore.getPageSource('home');
-		loadHomeData(false, activeSource);
-
-		musicSourceStore.load().then(() => {
-			const actualSource = musicSourceStore.getPageSource('home');
-			if (actualSource !== activeSource) {
-				const dataBefore = homeData;
-				loadHomeData(true, actualSource).then(() => {
-					if (homeData !== dataBefore) {
-						activeSource = actualSource;
-					}
-				});
-			}
-		});
+	$effect(() => {
+		const source = homeMusicSource.current;
+		loadHomeData(false, source);
 	});
 
 	onDestroy(cleanup);
 	beforeNavigate(cleanup);
 
-	function handleSourceChange(source: MusicSource) {
-		activeSource = source;
+	function handleSourceChange(source: MusicSourceType) {
+		homeMusicSource.current = source;
 		removeQueueCachedData();
 		loadHomeData(true, source);
 	}
@@ -195,7 +183,7 @@
 			});
 		}
 		if (
-			activeSource === 'listenbrainz' &&
+			homeMusicSource.current === 'listenbrainz' &&
 			homeData.weekly_exploration &&
 			homeData.weekly_exploration.tracks.length > 0
 		) {

@@ -1,10 +1,10 @@
 <script lang="ts">
 	import { Music, Play, Loader2, RefreshCw } from 'lucide-svelte';
 	import { getQueueCachedData, subscribeQueueCacheChanges } from '$lib/utils/discoverQueueCache';
-	import type { MusicSource } from '$lib/stores/musicSource';
+	import type { MusicSourceType } from '$lib/stores/musicSource.svelte';
 	import { discoverQueueStatusStore, type QueueBuildStatus } from '$lib/stores/discoverQueueStatus';
 
-	let { onLaunch, source }: { onLaunch: () => void; source: MusicSource } = $props();
+	let { onLaunch, source }: { onLaunch: () => void; source: MusicSourceType } = $props();
 
 	let bgStatus = $state<QueueBuildStatus>('unknown');
 

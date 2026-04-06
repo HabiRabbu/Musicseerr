@@ -1,26 +1,30 @@
 <script lang="ts">
-	import { musicSourceStore, type MusicSource } from '$lib/stores/musicSource';
+	import { MusicSource, type MusicSourceType } from '$lib/stores/musicSource.svelte';
 	import { integrationStore } from '$lib/stores/integration';
 	import { fromStore } from 'svelte/store';
 
 	const integration = fromStore(integrationStore);
-	const source = fromStore(musicSourceStore);
+	const pageMusicSourceState = new MusicSource(() => 'home');
 
 	let saving = $state(false);
 	let message = $state('');
 
 	const lbConnected = $derived(integration.current.listenbrainz);
 	const lfmConnected = $derived(integration.current.lastfm);
-	const currentSource = $derived(source.current.source);
 	const bothConnected = $derived(lbConnected && lfmConnected);
+	const currentSource = $derived(pageMusicSourceState.current);
 
 	async function handleChange(event: Event) {
 		const target = event.target as HTMLSelectElement;
-		const newSource = target.value as MusicSource;
-		if (newSource === currentSource) return;
+		const newSource = target.value as MusicSourceType;
+		if (newSource === pageMusicSourceState.current) return;
+
 		saving = true;
 		message = '';
-		const ok = await musicSourceStore.save(newSource);
+
+		pageMusicSourceState.current = newSource;
+		const ok = await pageMusicSourceState.save();
+
 		if (ok) {
 			message = 'Default music source updated';
 			setTimeout(() => {
@@ -29,12 +33,12 @@
 		} else {
 			message = "Couldn't save the default music source.";
 		}
+
 		saving = false;
 	}
 
 	$effect(() => {
 		integrationStore.ensureLoaded();
-		musicSourceStore.load();
 	});
 </script>
 
@@ -50,12 +54,17 @@
 			<div class="alert alert-info">
 				<span>
 					Connect both
-					{#if !lbConnected}<a href="/settings?tab=listenbrainz" class="link font-medium"
-							>ListenBrainz</a
-						>{:else}ListenBrainz{/if}
+					{#if !lbConnected}
+						<a href="/settings?tab=listenbrainz" class="link font-medium"> ListenBrainz </a>
+					{:else}
+						ListenBrainz
+					{/if}
 					and
-					{#if !lfmConnected}<a href="/settings?tab=lastfm" class="link font-medium">Last.fm</a
-						>{:else}Last.fm{/if}
+					{#if !lfmConnected}
+						<a href="/settings?tab=lastfm" class="link font-medium">Last.fm</a>
+					{:else}
+						Last.fm
+					{/if}
 					before choosing a default source. Right now MusicSeerr is using {lbConnected
 						? 'ListenBrainz'
 						: lfmConnected

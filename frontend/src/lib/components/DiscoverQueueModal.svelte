@@ -9,7 +9,7 @@
 		removeQueueCachedData,
 		type QueueCacheData
 	} from '$lib/utils/discoverQueueCache';
-	import type { MusicSource } from '$lib/stores/musicSource';
+	import type { MusicSourceType } from '$lib/stores/musicSource.svelte';
 	import { discoverQueueStatusStore } from '$lib/stores/discoverQueueStatus';
 	import { getCacheTTLs } from '$lib/stores/cacheTtl';
 	import { resolveQueueCloseAction } from '$lib/utils/discoverQueueActions';
@@ -27,7 +27,7 @@
 	} from '$lib/types';
 	import { SvelteMap } from 'svelte/reactivity';
 
-	let { open = $bindable(false), source }: { open: boolean; source: MusicSource } = $props();
+	let { open = $bindable(false), source }: { open: boolean; source: MusicSourceType } = $props();
 
 	function emptyEnrichment(): DiscoverQueueEnrichment {
 		return {

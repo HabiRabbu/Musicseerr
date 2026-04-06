@@ -47,6 +47,7 @@
 		"vitest-browser-svelte": "^1.1.0"
 	},
 	"dependencies": {
-		"lucide-svelte": "^0.575.0"
+		"lucide-svelte": "^0.575.0",
+		"runed": "^0.37.1"
 	}
 }
