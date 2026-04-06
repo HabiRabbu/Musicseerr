@@ -1,7 +1,7 @@
 import { writable } from 'svelte/store';
 import { browser } from '$app/environment';
 import { API } from '$lib/constants';
-import { musicSourceStore, type MusicSource } from '$lib/stores/musicSource';
+import { MusicSource, type MusicSourceType } from '$lib/stores/musicSource.svelte';
 import { getCacheTTLs } from '$lib/stores/cacheTtl';
 import { api, ApiError } from '$lib/api/client';
 
@@ -30,6 +30,8 @@ const INITIAL: DiscoverQueueStatusState = {
 	lastChecked: 0
 };
 
+const discoverMusicSource = new MusicSource(() => 'discover');
+
 function createDiscoverQueueStatusStore() {
 	const { subscribe, set, update } = writable<DiscoverQueueStatusState>({ ...INITIAL });
 
@@ -55,11 +57,11 @@ function createDiscoverQueueStatusStore() {
 		});
 	}
 
-	function resolveSource(source?: MusicSource): MusicSource {
-		return source ?? musicSourceStore.getPageSource('discover');
+	function resolveSource(source?: MusicSourceType): MusicSourceType {
+		return source ?? discoverMusicSource.current;
 	}
 
-	async function fetchStatus(source?: MusicSource): Promise<QueueStatusPayload | null> {
+	async function fetchStatus(source?: MusicSourceType): Promise<QueueStatusPayload | null> {
 		if (!browser) return null;
 		try {
 			const activeSource = resolveSource(source);
@@ -71,7 +73,7 @@ function createDiscoverQueueStatusStore() {
 		}
 	}
 
-	async function triggerGenerate(force = false, source?: MusicSource): Promise<void> {
+	async function triggerGenerate(force = false, source?: MusicSourceType): Promise<void> {
 		if (!browser) return;
 		try {
 			const activeSource = resolveSource(source);
@@ -97,7 +99,7 @@ function createDiscoverQueueStatusStore() {
 		}
 	}
 
-	function startPolling(source?: MusicSource): void {
+	function startPolling(source?: MusicSourceType): void {
 		if (pollTimer || !browser) return;
 		isPolling = true;
 		const interval = getPollingInterval();
@@ -117,7 +119,7 @@ function createDiscoverQueueStatusStore() {
 		isPolling = false;
 	}
 
-	async function init(source?: MusicSource): Promise<void> {
+	async function init(source?: MusicSourceType): Promise<void> {
 		if (!browser) return;
 		const activeSource = resolveSource(source);
 		const result = await fetchStatus(activeSource);

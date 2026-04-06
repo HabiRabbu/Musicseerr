@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { getCoverUrl, isAbortError } from './errorHandling';
+import { getApiUrl } from './api';
 
 describe('isAbortError', () => {
 	it('returns true for Error named AbortError', () => {
@@ -29,13 +30,15 @@ describe('getCoverUrl', () => {
 
 	it('returns API URL when albumId is a valid MBID', () => {
 		expect.assertions(1);
-		expect(getCoverUrl(null, validMbid)).toBe(`/api/v1/covers/release-group/${validMbid}?size=250`);
+		expect(getCoverUrl(null, validMbid)).toBe(
+			getApiUrl(`/api/v1/covers/release-group/${validMbid}?size=250`)
+		);
 	});
 
 	it('ignores coverUrl when albumId is a valid MBID', () => {
 		expect.assertions(1);
 		expect(getCoverUrl('/some/custom/url.jpg', validMbid)).toBe(
-			`/api/v1/covers/release-group/${validMbid}?size=250`
+			getApiUrl(`/api/v1/covers/release-group/${validMbid}?size=250`)
 		);
 	});
 
@@ -47,20 +50,22 @@ describe('getCoverUrl', () => {
 	it('returns API fallback URL when albumId is not a valid MBID and coverUrl is null', () => {
 		expect.assertions(1);
 		expect(getCoverUrl(null, 'not-a-uuid')).toBe(
-			'/api/v1/covers/release-group/not-a-uuid?size=250'
+			getApiUrl('/api/v1/covers/release-group/not-a-uuid?size=250')
 		);
 	});
 
 	it('returns API fallback URL when albumId is not a valid MBID and coverUrl is undefined', () => {
 		expect.assertions(1);
 		expect(getCoverUrl(undefined, 'not-a-uuid')).toBe(
-			'/api/v1/covers/release-group/not-a-uuid?size=250'
+			getApiUrl('/api/v1/covers/release-group/not-a-uuid?size=250')
 		);
 	});
 
 	it('returns API fallback URL when coverUrl is empty string', () => {
 		expect.assertions(1);
-		expect(getCoverUrl('', 'not-a-uuid')).toBe('/api/v1/covers/release-group/not-a-uuid?size=250');
+		expect(getCoverUrl('', 'not-a-uuid')).toBe(
+			getApiUrl('/api/v1/covers/release-group/not-a-uuid?size=250')
+		);
 	});
 
 	it('always returns a non-empty string', () => {

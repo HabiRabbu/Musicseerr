@@ -3,7 +3,7 @@ import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import SourceSwitcher from './SourceSwitcher.svelte';
 import { integrationStore } from '$lib/stores/integration';
-import { musicSourceStore, type MusicSource } from '$lib/stores/musicSource';
+import { MusicSource, type MusicSourceType } from '$lib/stores/musicSource.svelte';
 import { PAGE_SOURCE_KEYS } from '$lib/constants';
 
 describe('SourceSwitcher.svelte', () => {
@@ -85,7 +85,7 @@ describe('SourceSwitcher.svelte', () => {
 
 	it('calls onSourceChange when switching source', async () => {
 		integrationStore.setStatus({ listenbrainz: true, lastfm: true });
-		const onSourceChange = vi.fn<(source: MusicSource) => void>();
+		const onSourceChange = vi.fn<(source: MusicSourceType) => void>();
 		render(SourceSwitcher, {
 			props: { pageKey: 'home', onSourceChange }
 		} as unknown as Parameters<typeof render<typeof SourceSwitcher>>[1]);
@@ -108,8 +108,9 @@ describe('SourceSwitcher.svelte', () => {
 		const lfmBtn = page.getByRole('button', { name: 'Last.fm' });
 		await lfmBtn.click();
 
+		const homeMusicSource = new MusicSource(() => 'home');
 		await vi.waitFor(() => {
-			expect(musicSourceStore.getPageSource('home')).toBe('lastfm');
+			expect(homeMusicSource.current).toBe('lastfm');
 		});
 	});
 });

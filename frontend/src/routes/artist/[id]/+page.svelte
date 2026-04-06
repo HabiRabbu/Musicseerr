@@ -30,7 +30,7 @@
 	import { requestAlbum } from '$lib/utils/albumRequest';
 	import { getArtistDiscoveryCache, setArtistDiscoveryCache } from '$lib/stores/discoveryCache';
 	import { integrationStore } from '$lib/stores/integration';
-	import { musicSourceStore, type MusicSource } from '$lib/stores/musicSource';
+	import { MusicSource, type MusicSourceType } from '$lib/stores/musicSource.svelte';
 	import {
 		artistBasicCache,
 		artistExtendedCache,
@@ -46,6 +46,8 @@
 	}
 
 	let { data }: Props = $props();
+
+	const artistMusicSource = new MusicSource(() => 'artist');
 
 	let artist: ArtistInfo | null = $state(null);
 	let loadingBasic = $state(true);
@@ -209,18 +211,13 @@
 		}
 		abortController = new AbortController();
 
-		// Fire discovery immediately — only needs artistId (from URL), not basic data
-		const sourceLoadPromise = musicSourceStore.load();
 		const currentController = abortController;
-		sourceLoadPromise.then(() => {
-			if (currentController.signal.aborted) return;
-			void fetchDiscoveryData(musicSourceStore.getPageSource('artist'));
-		});
+		if (!currentController.signal.aborted) {
+			void fetchDiscoveryData(artistMusicSource.current);
+		}
 
 		if (refreshBasic || !artist) {
-			await Promise.all([fetchBasicInfo(force), sourceLoadPromise]);
-		} else {
-			await sourceLoadPromise;
+			await fetchBasicInfo(force);
 		}
 
 		if (artist) {
@@ -299,8 +296,8 @@
 		}
 	}
 
-	async function fetchDiscoveryData(sourceOverride?: MusicSource) {
-		const activeSource = sourceOverride ?? musicSourceStore.getPageSource('artist');
+	async function fetchDiscoveryData(sourceOverride?: MusicSourceType) {
+		const activeSource = sourceOverride ?? artistMusicSource.current;
 		const cacheKey = `${data.artistId}:${activeSource}`;
 		const cached = getArtistDiscoveryCache(cacheKey);
 		if (cached) {
@@ -410,14 +407,15 @@
 		}
 	}
 
-	function handleSourceChange(source: MusicSource) {
+	function handleSourceChange(source: MusicSourceType) {
+		artistMusicSource.current = source;
 		similarArtists = null;
 		topSongs = null;
 		topAlbums = null;
 		loadingSimilar = true;
 		loadingTopSongs = true;
 		loadingTopAlbums = true;
-		fetchDiscoveryData(source);
+		void fetchDiscoveryData(source);
 	}
 
 	async function fetchMoreReleases() {

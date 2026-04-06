@@ -6,6 +6,7 @@ vi.mock('$lib/utils/navigationAbort', () => ({
 
 import { api, ApiError } from './client';
 import { pageFetch } from '$lib/utils/navigationAbort';
+import { getApiUrl } from '$lib/utils/api';
 
 const mockPageFetch = vi.mocked(pageFetch);
 const mockGlobalFetch = vi.fn();
@@ -54,7 +55,7 @@ describe('api client', () => {
 			mockPageFetch.mockResolvedValue(jsonResponse({ name: 'test' }));
 			const result = await api.get<{ name: string }>('/api/v1/test');
 			expect(mockPageFetch).toHaveBeenCalledWith(
-				'/api/v1/test',
+				getApiUrl('/api/v1/test'),
 				expect.objectContaining({ method: 'GET' })
 			);
 			expect(result).toEqual({ name: 'test' });
@@ -65,7 +66,7 @@ describe('api client', () => {
 			mockPageFetch.mockResolvedValue(jsonResponse({ ok: true }));
 			await api.get('/api/v1/test', { signal: controller.signal });
 			expect(mockPageFetch).toHaveBeenCalledWith(
-				'/api/v1/test',
+				getApiUrl('/api/v1/test'),
 				expect.objectContaining({ signal: controller.signal })
 			);
 		});
@@ -74,7 +75,7 @@ describe('api client', () => {
 			mockPageFetch.mockResolvedValue(jsonResponse({ ok: true }));
 			await api.get('/api/v1/test', { cache: 'no-cache' });
 			expect(mockPageFetch).toHaveBeenCalledWith(
-				'/api/v1/test',
+				getApiUrl('/api/v1/test'),
 				expect.objectContaining({ cache: 'no-cache' })
 			);
 		});
@@ -85,7 +86,7 @@ describe('api client', () => {
 			mockGlobalFetch.mockResolvedValue(jsonResponse({ name: 'global' }));
 			const result = await api.global.get<{ name: string }>('/api/v1/global');
 			expect(mockGlobalFetch).toHaveBeenCalledWith(
-				'/api/v1/global',
+				getApiUrl('/api/v1/global'),
 				expect.objectContaining({ method: 'GET' })
 			);
 			expect(mockPageFetch).not.toHaveBeenCalled();
@@ -98,7 +99,7 @@ describe('api client', () => {
 			mockPageFetch.mockResolvedValue(jsonResponse({ id: 1 }, 201));
 			const result = await api.post<{ id: number }>('/api/v1/items', { name: 'new' });
 			expect(mockPageFetch).toHaveBeenCalledWith(
-				'/api/v1/items',
+				getApiUrl('/api/v1/items'),
 				expect.objectContaining({
 					method: 'POST',
 					body: JSON.stringify({ name: 'new' })
@@ -132,7 +133,7 @@ describe('api client', () => {
 			mockPageFetch.mockResolvedValue(jsonResponse({ updated: true }));
 			await api.put('/api/v1/items/1', { name: 'updated' });
 			expect(mockPageFetch).toHaveBeenCalledWith(
-				'/api/v1/items/1',
+				getApiUrl('/api/v1/items/1'),
 				expect.objectContaining({ method: 'PUT' })
 			);
 		});
@@ -143,7 +144,7 @@ describe('api client', () => {
 			mockPageFetch.mockResolvedValue(jsonResponse({ patched: true }));
 			await api.patch('/api/v1/items/1', { name: 'patched' });
 			expect(mockPageFetch).toHaveBeenCalledWith(
-				'/api/v1/items/1',
+				getApiUrl('/api/v1/items/1'),
 				expect.objectContaining({ method: 'PATCH' })
 			);
 		});
@@ -154,7 +155,7 @@ describe('api client', () => {
 			mockPageFetch.mockResolvedValue(emptyResponse(204));
 			await api.delete('/api/v1/items/1');
 			expect(mockPageFetch).toHaveBeenCalledWith(
-				'/api/v1/items/1',
+				getApiUrl('/api/v1/items/1'),
 				expect.objectContaining({ method: 'DELETE' })
 			);
 		});
@@ -162,7 +163,7 @@ describe('api client', () => {
 		it('returns typed JSON for 200 DELETE responses', async () => {
 			mockPageFetch.mockResolvedValue(jsonResponse({ success: true, artist_removed: true }));
 			const data = await api.delete<{ success: boolean; artist_removed: boolean }>(
-				'/api/v1/items/1'
+				getApiUrl('/api/v1/items/1')
 			);
 			expect(data).toEqual({ success: true, artist_removed: true });
 		});
