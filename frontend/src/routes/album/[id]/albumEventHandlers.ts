@@ -45,7 +45,10 @@ export function createEventHandlers(deps: EventHandlerDeps) {
 		deps.setQuota(q);
 	}
 
-	async function handleRequest(opts?: { monitorArtist?: boolean; autoDownloadArtist?: boolean }): Promise<void> {
+	async function handleRequest(opts?: {
+		monitorArtist?: boolean;
+		autoDownloadArtist?: boolean;
+	}): Promise<void> {
 		const album = deps.getAlbum();
 		if (!album || deps.getRequesting()) return;
 		deps.setRequesting(true);
