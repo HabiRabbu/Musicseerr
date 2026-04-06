@@ -5,6 +5,7 @@
 	import { appendAudioDBSizeSuffix } from '$lib/utils/imageSuffix';
 	import { imageSettingsStore } from '$lib/stores/imageSettings';
 	import ArtistLinks from './ArtistLinks.svelte';
+	import ArtistMonitoringToggle from './ArtistMonitoringToggle.svelte';
 	import BackButton from './BackButton.svelte';
 	import HeroBackdrop from './HeroBackdrop.svelte';
 	import { getApiUrl } from '$lib/utils/api';
@@ -153,6 +154,20 @@
 
 					{#if validLinks.length > 0}
 						<ArtistLinks links={validLinks} />
+					{/if}
+
+					{#if artist.in_lidarr}
+						<div class="mt-3">
+							<ArtistMonitoringToggle
+								artistMbid={artist.musicbrainz_id}
+								monitored={artist.monitored ?? false}
+								autoDownload={artist.auto_download ?? false}
+								on:change={(e) => {
+									artist.monitored = e.detail.monitored;
+									artist.auto_download = e.detail.autoDownload;
+								}}
+							/>
+						</div>
 					{/if}
 				</div>
 			</div>

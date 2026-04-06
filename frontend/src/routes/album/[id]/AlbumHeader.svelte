@@ -17,7 +17,9 @@
 		refreshing: boolean;
 		pollingForSources: boolean;
 		lidarrConfigured: boolean;
-		onrequest: () => void;
+
+		artistMonitored?: boolean;
+		onrequest: (opts?: { monitorArtist?: boolean; autoDownloadArtist?: boolean }) => void;
 		ondelete: () => void;
 		onrefresh: () => void;
 		onartistclick: () => void;
@@ -33,11 +35,22 @@
 		refreshing,
 		pollingForSources,
 		lidarrConfigured,
+		artistMonitored = false,
 		onrequest,
 		ondelete,
 		onrefresh,
 		onartistclick
 	}: Props = $props();
+
+	let monitorArtist = $state(false);
+	let autoDownloadArtist = $state(false);
+
+	// Reset checkboxes when navigating between albums
+	$effect(() => {
+		void album.musicbrainz_id;
+		monitorArtist = false;
+		autoDownloadArtist = false;
+	});
 
 	let backdropUrl = $derived(
 		album.cover_url ||
@@ -171,20 +184,42 @@
 							Remove
 						</button>
 					{:else}
-						<button
-							class="btn btn-lg gap-2"
-							style="background-color: {colors.accent}; color: {colors.secondary}; border: none;"
-							onclick={onrequest}
-							disabled={requesting}
-						>
-							{#if requesting}
-								<span class="loading loading-spinner loading-sm"></span>
-								Requesting...
-							{:else}
-								<Plus class="h-5 w-5" />
-								Add to Library
+						<div class="flex flex-col gap-3">
+							<button
+								class="btn btn-lg gap-2"
+								style="background-color: {colors.accent}; color: {colors.secondary}; border: none;"
+								onclick={() => onrequest({ monitorArtist, autoDownloadArtist })}
+								disabled={requesting}
+							>
+								{#if requesting}
+									<span class="loading loading-spinner loading-sm"></span>
+									Requesting...
+								{:else}
+									<Plus class="h-5 w-5" />
+									Add to Library
+								{/if}
+							</button>
+							{#if !artistMonitored}
+								<label class="label cursor-pointer gap-2 justify-start">
+									<input
+										type="checkbox"
+										bind:checked={monitorArtist}
+										class="checkbox checkbox-sm checkbox-accent"
+									/>
+									<span class="text-sm text-base-content/70">Monitor this artist</span>
+								</label>
+								{#if monitorArtist}
+									<label class="label cursor-pointer gap-2 justify-start pl-6">
+										<input
+											type="checkbox"
+											bind:checked={autoDownloadArtist}
+											class="checkbox checkbox-sm checkbox-accent"
+										/>
+										<span class="text-sm text-base-content/70">Download new releases</span>
+									</label>
+								{/if}
 							{/if}
-						</button>
+						</div>
 					{/if}
 				</div>
 			{/if}

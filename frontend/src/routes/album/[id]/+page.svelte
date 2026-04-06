@@ -63,6 +63,7 @@
 				refreshing={state.refreshing}
 				pollingForSources={state.pollingForSources}
 				lidarrConfigured={$integrationStore.lidarr}
+				artistMonitored={state.artistMonitored}
 				onrequest={state.handleRequest}
 				ondelete={state.handleDeleteClick}
 				onrefresh={state.refreshAll}

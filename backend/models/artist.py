@@ -51,6 +51,9 @@ class ArtistInfo(AppStruct):
     aliases: list[str] = []
     external_links: list[ExternalLink] = []
     in_library: bool = False
+    in_lidarr: bool = False
+    monitored: bool = False
+    auto_download: bool = False
     albums: list[ReleaseItem] = []
     singles: list[ReleaseItem] = []
     eps: list[ReleaseItem] = []

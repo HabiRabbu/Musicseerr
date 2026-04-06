@@ -12,6 +12,9 @@ export type AlbumRequestContext = {
 	artist?: string;
 	album?: string;
 	year?: number | null;
+	artistMbid?: string;
+	monitorArtist?: boolean;
+	autoDownloadArtist?: boolean;
 };
 
 export async function requestAlbum(
@@ -23,7 +26,10 @@ export async function requestAlbum(
 			musicbrainz_id: musicbrainzId,
 			artist: context?.artist ?? undefined,
 			album: context?.album ?? undefined,
-			year: context?.year ?? undefined
+			year: context?.year ?? undefined,
+			artist_mbid: context?.artistMbid ?? undefined,
+			monitor_artist: context?.monitorArtist ?? false,
+			auto_download_artist: context?.autoDownloadArtist ?? false
 		});
 
 		libraryStore.addRequested(musicbrainzId);

@@ -21,6 +21,8 @@ class RequestHistoryRecord(msgspec.Struct):
     cover_url: str | None = None
     completed_at: str | None = None
     lidarr_album_id: int | None = None
+    monitor_artist: bool = False
+    auto_download_artist: bool = False
 
 
 class RequestHistoryStore:
@@ -56,13 +58,22 @@ class RequestHistoryStore:
                     requested_at TEXT NOT NULL,
                     completed_at TEXT,
                     status TEXT NOT NULL,
-                    lidarr_album_id INTEGER
+                    lidarr_album_id INTEGER,
+                    monitor_artist INTEGER NOT NULL DEFAULT 0,
+                    auto_download_artist INTEGER NOT NULL DEFAULT 0
                 )
                 """
             )
             conn.execute(
                 "CREATE INDEX IF NOT EXISTS idx_request_history_status_requested_at ON request_history(status, requested_at DESC)"
             )
+            # Migrate existing tables missing the monitoring columns
+            for col in ("monitor_artist", "auto_download_artist"):
+                try:
+                    conn.execute(f"ALTER TABLE request_history ADD COLUMN {col} INTEGER NOT NULL DEFAULT 0")
+                except sqlite3.OperationalError as e:
+                    if "duplicate column" not in str(e).lower():
+                        logger.warning("Unexpected error adding column %s: %s", col, e)
             conn.commit()
         finally:
             conn.close()
@@ -105,6 +116,8 @@ class RequestHistoryStore:
             completed_at=row["completed_at"],
             status=row["status"],
             lidarr_album_id=row["lidarr_album_id"],
+            monitor_artist=bool(row["monitor_artist"]) if row["monitor_artist"] is not None else False,
+            auto_download_artist=bool(row["auto_download_artist"]) if row["auto_download_artist"] is not None else False,
         )
 
     async def async_record_request(
@@ -116,6 +129,8 @@ class RequestHistoryStore:
         cover_url: str | None = None,
         artist_mbid: str | None = None,
         lidarr_album_id: int | None = None,
+        monitor_artist: bool = False,
+        auto_download_artist: bool = False,
     ) -> None:
         requested_at = datetime.now(timezone.utc).isoformat()
         normalized_mbid = musicbrainz_id.lower()
@@ -125,8 +140,9 @@ class RequestHistoryStore:
                 """
                 INSERT INTO request_history (
                     musicbrainz_id_lower, musicbrainz_id, artist_name, album_title,
-                    artist_mbid, year, cover_url, requested_at, completed_at, status, lidarr_album_id
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, 'pending', ?)
+                    artist_mbid, year, cover_url, requested_at, completed_at, status, lidarr_album_id,
+                    monitor_artist, auto_download_artist
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, 'pending', ?, ?, ?)
                 ON CONFLICT(musicbrainz_id_lower) DO UPDATE SET
                     musicbrainz_id = excluded.musicbrainz_id,
                     artist_name = excluded.artist_name,
@@ -137,7 +153,9 @@ class RequestHistoryStore:
                     requested_at = excluded.requested_at,
                     completed_at = NULL,
                     status = 'pending',
-                    lidarr_album_id = COALESCE(excluded.lidarr_album_id, request_history.lidarr_album_id)
+                    lidarr_album_id = COALESCE(excluded.lidarr_album_id, request_history.lidarr_album_id),
+                    monitor_artist = excluded.monitor_artist,
+                    auto_download_artist = excluded.auto_download_artist
                 """,
                 (
                     normalized_mbid,
@@ -149,6 +167,8 @@ class RequestHistoryStore:
                     cover_url,
                     requested_at,
                     lidarr_album_id,
+                    int(monitor_artist),
+                    int(auto_download_artist),
                 ),
             )
 
@@ -165,6 +185,19 @@ class RequestHistoryStore:
             return self._row_to_record(row)
 
         return await self._read(operation)
+
+    async def async_update_monitoring_flags(
+        self, musicbrainz_id: str, *, monitor_artist: bool, auto_download_artist: bool,
+    ) -> None:
+        normalized_mbid = musicbrainz_id.lower()
+
+        def operation(conn: sqlite3.Connection) -> None:
+            conn.execute(
+                "UPDATE request_history SET monitor_artist = ?, auto_download_artist = ? WHERE musicbrainz_id_lower = ?",
+                (int(monitor_artist), int(auto_download_artist), normalized_mbid),
+            )
+
+        await self._write(operation)
 
     async def async_get_active_mbids(self) -> set[str]:
         """Return the set of MBIDs with active (pending/downloading) requests."""

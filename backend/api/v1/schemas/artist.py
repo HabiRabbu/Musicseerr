@@ -34,3 +34,20 @@ class LastFmArtistEnrichment(AppStruct):
     playcount: int = 0
     similar_artists: list[LastFmSimilarArtistSchema] = []
     url: str | None = None
+
+
+class ArtistMonitoringRequest(AppStruct):
+    monitored: bool
+    auto_download: bool = False
+
+
+class ArtistMonitoringResponse(AppStruct):
+    success: bool
+    monitored: bool
+    auto_download: bool
+
+
+class ArtistMonitoringStatus(AppStruct):
+    in_lidarr: bool
+    monitored: bool
+    auto_download: bool

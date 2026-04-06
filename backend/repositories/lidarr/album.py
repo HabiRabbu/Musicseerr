@@ -395,6 +395,9 @@ class LidarrAlbumRepository(LidarrHistoryRepository):
             await self._invalidate_album_list_caches()
             await self._cache.clear_prefix(f"{LIDARR_PREFIX}artists:mbids")
 
+            # Re-fetch so payload reflects the monitored=True state
+            final_album = await self._get_album_by_foreign_id(musicbrainz_id) or album_obj
+
             total_ms = int((time.monotonic() - t0) * 1000)
             logger.info(
                 "add_album timing: album=%s artist_ensure=%dms total=%dms (existing album, monitor+search)",
@@ -403,7 +406,7 @@ class LidarrAlbumRepository(LidarrHistoryRepository):
 
             return {
                 "message": f"Album monitored & search triggered: {album_title}",
-                "payload": album_obj,
+                "payload": final_album,
             }
 
         # Album doesn't exist yet — wait for indexing after artist add/refresh

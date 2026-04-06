@@ -160,6 +160,26 @@ def get_request_queue() -> "RequestQueue":
             else:
                 logger.warning(f"Album {album_mbid[:8]}... added but not monitored - skipping cache promotion")
 
+        try:
+            record = await request_history.async_get_record(album_mbid)
+            if record and record.monitor_artist and record.artist_mbid:
+                monitor_new = "all" if record.auto_download_artist else "none"
+                for attempt in range(2):
+                    try:
+                        await lidarr_repo.update_artist_monitoring(
+                            record.artist_mbid, monitored=True, monitor_new_items=monitor_new,
+                        )
+                        await memory_cache.delete(f"{ARTIST_INFO_PREFIX}{record.artist_mbid}")
+                        logger.info("Applied deferred artist monitoring for %s", record.artist_mbid[:8])
+                        break
+                    except Exception:  # noqa: BLE001
+                        if attempt == 0:
+                            await asyncio.sleep(2)
+                        else:
+                            raise
+        except Exception as e:  # noqa: BLE001
+            logger.warning("Failed to apply deferred artist monitoring for %s: %s", album_mbid[:8], e)
+
         return result
 
     store = QueueStore(db_path=settings.queue_db_path)

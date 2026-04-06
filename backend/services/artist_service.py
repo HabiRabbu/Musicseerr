@@ -21,7 +21,7 @@ from infrastructure.cache.cache_keys import ARTIST_INFO_PREFIX
 from infrastructure.cache.memory_cache import CacheInterface
 from infrastructure.cache.disk_cache import DiskMetadataCache
 from infrastructure.validators import validate_mbid
-from core.exceptions import ResourceNotFoundError
+from core.exceptions import ExternalServiceError, ResourceNotFoundError
 from services.audiodb_image_service import AudioDBImageService
 from repositories.audiodb_models import AudioDBArtistImages
 
@@ -228,13 +228,41 @@ class ArtistService:
         else:
             logger.info(f"Using MusicBrainz as primary source for artist {artist_id[:8]}")
             artist_info = await self._build_artist_from_musicbrainz(artist_id, library_artist_mbids, library_album_mbids)
+        if lidarr_artist is not None:
+            artist_info.in_lidarr = True
+            artist_info.monitored = lidarr_artist.get("monitored", False)
+            artist_info.auto_download = lidarr_artist.get("monitor_new_items", "none") == "all"
         artist_info = await self._apply_audiodb_artist_images(
             artist_info, artist_id, artist_info.name,
             allow_fetch=False, is_monitored=artist_info.in_library,
         )
         await self._save_artist_to_cache(artist_id, artist_info)
         return artist_info
-    
+
+    async def set_artist_monitoring(
+        self, artist_mbid: str, *, monitored: bool, auto_download: bool = False,
+    ) -> dict[str, Any]:
+        if not self._lidarr_repo.is_configured():
+            raise ExternalServiceError("Lidarr is not configured")
+        monitor_new_items = "all" if (monitored and auto_download) else "none"
+        result = await self._lidarr_repo.update_artist_monitoring(
+            artist_mbid, monitored=monitored, monitor_new_items=monitor_new_items,
+        )
+        await self._cache.delete(f"{ARTIST_INFO_PREFIX}{artist_mbid}")
+        return result
+
+    async def get_artist_monitoring_status(self, artist_mbid: str) -> dict[str, Any]:
+        if not self._lidarr_repo.is_configured():
+            return {"in_lidarr": False, "monitored": False, "auto_download": False}
+        details = await self._lidarr_repo.get_artist_details(artist_mbid)
+        if details is None:
+            return {"in_lidarr": False, "monitored": False, "auto_download": False}
+        return {
+            "in_lidarr": True,
+            "monitored": details.get("monitored", False),
+            "auto_download": details.get("monitor_new_items", "none") == "all",
+        }
+
     async def _build_artist_from_lidarr(
         self,
         artist_id: str,

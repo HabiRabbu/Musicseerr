@@ -147,6 +147,9 @@ export type ArtistInfo = {
 	aliases: string[];
 	external_links: ExternalLink[];
 	in_library: boolean;
+	in_lidarr?: boolean;
+	monitored?: boolean;
+	auto_download?: boolean;
 	albums: ReleaseGroup[];
 	singles: ReleaseGroup[];
 	eps: ReleaseGroup[];

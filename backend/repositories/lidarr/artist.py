@@ -113,6 +113,7 @@ class LidarrArtistRepository(LidarrBase):
                 "fanart_url": image_urls["fanart"],
                 "banner_url": image_urls["banner"],
                 "monitored": artist.get("monitored", False),
+                "monitor_new_items": artist.get("monitorNewItems", "none"),
                 "statistics": artist.get("statistics", {}),
                 "ratings": artist.get("ratings", {}),
             }
@@ -215,6 +216,38 @@ class LidarrArtistRepository(LidarrBase):
         except Exception as e:
             logger.error(f"Failed to delete artist {artist_id}: {e}")
             raise
+
+    async def update_artist_monitoring(
+        self, artist_mbid: str, *, monitored: bool, monitor_new_items: str = "none",
+    ) -> dict[str, Any]:
+        if monitor_new_items not in ("none", "all"):
+            raise ValueError(f"Invalid monitor_new_items value: {monitor_new_items}")
+
+        data = await self._get("/api/v1/artist", params={"mbId": artist_mbid})
+        if not data or not isinstance(data, list) or len(data) == 0:
+            raise ExternalServiceError(f"Artist {artist_mbid[:8]} not found in Lidarr")
+
+        artist_id = data[0].get("id")
+        if not artist_id:
+            raise ExternalServiceError(f"Artist {artist_mbid[:8]} has no Lidarr ID")
+
+        await self._put(
+            "/api/v1/artist/editor",
+            {
+                "artistIds": [artist_id],
+                "monitored": monitored,
+                "monitorNewItems": monitor_new_items,
+            },
+        )
+
+        cache_key = f"{LIDARR_ARTIST_DETAILS_PREFIX}{artist_mbid}"
+        await self._cache.delete(cache_key)
+
+        logger.info(
+            "Updated artist %s monitoring: monitored=%s, monitorNewItems=%s",
+            artist_mbid[:8], monitored, monitor_new_items,
+        )
+        return {"monitored": monitored, "auto_download": monitor_new_items == "all"}
 
     async def _ensure_artist_exists(
         self, artist_mbid: str, artist_name_hint: Optional[str] = None

@@ -87,3 +87,8 @@ class LidarrRepositoryProtocol(Protocol):
 
     async def get_recently_imported(self, limit: int = 20) -> list[LibraryAlbum]:
         ...
+
+    async def update_artist_monitoring(
+        self, artist_mbid: str, *, monitored: bool, monitor_new_items: str = "none",
+    ) -> dict[str, Any]:
+        ...

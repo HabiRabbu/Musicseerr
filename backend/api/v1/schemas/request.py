@@ -7,6 +7,9 @@ class AlbumRequest(AppStruct):
     artist: str | None = None
     album: str | None = None
     year: int | None = None
+    artist_mbid: str | None = None
+    monitor_artist: bool = False
+    auto_download_artist: bool = False
 
 
 class RequestAcceptedResponse(AppStruct):

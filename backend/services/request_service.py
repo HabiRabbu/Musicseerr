@@ -25,6 +25,9 @@ class RequestService:
         artist: str | None = None,
         album: str | None = None,
         year: int | None = None,
+        artist_mbid: str | None = None,
+        monitor_artist: bool = False,
+        auto_download_artist: bool = False,
     ) -> RequestAcceptedResponse:
         if not self._lidarr_repo.is_configured():
             raise ExternalServiceError("Lidarr isn't configured. Add an API key in Settings before requesting albums.")
@@ -33,6 +36,11 @@ class RequestService:
             # Don't overwrite an active record (pending/downloading) — just re-check the queue.
             existing = await self._request_history.async_get_record(musicbrainz_id)
             if existing and existing.status in ("pending", "downloading"):
+                # Merge monitoring flags if the user updated their choice on re-request
+                if monitor_artist and not existing.monitor_artist:
+                    await self._request_history.async_update_monitoring_flags(
+                        musicbrainz_id, monitor_artist=True, auto_download_artist=auto_download_artist,
+                    )
                 enqueued = await self._request_queue.enqueue(musicbrainz_id)
                 return RequestAcceptedResponse(
                     success=True,
@@ -45,6 +53,9 @@ class RequestService:
                 artist_name=artist or "Unknown",
                 album_title=album or "Unknown",
                 year=year,
+                artist_mbid=artist_mbid,
+                monitor_artist=monitor_artist,
+                auto_download_artist=auto_download_artist,
             )
         except Exception as e:  # noqa: BLE001
             logger.error("Failed to record request history for %s: %s", musicbrainz_id, e)
