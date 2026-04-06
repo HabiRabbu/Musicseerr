@@ -316,19 +316,32 @@
 				</p>
 			{/if}
 		</div>
-		<button
-			class="btn btn-sm btn-primary gap-1"
-			onclick={syncLibrary}
-			disabled={syncing || syncStatus.isActive}
-		>
-			{#if syncing || syncStatus.isActive}
-				<Loader2 class="h-4 w-4 animate-spin" />
-				<span class="hidden sm:inline">Syncing...</span>
+		<div class="flex gap-2">
+			{#if syncStatus.isActive}
+				<button
+					class="btn btn-sm btn-error gap-1"
+					onclick={() => syncStatus.cancelSync()}
+					aria-label="Stop Sync"
+				>
+					<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+					<span class="hidden sm:inline">Stop Sync</span>
+				</button>
 			{:else}
-				<RefreshCw class="h-4 w-4" />
-				<span class="hidden sm:inline">Sync Library</span>
+				<button
+					class="btn btn-sm btn-primary gap-1"
+					onclick={syncLibrary}
+					disabled={syncing}
+				>
+					{#if syncing}
+						<Loader2 class="h-4 w-4 animate-spin" />
+						<span class="hidden sm:inline">Syncing...</span>
+					{:else}
+						<RefreshCw class="h-4 w-4" />
+						<span class="hidden sm:inline">Sync Library</span>
+					{/if}
+				</button>
 			{/if}
-		</button>
+		</div>
 	</div>
 
 	{#if !isSearching}
@@ -510,18 +523,28 @@
 			<p class="text-base-content/70 mb-4">
 				Your Lidarr library is empty or hasn't been synced yet.
 			</p>
-			<button
-				class="btn btn-primary gap-2"
-				onclick={syncLibrary}
-				disabled={syncing || syncStatus.isActive}
-			>
-				{#if syncing || syncStatus.isActive}
-					<Loader2 class="h-4 w-4 animate-spin" />
-					Syncing...
-				{:else}
-					Sync Now
-				{/if}
-			</button>
+			{#if syncStatus.isActive}
+				<button
+					class="btn btn-error gap-2"
+					onclick={() => syncStatus.cancelSync()}
+				>
+					<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+					Stop Sync
+				</button>
+			{:else}
+				<button
+					class="btn btn-primary gap-2"
+					onclick={syncLibrary}
+					disabled={syncing}
+				>
+					{#if syncing}
+						<Loader2 class="h-4 w-4 animate-spin" />
+						Syncing...
+					{:else}
+						Sync Now
+					{/if}
+				</button>
+			{/if}
 		</div>
 	{/if}
 </div>

@@ -409,6 +409,7 @@ class ArtistDiscoveryService:
         delay: float = 0.5,
         status_service: Any = None,
         mbid_to_name: dict[str, str] | None = None,
+        generation: int = 0,
     ) -> int:
         global _discovery_precache_running
         if _discovery_precache_running:
@@ -420,6 +421,7 @@ class ArtistDiscoveryService:
             return await self._do_precache_artist_discovery(
                 artist_mbids, delay=delay,
                 status_service=status_service, mbid_to_name=mbid_to_name,
+                generation=generation,
             )
         finally:
             _discovery_precache_running = False
@@ -430,6 +432,7 @@ class ArtistDiscoveryService:
         delay: float = 0.5,
         status_service: Any = None,
         mbid_to_name: dict[str, str] | None = None,
+        generation: int = 0,
     ) -> int:
         sources: list[Literal["listenbrainz", "lastfm"]] = []
         if self._lb_repo.is_configured():
@@ -504,7 +507,7 @@ class ArtistDiscoveryService:
 
                 if status_service:
                     artist_name = (mbid_to_name or {}).get(mbid, mbid[:8])
-                    await status_service.update_progress(local_progress, current_item=artist_name)
+                    await status_service.update_progress(local_progress, current_item=artist_name, generation=generation)
 
                 if local_progress % 10 == 0:
                     logger.info("Discovery precache progress: %d/%d artists", local_progress, len(artist_mbids))
@@ -517,7 +520,7 @@ class ArtistDiscoveryService:
                     local_progress = progress_counter
                 if status_service:
                     artist_name = (mbid_to_name or {}).get(mbid, mbid[:8])
-                    await status_service.update_progress(local_progress, current_item=artist_name)
+                    await status_service.update_progress(local_progress, current_item=artist_name, generation=generation)
                 return False
 
         chunk = max(discovery_concurrency * 4, 20)

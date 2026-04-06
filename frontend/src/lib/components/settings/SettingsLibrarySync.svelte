@@ -126,12 +126,18 @@
 				{/if}
 
 				<div class="card-actions justify-end gap-2">
-					<button class="btn btn-ghost" onclick={syncNow} disabled={syncing}>
-						{#if syncing}
-							<span class="loading loading-spinner loading-sm"></span>
-						{/if}
-						Sync Now
-					</button>
+					{#if syncStatus.isActive}
+						<button class="btn btn-error" onclick={() => syncStatus.cancelSync()}>
+							Stop Sync
+						</button>
+					{:else}
+						<button class="btn btn-ghost" onclick={syncNow} disabled={syncing}>
+							{#if syncing}
+								<span class="loading loading-spinner loading-sm"></span>
+							{/if}
+							Sync Now
+						</button>
+					{/if}
 					<button class="btn btn-primary" onclick={save} disabled={form.saving}>
 						{#if form.saving}
 							<span class="loading loading-spinner loading-sm"></span>

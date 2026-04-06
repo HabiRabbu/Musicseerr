@@ -126,7 +126,7 @@ class TestAudioDBParallel:
         status = _make_status_service()
         await phase.precache_audiodb_data([], [], status)
 
-        status.skip_phase.assert_called_once_with('audiodb_prewarm')
+        status.skip_phase.assert_called_once_with('audiodb_prewarm', generation=0)
         assert True
 
     @pytest.mark.asyncio
@@ -149,5 +149,5 @@ class TestAudioDBParallel:
 
         await phase.precache_audiodb_data(artists, [], status)
 
-        status.skip_phase.assert_called_once_with('audiodb_prewarm')
+        status.skip_phase.assert_called_once_with('audiodb_prewarm', generation=0)
         assert True

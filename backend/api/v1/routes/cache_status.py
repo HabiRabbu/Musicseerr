@@ -36,6 +36,17 @@ async def get_sync_status(
     )
 
 
+@router.post("/cancel")
+async def cancel_sync(
+    status_service: CacheStatusService = Depends(get_cache_status_service),
+):
+    from core.task_registry import TaskRegistry
+    await status_service.cancel_current_sync()
+    TaskRegistry.get_instance().cancel("precache-library")
+    await status_service.wait_for_completion()
+    return {"status": "cancelled"}
+
+
 @router.get("/stream")
 async def stream_sync_status(
     status_service: CacheStatusService = Depends(get_cache_status_service),

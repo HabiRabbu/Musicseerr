@@ -417,10 +417,23 @@ class LibraryService:
                         exc = t.exception()
                         if exc:
                             logger.error(f"Precache task failed: {exc}")
+                            task_success = False
+                        else:
+                            task_success = not t.cancelled()
                     except asyncio.CancelledError:
                         logger.info("Precache task was cancelled")
+                        task_success = False
                     finally:
                         status_service.set_current_task(None)
+                        try:
+                            lidarr_settings = self._preferences_service.get_lidarr_settings()
+                            if sync_started_at >= (lidarr_settings.last_sync or 0):
+                                updated = clone_with_updates(lidarr_settings, {
+                                    'last_sync_success': task_success,
+                                })
+                                self._preferences_service.save_lidarr_settings(updated)
+                        except Exception as e:  # noqa: BLE001
+                            logger.warning(f"Failed to update last_sync_success: {e}")
 
                 task.add_done_callback(on_task_done)
                 status_service.set_current_task(task)
@@ -428,6 +441,7 @@ class LibraryService:
                 logger.info(f"Library sync complete: {len(artists)} artists, {len(albums)} albums")
 
                 self._update_last_sync_timestamp()
+                sync_started_at = self._preferences_service.get_lidarr_settings().last_sync or 0
 
                 result = SyncLibraryResponse(
                     status='success',

@@ -116,10 +116,12 @@ async def sync_library_periodically(
             
             logger.info(f"Auto-syncing library (frequency: {sync_freq})")
             sync_success = False
+            should_update_status = True
             try:
                 result = await library_service.sync_library()
                 if result.status == "skipped":
                     logger.info("Auto-sync skipped - sync already in progress")
+                    should_update_status = False
                     continue
                 sync_success = True
                 logger.info("Auto-sync completed successfully")
@@ -129,12 +131,13 @@ async def sync_library_periodically(
                 sync_success = False
             
             finally:
-                lidarr_settings = preferences_service.get_lidarr_settings()
-                updated_settings = clone_with_updates(lidarr_settings, {
-                    'last_sync': int(time()),
-                    'last_sync_success': sync_success
-                })
-                preferences_service.save_lidarr_settings(updated_settings)
+                if should_update_status:
+                    lidarr_settings = preferences_service.get_lidarr_settings()
+                    updated_settings = clone_with_updates(lidarr_settings, {
+                        'last_sync': int(time()),
+                        'last_sync_success': sync_success
+                    })
+                    preferences_service.save_lidarr_settings(updated_settings)
         
         except asyncio.CancelledError:
             logger.info("Library sync task cancelled")

@@ -58,8 +58,8 @@ async def test_progress_updates_on_success():
         )
 
     assert status.update_progress.call_count == 2
-    status.update_progress.assert_any_call(1, current_item="Artist A")
-    status.update_progress.assert_any_call(2, current_item="Artist B")
+    status.update_progress.assert_any_call(1, current_item="Artist A", generation=0)
+    status.update_progress.assert_any_call(2, current_item="Artist B", generation=0)
 
 
 @pytest.mark.asyncio
@@ -82,9 +82,9 @@ async def test_progress_updates_even_on_failure():
         )
 
     assert status.update_progress.call_count == 3
-    status.update_progress.assert_any_call(1, current_item="A")
-    status.update_progress.assert_any_call(2, current_item="B")
-    status.update_progress.assert_any_call(3, current_item="C")
+    status.update_progress.assert_any_call(1, current_item="A", generation=0)
+    status.update_progress.assert_any_call(2, current_item="B", generation=0)
+    status.update_progress.assert_any_call(3, current_item="C", generation=0)
 
 
 @pytest.mark.asyncio

@@ -135,7 +135,10 @@ backend-test-album-refresh: $(BACKEND_VENV_STAMP) ## Run album refresh endpoint 
 
 test-audiodb-all: backend-test-audiodb backend-test-audiodb-prewarm backend-test-audiodb-settings backend-test-coverart-audiodb backend-test-audiodb-phase8 backend-test-audiodb-phase9 frontend-test-audiodb-images ## Run every AudioDB test target
 
-test-sync-all: backend-test-sync-watchdog backend-test-sync-resume backend-test-audiodb-parallel ## Run all sync robustness tests
+backend-test-sync-generation: $(BACKEND_VENV_STAMP) ## Run MUS-19 sync generation counter tests
+	cd "$(BACKEND_DIR)" && .venv/bin/python -m pytest tests/test_sync_generation.py -v
+
+test-sync-all: backend-test-sync-watchdog backend-test-sync-resume backend-test-audiodb-parallel backend-test-sync-generation ## Run all sync robustness tests
 
 frontend-install: ## Install frontend npm dependencies
 	cd "$(FRONTEND_DIR)" && $(NPM) install

@@ -179,15 +179,16 @@ class AudioDBPhase:
         artists: list[dict],
         albums: list[Any],
         status_service: CacheStatusService,
+        generation: int = 0,
     ) -> None:
         if self._audiodb_image_service is None:
-            await status_service.skip_phase('audiodb_prewarm')
+            await status_service.skip_phase('audiodb_prewarm', generation=generation)
             return
 
         settings = self._preferences_service.get_advanced_settings()
         if not settings.audiodb_enabled:
             logger.info("AudioDB pre-warming skipped (audiodb_enabled=false)")
-            await status_service.skip_phase('audiodb_prewarm')
+            await status_service.skip_phase('audiodb_prewarm', generation=generation)
             return
 
         concurrency = settings.audiodb_prewarm_concurrency
@@ -197,7 +198,7 @@ class AudioDBPhase:
         total = len(needed_artists) + len(needed_albums)
         if total == 0:
             logger.info("AudioDB prewarm: all items already cached")
-            await status_service.skip_phase('audiodb_prewarm')
+            await status_service.skip_phase('audiodb_prewarm', generation=generation)
             return
 
         original_total = len(artists) + len(albums)
@@ -206,7 +207,7 @@ class AudioDBPhase:
             "Phase 5 (AudioDB): Pre-warming %d items (%d artists, %d albums), %.0f%% already cached, concurrency=%d delay=%.1fs",
             total, len(needed_artists), len(needed_albums), initial_hit_rate, concurrency, inter_item_delay,
         )
-        await status_service.update_phase('audiodb_prewarm', total)
+        await status_service.update_phase('audiodb_prewarm', total, generation=generation)
 
         needed_artists = self.sort_by_cover_priority(needed_artists, "artist")
         needed_albums = self.sort_by_cover_priority(needed_albums, "album")
@@ -249,7 +250,7 @@ class AudioDBPhase:
                 processed += 1
                 local_processed = processed
                 snap_ok, snap_fail = bytes_ok, bytes_fail
-            await status_service.update_progress(local_processed, f"AudioDB: {name}")
+            await status_service.update_progress(local_processed, f"AudioDB: {name}", generation=generation)
 
             if local_processed % _AUDIODB_PREWARM_LOG_INTERVAL == 0:
                 logger.info(
@@ -291,7 +292,7 @@ class AudioDBPhase:
                 processed += 1
                 local_processed = processed
                 snap_ok, snap_fail = bytes_ok, bytes_fail
-            await status_service.update_progress(local_processed, f"AudioDB: {album_name or 'Unknown'}")
+            await status_service.update_progress(local_processed, f"AudioDB: {album_name or 'Unknown'}", generation=generation)
 
             if local_processed % _AUDIODB_PREWARM_LOG_INTERVAL == 0:
                 logger.info(

@@ -141,6 +141,7 @@ class LibraryPrecacheService:
 
     async def _do_precache(self, artists: list[dict], albums: list[Any], status_service: CacheStatusService, resume: bool = False) -> None:
         from core.dependencies import get_album_service
+        generation = 0
         try:
             processed_artists: set[str] = set()
             processed_albums: set[str] = set()
@@ -152,9 +153,9 @@ class LibraryPrecacheService:
                 processed_albums = await self._sync_state_store.get_processed_items('album')
 
                 state = await self._sync_state_store.get_sync_state()
-                if state and state.get('phase') == 'albums':
+                if state and state.get('phase') in ('albums', 'audiodb_prewarm'):
                     skip_artists = True
-                    logger.info(f"Resuming from albums phase, {len(processed_albums)} albums already processed")
+                    logger.info(f"Resuming from {state.get('phase')} phase, {len(processed_albums)} albums already processed")
                 else:
                     logger.info(f"Resuming from artists phase, {len(processed_artists)} artists already processed")
 
@@ -172,11 +173,14 @@ class LibraryPrecacheService:
                 remaining_artists = [a for a in artists if a.get('mbid') not in processed_artists]
                 logger.info(f"Phase 1: Caching {len(remaining_artists)} artist metadata + images ({len(processed_artists)} already done)")
                 if remaining_artists:
-                    await status_service.start_sync('artists', len(remaining_artists), total_artists=total_artists, total_albums=total_albums)
-                    await self._artist_phase.precache_artist_images(remaining_artists, status_service, library_artist_mbids, library_album_mbids, len(processed_artists))
+                    generation = await status_service.start_sync('artists', len(remaining_artists), total_artists=total_artists, total_albums=total_albums)
+                    await self._artist_phase.precache_artist_images(remaining_artists, status_service, library_artist_mbids, library_album_mbids, len(processed_artists), generation=generation)
                 else:
-                    await status_service.start_sync('artists', 0, total_artists=total_artists, total_albums=total_albums)
-                    await status_service.skip_phase('artists')
+                    generation = await status_service.start_sync('artists', 0, total_artists=total_artists, total_albums=total_albums)
+                    await status_service.skip_phase('artists', generation=generation)
+            else:
+                generation = await status_service.start_sync('albums', 0, total_artists=total_artists, total_albums=total_albums)
+                logger.info("Resuming sync, skipping artists/discovery phases")
             if status_service.is_cancelled():
                 logger.info("Pre-cache cancelled after Phase 1")
                 return
@@ -188,7 +192,7 @@ class LibraryPrecacheService:
                 ]
                 if artist_mbids:
                     logger.info(f"Phase 1.5: Pre-caching discovery data (popular albums/songs/similar) for {len(artist_mbids)} library artists")
-                    await status_service.update_phase('discovery', len(artist_mbids))
+                    await status_service.update_phase('discovery', len(artist_mbids), generation=generation)
                     mbid_to_name = {
                         a.get('mbid'): a.get('name', a.get('mbid', '')[:8])
                         for a in artists if a.get('mbid')
@@ -199,13 +203,14 @@ class LibraryPrecacheService:
                         await self._artist_discovery_service.precache_artist_discovery(
                             artist_mbids, delay=precache_delay,
                             status_service=status_service, mbid_to_name=mbid_to_name,
+                            generation=generation,
                         )
                     except Exception as e:  # noqa: BLE001
                         logger.warning(f"Discovery precache failed (non-fatal): {e}")
                 else:
-                    await status_service.skip_phase('discovery')
+                    await status_service.skip_phase('discovery', generation=generation)
             elif not skip_artists:
-                await status_service.skip_phase('discovery')
+                await status_service.skip_phase('discovery', generation=generation)
 
             if status_service.is_cancelled():
                 logger.info("Pre-cache cancelled after Phase 1.5")
@@ -253,27 +258,25 @@ class LibraryPrecacheService:
                 f"{already_cached} already cached, {len(processed_albums)} from previous run"
             )
             if items_to_process:
-                await status_service.update_phase('albums', len(items_to_process))
-                await self._album_phase.precache_album_data(items_to_process, monitored_mbids, status_service, library_album_mbids, len(processed_albums))
+                await status_service.update_phase('albums', len(items_to_process), generation=generation)
+                await self._album_phase.precache_album_data(items_to_process, monitored_mbids, status_service, library_album_mbids, len(processed_albums), generation=generation)
             else:
-                await status_service.skip_phase('albums')
+                await status_service.skip_phase('albums', generation=generation)
+
+            if status_service.is_cancelled():
+                logger.info("Pre-cache cancelled after albums phase")
+                return
+
+            try:
+                logger.info("Starting AudioDB image prewarm...")
+                await self._audiodb_phase.precache_audiodb_data(artists, albums, status_service, generation=generation)
+                logger.info("AudioDB image prewarm complete")
+            except Exception as e:  # noqa: BLE001
+                logger.warning(f"AudioDB pre-warming failed (non-fatal): {e}")
 
             if not status_service.is_cancelled():
-                await status_service.complete_sync()
-                logger.info("Library resource pre-caching complete (core phases done)")
-
-                try:
-                    audiodb_timeout = self._preferences_service.get_advanced_settings().sync_max_timeout_hours * 3600
-                    logger.info("Starting AudioDB image prewarm as background enhancement...")
-                    await asyncio.wait_for(
-                        self._audiodb_phase.precache_audiodb_data(artists, albums, status_service),
-                        timeout=audiodb_timeout,
-                    )
-                    logger.info("AudioDB image prewarm complete")
-                except asyncio.TimeoutError:
-                    logger.warning("AudioDB pre-warming timed out (non-fatal)")
-                except Exception as e:  # noqa: BLE001
-                    logger.warning(f"AudioDB pre-warming failed (non-fatal): {e}")
+                await status_service.complete_sync(generation=generation)
+                logger.info("Library resource pre-caching complete")
             else:
                 logger.info("Library resource pre-caching complete (cancelled)")
         except Exception as e:
@@ -281,4 +284,4 @@ class LibraryPrecacheService:
             raise
         finally:
             if status_service.is_syncing():
-                await status_service.complete_sync()
+                await status_service.complete_sync(generation=generation)
