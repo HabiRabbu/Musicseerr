@@ -27,7 +27,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 _CONCURRENCY_LIMIT = 5
-_NEGATIVE_CACHE_TTL = 14400  # 4 hours — aligned with periodic warmup interval
+_NEGATIVE_CACHE_TTL = 14400  # 4 hours - aligned with periodic warmup interval
 
 
 def _cache_get_mbid(cache: dict[str, str | tuple[None, float]], key: str) -> str | None:
@@ -82,6 +82,16 @@ class NavidromeLibraryService:
     def lookup_navidrome_id(self, mbid: str) -> str | None:
         """Public accessor for MBID → Navidrome album ID reverse index."""
         return self._mbid_to_navidrome_id.get(mbid)
+
+    def invalidate_album_cache(self, album_mbid: str) -> None:
+        """Remove cached entries for a specific album MBID, forcing re-lookup on next match."""
+        self._mbid_to_navidrome_id.pop(album_mbid, None)
+        stale_keys = [k for k, v in self._album_mbid_cache.items() if v == album_mbid]
+        for key in stale_keys:
+            del self._album_mbid_cache[key]
+        if stale_keys:
+            self._dirty = True
+            logger.debug("navidrome.cache action=invalidate mbid=%s cleared_keys=%d", album_mbid[:8], len(stale_keys))
 
     async def _resolve_album_mbid(self, name: str, artist: str) -> str | None:
         """Resolve a release-group MBID for an album via Lidarr library matching."""
@@ -482,7 +492,7 @@ class NavidromeLibraryService:
                 logger.warning("Failed to load Navidrome MBID cache from disk", exc_info=True)
 
         if not self._lidarr_album_index:
-            logger.warning("Lidarr library data unavailable — Lidarr enrichment will be skipped")
+            logger.warning("Lidarr library data unavailable - Lidarr enrichment will be skipped")
 
         # Phase 2: Fetch current Navidrome library (paginated) for reconciliation + enrichment
         try:
@@ -502,7 +512,7 @@ class NavidromeLibraryService:
             logger.warning("Failed to fetch Navidrome albums for MBID enrichment")
             return
 
-        # Phase 3: Reconcile — remove stale entries no longer in Navidrome
+        # Phase 3: Reconcile - remove stale entries no longer in Navidrome
         current_album_keys: set[str] = set()
         current_artist_names: set[str] = set()
         for album in all_albums:

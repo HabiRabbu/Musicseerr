@@ -5,7 +5,7 @@
 	import AlbumImage from '$lib/components/AlbumImage.svelte';
 	import HeroBackdrop from '$lib/components/HeroBackdrop.svelte';
 	import { formatTotalDuration } from '$lib/utils/formatting';
-	import { Check, Trash2, Clock, Plus } from 'lucide-svelte';
+	import { Check, Trash2, Clock, Plus, RefreshCw } from 'lucide-svelte';
 
 	interface Props {
 		album: AlbumBasicInfo;
@@ -14,9 +14,12 @@
 		inLibrary: boolean;
 		isRequested: boolean;
 		requesting: boolean;
+		refreshing: boolean;
+		pollingForSources: boolean;
 		lidarrConfigured: boolean;
 		onrequest: () => void;
 		ondelete: () => void;
+		onrefresh: () => void;
 		onartistclick: () => void;
 	}
 
@@ -27,9 +30,12 @@
 		inLibrary,
 		isRequested,
 		requesting,
+		refreshing,
+		pollingForSources,
 		lidarrConfigured,
 		onrequest,
 		ondelete,
+		onrefresh,
 		onartistclick
 	}: Props = $props();
 
@@ -53,6 +59,16 @@
 	/>
 
 	<div class="relative z-10 flex flex-col lg:flex-row gap-6 lg:gap-8 p-4 sm:p-6 lg:p-8">
+		{#if (inLibrary || isRequested) && lidarrConfigured}
+			<button
+				class="absolute top-3 right-3 btn btn-sm btn-ghost btn-circle z-20"
+				onclick={onrefresh}
+				disabled={refreshing}
+				title="Refresh album status"
+			>
+				<RefreshCw class="h-5 w-5 {refreshing ? 'animate-spin' : ''}" />
+			</button>
+		{/if}
 		<div class="w-full lg:w-64 xl:w-80 flex-shrink-0">
 			<AlbumImage
 				mbid={album.musicbrainz_id}
@@ -135,6 +151,12 @@
 							<Check class="h-4 w-4" />
 							In Library
 						</div>
+						{#if pollingForSources}
+							<div class="badge badge-lg badge-ghost gap-2 animate-pulse">
+								<span class="loading loading-spinner loading-xs"></span>
+								Checking for sources…
+							</div>
+						{/if}
 						<button class="btn btn-sm btn-error btn-outline gap-1" onclick={ondelete}>
 							<Trash2 class="h-4 w-4" />
 							Remove

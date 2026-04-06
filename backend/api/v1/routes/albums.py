@@ -5,10 +5,11 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, R
 from core.exceptions import ClientDisconnectedError
 from api.v1.schemas.album import AlbumInfo, AlbumBasicInfo, AlbumTracksInfo, LastFmAlbumEnrichment
 from api.v1.schemas.discovery import SimilarAlbumsResponse, MoreByArtistResponse
-from core.dependencies import get_album_service, get_album_discovery_service, get_album_enrichment_service
+from core.dependencies import get_album_service, get_album_discovery_service, get_album_enrichment_service, get_navidrome_library_service
 from services.album_service import AlbumService
 from services.album_discovery_service import AlbumDiscoveryService
 from services.album_enrichment_service import AlbumEnrichmentService
+from services.navidrome_library_service import NavidromeLibraryService
 from infrastructure.validators import is_unknown_mbid
 from infrastructure.degradation import try_get_degradation_context
 from infrastructure.msgspec_fastapi import MsgSpecRoute
@@ -38,6 +39,30 @@ async def get_album(
             result = msgspec.structs.replace(result, service_status=ctx.degraded_summary())
         return result
     except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid album request"
+        )
+
+
+@router.post("/{album_id}/refresh", response_model=AlbumBasicInfo)
+async def refresh_album(
+    album_id: str,
+    album_service: AlbumService = Depends(get_album_service),
+    navidrome_service: NavidromeLibraryService = Depends(get_navidrome_library_service),
+):
+    """Clear all caches for an album and return fresh data."""
+    if is_unknown_mbid(album_id):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid or unknown album ID: {album_id}"
+        )
+
+    try:
+        navidrome_service.invalidate_album_cache(album_id)
+        await album_service.refresh_album(album_id)
+        return await album_service.get_album_basic_info(album_id)
+    except ValueError:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid album request"

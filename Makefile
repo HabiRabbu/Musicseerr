@@ -127,6 +127,9 @@ test-mus14-all: backend-test-request-queue backend-test-artist-lock backend-test
 backend-test-mus15-status-race: $(BACKEND_VENV_STAMP) ## Run MUS-15 status race condition tests
 	cd "$(BACKEND_DIR)" && .venv/bin/python -m pytest tests/test_mus15_status_race.py -v
 
+backend-test-album-refresh: $(BACKEND_VENV_STAMP) ## Run album refresh endpoint tests
+	cd "$(BACKEND_DIR)" && .venv/bin/python -m pytest tests/routes/test_album_refresh.py tests/services/test_navidrome_cache_invalidation.py -v
+
 test-audiodb-all: backend-test-audiodb backend-test-audiodb-prewarm backend-test-audiodb-settings backend-test-coverart-audiodb backend-test-audiodb-phase8 backend-test-audiodb-phase9 frontend-test-audiodb-images ## Run every AudioDB test target
 
 test-sync-all: backend-test-sync-watchdog backend-test-sync-resume backend-test-audiodb-parallel ## Run all sync robustness tests

@@ -48,7 +48,8 @@ import {
 	fetchJellyfinMatch,
 	fetchLocalMatch,
 	fetchNavidromeMatch,
-	fetchLastFm
+	fetchLastFm,
+	refreshAlbum
 } from './albumFetchers';
 import { buildRenderedTrackSections, buildSortedTrackMap } from './albumTrackResolvers';
 import type { RenderedTrackSection } from './albumTrackResolvers';
@@ -98,6 +99,9 @@ export function createAlbumPageState(albumIdGetter: () => string) {
 	let renderedTrackSections = $state<RenderedTrackSection[]>([]);
 	let playlistModalRef = $state<{ open: (tracks: QueueItem[]) => void } | null>(null);
 	let abortController: AbortController | null = null;
+	let refreshing = $state(false);
+	let pollingForSources = $state(false);
+	let pollTimer: ReturnType<typeof setInterval> | null = null;
 
 	// eslint-disable-next-line svelte/prefer-svelte-reactivity -- derived Map is recreated each time, reactive by nature
 	const trackLinkMap = $derived(new Map(trackLinks.map((tl) => [getDiscTrackKey(tl), tl])));
@@ -116,6 +120,7 @@ export function createAlbumPageState(albumIdGetter: () => string) {
 
 	function resetState() {
 		if (abortController) { abortController.abort(); abortController = null; }
+		stopPolling();
 		album = null; tracksInfo = null; renderedTrackSections = []; error = null;
 		loadingBasic = true; loadingTracks = true; tracksError = false;
 		loadingDiscovery = true; moreByArtist = null; similarAlbums = null;
@@ -123,6 +128,7 @@ export function createAlbumPageState(albumIdGetter: () => string) {
 		jellyfinMatch = null; localMatch = null; navidromeMatch = null;
 		loadingJellyfin = false; loadingLocal = false; loadingNavidrome = false;
 		lastfmEnrichment = null; loadingLastfm = true;
+		refreshing = false;
 	}
 
 	function hydrateFromCache(albumId: string) {
@@ -286,7 +292,7 @@ export function createAlbumPageState(albumIdGetter: () => string) {
 		if (refreshDiscovery) void doFetchDiscovery(albumId, signal);
 		if (!refreshBasic) void doFetchYouTube(albumId, signal);
 		if (refreshLastfm) void doFetchLastFm(albumId, signal);
-		// Navidrome match needs album title/artist — fire after basic loads
+		// Navidrome match needs album title/artist - fire after basic loads
 		if (refreshSourceMatch) {
 			void (async () => {
 				try {
@@ -302,11 +308,73 @@ export function createAlbumPageState(albumIdGetter: () => string) {
 		}
 	}
 
+	function stopPolling() {
+		if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+		pollingForSources = false;
+	}
+
+	function hasAnySourceFound(): boolean {
+		return !!(jellyfinMatch?.found || localMatch?.found || navidromeMatch?.found);
+	}
+
+	async function forceLoadAlbum(albumId: string): Promise<void> {
+		albumBasicCache.remove(albumId);
+		albumTracksCache.remove(albumId);
+		albumSourceMatchCache.remove(albumId);
+
+		if (abortController) abortController.abort();
+		abortController = new AbortController();
+		const signal = abortController.signal;
+
+		try {
+			const freshBasic = await refreshAlbum(albumId, signal);
+			if (freshBasic) { album = freshBasic; extractServiceStatus(album); albumBasicCache.set(album, albumId); }
+		} catch { /* refresh endpoint failure is non-fatal, loadAlbum will re-fetch */ }
+
+		if (signal.aborted) return;
+		await loadAlbum(albumId);
+	}
+
+	async function refreshAll(): Promise<void> {
+		const albumId = albumIdGetter();
+		if (!albumId || refreshing) return;
+		refreshing = true;
+		try {
+			await forceLoadAlbum(albumId);
+		} finally {
+			refreshing = false;
+		}
+	}
+
+	function startSourcePolling(): void {
+		stopPolling();
+		const albumId = albumIdGetter();
+		if (!albumId) return;
+		pollingForSources = true;
+		const startTime = Date.now();
+		const POLL_INTERVAL = 30_000;
+		const MAX_POLL_DURATION = 5 * 60_000;
+
+		pollTimer = setInterval(() => {
+			if (Date.now() - startTime >= MAX_POLL_DURATION || hasAnySourceFound()) {
+				stopPolling();
+				return;
+			}
+			void forceLoadAlbum(albumId);
+		}, POLL_INTERVAL);
+	}
+
 	$effect(() => {
 		const albumId = albumIdGetter();
 		if (!browser || !albumId) return;
 		untrack(() => { resetState(); void loadAlbum(albumId); });
-		return () => { if (abortController) { abortController.abort(); abortController = null; } };
+		return () => { stopPolling(); if (abortController) { abortController.abort(); abortController = null; } };
+	});
+
+	$effect(() => {
+		if (inLibrary && !hasAnySourceFound()) {
+			untrack(() => startSourcePolling());
+		}
 	});
 
 	const eventHandlers = createEventHandlers({
@@ -324,7 +392,8 @@ export function createAlbumPageState(albumIdGetter: () => string) {
 		setShowArtistRemovedModal: (v) => (showArtistRemovedModal = v),
 		setRemovedArtistName: (v) => (removedArtistName = v),
 		setToast: (msg, type) => { toastMessage = msg; toastType = type; },
-		setShowToast: (v) => (showToast = v)
+		setShowToast: (v) => (showToast = v),
+		onRequestSuccess: () => { albumSourceMatchCache.remove(albumIdGetter()); }
 	});
 
 	function retryTracks(): void {
@@ -416,6 +485,8 @@ export function createAlbumPageState(albumIdGetter: () => string) {
 		get navidromeTrackMap() { return navidromeTrackMap; },
 		get inLibrary() { return inLibrary; },
 		get isRequested() { return isRequested; },
+		get refreshing() { return refreshing; },
+		get pollingForSources() { return pollingForSources; },
 		get playlistModalRef() { return playlistModalRef; },
 		set playlistModalRef(v) { playlistModalRef = v; },
 		jellyfinCallbacks,
@@ -423,6 +494,7 @@ export function createAlbumPageState(albumIdGetter: () => string) {
 		navidromeCallbacks,
 		...eventHandlers,
 		retryTracks,
+		refreshAll,
 		playSourceTrack,
 		getTrackContextMenuItems
 	};

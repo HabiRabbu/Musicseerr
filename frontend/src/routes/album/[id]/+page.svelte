@@ -60,9 +60,12 @@
 				inLibrary={state.inLibrary}
 				isRequested={state.isRequested}
 				requesting={state.requesting}
+				refreshing={state.refreshing}
+				pollingForSources={state.pollingForSources}
 				lidarrConfigured={$integrationStore.lidarr}
 				onrequest={state.handleRequest}
 				ondelete={state.handleDeleteClick}
+				onrefresh={state.refreshAll}
 				onartistclick={state.goToArtist}
 			/>
 

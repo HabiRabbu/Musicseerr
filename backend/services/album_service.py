@@ -8,7 +8,7 @@ from repositories.protocols import LidarrRepositoryProtocol, MusicBrainzReposito
 from services.preferences_service import PreferencesService
 from services.album_utils import parse_year, find_primary_release, get_ranked_releases, extract_artist_info, extract_tracks, extract_label, build_album_basic_info, lidarr_to_basic_info, mb_to_basic_info
 from infrastructure.persistence import LibraryDB
-from infrastructure.cache.cache_keys import ALBUM_INFO_PREFIX
+from infrastructure.cache.cache_keys import ALBUM_INFO_PREFIX, LIDARR_ALBUM_DETAILS_PREFIX
 from infrastructure.cache.memory_cache import CacheInterface
 from infrastructure.cache.disk_cache import DiskMetadataCache
 from infrastructure.cover_urls import prefer_release_group_cover_url
@@ -190,6 +190,18 @@ class AlbumService:
             await self.get_album_info(release_group_id)
         except Exception:  # noqa: BLE001
             logger.debug(f"Background album cache warm failed for {release_group_id[:8]}")
+
+    async def refresh_album(self, release_group_id: str) -> AlbumInfo:
+        release_group_id = validate_mbid(release_group_id, "album")
+
+        await self._cache.delete(f"{ALBUM_INFO_PREFIX}{release_group_id}")
+        await self._cache.delete(f"{LIDARR_ALBUM_DETAILS_PREFIX}{release_group_id}")
+        await self._disk_cache.delete_album(release_group_id)
+        self._revalidation_timestamps.pop(release_group_id, None)
+        self._album_in_flight.pop(release_group_id, None)
+
+        logger.info("Cleared all caches for album %s", release_group_id[:8])
+        return await self.get_album_info(release_group_id)
 
     async def get_album_info(self, release_group_id: str, monitored_mbids: set[str] = None) -> AlbumInfo:
         try:

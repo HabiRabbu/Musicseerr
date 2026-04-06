@@ -112,3 +112,10 @@ export async function fetchLastFm(
 		{ signal }
 	);
 }
+
+export async function refreshAlbum(
+	albumId: string,
+	signal?: AbortSignal
+): Promise<AlbumBasicInfo | null> {
+	return api.post<AlbumBasicInfo>(`/api/v1/albums/${albumId}/refresh`, undefined, { signal }).catch(() => null);
+}
