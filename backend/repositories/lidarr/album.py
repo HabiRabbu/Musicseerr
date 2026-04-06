@@ -298,9 +298,10 @@ class LidarrAlbumRepository(LidarrHistoryRepository):
         if not album_obj:
             async def album_is_indexed():
                 a = await self._get_album_by_foreign_id(musicbrainz_id)
-                return a and a.get("id") and a.get("releases")
+                return a and a.get("id")
 
-            album_obj = await self._wait_for(album_is_indexed, timeout=60.0, poll=3.0)
+            await self._wait_for_artist_commands_to_complete(artist_id, timeout=600.0)
+            album_obj = await self._wait_for(album_is_indexed, timeout=60.0, poll=5.0)
 
             if not album_obj:
                 profile_id = artist.get("qualityProfileId")
@@ -316,10 +317,12 @@ class LidarrAlbumRepository(LidarrHistoryRepository):
                 payload = {
                     "title": album_title,
                     "artistId": artist_id,
+                    "artist": artist,
                     "foreignAlbumId": musicbrainz_id,
                     "monitored": True,
                     "anyReleaseOk": True,
                     "profileId": profile_id,
+                    "images": [],
                     "addOptions": {"addType": "automatic", "searchForNewAlbum": True},
                 }
 
@@ -328,7 +331,9 @@ class LidarrAlbumRepository(LidarrHistoryRepository):
                     action = "added"
                     album_obj = await self._wait_for(album_is_indexed, timeout=120.0, poll=2.0)
                 except Exception as e:
-                    if "POST failed" in str(e) or "405" in str(e):
+                    err_str = str(e)
+                    if "POST failed" in err_str or "405" in err_str:
+                        logger.debug("Raw Lidarr rejection for %s: %s", album_title, err_str)
                         raise ExternalServiceError(
                             f"Cannot add this {album_type}. "
                             f"Lidarr rejected adding '{album_title}'. This is likely because your Lidarr "
@@ -337,6 +342,7 @@ class LidarrAlbumRepository(LidarrHistoryRepository):
                             f"and enable '{album_type}' in your active profile."
                         )
                     else:
+                        logger.debug("Unexpected error adding '%s': %s", album_title, err_str)
                         raise
 
         if not album_obj or "id" not in album_obj:
@@ -396,6 +402,9 @@ class LidarrAlbumRepository(LidarrHistoryRepository):
                         body = cmd.get("body", {})
                         cmd_artist_id = body.get("artistId")
                         cmd_artist_ids = body.get("artistIds", [])
+
+                        if not isinstance(cmd_artist_ids, list):
+                            cmd_artist_ids = [cmd_artist_ids] if cmd_artist_ids else []
 
                         if cmd_artist_id == artist_id or artist_id in cmd_artist_ids:
                             has_running_commands = True

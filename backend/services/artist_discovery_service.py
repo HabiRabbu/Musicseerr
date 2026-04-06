@@ -26,6 +26,9 @@ DEFAULT_SIMILAR_COUNT = 15
 DEFAULT_TOP_SONGS_COUNT = 10
 DEFAULT_TOP_ALBUMS_COUNT = 10
 
+# Module-level flag survives singleton cache invalidation / instance recreation
+_discovery_precache_running = False
+
 
 class ArtistDiscoveryService:
     def __init__(
@@ -407,6 +410,27 @@ class ArtistDiscoveryService:
         status_service: Any = None,
         mbid_to_name: dict[str, str] | None = None,
     ) -> int:
+        global _discovery_precache_running
+        if _discovery_precache_running:
+            logger.info("Discovery precache already running, skipping duplicate invocation")
+            return 0
+
+        _discovery_precache_running = True
+        try:
+            return await self._do_precache_artist_discovery(
+                artist_mbids, delay=delay,
+                status_service=status_service, mbid_to_name=mbid_to_name,
+            )
+        finally:
+            _discovery_precache_running = False
+
+    async def _do_precache_artist_discovery(
+        self,
+        artist_mbids: list[str],
+        delay: float = 0.5,
+        status_service: Any = None,
+        mbid_to_name: dict[str, str] | None = None,
+    ) -> int:
         sources: list[Literal["listenbrainz", "lastfm"]] = []
         if self._lb_repo.is_configured():
             sources.append("listenbrainz")
@@ -469,8 +493,9 @@ class ArtistDiscoveryService:
                         async with counter_lock:
                             source_fetches += 1
 
-                if delay > 0:
-                    await asyncio.sleep(delay)
+                    # Sleep inside semaphore to hold slot and throttle API calls
+                    if delay > 0:
+                        await asyncio.sleep(delay)
 
                 async with counter_lock:
                     cached_count += 1
