@@ -13,7 +13,7 @@
 	import { API } from '$lib/constants';
 	import { isAbortError } from '$lib/utils/errorHandling';
 	import type { Artist, Album } from '$lib/types';
-	import { CircleX, X, RefreshCw, ChevronRight, Search, Loader2, Settings2 } from 'lucide-svelte';
+	import { CircleX, X, RefreshCw, ChevronRight, Search, Loader2, Settings2, Eye } from 'lucide-svelte';
 
 	const CIRCUIT_BREAKER_CODE = 'CIRCUIT_BREAKER_OPEN';
 
@@ -326,6 +326,16 @@
 					<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
 					<span class="hidden sm:inline">Stop Sync</span>
 				</button>
+				{#if syncStatus.isDismissed}
+					<button
+						class="btn btn-sm btn-ghost gap-1"
+						onclick={() => syncStatus.undismiss()}
+						aria-label="Show sync progress"
+					>
+						<Eye class="h-4 w-4" />
+						<span class="hidden sm:inline">Show Progress</span>
+					</button>
+				{/if}
 			{:else}
 				<button
 					class="btn btn-sm btn-primary gap-1"
@@ -343,6 +353,22 @@
 			{/if}
 		</div>
 	</div>
+
+	{#if syncStatus.isActive}
+		<div class="w-full mt-2">
+			<div class="flex items-center gap-2 text-sm text-base-content/70 mb-1">
+				<span>{syncStatus.phaseLabel}</span>
+				{#if syncStatus.totalItems > 0}
+					<span>— {syncStatus.processedItems}/{syncStatus.totalItems}</span>
+				{/if}
+			</div>
+			<progress
+				class="progress progress-primary w-full"
+				value={syncStatus.progress}
+				max="100"
+			></progress>
+		</div>
+	{/if}
 
 	{#if !isSearching}
 		<section class="mb-8">
@@ -524,13 +550,40 @@
 				Your Lidarr library is empty or hasn't been synced yet.
 			</p>
 			{#if syncStatus.isActive}
-				<button
-					class="btn btn-error gap-2"
-					onclick={() => syncStatus.cancelSync()}
-				>
-					<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
-					Stop Sync
-				</button>
+				<div class="flex flex-col items-center gap-3 w-full max-w-md">
+					<div class="flex gap-2">
+						<button
+							class="btn btn-error gap-2"
+							onclick={() => syncStatus.cancelSync()}
+						>
+							<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+							Stop Sync
+						</button>
+						{#if syncStatus.isDismissed}
+							<button
+								class="btn btn-ghost gap-2"
+								onclick={() => syncStatus.undismiss()}
+								aria-label="Show sync progress"
+							>
+								<Eye class="h-4 w-4" />
+								Show Progress
+							</button>
+						{/if}
+					</div>
+					<div class="w-full">
+						<div class="flex items-center justify-center gap-2 text-sm text-base-content/70 mb-1">
+							<span>{syncStatus.phaseLabel}</span>
+							{#if syncStatus.totalItems > 0}
+								<span>— {syncStatus.processedItems}/{syncStatus.totalItems}</span>
+							{/if}
+						</div>
+						<progress
+							class="progress progress-primary w-full"
+							value={syncStatus.progress}
+							max="100"
+						></progress>
+					</div>
+				</div>
 			{:else}
 				<button
 					class="btn btn-primary gap-2"

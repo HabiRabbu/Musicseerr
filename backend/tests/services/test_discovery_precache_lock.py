@@ -103,8 +103,8 @@ async def test_lock_released_after_exception():
 
 
 @pytest.mark.asyncio
-async def test_delay_holds_semaphore_slot():
-    """Delay is applied inside the semaphore, blocking other artists from starting."""
+async def test_delay_does_not_hold_semaphore_slot():
+    """Delay is applied outside the semaphore, allowing other artists to start during sleep."""
     svc = _make_service()
     timestamps: list[float] = []
 
@@ -125,12 +125,13 @@ async def test_delay_holds_semaphore_slot():
         )
 
     assert len(timestamps) == 4
-    # With concurrency=2 and delay=0.15s inside semaphore, the 3rd artist
-    # cannot start until one of the first two finishes its delay.
-    # The gap between the 2nd and 3rd timestamps should be >= delay.
+    # With concurrency=2 and delay=0.15s OUTSIDE semaphore, the 3rd artist
+    # can start as soon as a semaphore slot frees (before the delay finishes).
+    # All four API calls should start quickly — the gap between 1st and 3rd
+    # should be small since the semaphore isn't held during sleep.
     sorted_ts = sorted(timestamps)
     gap = sorted_ts[2] - sorted_ts[0]
-    assert gap >= 0.1, f"Expected >=0.1s gap due to semaphore-held delay, got {gap:.3f}s"
+    assert gap < 0.15, f"Expected <0.15s gap since sleep is outside semaphore, got {gap:.3f}s"
 
 
 @pytest.mark.asyncio

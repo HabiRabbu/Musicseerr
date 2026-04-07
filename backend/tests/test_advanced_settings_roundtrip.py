@@ -209,7 +209,8 @@ class TestSyncSettingsRoundTrip:
         ("sync_max_timeout_hours", 8),
         ("audiodb_prewarm_concurrency", 4),
         ("audiodb_prewarm_delay", 0.3),
-        ("artist_discovery_precache_concurrency", 3),
+        ("artist_discovery_precache_concurrency", 5),
+        ("artist_discovery_precache_delay", 0.2),
     ])
     def test_defaults_match(self, field: str, default_val) -> None:
         backend = AdvancedSettings()

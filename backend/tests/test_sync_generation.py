@@ -83,7 +83,7 @@ class TestGenerationCounter:
 
     @pytest.mark.asyncio
     async def test_generation_zero_bypasses_guard(self):
-        """generation=0 (default) always passes — backward compatibility."""
+        """generation=0 (default) always passes through, for backward compatibility."""
         svc = _make_status_service()
         _gen = await svc.start_sync('artists', 10)
 

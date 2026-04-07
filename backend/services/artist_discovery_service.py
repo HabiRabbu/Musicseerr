@@ -450,7 +450,7 @@ class ArtistDiscoveryService:
         cached_count = 0
         source_fetches = 0
         advanced = self._preferences_service.get_advanced_settings() if self._preferences_service else None
-        discovery_concurrency = getattr(advanced, 'artist_discovery_precache_concurrency', 3) if advanced else 3
+        discovery_concurrency = getattr(advanced, 'artist_discovery_precache_concurrency', 5) if advanced else 5
         sem = asyncio.Semaphore(discovery_concurrency)
         counter_lock = asyncio.Lock()
         progress_counter = 0
@@ -496,9 +496,8 @@ class ArtistDiscoveryService:
                         async with counter_lock:
                             source_fetches += 1
 
-                    # Sleep inside semaphore to hold slot and throttle API calls
-                    if delay > 0:
-                        await asyncio.sleep(delay)
+                if delay > 0:
+                    await asyncio.sleep(delay)
 
                 async with counter_lock:
                     cached_count += 1

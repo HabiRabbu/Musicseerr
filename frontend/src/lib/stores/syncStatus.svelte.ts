@@ -293,6 +293,10 @@ function createSyncStatusStore() {
 			isDismissed = true;
 		},
 
+		undismiss(): void {
+			isDismissed = false;
+		},
+
 		minimize(): void {
 			isMinimized = true;
 		},

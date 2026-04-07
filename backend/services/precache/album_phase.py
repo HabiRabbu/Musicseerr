@@ -74,7 +74,8 @@ class AlbumPhase:
         metadata_fetched = 0
         covers_fetched = 0
         consecutive_slow_batches = 0
-        for i in range(0, len(release_group_ids), batch_size):
+        i = 0
+        while i < len(release_group_ids):
             if status_service.is_cancelled():
                 logger.info("Album pre-caching cancelled by user")
                 break
@@ -115,9 +116,11 @@ class AlbumPhase:
                 if avg_time_per_item < 0.8 and batch_size < max_batch:
                     batch_size = min(batch_size + 1, max_batch)
                     logger.debug(f"Increasing batch size to {batch_size} (fast: {avg_time_per_item:.2f}s/item)")
-            if (i + batch_size) % 30 == 0 or (i + batch_size) >= len(release_group_ids):
-                percent = int((min(i + batch_size, len(release_group_ids)) / len(release_group_ids)) * 100)
-                logger.info(f"Album progress: {min(i + batch_size, len(release_group_ids))}/{len(release_group_ids)} ({percent}%) - metadata: {metadata_fetched}, covers: {covers_fetched} [batch: {batch_size}]")
+            next_i = i + len(batch)
+            if next_i % 30 == 0 or next_i >= len(release_group_ids):
+                percent = int((min(next_i, len(release_group_ids)) / len(release_group_ids)) * 100)
+                logger.info(f"Album progress: {min(next_i, len(release_group_ids))}/{len(release_group_ids)} ({percent}%) - metadata: {metadata_fetched}, covers: {covers_fetched} [batch: {batch_size}]")
+            i = next_i
             await asyncio.sleep(advanced_settings.delay_albums)
         await status_service.persist_progress(force=True, generation=generation)
         logger.info(f"Album pre-caching complete: metadata fetched={metadata_fetched}, covers fetched={covers_fetched}, total processed={len(release_group_ids)}")

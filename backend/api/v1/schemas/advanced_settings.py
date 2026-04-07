@@ -62,8 +62,8 @@ class AdvancedSettings(AppStruct):
     delay_albums: float = 0.3
     artist_discovery_warm_interval: int = 14400
     artist_discovery_warm_delay: float = 0.5
-    artist_discovery_precache_delay: float = 0.3
-    artist_discovery_precache_concurrency: int = 3
+    artist_discovery_precache_delay: float = 0.2
+    artist_discovery_precache_concurrency: int = 5
     memory_cache_max_entries: int = 10000
     memory_cache_cleanup_interval: int = 300
     cover_memory_cache_max_entries: int = 128
@@ -237,7 +237,7 @@ class AdvancedSettingsFrontend(AppStruct):
     delay_albums: float = 0.3
     artist_discovery_warm_interval: int = 240
     artist_discovery_warm_delay: float = 0.5
-    artist_discovery_precache_delay: float = 0.3
+    artist_discovery_precache_delay: float = 0.2
     memory_cache_max_entries: int = 10000
     memory_cache_cleanup_interval: int = 300
     cover_memory_cache_max_entries: int = 128
@@ -285,7 +285,7 @@ class AdvancedSettingsFrontend(AppStruct):
     audiodb_prewarm_concurrency: int = 4
     audiodb_prewarm_delay: float = 0.3
     request_concurrency: int = 2
-    artist_discovery_precache_concurrency: int = 3
+    artist_discovery_precache_concurrency: int = 5
 
     def __post_init__(self) -> None:
         int_coerce_fields = [
