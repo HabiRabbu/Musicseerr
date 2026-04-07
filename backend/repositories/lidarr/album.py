@@ -423,7 +423,7 @@ class LidarrAlbumRepository(LidarrHistoryRepository):
 
         async def album_is_indexed():
             a = await self._get_album_by_foreign_id(musicbrainz_id)
-            return a and a.get("id")
+            return a if a and a.get("id") else None
 
         # Only wait for auto-indexing if we just created/refreshed the artist;
         # for existing artists nothing triggered new indexing, so skip the long wait.

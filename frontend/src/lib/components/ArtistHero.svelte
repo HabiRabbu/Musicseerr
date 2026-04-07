@@ -1,11 +1,12 @@
 <script lang="ts">
 	import { run } from 'svelte/legacy';
 
-	import { Check } from 'lucide-svelte';
+	import { Check, RefreshCw } from 'lucide-svelte';
 	import type { ArtistInfo } from '$lib/types';
 	import { extractDominantColor, DEFAULT_GRADIENT } from '$lib/utils/colors';
 	import { appendAudioDBSizeSuffix } from '$lib/utils/imageSuffix';
 	import { imageSettingsStore } from '$lib/stores/imageSettings';
+	import { monitoredArtistsStore } from '$lib/stores/monitoredArtists';
 	import ArtistLinks from './ArtistLinks.svelte';
 	import ArtistMonitoringToggle from './ArtistMonitoringToggle.svelte';
 	import BackButton from './BackButton.svelte';
@@ -15,13 +16,22 @@
 	interface Props {
 		artist: ArtistInfo;
 		showBackButton?: boolean;
+		refreshing?: boolean;
+		onrefresh?: () => void;
 	}
 
-	let { artist, showBackButton = false }: Props = $props();
+	let { artist, showBackButton = false, refreshing = false, onrefresh }: Props = $props();
 
 	let heroGradient = $state(DEFAULT_GRADIENT);
 	let heroImageLoaded = $state(false);
 	let avatarRemoteError = $state(false);
+
+	let pendingMonitor = $derived(
+		artist.musicbrainz_id
+			? $monitoredArtistsStore.get(artist.musicbrainz_id.toLowerCase())
+			: undefined
+	);
+	let showMonitoring = $derived(artist.in_lidarr || !!pendingMonitor);
 
 	let useRemoteAvatar = $derived(artist.thumb_url && $imageSettingsStore.directRemoteImagesEnabled);
 	let resolvedRemoteAvatar = $derived(
@@ -76,6 +86,16 @@
 	/>
 
 	<div class="relative z-10 px-4 sm:px-8 lg:px-12 pt-6 pb-8 sm:pt-8 sm:pb-12">
+		{#if onrefresh && artist.in_lidarr}
+			<button
+				class="absolute top-3 right-3 btn btn-sm btn-ghost btn-circle z-20"
+				onclick={onrefresh}
+				disabled={refreshing}
+				title="Refresh artist info"
+			>
+				<RefreshCw class="h-5 w-5 {refreshing ? 'animate-spin' : ''}" />
+			</button>
+		{/if}
 		<div class="max-w-7xl mx-auto">
 			{#if showBackButton}
 				<div class="mb-4">
@@ -167,12 +187,17 @@
 						<ArtistLinks links={validLinks} />
 					{/if}
 
-					{#if artist.in_lidarr}
+					{#if showMonitoring}
 						<div class="mt-3">
 							<ArtistMonitoringToggle
 								artistMbid={artist.musicbrainz_id}
-								monitored={artist.monitored ?? false}
-								autoDownload={artist.auto_download ?? false}
+								monitored={pendingMonitor && !artist.in_lidarr
+									? pendingMonitor.monitored
+									: (artist.monitored ?? false)}
+								autoDownload={pendingMonitor && !artist.in_lidarr
+									? pendingMonitor.autoDownload
+									: (artist.auto_download ?? false)}
+								disabled={!!pendingMonitor && !artist.in_lidarr}
 								on:change={(e) => {
 									artist.monitored = e.detail.monitored;
 									artist.auto_download = e.detail.autoDownload;

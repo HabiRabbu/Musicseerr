@@ -18,6 +18,7 @@ import type {
 	LastFmAlbumEnrichment
 } from '$lib/types';
 import { libraryStore } from '$lib/stores/library';
+import { monitoredArtistsStore } from '$lib/stores/monitoredArtists';
 import { integrationStore } from '$lib/stores/integration';
 import { isAbortError } from '$lib/utils/errorHandling';
 import { extractServiceStatus } from '$lib/utils/serviceStatus';
@@ -31,6 +32,7 @@ import {
 	albumSourceMatchCache
 } from '$lib/utils/albumDetailCache';
 import { hydrateDetailCacheEntry } from '$lib/utils/detailCacheHydration';
+import { artistBasicCache } from '$lib/utils/artistDetailCache';
 import { compareDiscTrack, getDiscTrackKey } from '$lib/player/queueHelpers';
 import type { QueueItem } from '$lib/player/types';
 import { launchJellyfinPlayback } from '$lib/player/launchJellyfinPlayback';
@@ -533,10 +535,14 @@ export function createAlbumPageState(albumIdGetter: () => string) {
 			toastType = type;
 		},
 		setShowToast: (v) => (showToast = v),
-		onRequestSuccess: () => {
+		onRequestSuccess: (opts) => {
 			albumSourceMatchCache.remove(albumIdGetter());
 			const aid = album?.artist_id;
 			if (aid && abortController) void fetchArtistMonitoringState(aid, abortController.signal);
+			if (opts?.monitorArtist && aid) {
+				monitoredArtistsStore.addPendingMonitor(aid, opts.autoDownloadArtist ?? false);
+				artistBasicCache.remove(aid);
+			}
 		}
 	});
 

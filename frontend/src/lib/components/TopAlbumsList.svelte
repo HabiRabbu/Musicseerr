@@ -98,7 +98,7 @@
 		</div>
 	{:else}
 		<div class="space-y-1">
-			{#each albums as album (album.title + album.artist_name)}
+			{#each albums as album, i (album.release_group_mbid || `album-${i}`)}
 				{#if album.release_group_mbid}
 					<a
 						href={albumHref(album.release_group_mbid)}

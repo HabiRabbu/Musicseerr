@@ -13,7 +13,16 @@
 	import { API } from '$lib/constants';
 	import { isAbortError } from '$lib/utils/errorHandling';
 	import type { Artist, Album } from '$lib/types';
-	import { CircleX, X, RefreshCw, ChevronRight, Search, Loader2, Settings2, Eye } from 'lucide-svelte';
+	import {
+		CircleX,
+		X,
+		RefreshCw,
+		ChevronRight,
+		Search,
+		Loader2,
+		Settings2,
+		Eye
+	} from 'lucide-svelte';
 
 	const CIRCUIT_BREAKER_CODE = 'CIRCUIT_BREAKER_OPEN';
 
@@ -323,7 +332,16 @@
 					onclick={() => syncStatus.cancelSync()}
 					aria-label="Stop Sync"
 				>
-					<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+					<svg
+						xmlns="http://www.w3.org/2000/svg"
+						class="h-4 w-4"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+						stroke-linecap="round"
+						stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" /></svg
+					>
 					<span class="hidden sm:inline">Stop Sync</span>
 				</button>
 				{#if syncStatus.isDismissed}
@@ -337,11 +355,7 @@
 					</button>
 				{/if}
 			{:else}
-				<button
-					class="btn btn-sm btn-primary gap-1"
-					onclick={syncLibrary}
-					disabled={syncing}
-				>
+				<button class="btn btn-sm btn-primary gap-1" onclick={syncLibrary} disabled={syncing}>
 					{#if syncing}
 						<Loader2 class="h-4 w-4 animate-spin" />
 						<span class="hidden sm:inline">Syncing...</span>
@@ -362,10 +376,7 @@
 					<span>— {syncStatus.processedItems}/{syncStatus.totalItems}</span>
 				{/if}
 			</div>
-			<progress
-				class="progress progress-primary w-full"
-				value={syncStatus.progress}
-				max="100"
+			<progress class="progress progress-primary w-full" value={syncStatus.progress} max="100"
 			></progress>
 		</div>
 	{/if}
@@ -552,11 +563,17 @@
 			{#if syncStatus.isActive}
 				<div class="flex flex-col items-center gap-3 w-full max-w-md">
 					<div class="flex gap-2">
-						<button
-							class="btn btn-error gap-2"
-							onclick={() => syncStatus.cancelSync()}
-						>
-							<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+						<button class="btn btn-error gap-2" onclick={() => syncStatus.cancelSync()}>
+							<svg
+								xmlns="http://www.w3.org/2000/svg"
+								class="h-4 w-4"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="2"
+								stroke-linecap="round"
+								stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" /></svg
+							>
 							Stop Sync
 						</button>
 						{#if syncStatus.isDismissed}
@@ -577,19 +594,12 @@
 								<span>— {syncStatus.processedItems}/{syncStatus.totalItems}</span>
 							{/if}
 						</div>
-						<progress
-							class="progress progress-primary w-full"
-							value={syncStatus.progress}
-							max="100"
+						<progress class="progress progress-primary w-full" value={syncStatus.progress} max="100"
 						></progress>
 					</div>
 				</div>
 			{:else}
-				<button
-					class="btn btn-primary gap-2"
-					onclick={syncLibrary}
-					disabled={syncing}
-				>
+				<button class="btn btn-primary gap-2" onclick={syncLibrary} disabled={syncing}>
 					{#if syncing}
 						<Loader2 class="h-4 w-4 animate-spin" />
 						Syncing...

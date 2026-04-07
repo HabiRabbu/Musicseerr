@@ -122,7 +122,7 @@
 				<span class="text-xs font-semibold uppercase tracking-widest text-base-content/70 mr-1">
 					{group.label}
 				</span>
-				{#each group.links as link (link.type)}
+				{#each group.links as link (link.label)}
 					<a
 						href={link.url}
 						target="_blank"

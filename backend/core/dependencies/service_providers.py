@@ -118,6 +118,9 @@ def get_request_queue() -> "RequestQueue":
             invalidations.append(
                 memory_cache.delete(f"{ARTIST_INFO_PREFIX}{record.artist_mbid}")
             )
+            invalidations.append(
+                disk_cache.delete_artist(record.artist_mbid)
+            )
         await asyncio.gather(*invalidations, return_exceptions=True)
         try:
             await library_db.upsert_album({
@@ -174,6 +177,7 @@ def get_request_queue() -> "RequestQueue":
                             record.artist_mbid, monitored=True, monitor_new_items=monitor_new,
                         )
                         await memory_cache.delete(f"{ARTIST_INFO_PREFIX}{record.artist_mbid}")
+                        await disk_cache.delete_artist(record.artist_mbid)
                         logger.info("Applied deferred artist monitoring for %s", record.artist_mbid[:8])
                         break
                     except Exception:  # noqa: BLE001

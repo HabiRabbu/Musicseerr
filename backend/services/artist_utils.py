@@ -54,7 +54,7 @@ def detect_platform(url: str, rel_type: str) -> tuple[str, str]:
 def extract_tags(mb_artist: dict[str, Any], limit: int = 10) -> list[str]:
     tags = []
     if mb_tags := mb_artist.get("tags", []):
-        tags = [tag.get("name") for tag in mb_tags if tag.get("name")][:limit]
+        tags = list(dict.fromkeys(tag.get("name") for tag in mb_tags if tag.get("name")))[:limit]
     return tags
 
 

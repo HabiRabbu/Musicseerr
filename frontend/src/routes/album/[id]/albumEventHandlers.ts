@@ -20,7 +20,10 @@ export interface EventHandlerDeps {
 	setRemovedArtistName: (v: string) => void;
 	setToast: (msg: string, type: 'success' | 'error' | 'info' | 'warning') => void;
 	setShowToast: (v: boolean) => void;
-	onRequestSuccess?: () => void;
+	onRequestSuccess?: (opts?: {
+		monitorArtist?: boolean;
+		autoDownloadArtist?: boolean;
+	}) => void;
 }
 
 export function createEventHandlers(deps: EventHandlerDeps) {
@@ -68,7 +71,7 @@ export function createEventHandlers(deps: EventHandlerDeps) {
 				deps.albumBasicCacheSet(current, deps.getAlbumId());
 				deps.setToast('Added to Library', 'success');
 				deps.setShowToast(true);
-				deps.onRequestSuccess?.();
+				deps.onRequestSuccess?.(opts);
 			}
 		} finally {
 			deps.setRequesting(false);

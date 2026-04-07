@@ -186,7 +186,7 @@
 		</div>
 	{:else}
 		<div class="space-y-1">
-			{#each songs as song, i (song.title + song.artist_name)}
+			{#each songs as song, i (song.recording_mbid || `song-${i}`)}
 				<TrackRow
 					{song}
 					position={i + 1}
