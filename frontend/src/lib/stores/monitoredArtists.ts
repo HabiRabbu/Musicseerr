@@ -25,9 +25,7 @@ function pruneExpiredPendingMonitors(
 	entries: Map<string, PendingMonitor>,
 	now = Date.now()
 ): Map<string, PendingMonitor> {
-	return new Map(
-		[...entries.entries()].filter(([, entry]) => now - entry.timestamp < MAX_AGE_MS)
-	);
+	return new Map([...entries.entries()].filter(([, entry]) => now - entry.timestamp < MAX_AGE_MS));
 }
 
 function loadFromStorage(): Map<string, PendingMonitor> {

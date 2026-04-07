@@ -20,10 +20,7 @@ export interface EventHandlerDeps {
 	setRemovedArtistName: (v: string) => void;
 	setToast: (msg: string, type: 'success' | 'error' | 'info' | 'warning') => void;
 	setShowToast: (v: boolean) => void;
-	onRequestSuccess?: (opts?: {
-		monitorArtist?: boolean;
-		autoDownloadArtist?: boolean;
-	}) => void;
+	onRequestSuccess?: (opts?: { monitorArtist?: boolean; autoDownloadArtist?: boolean }) => void;
 }
 
 export function createEventHandlers(deps: EventHandlerDeps) {

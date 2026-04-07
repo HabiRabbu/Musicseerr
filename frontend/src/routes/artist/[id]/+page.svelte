@@ -193,7 +193,11 @@
 
 	async function fetchArtist(force = false) {
 		const hasPendingMonitor = !!monitoredArtistsStore.getPendingMonitor(data.artistId);
-		const { refreshBasic: cacheRefreshBasic, refreshExtended, refreshLastfm } = force
+		const {
+			refreshBasic: cacheRefreshBasic,
+			refreshExtended,
+			refreshLastfm
+		} = force
 			? { refreshBasic: true, refreshExtended: true, refreshLastfm: true }
 			: hydrateFromCache(data.artistId);
 		const staleLibraryFlags = artist && artist.in_library && !artist.in_lidarr;
@@ -616,7 +620,12 @@
 
 			<div class="xl:col-start-2 xl:row-start-1 space-y-4 sm:space-y-6 lg:space-y-8">
 				<section id="section-overview" class="space-y-4 scroll-mt-24">
-					<ArtistHero {artist} showBackButton refreshing={refreshingArtist} onrefresh={handleRefreshClick} />
+					<ArtistHero
+						{artist}
+						showBackButton
+						refreshing={refreshingArtist}
+						onrefresh={handleRefreshClick}
+					/>
 
 					<div class="flex flex-wrap items-center gap-x-4 gap-y-2 justify-center sm:justify-start">
 						{#if artist.country}
