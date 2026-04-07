@@ -12,7 +12,7 @@ BACKEND_VIRTUALENV_ZIPAPP := $(BACKEND_DIR)/.virtualenv.pyz
 PYTHON ?= python3
 NPM ?= pnpm
 
-.PHONY: help backend-venv backend-lint backend-test backend-test-audiodb backend-test-audiodb-prewarm backend-test-audiodb-settings backend-test-coverart-audiodb backend-test-audiodb-phase8 backend-test-audiodb-phase9 backend-test-exception-handling backend-test-playlist backend-test-multidisc backend-test-performance backend-test-security backend-test-config-validation backend-test-home backend-test-home-genre backend-test-infra-hardening backend-test-library-pagination backend-test-search-top-result test-audiodb-all backend-test-artist-page backend-test-monitoring-cache frontend-install frontend-build frontend-check frontend-lint frontend-test frontend-test-queuehelpers frontend-test-album-page frontend-test-playlist-detail frontend-test-audiodb-images frontend-browser-install project-map rebuild test check lint ci
+.PHONY: help backend-venv backend-lint backend-test backend-test-audiodb backend-test-audiodb-prewarm backend-test-audiodb-settings backend-test-coverart-audiodb backend-test-audiodb-phase8 backend-test-audiodb-phase9 backend-test-exception-handling backend-test-playlist backend-test-multidisc backend-test-performance backend-test-security backend-test-config-validation backend-test-home backend-test-home-genre backend-test-infra-hardening backend-test-library-pagination backend-test-search-top-result test-audiodb-all backend-test-artist-page backend-test-monitoring-cache frontend-install frontend-build frontend-format-check frontend-check frontend-lint frontend-test frontend-test-queuehelpers frontend-test-album-page frontend-test-playlist-detail frontend-test-audiodb-images frontend-browser-install project-map rebuild test check lint ci
 
 help: ## Show available targets
 	@grep -E '^[a-zA-Z0-9_.-]+:.*## ' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*## "}; {printf "%-26s %s\n", $$1, $$2}'
@@ -154,6 +154,9 @@ frontend-install: ## Install frontend npm dependencies
 
 frontend-build: ## Run frontend production build
 	cd "$(FRONTEND_DIR)" && $(NPM) run build
+
+frontend-format-check: ## Run frontend formatting checks
+	cd "$(FRONTEND_DIR)" && $(NPM) run format:check
 
 frontend-check: ## Run frontend type checks
 	cd "$(FRONTEND_DIR)" && $(NPM) run check

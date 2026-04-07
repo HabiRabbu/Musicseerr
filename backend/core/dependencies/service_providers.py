@@ -1,4 +1,4 @@
-"""Tier 4 — Business-logic service providers."""
+"""Tier 4 - Business-logic service providers."""
 
 from __future__ import annotations
 
@@ -91,19 +91,8 @@ def get_album_service() -> "AlbumService":
     return AlbumService(lidarr_repo, mb_repo, library_db, memory_cache, disk_cache, preferences_service, audiodb_image_service, browse_queue)
 
 
-@singleton
-def get_request_queue() -> "RequestQueue":
-    from infrastructure.queue.request_queue import RequestQueue
-    from infrastructure.queue.queue_store import QueueStore
-    from infrastructure.persistence.request_history import RequestHistoryRecord
-    from core.config import get_settings
-    settings = get_settings()
-
-    lidarr_repo = get_lidarr_repository()
-    disk_cache = get_disk_cache()
-    cover_repo = get_coverart_repository()
-    memory_cache = get_cache()
-    library_db = get_library_db()
+def make_on_queue_import(memory_cache, disk_cache, library_db):
+    """Create the on_queue_import closure used by the request queue."""
 
     async def on_queue_import(record: RequestHistoryRecord) -> None:
         """Invalidate caches when the queue worker detects an already-imported album."""
@@ -136,6 +125,12 @@ def get_request_queue() -> "RequestQueue":
             logger.warning("Queue import: failed to upsert album %s: %s", record.musicbrainz_id[:8], ex)
         logger.info("Queue import: invalidated caches for album=%s", record.musicbrainz_id[:8])
 
+    return on_queue_import
+
+
+def make_processor(lidarr_repo, memory_cache, disk_cache, cover_repo, request_history):
+    """Create the processor closure used by the request queue."""
+
     async def processor(album_mbid: str) -> dict:
         result = await lidarr_repo.add_album(album_mbid)
 
@@ -143,7 +138,7 @@ def get_request_queue() -> "RequestQueue":
         if payload and isinstance(payload, dict):
             is_monitored = payload.get("monitored", False)
 
-            # Belt-andsuspenders: prefer structured signal over payload inspection
+            # Prefer the explicit monitored flag before falling back to the top-level result.
             if not is_monitored:
                 is_monitored = bool(result.get("monitored"))
 
@@ -190,8 +185,28 @@ def get_request_queue() -> "RequestQueue":
 
         return result
 
+    return processor
+
+
+@singleton
+def get_request_queue() -> "RequestQueue":
+    from infrastructure.queue.request_queue import RequestQueue
+    from infrastructure.queue.queue_store import QueueStore
+    from core.config import get_settings
+    settings = get_settings()
+
+    lidarr_repo = get_lidarr_repository()
+    disk_cache = get_disk_cache()
+    cover_repo = get_coverart_repository()
+    memory_cache = get_cache()
+    library_db = get_library_db()
+
+    on_queue_import = make_on_queue_import(memory_cache, disk_cache, library_db)
+
     store = QueueStore(db_path=settings.queue_db_path)
     request_history = get_request_history_store()
+
+    processor = make_processor(lidarr_repo, memory_cache, disk_cache, cover_repo, request_history)
 
     concurrency = 2
     try:

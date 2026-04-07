@@ -183,7 +183,7 @@ class TestCancelRoute:
         app.include_router(router)
         app.dependency_overrides[get_cache_status_service] = lambda: mock_svc
 
-        with patch("api.v1.routes.cache_status.TaskRegistry") as MockRegistry:
+        with patch("core.task_registry.TaskRegistry") as MockRegistry:
             mock_registry_instance = MagicMock()
             MockRegistry.get_instance.return_value = mock_registry_instance
 

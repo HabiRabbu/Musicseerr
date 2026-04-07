@@ -40,6 +40,21 @@ class TaskRegistry:
         with self._lock:
             self._tasks.pop(name, None)
 
+    async def cancel(self, name: str, grace_period: float = 10.0) -> None:
+        with self._lock:
+            task = self._tasks.pop(name, None)
+
+        if task is None or task.done():
+            return
+
+        task.cancel()
+        try:
+            await asyncio.wait_for(task, timeout=grace_period)
+        except asyncio.CancelledError:
+            return
+        except asyncio.TimeoutError:
+            logger.warning("Task '%s' did not finish within grace period", name)
+
     async def cancel_all(self, grace_period: float = 10.0) -> None:
         with self._lock:
             tasks = dict(self._tasks)

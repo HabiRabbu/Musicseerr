@@ -430,6 +430,7 @@ class ArtistService:
             artist_info = await self._apply_audiodb_artist_images(
                 artist_info, artist_id, artist_info.name, allow_fetch=False,
             )
+            await self._refresh_library_flags(artist_info)
             await self._save_artist_to_cache(artist_id, artist_info)
             if not future.done():
                 future.set_result(artist_info)
