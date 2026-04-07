@@ -224,14 +224,21 @@
 		}
 
 		if (artist) {
+			const secondaryPromises: Promise<void>[] = [];
 			if (refreshExtended) {
-				void fetchExtendedInfo(force, artist);
+				secondaryPromises.push(fetchExtendedInfo(force, artist));
 			}
 			if (refreshLastfm) {
-				void fetchLastFmEnrichment();
+				secondaryPromises.push(fetchLastFmEnrichment());
 			}
+
+			// Start background release loading after all other data has settled
 			if (hasMoreReleases) {
-				void fetchMoreReleases();
+				Promise.allSettled(secondaryPromises).then(() => {
+					if (abortController && !abortController.signal.aborted) {
+						void fetchMoreReleases();
+					}
+				});
 			}
 		}
 	}
@@ -691,12 +698,8 @@
 					>
 						<span class="loading loading-spinner loading-md" style="color: {colors.accent};"></span>
 						<div class="flex flex-col items-start">
-							<span class="font-semibold text-base" style="color: {colors.accent};"
-								>Loading all releases...</span
-							>
-							<span class="text-sm text-base-content/70"
-								>Loaded {loadedReleaseCount} of {totalReleaseCount} releases</span
-							>
+							<span class="font-semibold text-base" style="color: {colors.accent};">Loading releases...</span>
+							<span class="text-sm text-base-content/70">Loaded {loadedReleaseCount} of {totalReleaseCount} releases</span>
 						</div>
 					</div>
 				{/if}

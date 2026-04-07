@@ -416,30 +416,29 @@ class TestGetTopAlbumsSource:
         assert result.albums[2].requested is False
 
     @pytest.mark.asyncio
-    async def test_source_lastfm_resolves_release_mbids_to_release_groups(self):
+    async def test_source_lastfm_uses_raw_mbids_without_resolution(self):
         lastfm_albums = [
             LastFmAlbum(name="Album A", artist_name="Artist", mbid="release-mbid-a", playcount=100),
             LastFmAlbum(name="Album B", artist_name="Artist", mbid="release-mbid-b", playcount=50),
         ]
         svc, _, lastfm_repo, _ = _make_service()
         lastfm_repo.get_artist_top_albums.return_value = lastfm_albums
-        svc._lidarr_repo.get_library_mbids = AsyncMock(return_value={"rg-resolved-a"})
+        svc._lidarr_repo.get_library_mbids = AsyncMock(return_value={"release-mbid-a"})
         svc._lidarr_repo.get_requested_mbids = AsyncMock(return_value=set())
 
-        async def mock_resolve(rid):
-            return {"release-mbid-a": "rg-resolved-a", "release-mbid-b": "rg-resolved-b"}.get(rid)
-
-        svc._mb_repo.get_release_group_id_from_release = mock_resolve
+        svc._mb_repo.get_release_group_id_from_release = AsyncMock(
+            side_effect=AssertionError("Resolution should not be called")
+        )
 
         result = await svc.get_top_albums("mbid-123", count=10, source="lastfm")
 
-        assert result.albums[0].release_group_mbid == "rg-resolved-a"
+        assert result.albums[0].release_group_mbid == "release-mbid-a"
         assert result.albums[0].in_library is True
-        assert result.albums[1].release_group_mbid == "rg-resolved-b"
+        assert result.albums[1].release_group_mbid == "release-mbid-b"
         assert result.albums[1].in_library is False
 
     @pytest.mark.asyncio
-    async def test_source_lastfm_keeps_original_mbid_when_resolution_fails(self):
+    async def test_source_lastfm_keeps_raw_mbid_directly(self):
         lastfm_albums = [
             LastFmAlbum(name="Album A", artist_name="Artist", mbid="already-rg-mbid", playcount=100),
         ]
@@ -447,8 +446,6 @@ class TestGetTopAlbumsSource:
         lastfm_repo.get_artist_top_albums.return_value = lastfm_albums
         svc._lidarr_repo.get_library_mbids = AsyncMock(return_value=set())
         svc._lidarr_repo.get_requested_mbids = AsyncMock(return_value=set())
-
-        svc._mb_repo.get_release_group_id_from_release = AsyncMock(return_value=None)
 
         result = await svc.get_top_albums("mbid-123", count=10, source="lastfm")
 

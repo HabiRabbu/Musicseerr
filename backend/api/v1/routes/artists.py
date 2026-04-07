@@ -36,7 +36,7 @@ async def get_artist(
         )
     
     try:
-        result = await artist_service.get_artist_info(artist_id)
+        result = await artist_service.get_artist_info_basic(artist_id)
         ctx = try_get_degradation_context()
         if ctx and ctx.has_degradation():
             result = msgspec.structs.replace(result, service_status=ctx.degraded_summary())

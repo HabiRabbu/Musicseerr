@@ -657,29 +657,24 @@ class ArtistDiscoveryService:
             )
 
             trimmed = lfm_albums[:count]
-            mbids_from_lastfm = [
-                a.mbid.strip().lower() for a in trimmed if a.mbid and a.mbid.strip()
-            ]
-            rg_map = await self._resolve_release_groups(mbids_from_lastfm) if mbids_from_lastfm else {}
 
             albums = []
             for a in trimmed:
                 raw_mbid = a.mbid.strip().lower() if a.mbid and a.mbid.strip() else None
-                resolved_mbid = rg_map.get(raw_mbid, raw_mbid) if raw_mbid else None
                 albums.append(
                     TopAlbum(
-                        release_group_mbid=resolved_mbid,
+                        release_group_mbid=raw_mbid,
                         title=a.name,
                         artist_name=a.artist_name,
                         listen_count=a.playcount,
                         in_library=(
-                            resolved_mbid in library_album_mbids
-                            if resolved_mbid
+                            raw_mbid in library_album_mbids
+                            if raw_mbid
                             else False
                         ),
                         requested=(
-                            resolved_mbid in requested_album_mbids
-                            if resolved_mbid
+                            raw_mbid in requested_album_mbids
+                            if raw_mbid
                             else False
                         ),
                     )

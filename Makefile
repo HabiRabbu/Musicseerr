@@ -12,7 +12,7 @@ BACKEND_VIRTUALENV_ZIPAPP := $(BACKEND_DIR)/.virtualenv.pyz
 PYTHON ?= python3
 NPM ?= pnpm
 
-.PHONY: help backend-venv backend-lint backend-test backend-test-audiodb backend-test-audiodb-prewarm backend-test-audiodb-settings backend-test-coverart-audiodb backend-test-audiodb-phase8 backend-test-audiodb-phase9 backend-test-exception-handling backend-test-playlist backend-test-multidisc backend-test-performance backend-test-security backend-test-config-validation backend-test-home backend-test-home-genre backend-test-infra-hardening backend-test-library-pagination backend-test-search-top-result test-audiodb-all frontend-install frontend-build frontend-check frontend-lint frontend-test frontend-test-queuehelpers frontend-test-album-page frontend-test-playlist-detail frontend-test-audiodb-images frontend-browser-install project-map rebuild test check lint ci
+.PHONY: help backend-venv backend-lint backend-test backend-test-audiodb backend-test-audiodb-prewarm backend-test-audiodb-settings backend-test-coverart-audiodb backend-test-audiodb-phase8 backend-test-audiodb-phase9 backend-test-exception-handling backend-test-playlist backend-test-multidisc backend-test-performance backend-test-security backend-test-config-validation backend-test-home backend-test-home-genre backend-test-infra-hardening backend-test-library-pagination backend-test-search-top-result test-audiodb-all backend-test-artist-page frontend-install frontend-build frontend-check frontend-lint frontend-test frontend-test-queuehelpers frontend-test-album-page frontend-test-playlist-detail frontend-test-audiodb-images frontend-browser-install project-map rebuild test check lint ci
 
 help: ## Show available targets
 	@grep -E '^[a-zA-Z0-9_.-]+:.*## ' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*## "}; {printf "%-26s %s\n", $$1, $$2}'
@@ -132,6 +132,9 @@ backend-test-artist-monitoring: $(BACKEND_VENV_STAMP) ## Run MUS-15B artist moni
 
 backend-test-album-refresh: $(BACKEND_VENV_STAMP) ## Run album refresh endpoint tests
 	cd "$(BACKEND_DIR)" && .venv/bin/python -m pytest tests/routes/test_album_refresh.py tests/services/test_navidrome_cache_invalidation.py -v
+
+backend-test-artist-page: $(BACKEND_VENV_STAMP) ## Run artist page latency tests (basic route, releases, Last.fm fast path)
+	cd "$(BACKEND_DIR)" && .venv/bin/python -m pytest tests/routes/test_artist_basic_route.py tests/routes/test_artist_releases_route.py tests/services/test_artist_basic_info.py tests/services/test_top_albums_lastfm_fast.py -v
 
 test-audiodb-all: backend-test-audiodb backend-test-audiodb-prewarm backend-test-audiodb-settings backend-test-coverart-audiodb backend-test-audiodb-phase8 backend-test-audiodb-phase9 frontend-test-audiodb-images ## Run every AudioDB test target
 

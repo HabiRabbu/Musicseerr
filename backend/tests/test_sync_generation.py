@@ -1,6 +1,7 @@
 """Tests for MUS-19: sync generation counter, false-failed status, cancel, progress clamp."""
 
 import asyncio
+import os
 
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -165,7 +166,7 @@ class TestCancelRoute:
     """Cancel sync API endpoint."""
 
     @pytest.mark.skipif(
-        not __import__('os').access('/app', __import__('os').W_OK),
+        not os.access('/app', os.W_OK),
         reason="Route tests require /app to be writable (Docker environment)",
     )
     def test_cancel_endpoint_calls_service_and_registry(self):
