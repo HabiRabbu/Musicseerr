@@ -82,6 +82,9 @@ backend-test-infra-hardening: $(BACKEND_VENV_STAMP) ## Run infrastructure harden
 backend-test-discovery-precache: $(BACKEND_VENV_STAMP) ## Run artist discovery precache tests
 	cd "$(BACKEND_DIR)" && .venv/bin/python -m pytest tests/services/test_discovery_precache_progress.py tests/services/test_discovery_precache_lock.py tests/infrastructure/test_retry_non_breaking.py -v
 
+backend-test-dedup-cancellation: $(BACKEND_VENV_STAMP) ## Run deduplicator cancellation tests
+	cd "$(BACKEND_DIR)" && .venv/bin/python -m pytest tests/infrastructure/test_dedup_cancellation.py tests/infrastructure/test_disconnect.py -v
+
 backend-test-library-pagination: $(BACKEND_VENV_STAMP) ## Run library pagination tests
 	cd "$(BACKEND_DIR)" && .venv/bin/python -m pytest tests/infrastructure/test_library_pagination.py -v
 
@@ -163,6 +166,9 @@ frontend-test: ## Run the frontend vitest suite
 
 frontend-test-queuehelpers: ## Run queue helper regressions
 	cd "$(FRONTEND_DIR)" && $(NPM) exec vitest run --project server src/lib/player/queueHelpers.spec.ts
+
+frontend-test-monitored-artists: ## Run pending monitored artist store tests
+	cd "$(FRONTEND_DIR)" && $(NPM) exec vitest run --project server src/lib/stores/monitoredArtists.spec.ts
 
 frontend-test-album-page: ## Run the album page browser test
 	cd "$(FRONTEND_DIR)" && $(NPM) exec vitest run --project client src/routes/album/[id]/page.svelte.spec.ts

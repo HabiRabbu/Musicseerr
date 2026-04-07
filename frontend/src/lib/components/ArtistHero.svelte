@@ -6,7 +6,7 @@
 	import { extractDominantColor, DEFAULT_GRADIENT } from '$lib/utils/colors';
 	import { appendAudioDBSizeSuffix } from '$lib/utils/imageSuffix';
 	import { imageSettingsStore } from '$lib/stores/imageSettings';
-	import { monitoredArtistsStore } from '$lib/stores/monitoredArtists';
+	import { getValidPendingMonitor, monitoredArtistsStore } from '$lib/stores/monitoredArtists';
 	import ArtistLinks from './ArtistLinks.svelte';
 	import ArtistMonitoringToggle from './ArtistMonitoringToggle.svelte';
 	import BackButton from './BackButton.svelte';
@@ -26,10 +26,8 @@
 	let heroImageLoaded = $state(false);
 	let avatarRemoteError = $state(false);
 
-	let pendingMonitor = $derived(
-		artist.musicbrainz_id
-			? $monitoredArtistsStore.get(artist.musicbrainz_id.toLowerCase())
-			: undefined
+	let pendingMonitor = $derived.by(() =>
+		getValidPendingMonitor($monitoredArtistsStore, artist.musicbrainz_id)
 	);
 	let showMonitoring = $derived(artist.in_lidarr || !!pendingMonitor);
 

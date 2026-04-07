@@ -25,6 +25,7 @@ CIRCUIT_OPEN_CACHE_TTL = 30
 DEFAULT_SIMILAR_COUNT = 15
 DEFAULT_TOP_SONGS_COUNT = 10
 DEFAULT_TOP_ALBUMS_COUNT = 10
+_DISCOVERY_WORKER_TIMEOUT = 120
 
 # Module-level flag survives singleton cache invalidation / instance recreation
 _discovery_precache_running = False
@@ -454,6 +455,7 @@ class ArtistDiscoveryService:
         sem = asyncio.Semaphore(discovery_concurrency)
         counter_lock = asyncio.Lock()
         progress_counter = 0
+        counted_workers: set[int] = set()
 
         async def process_artist(idx: int, mbid: str) -> bool:
             nonlocal cached_count, source_fetches, progress_counter
@@ -503,6 +505,7 @@ class ArtistDiscoveryService:
                     cached_count += 1
                     progress_counter += 1
                     local_progress = progress_counter
+                    counted_workers.add(idx)
 
                 if status_service:
                     artist_name = (mbid_to_name or {}).get(mbid, mbid[:8])
@@ -517,9 +520,31 @@ class ArtistDiscoveryService:
                 async with counter_lock:
                     progress_counter += 1
                     local_progress = progress_counter
+                    counted_workers.add(idx)
                 if status_service:
                     artist_name = (mbid_to_name or {}).get(mbid, mbid[:8])
                     await status_service.update_progress(local_progress, current_item=artist_name, generation=generation)
+                return False
+
+        async def process_artist_with_timeout(idx: int, mbid: str) -> bool:
+            nonlocal progress_counter
+            try:
+                return await asyncio.wait_for(
+                    process_artist(idx, mbid), timeout=_DISCOVERY_WORKER_TIMEOUT
+                )
+            except asyncio.TimeoutError:
+                logger.warning("Discovery timed out for %s after %ds", mbid[:8], _DISCOVERY_WORKER_TIMEOUT)
+                async with counter_lock:
+                    if idx not in counted_workers:
+                        progress_counter += 1
+                        counted_workers.add(idx)
+                    local_progress = progress_counter
+                if status_service:
+                    artist_name = (mbid_to_name or {}).get(mbid, mbid[:8])
+                    await status_service.update_progress(
+                        local_progress, current_item=f"{artist_name} (timed out)",
+                        generation=generation,
+                    )
                 return False
 
         chunk = max(discovery_concurrency * 4, 20)
@@ -528,7 +553,7 @@ class ArtistDiscoveryService:
                 logger.info("Discovery precache cancelled by user")
                 break
             batch = artist_mbids[i:i + chunk]
-            batch_tasks = [asyncio.create_task(process_artist(i + j, mbid)) for j, mbid in enumerate(batch)]
+            batch_tasks = [asyncio.create_task(process_artist_with_timeout(i + j, mbid)) for j, mbid in enumerate(batch)]
             if batch_tasks:
                 await asyncio.gather(*batch_tasks, return_exceptions=True)
 

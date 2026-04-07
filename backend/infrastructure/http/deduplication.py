@@ -9,28 +9,36 @@ logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
 
+_MAX_DEDUP_RETRIES = 1
+
 
 class RequestDeduplicator:
     """
     Prevents duplicate concurrent requests by coalescing identical requests.
-    
+
     If request A is in-flight and request B arrives with the same key,
     request B will wait for A's result instead of making a duplicate call.
+
+    Uses ``asyncio.shield`` so that a waiter's task cancellation propagates
+    cleanly without poisoning the shared future.  If the leader disconnects
+    (``ClientDisconnectedError``), the shared future is cancelled and one
+    waiting follower is allowed to retry as the new leader (bounded to
+    ``_MAX_DEDUP_RETRIES`` attempts).
     """
-    
+
     def __init__(self):
         self._pending: dict[str, asyncio.Future[Any]] = {}
         self._lock = asyncio.Lock()
-    
+
     async def dedupe(
         self,
         key: str,
         coro_factory: Callable[[], Awaitable[T]]
     ) -> T:
+        retries = 0
         while True:
             async with self._lock:
                 if key in self._pending:
-                    logger.debug(f"Deduplicating request: {key}")
                     future = self._pending[key]
                     should_execute = False
                 else:
@@ -41,21 +49,35 @@ class RequestDeduplicator:
             if should_execute:
                 try:
                     result = await coro_factory()
-                    future.set_result(result)
+                    if not future.done():
+                        future.set_result(result)
+                    return result
                 except ClientDisconnectedError:
-                    future.cancel()
+                    if not future.done():
+                        future.cancel()
                     raise
-                except Exception as e:  # noqa: BLE001
-                    future.set_exception(e)
+                except BaseException as exc:
+                    if not future.done():
+                        future.set_exception(exc)
+                    raise
                 finally:
                     if not future.done():
                         future.cancel()
                     async with self._lock:
                         self._pending.pop(key, None)
 
+            # Follower path: shield prevents waiter cancellation from poisoning the shared future.
             try:
-                return await future
+                return await asyncio.shield(future)
             except asyncio.CancelledError:
+                task = asyncio.current_task()
+                if task is not None and task.cancelling() > 0:
+                    raise
+                # Future was cancelled by the leader (disconnect). Retry once
+                # so this follower can take over as leader.
+                retries += 1
+                if retries > _MAX_DEDUP_RETRIES:
+                    raise
                 continue
 
 
@@ -70,7 +92,7 @@ def deduplicate(key_func: Callable[..., str]):
     """
     Decorator that deduplicates concurrent calls to the same function
     with the same key.
-    
+
     Usage:
         @deduplicate(lambda self, artist_id: f"artist:{artist_id}")
         async def get_artist(self, artist_id: str) -> Artist:

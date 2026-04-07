@@ -191,3 +191,32 @@ async def test_guard_survives_instance_recreation():
         await task1
 
     assert _ads_module._discovery_precache_running is False
+
+
+@pytest.mark.asyncio
+async def test_worker_timeout_fires_and_updates_progress():
+    """A worker that exceeds the per-artist timeout is killed and progress is updated."""
+    svc = _make_service()
+
+    async def hang_forever(*args, **kwargs):
+        await asyncio.sleep(9999)
+        return MagicMock()  # pragma: no cover
+
+    status = MagicMock()
+    status.is_cancelled = MagicMock(return_value=False)
+    status.update_progress = AsyncMock()
+
+    with (
+        patch.object(svc, "get_similar_artists", new_callable=AsyncMock, side_effect=hang_forever),
+        patch.object(svc, "get_top_songs", new_callable=AsyncMock, side_effect=hang_forever),
+        patch.object(svc, "get_top_albums", new_callable=AsyncMock, side_effect=hang_forever),
+        patch("services.artist_discovery_service._DISCOVERY_WORKER_TIMEOUT", 0.1),
+    ):
+        result = await svc.precache_artist_discovery(
+            ["mbid-a"], delay=0, status_service=status,
+        )
+
+    assert result == 0
+    assert status.update_progress.await_count >= 1
+    last_call_args = status.update_progress.call_args
+    assert "timed out" in str(last_call_args)

@@ -98,9 +98,13 @@ class LibraryPrecacheService:
                     if not task.done():
                         task.cancel()
                         try:
-                            await task
-                        except (asyncio.CancelledError, Exception):
-                            pass
+                            await asyncio.wait_for(asyncio.shield(task), timeout=15)
+                        except asyncio.CancelledError:
+                            if asyncio.current_task().cancelling() > 0:
+                                raise  # outer task cancelled; propagate
+                            # inner task exited cleanly after cancel
+                        except (asyncio.TimeoutError, Exception):
+                            logger.warning("Precache task did not exit within 15s of cancel")
                     await status_service.complete_sync(str(exc))
                     raise ExternalServiceError(str(exc))
 
@@ -186,10 +190,10 @@ class LibraryPrecacheService:
                 return
 
             if self._artist_discovery_service and not skip_artists:
-                artist_mbids = [
+                artist_mbids = list(dict.fromkeys(
                     a.get('mbid') for a in artists
                     if a.get('mbid') and not a.get('mbid', '').startswith('unknown_')
-                ]
+                ))
                 if artist_mbids:
                     logger.info(f"Phase 1.5: Pre-caching discovery data (popular albums/songs/similar) for {len(artist_mbids)} library artists")
                     await status_service.update_phase('discovery', len(artist_mbids), generation=generation)

@@ -43,6 +43,19 @@ class ArtistPhase:
         from infrastructure.validators import is_unknown_mbid
         artist_service = get_artist_service()
 
+        seen_mbids: set[str] = set()
+        unique_artists: list[dict] = []
+        for a in artists:
+            mbid = a.get('mbid')
+            if not mbid or is_unknown_mbid(mbid):
+                unique_artists.append(a)
+            elif mbid.lower() not in seen_mbids:
+                seen_mbids.add(mbid.lower())
+                unique_artists.append(a)
+        if len(unique_artists) < len(artists):
+            logger.info("Deduplicated %d artists to %d unique", len(artists), len(unique_artists))
+        artists = unique_artists
+
         async def cache_artist(artist: dict, index: int) -> str:
             mbid = artist.get('mbid')
             try:
