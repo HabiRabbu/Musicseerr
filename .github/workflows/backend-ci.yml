@@ -2,8 +2,8 @@ name: Backend CI
 
 on:
   push:
-  pull_request:
     branches: [main]
+  pull_request:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
