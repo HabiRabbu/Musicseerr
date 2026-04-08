@@ -7,7 +7,7 @@
 	import { isValidMbid } from '$lib/utils/formatting';
 	import { imageSettingsStore } from '$lib/stores/imageSettings';
 	import { appendAudioDBSizeSuffix } from '$lib/utils/imageSuffix';
-	import { getApiUrl } from '$lib/utils/api';
+	import { getApiUrl } from '$lib/api/api-utils';
 
 	interface Props {
 		mbid: string;

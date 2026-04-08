@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { getApiUrl } from '$lib/utils/api';
+	import { getApiUrl } from '$lib/api/api-utils';
 	import { Search } from 'lucide-svelte';
 	import type { SuggestResult } from '$lib/types';
 	import { API } from '$lib/constants';
