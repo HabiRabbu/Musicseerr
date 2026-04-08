@@ -45,5 +45,25 @@ export default defineConfig(
 		rules: {
 			'svelte/no-navigation-without-resolve': 'off'
 		}
+	},
+	{
+		rules: {
+			'no-restricted-syntax': [
+				'error',
+				// Ensure not to call queryClient.setQueriesData or queryClient.setQueryData directly, as this will bypass the persister and lead to data loss on page refresh.
+				{
+					selector:
+						"CallExpression[callee.object.name='queryClient'][callee.property.name='setQueriesData']",
+					message:
+						"Direct use of 'queryClient.setQueriesData' is forbidden. Please use the 'setQueriesDataWithPersister' function instead."
+				},
+				{
+					selector:
+						"CallExpression[callee.object.name='queryClient'][callee.property.name='setQueryData']",
+					message:
+						"Direct use of 'queryClient.setQueryData' is forbidden. Please use the 'setQueryDataWithPersister' function instead."
+				}
+			]
+		}
 	}
 );

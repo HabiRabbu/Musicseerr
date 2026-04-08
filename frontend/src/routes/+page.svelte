@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { Shield, Music, CircleAlert, TrendingUp, Sparkles, Library } from 'lucide-svelte';
-	import { onMount, onDestroy } from 'svelte';
-	import { beforeNavigate } from '$app/navigation';
+	import { onMount } from 'svelte';
 	import HomeSection from '$lib/components/HomeSection.svelte';
 	import WeeklyExploration from '$lib/components/WeeklyExploration.svelte';
 	import ServicePromptCard from '$lib/components/ServicePromptCard.svelte';
@@ -9,166 +8,42 @@
 	import SourceSwitcher from '$lib/components/SourceSwitcher.svelte';
 	import SectionDivider from '$lib/components/SectionDivider.svelte';
 	import type {
-		HomeResponse,
 		HomeSection as HomeSectionType,
 		WeeklyExplorationSection as WeeklyExplorationSectionType
 	} from '$lib/types';
-	import { integrationStore } from '$lib/stores/integration';
 	import { musicSourceStore, type MusicSource } from '$lib/stores/musicSource';
 	import CarouselSkeleton from '$lib/components/CarouselSkeleton.svelte';
 	import PageHeader from '$lib/components/PageHeader.svelte';
-	import {
-		getHomeCachedData,
-		setHomeCachedData,
-		isHomeCacheStale,
-		getGreeting
-	} from '$lib/utils/homeCache';
-	import { isAbortError } from '$lib/utils/errorHandling';
-	import { api } from '$lib/api/client';
+	import { getGreeting } from '$lib/utils/homeCache';
 	import { removeQueueCachedData } from '$lib/utils/discoverQueueCache';
 	import { isDismissed } from '$lib/utils/dismissedPrompts';
+	import { getHomeQuery } from '$lib/queries/HomeQuery.svelte';
 
-	let homeData = $state<HomeResponse | null>(null);
-	let loading = $state(true);
 	let refreshing = $state(false);
-	let isUpdating = $state(false);
-	let error = $state('');
 	let lastUpdated = $state<Date | null>(null);
-	let abortController: AbortController | null = null;
-	let activeSource: MusicSource = 'listenbrainz';
+	let activeSource = $state<MusicSource>('listenbrainz');
 
-	function resolveHomeSource(source?: MusicSource): MusicSource {
-		return source ?? activeSource;
-	}
-
-	async function loadHomeData(forceRefresh = false, sourceOverride?: MusicSource) {
-		const source = resolveHomeSource(sourceOverride);
-		const cached = getHomeCachedData(source);
-		if (cached && !forceRefresh) {
-			homeData = cached.data;
-			lastUpdated = new Date(cached.timestamp);
-			loading = false;
-			if (isHomeCacheStale(cached.timestamp)) {
-				refreshInBackground(source);
-			}
-			return;
-		}
-
-		if (abortController) {
-			abortController.abort();
-		}
-		abortController = new AbortController();
-
-		if (!homeData) {
-			loading = true;
-		}
-
-		error = '';
-
-		try {
-			const data = await api.get<HomeResponse>(
-				`/api/v1/home?source=${encodeURIComponent(source)}`,
-				{
-					signal: abortController.signal
-				}
-			);
-			homeData = data;
-			lastUpdated = new Date();
-			setHomeCachedData(data, source);
-			if (data.integration_status) {
-				integrationStore.setStatus(data.integration_status);
-			}
-		} catch (e) {
-			if (isAbortError(e)) {
-				return;
-			}
-			if (!homeData) {
-				error = "Couldn't load the home page";
-			}
-		} finally {
-			loading = false;
-		}
-	}
-
-	async function refreshInBackground(sourceOverride?: MusicSource) {
-		if (refreshing) return;
-
-		if (abortController) {
-			abortController.abort();
-		}
-		abortController = new AbortController();
-		refreshing = true;
-		isUpdating = true;
-		const source = resolveHomeSource(sourceOverride);
-
-		try {
-			const data = await api.get<HomeResponse>(
-				`/api/v1/home?source=${encodeURIComponent(source)}`,
-				{
-					signal: abortController.signal
-				}
-			);
-			homeData = data;
-			lastUpdated = new Date();
-			setHomeCachedData(data, source);
-			if (data.integration_status) {
-				integrationStore.setStatus(data.integration_status);
-			}
-		} catch (e) {
-			if (isAbortError(e)) {
-				return;
-			}
-		} finally {
-			refreshing = false;
-			isUpdating = false;
-		}
-	}
+	const homeQuery = getHomeQuery(() => activeSource);
+	const homeData = $derived(homeQuery.data);
+	const loading = $derived(homeQuery.isLoading);
+	const isUpdating = $derived(homeQuery.isRefetching);
 
 	async function handleRefresh() {
-		refreshing = true;
-		isUpdating = true;
-		const minDelay = new Promise((r) => setTimeout(r, 500));
-		try {
-			await loadHomeData(true, activeSource);
-		} finally {
-			await minDelay;
-			refreshing = false;
-			isUpdating = false;
-			lastUpdated = new Date();
-		}
-	}
-
-	function cleanup() {
-		if (abortController) {
-			abortController.abort();
-			abortController = null;
-		}
+		homeQuery.refetch();
 	}
 
 	onMount(() => {
 		activeSource = musicSourceStore.getPageSource('home');
-		loadHomeData(false, activeSource);
 
 		musicSourceStore.load().then(() => {
 			const actualSource = musicSourceStore.getPageSource('home');
-			if (actualSource !== activeSource) {
-				const dataBefore = homeData;
-				loadHomeData(true, actualSource).then(() => {
-					if (homeData !== dataBefore) {
-						activeSource = actualSource;
-					}
-				});
-			}
+			activeSource = actualSource;
 		});
 	});
-
-	onDestroy(cleanup);
-	beforeNavigate(cleanup);
 
 	function handleSourceChange(source: MusicSource) {
 		activeSource = source;
 		removeQueueCachedData();
-		loadHomeData(true, source);
 	}
 
 	type PreGenreBlock =
@@ -306,11 +181,11 @@
 		<SourceSwitcher pageKey="home" onSourceChange={handleSourceChange} />
 	</div>
 
-	{#if error && !homeData}
+	{#if homeQuery.error && !homeData}
 		<div class="mt-16 flex flex-col items-center justify-center px-4">
 			<CircleAlert class="mb-4 h-10 w-10 text-base-content/50" />
-			<p class="text-base-content/70">{error}</p>
-			<button class="btn btn-primary mt-4" onclick={() => loadHomeData(true)}>Try Again</button>
+			<p class="text-base-content/70">{homeQuery.error}</p>
+			<button class="btn btn-primary mt-4" onclick={() => homeQuery.refetch()}>Try Again</button>
 		</div>
 	{:else}
 		<div class="space-y-10 px-4 sm:space-y-12 sm:px-6 lg:px-8">

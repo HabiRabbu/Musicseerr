@@ -164,7 +164,7 @@ export const API = {
 		suggest: (query: string, limit = 5) =>
 			`/api/v1/search/suggest?q=${encodeURIComponent(query.trim())}&limit=${limit}`
 	},
-	home: () => '/api/v1/home',
+	home: (source: string) => `/api/v1/home?source=${encodeURIComponent(source)}`,
 	homeIntegrationStatus: () => '/api/v1/home/integration-status',
 	discover: () => '/api/v1/discover',
 	discoverRefresh: () => '/api/v1/discover/refresh',
