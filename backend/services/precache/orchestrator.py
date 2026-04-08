@@ -103,7 +103,7 @@ class LibraryPrecacheService:
                             if asyncio.current_task().cancelling() > 0:
                                 raise  # outer task cancelled; propagate
                             # inner task exited cleanly after cancel
-                        except (asyncio.TimeoutError, Exception):
+                        except (asyncio.TimeoutError, Exception):  # noqa: BLE001
                             logger.warning("Precache task did not exit within 15s of cancel")
                     await status_service.complete_sync(str(exc))
                     raise ExternalServiceError(str(exc))
