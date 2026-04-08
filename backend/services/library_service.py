@@ -463,7 +463,7 @@ class LibraryService:
                     if future is not None and future.done() and not future.cancelled():
                         try:
                             future.exception()
-                        except BaseException:
+                        except BaseException:  # noqa: BLE001
                             pass
         except (ExternalServiceError, CircuitOpenError):
             raise

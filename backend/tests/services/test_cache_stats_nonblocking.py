@@ -50,11 +50,13 @@ class TestCacheStatsNonblocking:
                 return fake_du
             return fake_find
 
-        with patch("services.cache_service.CACHE_DIR") as mock_dir, \
+        with patch("services.cache_service.get_covers_cache_dir") as mock_get_dir, \
              patch("services.cache_service.shutil.which", return_value="/usr/bin/du"), \
              patch("services.cache_service.asyncio.to_thread", side_effect=mock_to_thread) as mock_tt:
+            mock_dir = MagicMock()
             mock_dir.exists.return_value = True
             mock_dir.__str__ = lambda s: "/app/cache/covers"
+            mock_get_dir.return_value = mock_dir
 
             stats = await svc.get_stats()
 
@@ -67,8 +69,10 @@ class TestCacheStatsNonblocking:
         """Second call within TTL returns cached stats without subprocess."""
         svc = _make_service()
 
-        with patch("services.cache_service.CACHE_DIR") as mock_dir:
+        with patch("services.cache_service.get_covers_cache_dir") as mock_get_dir:
+            mock_dir = MagicMock()
             mock_dir.exists.return_value = False
+            mock_get_dir.return_value = mock_dir
 
             stats1 = await svc.get_stats()
             stats2 = await svc.get_stats()

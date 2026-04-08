@@ -50,6 +50,36 @@ def mount_frontend(app: FastAPI):
             return FileResponse(logo)
         raise HTTPException(status_code=404, detail="Not found")
 
+    @app.get("/favicon.ico")
+    async def serve_favicon_ico():
+        if icon := resolve_asset("favicon.ico"):
+            return FileResponse(icon, media_type="image/x-icon", headers={"Cache-Control": "public, max-age=604800"})
+        raise HTTPException(status_code=404, detail="Not found")
+
+    @app.get("/favicon-{size}.png")
+    async def serve_favicon_png(size: str):
+        if icon := resolve_asset(f"favicon-{size}.png"):
+            return FileResponse(icon, media_type="image/png", headers={"Cache-Control": "public, max-age=604800"})
+        raise HTTPException(status_code=404, detail="Not found")
+
+    @app.get("/apple-touch-icon.png")
+    async def serve_apple_touch_icon():
+        if icon := resolve_asset("apple-touch-icon.png"):
+            return FileResponse(icon, media_type="image/png", headers={"Cache-Control": "public, max-age=604800"})
+        raise HTTPException(status_code=404, detail="Not found")
+
+    @app.get("/android-chrome-{size}.png")
+    async def serve_android_chrome(size: str):
+        if icon := resolve_asset(f"android-chrome-{size}.png"):
+            return FileResponse(icon, media_type="image/png", headers={"Cache-Control": "public, max-age=604800"})
+        raise HTTPException(status_code=404, detail="Not found")
+
+    @app.get("/site.webmanifest")
+    async def serve_webmanifest():
+        if manifest := resolve_asset("site.webmanifest"):
+            return FileResponse(manifest, media_type="application/manifest+json", headers={"Cache-Control": "public, max-age=604800"})
+        raise HTTPException(status_code=404, detail="Not found")
+
     @app.get("/")
     async def serve_root():
         if index_html.exists():

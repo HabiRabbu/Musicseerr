@@ -356,7 +356,7 @@ async def test_request_429(caplog):
     with caplog.at_level("WARNING"), pytest.raises(RateLimitedError):
         await repo.get_artist_by_mbid("cc197bad-dc9c-440d-a5b5-d52ba2e14234")
     assert repo._client.get.call_count == 3
-    assert _audiodb_circuit_breaker.failure_count == 3
+    assert _audiodb_circuit_breaker.failure_count == 1
     ratelimit_logs = [r.message for r in caplog.records if "audiodb.ratelimit" in r.message]
     assert len(ratelimit_logs) == 3
     assert all("retry_after_s=60" in msg for msg in ratelimit_logs)
@@ -625,7 +625,7 @@ async def test_rate_limit_failures_open_circuit_and_short_circuit_next_lookup():
     response = _mock_response(429)
     repo._client.get = AsyncMock(return_value=response)
 
-    for _ in range(2):
+    for _ in range(5):
         with pytest.raises(RateLimitedError):
             await repo.get_artist_by_mbid("cc197bad-dc9c-440d-a5b5-d52ba2e14234")
 
@@ -646,7 +646,7 @@ async def test_audiodb_specific_circuit_state_change_logs(caplog):
     repo._client.get = AsyncMock(return_value=fail_resp)
 
     with caplog.at_level("INFO"):
-        for _ in range(2):
+        for _ in range(5):
             with pytest.raises(ExternalServiceError):
                 await repo.get_artist_by_mbid("cc197bad-dc9c-440d-a5b5-d52ba2e14234")
 

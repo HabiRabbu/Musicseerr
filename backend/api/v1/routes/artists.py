@@ -166,7 +166,7 @@ async def get_artist_monitoring_status(
         )
     try:
         return await artist_service.get_artist_monitoring_status(artist_id)
-    except Exception:
+    except Exception:  # noqa: BLE001
         logger.debug("Failed to fetch monitoring status for %s", artist_id, exc_info=True)
         return ArtistMonitoringStatus(in_lidarr=False, monitored=False, auto_download=False)
 

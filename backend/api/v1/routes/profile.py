@@ -87,7 +87,7 @@ async def get_profile(
         try:
             s = await jellyfin_service.get_stats()
             return LibraryStats(source="Jellyfin", total_tracks=s.total_tracks, total_albums=s.total_albums, total_artists=s.total_artists)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.warning("Failed to fetch Jellyfin stats for profile: %s", e)
             return None
 
@@ -97,7 +97,7 @@ async def get_profile(
         try:
             s = await local_service.get_storage_stats()
             return LibraryStats(source="Local Files", total_tracks=s.total_tracks, total_albums=s.total_albums, total_artists=s.total_artists, total_size_bytes=s.total_size_bytes, total_size_human=s.total_size_human)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.warning("Failed to fetch Local Files stats for profile: %s", e)
             return None
 
@@ -107,7 +107,7 @@ async def get_profile(
         try:
             s = await navidrome_service.get_stats()
             return LibraryStats(source="Navidrome", total_tracks=s.total_tracks, total_albums=s.total_albums, total_artists=s.total_artists)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.warning("Failed to fetch Navidrome stats for profile: %s", e)
             return None
 

@@ -372,8 +372,10 @@ class TestCacheStatsAudioDBWiring:
         )
         svc._stats_cache_ttl = 0
 
-        with patch("services.cache_service.CACHE_DIR") as mock_dir:
+        with patch("services.cache_service.get_covers_cache_dir") as mock_get_dir:
+            mock_dir = MagicMock()
             mock_dir.exists.return_value = False
+            mock_get_dir.return_value = mock_dir
             stats = await svc.get_stats()
 
         assert stats.disk_audiodb_artist_count == 15

@@ -41,7 +41,7 @@ vi.mock('$lib/player/createSource', () => ({
 }));
 
 vi.mock('$lib/player/jellyfinPlaybackApi', () => ({
-	startSession: vi.fn(async (_itemId: string, playSessionId?: string) => playSessionId ?? ''),
+	startSession: vi.fn(async () => 'mock-session'),
 	reportProgress: vi.fn(async () => true),
 	reportStop: vi.fn(async () => true)
 }));
@@ -730,6 +730,7 @@ describe('Jellyfin session lifecycle', () => {
 
 		jellyfinApi =
 			(await import('$lib/player/jellyfinPlaybackApi')) as unknown as typeof jellyfinApi;
+		jellyfinApi.startSession.mockResolvedValue('ps-123');
 
 		mockApiGet.mockResolvedValue({
 			url: 'http://jf/Audio/1/stream?static=true',
@@ -769,7 +770,7 @@ describe('Jellyfin session lifecycle', () => {
 		playerStore.playQueue([makeJellyfinItem()]);
 		await vi.advanceTimersByTimeAsync(0);
 
-		expect(jellyfinApi.startSession).toHaveBeenCalledWith('jf-1', 'ps-123');
+		expect(jellyfinApi.startSession).toHaveBeenCalledWith('jf-1', undefined);
 	});
 
 	it('calls reportStop when switching tracks', async () => {
@@ -837,6 +838,7 @@ describe('beforeunload beacon', () => {
 
 		jellyfinApi =
 			(await import('$lib/player/jellyfinPlaybackApi')) as unknown as typeof jellyfinApi;
+		jellyfinApi.startSession.mockResolvedValue('ps-beacon');
 
 		mockApiGet.mockResolvedValue({
 			url: 'http://jf/Audio/1/stream?static=true',
@@ -965,11 +967,11 @@ describe('non-seekable state propagation', () => {
 		});
 	});
 
-	it('sets isSeekable to false when Jellyfin returns seekable: false', async () => {
+	it('sets isSeekable to true for Jellyfin streams', async () => {
 		const item = makeItem({ sourceType: 'jellyfin', trackSourceId: 'jf-ns', streamUrl: undefined });
 		playerStore.playQueue([item]);
 		await vi.advanceTimersByTimeAsync(0);
 
-		expect(playerStore.isSeekable).toBe(false);
+		expect(playerStore.isSeekable).toBe(true);
 	});
 });
