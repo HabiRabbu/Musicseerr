@@ -37,10 +37,7 @@
 		if (!form.data) return false;
 		return !!form.data.username && !!form.data.session_key;
 	});
-	const step3Complete = $derived.by(() => {
-		if (!form.data) return false;
-		return form.data.enabled;
-	});
+	const step3Complete = $derived(form.wasAlreadyEnabled);
 	const fullyConnected = $derived(step2Complete && step3Complete);
 	const showForm = $derived(!fullyConnected || showDetails);
 
