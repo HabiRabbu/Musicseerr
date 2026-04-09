@@ -21,7 +21,7 @@ from api.v1.schemas.playlists import (
     UpdatePlaylistRequest,
     UpdateTrackRequest,
 )
-from core.dependencies import JellyfinLibraryServiceDep, LocalFilesServiceDep, NavidromeLibraryServiceDep, PlaylistServiceDep
+from core.dependencies import JellyfinLibraryServiceDep, LocalFilesServiceDep, NavidromeLibraryServiceDep, PlexLibraryServiceDep, PlaylistServiceDep
 from core.exceptions import PlaylistNotFoundError
 from infrastructure.msgspec_fastapi import MsgSpecBody, MsgSpecRoute
 
@@ -74,6 +74,7 @@ def _track_to_response(t) -> PlaylistTrackResponse:
         disc_number=t.disc_number,
         duration=t.duration,
         created_at=t.created_at,
+        plex_rating_key=getattr(t, "plex_rating_key", None),
     )
 
 
@@ -206,6 +207,7 @@ async def add_tracks(
             "track_number": t.track_number,
             "disc_number": t.disc_number,
             "duration": int(t.duration) if t.duration is not None else None,
+            "plex_rating_key": t.plex_rating_key,
         }
         for t in body.tracks
     ]
@@ -269,6 +271,7 @@ async def update_track(
     jf_service: JellyfinLibraryServiceDep,
     local_service: LocalFilesServiceDep,
     nd_service: NavidromeLibraryServiceDep,
+    plex_service: PlexLibraryServiceDep,
     body: UpdateTrackRequest = MsgSpecBody(UpdateTrackRequest),
 ) -> PlaylistTrackResponse:
     result = await service.update_track_source(
@@ -278,6 +281,7 @@ async def update_track(
         jf_service=jf_service,
         local_service=local_service,
         nd_service=nd_service,
+        plex_service=plex_service,
     )
     return _track_to_response(result)
 
@@ -292,9 +296,11 @@ async def resolve_sources(
     jf_service: JellyfinLibraryServiceDep,
     local_service: LocalFilesServiceDep,
     nd_service: NavidromeLibraryServiceDep,
+    plex_service: PlexLibraryServiceDep,
 ) -> ResolveSourcesResponse:
     sources = await service.resolve_track_sources(
-        playlist_id, jf_service=jf_service, local_service=local_service, nd_service=nd_service,
+        playlist_id, jf_service=jf_service, local_service=local_service,
+        nd_service=nd_service, plex_service=plex_service,
     )
     return ResolveSourcesResponse(sources=sources)
 

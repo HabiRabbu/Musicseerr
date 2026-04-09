@@ -78,6 +78,7 @@ function makeTrack(overrides: Partial<PlaylistTrack> = {}): PlaylistTrack {
 		disc_number: null,
 		duration: 240,
 		created_at: '2026-01-01T00:00:00Z',
+		plex_rating_key: null,
 		...overrides
 	};
 }

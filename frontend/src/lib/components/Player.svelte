@@ -5,6 +5,7 @@
 	import YouTubePlayer from '$lib/components/YouTubePlayer.svelte';
 	import JellyfinIcon from '$lib/components/JellyfinIcon.svelte';
 	import NavidromeIcon from '$lib/components/NavidromeIcon.svelte';
+	import PlexIcon from '$lib/components/PlexIcon.svelte';
 	import QueueDrawer from '$lib/components/QueueDrawer.svelte';
 	import EqPanel from '$lib/components/EqPanel.svelte';
 	import NowPlayingIndicator from '$lib/components/NowPlayingIndicator.svelte';
@@ -123,7 +124,7 @@
 							{:else}
 								{playerStore.nowPlaying.albumName}
 							{/if}
-							—
+							-
 							{#if playerStore.nowPlaying.artistId}
 								<a href="/artist/{playerStore.nowPlaying.artistId}" class="hover:underline"
 									>{playerStore.nowPlaying.artistName}</a
@@ -329,6 +330,11 @@
 					<div class="hidden sm:flex items-center gap-2" style="color: rgb(var(--brand-navidrome))">
 						<NavidromeIcon class="h-5 w-5" />
 						<span class="text-sm font-medium">Navidrome</span>
+					</div>
+				{:else if playerStore.nowPlaying.sourceType === 'plex'}
+					<div class="hidden sm:flex items-center gap-2" style="color: rgb(var(--brand-plex))">
+						<PlexIcon class="h-5 w-5" />
+						<span class="text-sm font-medium">Plex</span>
 					</div>
 				{:else if playerStore.nowPlaying.sourceType === 'local'}
 					<div

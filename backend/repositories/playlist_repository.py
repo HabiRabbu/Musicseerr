@@ -63,7 +63,7 @@ class PlaylistTrackRecord:
         "id", "playlist_id", "position", "track_name", "artist_name",
         "album_name", "album_id", "artist_id", "track_source_id", "cover_url",
         "source_type", "available_sources", "format", "track_number", "disc_number",
-        "duration", "created_at",
+        "duration", "created_at", "plex_rating_key",
     )
 
     def __init__(
@@ -85,6 +85,7 @@ class PlaylistTrackRecord:
         disc_number: Optional[int],
         duration: Optional[int],
         created_at: str,
+        plex_rating_key: Optional[str] = None,
     ):
         self.id = id
         self.playlist_id = playlist_id
@@ -103,6 +104,7 @@ class PlaylistTrackRecord:
         self.disc_number = disc_number
         self.duration = duration
         self.created_at = created_at
+        self.plex_rating_key = plex_rating_key
 
 def get_cache_dir() -> Path:
       from core.config import get_settings
@@ -173,6 +175,11 @@ class PlaylistRepository:
             """)
             try:
                 conn.execute("ALTER TABLE playlist_tracks ADD COLUMN disc_number INTEGER")
+                conn.commit()
+            except sqlite3.OperationalError:
+                pass
+            try:
+                conn.execute("ALTER TABLE playlist_tracks ADD COLUMN plex_rating_key TEXT")
                 conn.commit()
             except sqlite3.OperationalError:
                 pass
@@ -337,8 +344,9 @@ class PlaylistRepository:
                     "INSERT INTO playlist_tracks "
                     "(id, playlist_id, position, track_name, artist_name, album_name, "
                     "album_id, artist_id, track_source_id, cover_url, source_type, "
-                    "available_sources, format, track_number, disc_number, duration, created_at) "
-                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    "available_sources, format, track_number, disc_number, duration, "
+                    "plex_rating_key, created_at) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                     (
                         track_id, playlist_id, pos,
                         track["track_name"], track["artist_name"], track["album_name"],
@@ -346,7 +354,7 @@ class PlaylistRepository:
                         track.get("track_source_id"), track.get("cover_url"),
                         track["source_type"], available_sources_json,
                         track.get("format"), track.get("track_number"), track.get("disc_number"),
-                        track.get("duration"), now,
+                        track.get("duration"), track.get("plex_rating_key"), now,
                     ),
                 )
                 created_records.append(PlaylistTrackRecord(
@@ -359,6 +367,7 @@ class PlaylistRepository:
                     format=track.get("format"), track_number=track.get("track_number"),
                     disc_number=track.get("disc_number"),
                     duration=track.get("duration"), created_at=now,
+                    plex_rating_key=track.get("plex_rating_key"),
                 ))
 
             conn.execute(
@@ -537,6 +546,7 @@ class PlaylistRepository:
         source_type: Optional[str] = None,
         available_sources: Optional[list[str]] = None,
         track_source_id: Optional[str] = None,
+        plex_rating_key: Optional[str] = _UNSET,
     ) -> Optional[PlaylistTrackRecord]:
         with self._write_lock:
             conn = self._get_connection()
@@ -554,11 +564,18 @@ class PlaylistRepository:
                 else row["available_sources"]
             )
             new_track_source_id = track_source_id if track_source_id is not None else row["track_source_id"]
+            new_plex_rating_key = (
+                plex_rating_key
+                if plex_rating_key is not _UNSET
+                else (row["plex_rating_key"] if "plex_rating_key" in row.keys() else None)
+            )
 
             conn.execute(
-                "UPDATE playlist_tracks SET source_type = ?, available_sources = ?, track_source_id = ? "
+                "UPDATE playlist_tracks SET source_type = ?, available_sources = ?, "
+                "track_source_id = ?, plex_rating_key = ? "
                 "WHERE id = ? AND playlist_id = ?",
-                (new_source_type, new_available, new_track_source_id, track_id, playlist_id),
+                (new_source_type, new_available, new_track_source_id, new_plex_rating_key,
+                 track_id, playlist_id),
             )
             now = datetime.now(timezone.utc).isoformat()
             conn.execute(
@@ -583,6 +600,7 @@ class PlaylistRepository:
             disc_number=row["disc_number"] if "disc_number" in row.keys() else None,
             duration=row["duration"],
             created_at=row["created_at"],
+            plex_rating_key=new_plex_rating_key,
         )
 
     def get_tracks(self, playlist_id: str) -> list[PlaylistTrackRecord]:
@@ -690,4 +708,5 @@ class PlaylistRepository:
             disc_number=row["disc_number"] if "disc_number" in row.keys() else None,
             duration=row["duration"],
             created_at=row["created_at"],
+            plex_rating_key=row["plex_rating_key"] if "plex_rating_key" in row.keys() else None,
         )

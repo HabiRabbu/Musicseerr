@@ -19,6 +19,7 @@ class PlaylistTrackResponse(AppStruct):
     disc_number: int | None = None
     duration: int | None = None
     created_at: str = ""
+    plex_rating_key: str | None = None
 
 
 class PlaylistSummaryResponse(AppStruct):
@@ -33,7 +34,7 @@ class PlaylistSummaryResponse(AppStruct):
 
 
 class PlaylistDetailResponse(AppStruct):
-    # Frontend PlaylistDetail extends PlaylistSummary — keep fields in sync with PlaylistSummaryResponse
+    # Keep these fields in sync with PlaylistSummaryResponse because the frontend extends PlaylistSummary.
     id: str
     name: str
     cover_urls: list[str] = msgspec.field(default_factory=list)
@@ -71,6 +72,7 @@ class TrackDataRequest(AppStruct):
     track_number: int | None = None
     disc_number: int | None = None
     duration: float | int | None = None
+    plex_rating_key: str | None = None
 
 
 class AddTracksRequest(AppStruct):

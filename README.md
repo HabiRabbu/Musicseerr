@@ -13,7 +13,7 @@
 
 ---
 
-MusicSeerr is a self-hosted music request and discovery app built around [Lidarr](https://lidarr.audio/). Search the full MusicBrainz catalogue, request albums, stream music from Jellyfin, Navidrome, or your local library, discover new albums based on your listening history, and scrobble everything to ListenBrainz and Last.fm. The whole thing runs as a single Docker container with a web UI for all configuration.
+MusicSeerr is a self-hosted music request and discovery app built around [Lidarr](https://lidarr.audio/). Search the full MusicBrainz catalogue, request albums, stream music from Jellyfin, Navidrome, Plex, or your local library, discover new albums based on your listening history, and scrobble everything to ListenBrainz and Last.fm. The whole thing runs as a single Docker container with a web UI for all configuration.
 
 ---
 
@@ -96,7 +96,7 @@ MusicSeerr is designed to work with Lidarr. If you're putting together a music s
 | [slskd](https://github.com/slskd/slskd) | Soulseek download client |
 | [Tubifarry](https://github.com/Tubifarry/Tubifarry) | YouTube-based download client for Lidarr |
 
-Lidarr is the only requirement. slskd and Tubifarry are optional but between them they cover most music sourcing needs. For playback, connect Jellyfin, Navidrome, or mount your music folder directly into the container.
+Lidarr is the only requirement. slskd and Tubifarry are optional but between them they cover most music sourcing needs. For playback, connect Jellyfin, Navidrome, Plex, or mount your music folder directly into the container.
 
 ---
 
@@ -112,6 +112,7 @@ MusicSeerr has a full audio player that supports multiple playback sources per t
 
 - Jellyfin, with configurable codec (AAC, MP3, FLAC, Opus, and others) and bitrate. Playback events are reported back to Jellyfin automatically.
 - Navidrome, streaming via the Subsonic API.
+- Plex Media Server, with direct-play audio streaming and native Plex scrobbling. Supports multi-library setups.
 - Local files, served directly from a mounted music directory.
 - YouTube, for previewing albums you haven't downloaded yet. Links can be auto-generated or set manually.
 
@@ -129,7 +130,7 @@ You can also browse by genre, view trending and popular charts over different ti
 
 Browse your Lidarr-managed library by artist or album with search, filtering, sorting, and pagination. View recently added albums and library statistics. Remove albums directly from the UI.
 
-Jellyfin, Navidrome, and local file sources each get their own library view with play, shuffle, and queue actions.
+Jellyfin, Navidrome, Plex, and local file sources each get their own library view with play, shuffle, and queue actions.
 
 ### Scrobbling
 
@@ -137,7 +138,7 @@ Every track you play can be scrobbled to ListenBrainz and Last.fm simultaneously
 
 ### Playlists
 
-Create playlists from any mix of Jellyfin, Navidrome, local, and YouTube tracks. Reorder by dragging, set custom cover art, and play everything through the same player.
+Create playlists from any mix of Jellyfin, Navidrome, Plex, local, and YouTube tracks. Reorder by dragging, set custom cover art, and play everything through the same player.
 
 ### Profile
 
@@ -156,6 +157,7 @@ Set a display name and avatar, view connected services, and check your library s
 | [Wikidata](https://www.wikidata.org/) | Artist descriptions and external links |
 | [Jellyfin](https://jellyfin.org/) | Audio streaming and library browsing |
 | [Navidrome](https://www.navidrome.org/) | Audio streaming via Subsonic API |
+| [Plex](https://www.plex.tv/) | Audio streaming and library browsing via Plex Media Server |
 | [ListenBrainz](https://listenbrainz.org/) | Listening history, discovery, scrobbling, weekly playlists |
 | [Last.fm](https://www.last.fm/) | Scrobbling and listen tracking |
 | YouTube | Album playback when no local copy exists |
@@ -189,6 +191,7 @@ Run `id` on your host to find your PUID and PGID values.
 | Lidarr URL, API key, profiles, root folder, sync frequency | Settings > Lidarr |
 | Jellyfin URL and API key | Settings > Jellyfin |
 | Navidrome URL and credentials | Settings > Navidrome |
+| Plex URL, token (OAuth or manual), music libraries, scrobble toggle | Settings > Plex |
 | Local files directory path | Settings > Local Files |
 | ListenBrainz username and token | Settings > ListenBrainz |
 | Last.fm API key, secret, and OAuth session | Settings > Last.fm |
@@ -234,6 +237,14 @@ volumes:
 ### Navidrome
 
 Connect your Navidrome instance under Settings > Navidrome.
+
+### Plex
+
+Connect Plex under Settings > Plex. You can sign in with Plex OAuth or paste in a token yourself. Once you're connected, choose the music libraries you want to include. If you pick more than one, MusicSeerr merges them into a single library view.
+
+Tracks play directly from Plex with no server-side transcoding. The MusicSeerr backend proxies the stream so your Plex token never reaches the browser.
+
+Plex scrobbling is on by default. Turn it off in Settings > Plex or from the library page if you'd rather rely on Last.fm and ListenBrainz instead.
 
 ### YouTube
 

@@ -35,6 +35,7 @@ from .repo_providers import (
     get_listenbrainz_repository,
     get_jellyfin_repository,
     get_navidrome_repository,
+    get_plex_repository,
     get_coverart_repository,
     get_youtube_repo,
     get_audiodb_image_service,
@@ -607,3 +608,22 @@ def get_navidrome_playback_service() -> "NavidromePlaybackService":
 
     navidrome_repo = get_navidrome_repository()
     return NavidromePlaybackService(navidrome_repo)
+
+
+@singleton
+def get_plex_library_service() -> "PlexLibraryService":
+    from services.plex_library_service import PlexLibraryService
+
+    plex_repo = get_plex_repository()
+    preferences_service = get_preferences_service()
+    library_db = get_library_db()
+    mbid_store = get_mbid_store()
+    return PlexLibraryService(plex_repo, preferences_service, library_db, mbid_store)
+
+
+@singleton
+def get_plex_playback_service() -> "PlexPlaybackService":
+    from services.plex_playback_service import PlexPlaybackService
+
+    plex_repo = get_plex_repository()
+    return PlexPlaybackService(plex_repo)

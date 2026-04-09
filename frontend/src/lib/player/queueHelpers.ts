@@ -3,6 +3,7 @@ import type {
 	JellyfinTrackInfo,
 	LocalTrackInfo,
 	NavidromeTrackInfo,
+	PlexTrackInfo,
 	YouTubeTrackLink
 } from '$lib/types';
 import type { PlaylistTrack } from '$lib/api/playlists';
@@ -35,6 +36,7 @@ export interface TrackSourceData {
 	jellyfinTrack?: JellyfinTrackInfo | null;
 	navidromeTrack?: NavidromeTrackInfo | null;
 	localTrack?: LocalTrackInfo | null;
+	plexTrack?: PlexTrackInfo | null;
 }
 
 export function normalizeDiscNumber(discNumber: number | null | undefined): number {
@@ -90,6 +92,16 @@ export function selectBestSource(
 			format
 		};
 	}
+	if (data.plexTrack) {
+		if (!data.plexTrack.part_key) return null;
+		const format = normalizeCodec(data.plexTrack.codec);
+		return {
+			sourceType: 'plex',
+			trackSourceId: data.plexTrack.part_key,
+			streamUrl: API.stream.plex(data.plexTrack.part_key),
+			format
+		};
+	}
 	return null;
 }
 
@@ -98,6 +110,7 @@ export function getAvailableSources(data: TrackSourceData): SourceType[] {
 	if (data.localTrack) sources.push('local');
 	if (data.navidromeTrack) sources.push('navidrome');
 	if (data.jellyfinTrack) sources.push('jellyfin');
+	if (data.plexTrack?.part_key) sources.push('plex');
 	return sources;
 }
 
@@ -111,6 +124,7 @@ export function buildQueueItem(meta: TrackMeta, data: TrackSourceData): QueueIte
 	if (data.localTrack) sourceIds.local = String(data.localTrack.track_file_id);
 	if (data.navidromeTrack) sourceIds.navidrome = data.navidromeTrack.navidrome_id;
 	if (data.jellyfinTrack) sourceIds.jellyfin = data.jellyfinTrack.jellyfin_id;
+	if (data.plexTrack?.part_key) sourceIds.plex = data.plexTrack.part_key;
 
 	return {
 		trackSourceId: best.trackSourceId,
@@ -127,7 +141,8 @@ export function buildQueueItem(meta: TrackMeta, data: TrackSourceData): QueueIte
 		format: best.format,
 		availableSources: getAvailableSources(data),
 		sourceIds,
-		duration: data.trackLength
+		duration: data.trackLength,
+		plexRatingKey: data.plexTrack?.plex_id
 	};
 }
 
@@ -203,6 +218,35 @@ export function buildQueueItemsFromLocal(tracks: LocalTrackInfo[], meta: TrackMe
 	}));
 }
 
+export function buildQueueItemsFromPlex(
+	tracks: PlexTrackInfo[],
+	meta: TrackMeta
+): QueueItem[] {
+	const normalizedCoverUrl = getCoverUrl(meta.coverUrl, meta.albumId);
+	return tracks
+		.filter((t) => t.part_key)
+		.map((t) => {
+		const format = normalizeCodec(t.codec);
+		return {
+			trackSourceId: t.part_key!,
+			trackName: t.title,
+			artistName: meta.artistName,
+			trackNumber: t.track_number,
+			discNumber: normalizeDiscNumber(t.disc_number),
+			albumId: meta.albumId,
+			albumName: meta.albumName,
+			coverUrl: normalizedCoverUrl,
+			sourceType: 'plex' as const,
+			artistId: meta.artistId,
+			streamUrl: API.stream.plex(t.part_key!),
+			format,
+			availableSources: ['plex'] as SourceType[],
+			duration: t.duration_seconds,
+			plexRatingKey: t.plex_id
+		};
+	});
+}
+
 export function buildQueueItemFromYouTube(track: YouTubeTrackLink, meta: TrackMeta): QueueItem {
 	const normalizedCoverUrl = getCoverUrl(meta.coverUrl, meta.albumId);
 	return {
@@ -231,6 +275,7 @@ function resolveStreamUrl(sourceType: string, trackSourceId: string): string | u
 	if (sourceType === 'local') return API.stream.local(trackSourceId);
 	if (sourceType === 'navidrome') return API.stream.navidrome(trackSourceId);
 	if (sourceType === 'jellyfin') return API.stream.jellyfin(trackSourceId);
+	if (sourceType === 'plex') return API.stream.plex(trackSourceId);
 	return undefined;
 }
 
@@ -257,6 +302,7 @@ export function playlistTrackToQueueItem(track: PlaylistTrack): QueueItem | null
 		format: track.format ?? undefined,
 		availableSources,
 		duration: track.duration ?? undefined,
-		playlistTrackId: track.id
+		playlistTrackId: track.id,
+		plexRatingKey: sourceType === 'plex' ? (track.plex_rating_key ?? undefined) : undefined
 	};
 }

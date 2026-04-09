@@ -25,6 +25,7 @@
 	import YouTubeIcon from '$lib/components/YouTubeIcon.svelte';
 	import NavidromeIcon from '$lib/components/NavidromeIcon.svelte';
 	import JellyfinIcon from '$lib/components/JellyfinIcon.svelte';
+	import PlexIcon from '$lib/components/PlexIcon.svelte';
 	import SidebarServiceHint from '$lib/components/SidebarServiceHint.svelte';
 	import DegradedBanner from '$lib/components/DegradedBanner.svelte';
 	import SearchSuggestions from '$lib/components/SearchSuggestions.svelte';
@@ -403,6 +404,23 @@
 					{:else if integrations.current.loaded}
 						<SidebarServiceHint label="Navidrome" settingsTab="navidrome">
 							{#snippet icon()}<NavidromeIcon class="h-6 w-6 text-primary" />{/snippet}
+						</SidebarServiceHint>
+					{/if}
+
+					{#if integrations.current.plex}
+						<li>
+							<a
+								href="/library/plex"
+								class="is-drawer-close:tooltip is-drawer-close:tooltip-right"
+								data-tip="Plex"
+							>
+								<PlexIcon class="h-6 w-6" style="color: rgb(var(--brand-plex))" />
+								<span class="is-drawer-close:hidden">Plex</span>
+							</a>
+						</li>
+					{:else if integrations.current.loaded}
+						<SidebarServiceHint label="Plex" settingsTab="plex">
+							{#snippet icon()}<PlexIcon class="h-6 w-6" style="color: rgb(var(--brand-plex))" />{/snippet}
 						</SidebarServiceHint>
 					{/if}
 
