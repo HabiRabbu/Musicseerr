@@ -267,7 +267,7 @@ class TestStringTrackNumberRegression:
         )
         await cache.set("source_resolution:mbid-abc", stale_data, ttl_seconds=3600)
 
-        jf, local, nd = await service._resolve_album_sources(
+        jf, local, nd, plex = await service._resolve_album_sources(
             "mbid-abc", None, None, None,
         )
 

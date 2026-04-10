@@ -64,6 +64,21 @@ class TokenNotAuthorizedError(ExternalServiceError):
     pass
 
 
+class PlexApiError(ExternalServiceError):
+    def __init__(
+        self,
+        message: str,
+        details: Any = None,
+        code: int | None = None,
+    ):
+        super().__init__(message, details)
+        self.code = code
+
+
+class PlexAuthError(PlexApiError):
+    pass
+
+
 class NavidromeApiError(ExternalServiceError):
     def __init__(
         self,

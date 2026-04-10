@@ -8,6 +8,7 @@
 	import JellyfinIcon from '$lib/components/JellyfinIcon.svelte';
 	import LocalFilesIcon from '$lib/components/LocalFilesIcon.svelte';
 	import NavidromeIcon from '$lib/components/NavidromeIcon.svelte';
+	import PlexIcon from '$lib/components/PlexIcon.svelte';
 	import NowPlayingIndicator from '$lib/components/NowPlayingIndicator.svelte';
 
 	interface Props {
@@ -325,6 +326,10 @@
 									</span>
 								{:else if item.sourceType === 'youtube'}
 									<span class="badge badge-xs badge-ghost">YT</span>
+								{:else if item.sourceType === 'plex'}
+									<span title="Plex" style="color: rgb(var(--brand-plex));">
+										<PlexIcon class="h-3.5 w-3.5" />
+									</span>
 								{/if}
 							</div>
 

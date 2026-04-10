@@ -13,6 +13,8 @@ export const CACHE_KEY_GROUPS = {
 		JELLYFIN_ALBUMS_LIST: 'musicseerr_jellyfin_albums_list',
 		NAVIDROME_SIDEBAR: 'musicseerr_navidrome_sidebar',
 		NAVIDROME_ALBUMS_LIST: 'musicseerr_navidrome_albums_list',
+		PLEX_SIDEBAR: 'musicseerr_plex_sidebar',
+		PLEX_ALBUMS_LIST: 'musicseerr_plex_albums_list',
 		LOCAL_FILES_ALBUMS_LIST: 'musicseerr_local_files_albums_list'
 	},
 	detail: {
@@ -64,6 +66,8 @@ export const CACHE_TTL_GROUPS = {
 		JELLYFIN_ALBUMS_LIST: 2 * 60 * 1000,
 		NAVIDROME_SIDEBAR: 2 * 60 * 1000,
 		NAVIDROME_ALBUMS_LIST: 2 * 60 * 1000,
+		PLEX_SIDEBAR: 2 * 60 * 1000,
+		PLEX_ALBUMS_LIST: 2 * 60 * 1000,
 		LOCAL_FILES_ALBUMS_LIST: 2 * 60 * 1000,
 		PLAYLIST_SOURCES: 15 * 60 * 1000
 	},
@@ -200,6 +204,11 @@ export const API = {
 	settings: () => '/api/v1/settings',
 	settingsNavidrome: () => '/api/v1/settings/navidrome',
 	settingsNavidromeVerify: () => '/api/v1/settings/navidrome/verify',
+	settingsPlex: () => '/api/v1/settings/plex',
+	settingsPlexVerify: () => '/api/v1/settings/plex/verify',
+	settingsPlexLibraries: () => '/api/v1/settings/plex/libraries',
+	plexAuthPin: () => '/api/v1/plex/auth/pin',
+	plexAuthPoll: (pinId: number) => `/api/v1/plex/auth/poll?pin_id=${pinId}`,
 	settingsLocalFiles: () => '/api/v1/settings/local-files',
 	settingsLocalFilesVerify: () => '/api/v1/settings/local-files/verify',
 	profile: {
@@ -233,6 +242,9 @@ export const API = {
 		navidrome: (id: string) => `/api/v1/stream/navidrome/${id}`,
 		navidromeScrobble: (id: string) => `/api/v1/stream/navidrome/${id}/scrobble`,
 		navidromeNowPlaying: (id: string) => `/api/v1/stream/navidrome/${id}/now-playing`,
+		plex: (partKey: string) => `/api/v1/stream/plex/${partKey}`,
+		plexScrobble: (ratingKey: string) => `/api/v1/stream/plex/${ratingKey}/scrobble`,
+		plexNowPlaying: (ratingKey: string) => `/api/v1/stream/plex/${ratingKey}/now-playing`,
 		local: (trackId: number | string) => `/api/v1/stream/local/${trackId}`
 	},
 	jellyfinLibrary: {
@@ -268,6 +280,21 @@ export const API = {
 		genres: () => '/api/v1/navidrome/genres',
 		stats: () => '/api/v1/navidrome/stats',
 		albumMatch: (albumId: string) => `/api/v1/navidrome/album-match/${albumId}`
+	},
+	plexLibrary: {
+		albums: (limit = 48, offset = 0, sortBy = 'name', genre?: string, sortOrder?: string) => {
+			let url = `/api/v1/plex/albums?limit=${limit}&offset=${offset}&sort_by=${sortBy}`;
+			if (sortOrder) url += `&sort_order=${sortOrder}`;
+			if (genre) url += `&genre=${encodeURIComponent(genre)}`;
+			return url;
+		},
+		albumDetail: (id: string) => `/api/v1/plex/albums/${id}`,
+		search: (q: string) => `/api/v1/plex/search?q=${encodeURIComponent(q)}`,
+		recent: (limit = 20) => `/api/v1/plex/recent?limit=${limit}`,
+		genres: () => '/api/v1/plex/genres',
+		stats: () => '/api/v1/plex/stats',
+		thumb: (ratingKey: string, size = 500) => `/api/v1/plex/thumb/${ratingKey}?size=${size}`,
+		albumMatch: (albumId: string) => `/api/v1/plex/album-match/${albumId}`
 	},
 	local: {
 		albumMatch: (mbid: string) => `/api/v1/local/albums/match/${mbid}`,

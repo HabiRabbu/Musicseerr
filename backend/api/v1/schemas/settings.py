@@ -2,6 +2,7 @@ from typing import Literal
 
 import msgspec
 
+from api.v1.schemas.plex import PlexLibrarySectionInfo
 from infrastructure.msgspec_fastapi import AppStruct
 
 LASTFM_SECRET_MASK = "••••••••"
@@ -93,6 +94,7 @@ class JellyfinConnectionSettings(AppStruct):
 
 
 NAVIDROME_PASSWORD_MASK = "********"
+PLEX_TOKEN_MASK = "plex****"
 
 
 class NavidromeConnectionSettings(AppStruct):
@@ -103,6 +105,34 @@ class NavidromeConnectionSettings(AppStruct):
 
     def __post_init__(self) -> None:
         self.navidrome_url = self.navidrome_url.rstrip("/") if self.navidrome_url else ""
+
+
+class PlexConnectionSettings(AppStruct):
+    plex_url: str = ""
+    plex_token: str = ""
+    enabled: bool = False
+    music_library_ids: list[str] = []
+    scrobble_to_plex: bool = True
+
+    def __post_init__(self) -> None:
+        self.plex_url = self.plex_url.rstrip("/") if self.plex_url else ""
+
+
+class PlexVerifyResponse(AppStruct):
+    valid: bool
+    message: str
+    libraries: list[PlexLibrarySectionInfo] = []
+
+
+class PlexOAuthPinResponse(AppStruct):
+    pin_id: int
+    pin_code: str
+    auth_url: str
+
+
+class PlexOAuthPollResponse(AppStruct):
+    completed: bool
+    auth_token: str = ""
 
 
 class JellyfinUserInfo(AppStruct):

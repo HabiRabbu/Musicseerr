@@ -1,4 +1,4 @@
-"""Domain 4 — MBID resolution and external-service index persistence."""
+"""Domain 4: MBID resolution and external-service index persistence."""
 
 import logging
 import sqlite3
@@ -62,6 +62,24 @@ class MBIDStore(PersistenceBase):
             conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS navidrome_artist_mbid_index (
+                    cache_key TEXT PRIMARY KEY,
+                    mbid TEXT,
+                    saved_at REAL NOT NULL
+                )
+                """
+            )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS plex_album_mbid_index (
+                    cache_key TEXT PRIMARY KEY,
+                    mbid TEXT,
+                    saved_at REAL NOT NULL
+                )
+                """
+            )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS plex_artist_mbid_index (
                     cache_key TEXT PRIMARY KEY,
                     mbid TEXT,
                     saved_at REAL NOT NULL
@@ -257,6 +275,63 @@ class MBIDStore(PersistenceBase):
         def operation(conn: sqlite3.Connection) -> None:
             conn.execute("DELETE FROM navidrome_album_mbid_index")
             conn.execute("DELETE FROM navidrome_artist_mbid_index")
+
+        await self._write(operation)
+
+    async def save_plex_album_mbid_index(self, index: dict[str, str | None]) -> None:
+        saved_at = time.time()
+        def operation(conn: sqlite3.Connection) -> None:
+            conn.execute("DELETE FROM plex_album_mbid_index")
+            for cache_key, mbid in index.items():
+                if cache_key:
+                    conn.execute(
+                        "INSERT OR REPLACE INTO plex_album_mbid_index (cache_key, mbid, saved_at) VALUES (?, ?, ?)",
+                        (cache_key, mbid, saved_at),
+                    )
+
+        await self._write(operation)
+
+    async def load_plex_album_mbid_index(self, max_age_seconds: int = 86400) -> dict[str, str | None]:
+        def operation(conn: sqlite3.Connection) -> dict[str, str | None]:
+            row = conn.execute("SELECT MAX(saved_at) AS saved_at FROM plex_album_mbid_index").fetchone()
+            if row is None or row["saved_at"] is None:
+                return {}
+            if time.time() - float(row["saved_at"]) > max(max_age_seconds, 1):
+                return {}
+            rows = conn.execute("SELECT cache_key, mbid FROM plex_album_mbid_index").fetchall()
+            return {str(r["cache_key"]): (str(r["mbid"]) if r["mbid"] else None) for r in rows if r["cache_key"]}
+
+        return await self._read(operation)
+
+    async def save_plex_artist_mbid_index(self, index: dict[str, str | None]) -> None:
+        saved_at = time.time()
+        def operation(conn: sqlite3.Connection) -> None:
+            conn.execute("DELETE FROM plex_artist_mbid_index")
+            for cache_key, mbid in index.items():
+                if cache_key:
+                    conn.execute(
+                        "INSERT OR REPLACE INTO plex_artist_mbid_index (cache_key, mbid, saved_at) VALUES (?, ?, ?)",
+                        (cache_key, mbid, saved_at),
+                    )
+
+        await self._write(operation)
+
+    async def load_plex_artist_mbid_index(self, max_age_seconds: int = 86400) -> dict[str, str | None]:
+        def operation(conn: sqlite3.Connection) -> dict[str, str | None]:
+            row = conn.execute("SELECT MAX(saved_at) AS saved_at FROM plex_artist_mbid_index").fetchone()
+            if row is None or row["saved_at"] is None:
+                return {}
+            if time.time() - float(row["saved_at"]) > max(max_age_seconds, 1):
+                return {}
+            rows = conn.execute("SELECT cache_key, mbid FROM plex_artist_mbid_index").fetchall()
+            return {str(r["cache_key"]): (str(r["mbid"]) if r["mbid"] else None) for r in rows if r["cache_key"]}
+
+        return await self._read(operation)
+
+    async def clear_plex_mbid_indexes(self) -> None:
+        def operation(conn: sqlite3.Connection) -> None:
+            conn.execute("DELETE FROM plex_album_mbid_index")
+            conn.execute("DELETE FROM plex_artist_mbid_index")
 
         await self._write(operation)
 

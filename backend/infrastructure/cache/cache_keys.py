@@ -2,7 +2,6 @@
 from typing import Optional
 
 
-
 MB_ARTIST_SEARCH_PREFIX = "mb:artist:search:"
 MB_ARTIST_DETAIL_PREFIX = "mb:artist:detail:"
 MB_ALBUM_SEARCH_PREFIX = "mb:album:search:"
@@ -22,6 +21,8 @@ LFM_PREFIX = "lfm_"
 JELLYFIN_PREFIX = "jellyfin_"
 
 NAVIDROME_PREFIX = "navidrome:"
+
+PLEX_PREFIX = "plex:"
 
 LIDARR_PREFIX = "lidarr:"
 LIDARR_REQUESTED_PREFIX = "lidarr_requested"
@@ -59,9 +60,8 @@ PREFERENCES_PREFIX = "preferences:"
 AUDIODB_PREFIX = "audiodb_"
 
 
-
 def musicbrainz_prefixes() -> list[str]:
-    """All MusicBrainz cache key prefixes — for bulk invalidation."""
+    """All MusicBrainz cache key prefixes for bulk invalidation."""
     return [
         MB_ARTIST_SEARCH_PREFIX,
         MB_ARTIST_DETAIL_PREFIX,
@@ -78,12 +78,10 @@ def musicbrainz_prefixes() -> list[str]:
 
 
 def listenbrainz_prefixes() -> list[str]:
-    """All ListenBrainz cache key prefixes."""
     return [LB_PREFIX]
 
 
 def lastfm_prefixes() -> list[str]:
-    """All Last.fm cache key prefixes."""
     return [LFM_PREFIX]
 
 
@@ -92,14 +90,12 @@ def home_prefixes() -> list[str]:
     return [HOME_RESPONSE_PREFIX, DISCOVER_RESPONSE_PREFIX, GENRE_ARTIST_PREFIX, GENRE_SECTION_PREFIX]
 
 
-
 def _sort_params(**kwargs) -> str:
     """Sort parameters for consistent key generation."""
     return ":".join(f"{k}={v}" for k, v in sorted(kwargs.items()) if v is not None)
 
 
 def mb_artist_search_key(query: str, limit: int, offset: int) -> str:
-    """Generate cache key for MusicBrainz artist search."""
     return f"{MB_ARTIST_SEARCH_PREFIX}{query}:{limit}:{offset}"
 
 
@@ -109,86 +105,70 @@ def mb_album_search_key(
     offset: int,
     included_secondary_types: Optional[set[str]] = None
 ) -> str:
-    """Generate cache key for MusicBrainz album search."""
     types_str = ",".join(sorted(included_secondary_types)) if included_secondary_types else "none"
     return f"{MB_ALBUM_SEARCH_PREFIX}{query}:{limit}:{offset}:{types_str}"
 
 
 def mb_artist_detail_key(mbid: str) -> str:
-    """Generate cache key for MusicBrainz artist details."""
     return f"{MB_ARTIST_DETAIL_PREFIX}{mbid}"
 
 
 def mb_release_group_key(mbid: str, includes: Optional[list[str]] = None) -> str:
-    """Generate cache key for MusicBrainz release group."""
     includes_str = ",".join(sorted(includes)) if includes else "default"
     return f"{MB_RG_DETAIL_PREFIX}{mbid}:{includes_str}"
 
 
 def mb_release_key(release_id: str, includes: Optional[list[str]] = None) -> str:
-    """Generate cache key for MusicBrainz release."""
     includes_str = ",".join(sorted(includes)) if includes else "default"
     return f"{MB_RELEASE_DETAIL_PREFIX}{release_id}:{includes_str}"
 
 
 def lidarr_library_albums_key(include_unmonitored: bool = False) -> str:
-    """Generate cache key for full Lidarr library album list."""
     suffix = "all" if include_unmonitored else "monitored"
     return f"{LIDARR_PREFIX}library:albums:{suffix}"
 
 
 def lidarr_library_artists_key(include_unmonitored: bool = False) -> str:
-    """Generate cache key for Lidarr library artist list."""
     suffix = "all" if include_unmonitored else "monitored"
     return f"{LIDARR_PREFIX}library:artists:{suffix}"
 
 
 def lidarr_library_mbids_key(include_release_ids: bool = False) -> str:
-    """Generate cache key for Lidarr library MBIDs."""
     suffix = "with_releases" if include_release_ids else "albums_only"
     return f"{LIDARR_PREFIX}library:mbids:{suffix}"
 
 
 def lidarr_artist_mbids_key() -> str:
-    """Generate cache key for Lidarr artist MBIDs."""
     return f"{LIDARR_PREFIX}artists:mbids"
 
 
 def lidarr_raw_albums_key() -> str:
-    """Generate cache key for raw Lidarr album payload."""
     return f"{LIDARR_PREFIX}raw:albums"
 
 
 def lidarr_library_grouped_key() -> str:
-    """Generate cache key for grouped Lidarr library albums."""
     return f"{LIDARR_PREFIX}library:grouped"
 
 
 def lidarr_requested_mbids_key() -> str:
-    """Generate cache key for Lidarr requested (pending download) MBIDs."""
     return f"{LIDARR_REQUESTED_PREFIX}_mbids"
 
 
 def lidarr_status_key() -> str:
-    """Generate cache key for Lidarr status."""
     return f"{LIDARR_PREFIX}status"
 
 
 def wikidata_artist_image_key(wikidata_id: str) -> str:
-    """Generate cache key for Wikidata artist image."""
     return f"{WIKIDATA_IMAGE_PREFIX}{wikidata_id}"
 
 
 def wikidata_url_key(artist_id: str) -> str:
-    """Generate cache key for artist Wikidata URL."""
     return f"{WIKIDATA_URL_PREFIX}{artist_id}"
 
 
 def wikipedia_extract_key(url: str) -> str:
-    """Generate cache key for Wikipedia extract."""
     return f"{WIKIPEDIA_PREFIX}{url}"
 
 
 def preferences_key() -> str:
-    """Generate cache key for preferences."""
     return f"{PREFERENCES_PREFIX}current"

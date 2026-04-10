@@ -19,6 +19,7 @@ export interface PlaylistTrack {
 	disc_number: number | null;
 	duration: number | null;
 	created_at: string;
+	plex_rating_key: string | null;
 }
 
 export interface PlaylistSummary {
@@ -50,6 +51,7 @@ export interface TrackData {
 	track_number?: number | null;
 	disc_number?: number | null;
 	duration?: number | null;
+	plex_rating_key?: string | null;
 }
 
 export function queueItemToTrackData(item: QueueItem): TrackData {
@@ -66,7 +68,8 @@ export function queueItemToTrackData(item: QueueItem): TrackData {
 		format: item.format ?? null,
 		track_number: item.trackNumber ?? null,
 		disc_number: item.discNumber ?? null,
-		duration: item.duration ?? null
+		duration: item.duration ?? null,
+		plex_rating_key: item.plexRatingKey ?? null
 	};
 }
 

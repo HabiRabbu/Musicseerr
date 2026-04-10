@@ -43,6 +43,9 @@ NPM    ?= pnpm
 	backend-test-multidisc \
 	backend-test-mus15-status-race \
 	backend-test-performance \
+	backend-test-plex \
+	backend-test-plex-repository \
+	backend-test-plex-routes \
 	backend-test-playlist \
 	backend-test-request-queue \
 	backend-test-request-service \
@@ -58,6 +61,7 @@ NPM    ?= pnpm
 	frontend-test-album-page \
 	frontend-test-audiodb-images \
 	frontend-test-monitored-artists \
+	frontend-test-plex \
 	frontend-test-playlist-detail \
 	frontend-test-queuehelpers \
 	project-map rebuild \
@@ -189,6 +193,15 @@ backend-test-search-top-result: $(BACKEND_VENV_STAMP) ## Run search top result d
 backend-test-security: $(BACKEND_VENV_STAMP) ## Run security regression tests
 	$(PYTEST) tests/test_rate_limiter_middleware.py tests/test_url_validation.py tests/test_error_leakage.py
 
+backend-test-plex: $(BACKEND_VENV_STAMP) ## Run all Plex integration backend tests
+	$(PYTEST) tests/repositories/test_plex_repository.py tests/services/test_plex_playback_service.py tests/services/test_plex_library_service.py tests/routes/test_plex_routes.py tests/routes/test_plex_settings.py tests/routes/test_plex_auth.py tests/services/test_plex_integration_status.py tests/services/test_plex_settings_lifecycle.py -v
+
+backend-test-plex-repository: $(BACKEND_VENV_STAMP) ## Run Plex repository unit tests
+	$(PYTEST) tests/repositories/test_plex_repository.py -v
+
+backend-test-plex-routes: $(BACKEND_VENV_STAMP) ## Run Plex route and settings tests
+	$(PYTEST) tests/routes/test_plex_routes.py tests/routes/test_plex_settings.py tests/routes/test_plex_auth.py -v
+
 backend-test-sync-coordinator: $(BACKEND_VENV_STAMP) ## Run sync coordinator tests (cooldown, dedup)
 	$(PYTEST) tests/test_sync_coordinator.py -v
 
@@ -257,6 +270,9 @@ frontend-test-playlist-detail: ## Run playlist page browser tests
 
 frontend-test-queuehelpers: ## Run queue helper regressions
 	cd "$(FRONTEND_DIR)" && $(NPM) exec vitest run --project server src/lib/player/queueHelpers.spec.ts
+
+frontend-test-plex: ## Run Plex frontend tests
+	cd "$(FRONTEND_DIR)" && $(NPM) exec vitest run --project server src/lib/player/plexPlaybackApi.spec.ts src/lib/player/launchPlexPlayback.spec.ts
 
 # Utilities
 

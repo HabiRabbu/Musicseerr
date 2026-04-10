@@ -11,6 +11,7 @@ from repositories.protocols.lidarr import LidarrRepositoryProtocol as LidarrRepo
 from repositories.protocols.listenbrainz import ListenBrainzRepositoryProtocol as ListenBrainzRepositoryProtocol
 from repositories.protocols.musicbrainz import MusicBrainzRepositoryProtocol as MusicBrainzRepositoryProtocol
 from repositories.protocols.navidrome import NavidromeRepositoryProtocol as NavidromeRepositoryProtocol
+from repositories.protocols.plex import PlexRepositoryProtocol as PlexRepositoryProtocol
 from repositories.protocols.wikidata import WikidataRepositoryProtocol as WikidataRepositoryProtocol
 from repositories.protocols.youtube import YouTubeRepositoryProtocol as YouTubeRepositoryProtocol
 
@@ -28,6 +29,7 @@ __all__ = [
     "ListenBrainzRepositoryProtocol",
     "MusicBrainzRepositoryProtocol",
     "NavidromeRepositoryProtocol",
+    "PlexRepositoryProtocol",
     "WikidataRepositoryProtocol",
     "YouTubeRepositoryProtocol",
     "ListenBrainzArtist",

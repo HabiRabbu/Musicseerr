@@ -13,12 +13,14 @@ from core.dependencies import (
     get_jellyfin_playback_service,
     get_local_files_service,
     get_navidrome_playback_service,
+    get_plex_playback_service,
 )
 from core.exceptions import ExternalServiceError, PlaybackNotAllowedError, ResourceNotFoundError
 from infrastructure.msgspec_fastapi import MsgSpecBody, MsgSpecRoute
 from services.jellyfin_playback_service import JellyfinPlaybackService
 from services.local_files_service import LocalFilesService
 from services.navidrome_playback_service import NavidromePlaybackService
+from services.plex_playback_service import PlexPlaybackService
 
 logger = logging.getLogger(__name__)
 
@@ -138,7 +140,7 @@ async def head_local_file(
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail="Track file not found on disk")
     except PermissionError:
-        raise HTTPException(status_code=403, detail="Access denied — path outside music directory")
+        raise HTTPException(status_code=403, detail="Access denied: path is outside the music directory")
     except ExternalServiceError as e:
         logger.error("Local head error for track %s: %s", track_id, e)
         raise HTTPException(status_code=502, detail="Failed to check local file")
@@ -170,7 +172,7 @@ async def stream_local_file(
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail="Track file not found on disk")
     except PermissionError:
-        raise HTTPException(status_code=403, detail="Access denied — path outside music directory")
+        raise HTTPException(status_code=403, detail="Access denied: path is outside the music directory")
     except ExternalServiceError as e:
         detail = str(e)
         if "Range not satisfiable" in detail:
@@ -227,4 +229,52 @@ async def navidrome_now_playing(
     playback_service: NavidromePlaybackService = Depends(get_navidrome_playback_service),
 ) -> dict[str, str]:
     ok = await playback_service.report_now_playing(item_id)
+    return {"status": "ok" if ok else "error"}
+
+
+@router.head("/plex/{part_key:path}")
+async def head_plex_audio(
+    part_key: str,
+    playback_service: PlexPlaybackService = Depends(get_plex_playback_service),
+) -> Response:
+    try:
+        return await playback_service.proxy_head(part_key)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid stream request")
+    except ExternalServiceError:
+        raise HTTPException(status_code=502, detail="Failed to stream from Plex")
+
+
+@router.get("/plex/{part_key:path}")
+async def stream_plex_audio(
+    part_key: str,
+    request: Request,
+    playback_service: PlexPlaybackService = Depends(get_plex_playback_service),
+) -> StreamingResponse:
+    try:
+        return await playback_service.proxy_stream(part_key, request.headers.get("Range"))
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid stream request")
+    except ExternalServiceError as e:
+        detail = str(e)
+        if "416" in detail or "Range not satisfiable" in detail:
+            raise HTTPException(status_code=416, detail="Range not satisfiable")
+        raise HTTPException(status_code=502, detail="Failed to stream from Plex")
+
+
+@router.post("/plex/{rating_key}/scrobble")
+async def scrobble_plex(
+    rating_key: str,
+    playback_service: PlexPlaybackService = Depends(get_plex_playback_service),
+) -> dict[str, str]:
+    ok = await playback_service.scrobble(rating_key)
+    return {"status": "ok" if ok else "error"}
+
+
+@router.post("/plex/{rating_key}/now-playing")
+async def plex_now_playing(
+    rating_key: str,
+    playback_service: PlexPlaybackService = Depends(get_plex_playback_service),
+) -> dict[str, str]:
+    ok = await playback_service.report_now_playing(rating_key)
     return {"status": "ok" if ok else "error"}

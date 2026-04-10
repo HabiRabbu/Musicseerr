@@ -9,6 +9,7 @@
 	import SettingsLibrarySync from '$lib/components/settings/SettingsLibrarySync.svelte';
 	import SettingsJellyfin from '$lib/components/settings/SettingsJellyfin.svelte';
 	import SettingsNavidrome from '$lib/components/settings/SettingsNavidrome.svelte';
+	import SettingsPlex from '$lib/components/settings/SettingsPlex.svelte';
 	import SettingsListenBrainz from '$lib/components/settings/SettingsListenBrainz.svelte';
 	import SettingsYouTube from '$lib/components/settings/SettingsYouTube.svelte';
 	import SettingsLocalFiles from '$lib/components/settings/SettingsLocalFiles.svelte';
@@ -30,17 +31,26 @@
 	} from 'lucide-svelte';
 	import JellyfinIcon from '$lib/components/JellyfinIcon.svelte';
 	import NavidromeIcon from '$lib/components/NavidromeIcon.svelte';
+	import PlexIcon from '$lib/components/PlexIcon.svelte';
 
 	const integration = fromStore(integrationStore);
 
 	const connectionMap: Record<
 		string,
-		'lastfm' | 'listenbrainz' | 'jellyfin' | 'navidrome' | 'youtube' | 'localfiles' | 'lidarr'
+		| 'lastfm'
+		| 'listenbrainz'
+		| 'jellyfin'
+		| 'navidrome'
+		| 'plex'
+		| 'youtube'
+		| 'localfiles'
+		| 'lidarr'
 	> = {
 		lastfm: 'lastfm',
 		listenbrainz: 'listenbrainz',
 		jellyfin: 'jellyfin',
 		navidrome: 'navidrome',
+		plex: 'plex',
 		youtube: 'youtube',
 		'local-files': 'localfiles',
 		'lidarr-connection': 'lidarr'
@@ -56,6 +66,7 @@
 		{ id: 'music-source', label: 'Music Source', group: 'Music Tracking', icon: BarChart3 },
 		{ id: 'jellyfin', label: 'Jellyfin', group: 'Media Servers', icon: JellyfinIcon },
 		{ id: 'navidrome', label: 'Navidrome', group: 'Media Servers', icon: NavidromeIcon },
+		{ id: 'plex', label: 'Plex', group: 'Media Servers', icon: PlexIcon },
 		{
 			id: 'lidarr-connection',
 			label: 'Lidarr Connection',
@@ -91,7 +102,7 @@
 	<div class="container mx-auto p-4 max-w-7xl">
 		<div class="mb-6">
 			<h1 class="text-3xl font-bold">Settings</h1>
-			<p class="text-base-content/70 mt-2">Manage your preferences and application settings</p>
+			<p class="text-base-content/70 mt-2">Manage your preferences and app settings.</p>
 		</div>
 
 		<div class="flex flex-col lg:flex-row gap-6">
@@ -150,6 +161,8 @@
 					<SettingsJellyfin />
 				{:else if activeTab === 'navidrome'}
 					<SettingsNavidrome />
+				{:else if activeTab === 'plex'}
+					<SettingsPlex />
 				{:else if activeTab === 'listenbrainz'}
 					<SettingsListenBrainz />
 				{:else if activeTab === 'youtube'}

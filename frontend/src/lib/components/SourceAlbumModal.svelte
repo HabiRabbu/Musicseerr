@@ -6,6 +6,7 @@
 	import { launchJellyfinPlayback } from '$lib/player/launchJellyfinPlayback';
 	import { launchLocalPlayback } from '$lib/player/launchLocalPlayback';
 	import { launchNavidromePlayback } from '$lib/player/launchNavidromePlayback';
+	import { launchPlexPlayback } from '$lib/player/launchPlexPlayback';
 	import ContextMenu from '$lib/components/ContextMenu.svelte';
 	import type { MenuItem } from '$lib/components/ContextMenu.svelte';
 	import AddToPlaylistModal from '$lib/components/AddToPlaylistModal.svelte';
@@ -15,6 +16,7 @@
 		buildQueueItemsFromJellyfin,
 		buildQueueItemsFromLocal,
 		buildQueueItemsFromNavidrome,
+		buildQueueItemsFromPlex,
 		compareDiscTrack,
 		normalizeDiscNumber,
 		type TrackMeta,
@@ -28,18 +30,26 @@
 		JellyfinTrackInfo,
 		LocalTrackInfo,
 		NavidromeTrackInfo,
+		PlexTrackInfo,
 		NavidromeAlbumDetail,
+		PlexAlbumDetail,
 		JellyfinAlbumSummary,
 		LocalAlbumSummary,
-		NavidromeAlbumSummary
+		NavidromeAlbumSummary,
+		PlexAlbumSummary
 	} from '$lib/types';
 
-	type SourceType = 'jellyfin' | 'local' | 'navidrome';
+	type SourceType = 'jellyfin' | 'local' | 'navidrome' | 'plex';
 
 	interface Props {
 		open: boolean;
 		sourceType: SourceType;
-		album: JellyfinAlbumSummary | LocalAlbumSummary | NavidromeAlbumSummary | null;
+		album:
+			| JellyfinAlbumSummary
+			| LocalAlbumSummary
+			| NavidromeAlbumSummary
+			| PlexAlbumSummary
+			| null;
 		onclose: () => void;
 	}
 
@@ -48,6 +58,7 @@
 	let jellyfinTracks = $state<JellyfinTrackInfo[]>([]);
 	let localTracks = $state<LocalTrackInfo[]>([]);
 	let navidromeTracks = $state<NavidromeTrackInfo[]>([]);
+	let plexTracks = $state<PlexTrackInfo[]>([]);
 	let loadingTracks = $state(false);
 	let trackError = $state('');
 	let fetchId = 0;
@@ -67,7 +78,9 @@
 			? jellyfinTracks.length
 			: sourceType === 'navidrome'
 				? navidromeTracks.length
-				: localTracks.length
+				: sourceType === 'plex'
+					? plexTracks.length
+					: localTracks.length
 	);
 
 	function getAlbumCoverUrl(): string {
@@ -78,6 +91,9 @@
 		if (sourceType === 'navidrome') {
 			return (album as NavidromeAlbumSummary).image_url ?? '';
 		}
+		if (sourceType === 'plex') {
+			return (album as PlexAlbumSummary).image_url ?? '';
+		}
 		return (album as LocalAlbumSummary).cover_url ?? '';
 	}
 
@@ -85,6 +101,7 @@
 		if (!album) return '';
 		if (sourceType === 'jellyfin') return (album as JellyfinAlbumSummary).jellyfin_id;
 		if (sourceType === 'navidrome') return (album as NavidromeAlbumSummary).navidrome_id;
+		if (sourceType === 'plex') return (album as PlexAlbumSummary).plex_id;
 		return String((album as LocalAlbumSummary).lidarr_album_id);
 	}
 
@@ -92,6 +109,7 @@
 		if (!album) return null;
 		if (sourceType === 'jellyfin') return (album as JellyfinAlbumSummary).musicbrainz_id ?? null;
 		if (sourceType === 'navidrome') return (album as NavidromeAlbumSummary).musicbrainz_id ?? null;
+		if (sourceType === 'plex') return (album as PlexAlbumSummary).musicbrainz_id ?? null;
 		return (album as LocalAlbumSummary).musicbrainz_id ?? null;
 	}
 
@@ -101,6 +119,8 @@
 			return (album as JellyfinAlbumSummary).artist_musicbrainz_id ?? null;
 		if (sourceType === 'navidrome')
 			return (album as NavidromeAlbumSummary).artist_musicbrainz_id ?? null;
+		if (sourceType === 'plex')
+			return (album as PlexAlbumSummary).artist_musicbrainz_id ?? null;
 		return (album as LocalAlbumSummary).artist_mbid ?? null;
 	}
 
@@ -112,6 +132,7 @@
 			jellyfinTracks = [];
 			localTracks = [];
 			navidromeTracks = [];
+			plexTracks = [];
 			trackError = '';
 		}
 	});
@@ -135,6 +156,13 @@
 				);
 				if (id !== fetchId) return;
 				navidromeTracks = detail.tracks ?? [];
+			} else if (sourceType === 'plex') {
+				const plexAlbum = album as PlexAlbumSummary;
+				const detail = await api.global.get<PlexAlbumDetail>(
+					API.plexLibrary.albumDetail(plexAlbum.plex_id)
+				);
+				if (id !== fetchId) return;
+				plexTracks = detail.tracks ?? [];
 			} else {
 				const localAlbum = album as LocalAlbumSummary;
 				const data = await api.global.get<LocalTrackInfo[]>(
@@ -188,6 +216,8 @@
 			launchJellyfinPlayback([...jellyfinTracks].sort(compareDiscTrack), 0, shuffle, meta);
 		} else if (sourceType === 'navidrome' && navidromeTracks.length > 0) {
 			launchNavidromePlayback([...navidromeTracks].sort(compareDiscTrack), 0, shuffle, meta);
+		} else if (sourceType === 'plex' && plexTracks.length > 0) {
+			launchPlexPlayback([...plexTracks].sort(compareDiscTrack), 0, shuffle, meta);
 		} else if (sourceType === 'local' && localTracks.length > 0) {
 			launchLocalPlayback([...localTracks].sort(compareDiscTrack), 0, shuffle, meta);
 		}
@@ -212,6 +242,17 @@
 			const track = navidromeTracks[index];
 			const sortedIdx = track ? sorted.indexOf(track) : index;
 			launchNavidromePlayback(sorted, sortedIdx >= 0 ? sortedIdx : index, false, meta);
+		} else if (sourceType === 'plex') {
+			const streamable = plexTracks.filter((t) => t.part_key);
+			const sorted = [...streamable].sort(compareDiscTrack);
+			const track = plexTracks[index];
+			if (track && !track.part_key) return;
+			const sortedIdx = track ? sorted.indexOf(track) : -1;
+			if (sortedIdx === -1 && sorted.length > 0) {
+				launchPlexPlayback(sorted, 0, false, meta);
+			} else if (sortedIdx >= 0) {
+				launchPlexPlayback(sorted, sortedIdx, false, meta);
+			}
 		} else {
 			const sorted = [...localTracks].sort(compareDiscTrack);
 			const track = localTracks[index];
@@ -258,6 +299,19 @@
 			return buildQueueItem(meta, sourceData);
 		}
 
+		if (sourceType === 'plex') {
+			const track = plexTracks[index];
+			if (!track) return null;
+			const sourceData: TrackSourceData = {
+				trackPosition: track.track_number,
+				discNumber: normalizeDiscNumber(track.disc_number),
+				trackTitle: track.title,
+				trackLength: track.duration_seconds,
+				plexTrack: track
+			};
+			return buildQueueItem(meta, sourceData);
+		}
+
 		const track = localTracks[index];
 		if (!track) return null;
 		const sourceData: TrackSourceData = {
@@ -277,6 +331,9 @@
 		}
 		if (sourceType === 'navidrome') {
 			return buildQueueItemsFromNavidrome([...navidromeTracks].sort(compareDiscTrack), meta);
+		}
+		if (sourceType === 'plex') {
+			return buildQueueItemsFromPlex([...plexTracks].sort(compareDiscTrack), meta);
 		}
 		return buildQueueItemsFromLocal([...localTracks].sort(compareDiscTrack), meta);
 	}
@@ -345,18 +402,21 @@
 	function getTrackName(index: number): string {
 		if (sourceType === 'jellyfin') return jellyfinTracks[index]?.title ?? '';
 		if (sourceType === 'navidrome') return navidromeTracks[index]?.title ?? '';
+		if (sourceType === 'plex') return plexTracks[index]?.title ?? '';
 		return localTracks[index]?.title ?? '';
 	}
 
 	function getTrackNumber(index: number): number {
 		if (sourceType === 'jellyfin') return jellyfinTracks[index]?.track_number ?? 0;
 		if (sourceType === 'navidrome') return navidromeTracks[index]?.track_number ?? 0;
+		if (sourceType === 'plex') return plexTracks[index]?.track_number ?? 0;
 		return localTracks[index]?.track_number ?? 0;
 	}
 
 	function getTrackDiscNumber(index: number): number {
 		if (sourceType === 'jellyfin') return normalizeDiscNumber(jellyfinTracks[index]?.disc_number);
 		if (sourceType === 'navidrome') return normalizeDiscNumber(navidromeTracks[index]?.disc_number);
+		if (sourceType === 'plex') return normalizeDiscNumber(plexTracks[index]?.disc_number);
 		return normalizeDiscNumber(localTracks[index]?.disc_number);
 	}
 
@@ -445,6 +505,8 @@
 							<span class="badge badge-sm badge-info">Jellyfin</span>
 						{:else if sourceType === 'navidrome'}
 							<span class="badge badge-sm badge-primary">Navidrome</span>
+						{:else if sourceType === 'plex'}
+							<span class="badge badge-sm badge-warning">Plex</span>
 						{:else}
 							{@const localAlbum = album as LocalAlbumSummary}
 							<span class="badge badge-sm badge-accent">Local</span>
@@ -530,6 +592,11 @@
 										{/if}
 									{:else if sourceType === 'navidrome'}
 										{@const dur = navidromeTracks[i]?.duration_seconds}
+										{#if dur}
+											<span class="text-xs opacity-40 shrink-0">{formatDuration(dur)}</span>
+										{/if}
+									{:else if sourceType === 'plex'}
+										{@const dur = plexTracks[i]?.duration_seconds}
 										{#if dur}
 											<span class="text-xs opacity-40 shrink-0">{formatDuration(dur)}</span>
 										{/if}

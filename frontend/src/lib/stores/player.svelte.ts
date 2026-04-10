@@ -17,6 +17,10 @@ import {
 	reportNavidromeScrobble,
 	reportNavidromeNowPlaying
 } from '$lib/player/navidromePlaybackApi';
+import {
+	reportPlexScrobble,
+	reportPlexNowPlaying
+} from '$lib/player/plexPlaybackApi';
 import { playbackToast } from '$lib/stores/playbackToast.svelte';
 import {
 	getStoredVolume,
@@ -118,7 +122,8 @@ function createPlayerStore() {
 	const handleBeforeUnload = createBeforeUnloadHandler(
 		() => ({ jellyfinItem: getJellyfinItem(), currentItem: queue[currentIndex] ?? null, progress }),
 		API.stream.jellyfinStop,
-		API.stream.navidromeScrobble
+		API.stream.navidromeScrobble,
+		API.stream.plexScrobble
 	);
 
 	function getNextIndex(): number | null {
@@ -188,6 +193,14 @@ function createPlayerStore() {
 			void reportNavidromeNowPlaying(item.trackSourceId);
 			return {
 				source: createPlaybackSource('navidrome', { url: url!, seekable: true }),
+				loadUrl: url
+			};
+		}
+		if (item.sourceType === 'plex') {
+			isSeekable = true;
+			if (item.plexRatingKey) void reportPlexNowPlaying(item.plexRatingKey);
+			return {
+				source: createPlaybackSource('plex', { url: url!, seekable: true }),
 				loadUrl: url
 			};
 		}
@@ -264,13 +277,13 @@ function createPlayerStore() {
 		playbackState = 'error';
 		const trackName = nowPlaying?.trackName ?? 'Unknown track';
 		if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
-			playbackToast.show('Multiple tracks failed — playback stopped', 'error');
+			playbackToast.show('Several tracks failed, so playback stopped.', 'error');
 			applyResetState();
 			return;
 		}
 		const nextIdx = getNextIndex();
 		if (nextIdx !== null) {
-			playbackToast.show(`"${trackName}" unavailable — skipping…`, 'warning');
+			playbackToast.show(`"${trackName}" is unavailable, skipping...`, 'warning');
 			errorSkipTimeout = setTimeout(() => {
 				errorSkipTimeout = null;
 				if (gen === loadGeneration) void loadQueueItem(nextIdx);
@@ -312,6 +325,8 @@ function createPlayerStore() {
 				const ci = queue[currentIndex] ?? null;
 				void stopJellyfinSession(getJellyfinItem(), progress);
 				if (ci?.sourceType === 'navidrome') void reportNavidromeScrobble(ci.trackSourceId);
+				if (ci?.sourceType === 'plex' && ci.plexRatingKey)
+					void reportPlexScrobble(ci.plexRatingKey);
 				const nextIdx = getNextIndex();
 				if (nextIdx !== null) {
 					void loadQueueItem(nextIdx).then(() => {
@@ -590,7 +605,8 @@ function createPlayerStore() {
 			playlistTrackId: string,
 			newSourceType: SourceType,
 			newTrackSourceId: string,
-			newFormat?: string
+			newFormat?: string,
+			plexRatingKey?: string
 		): void {
 			const r = updateItemByPlaylistTrackId(
 				queue,
@@ -598,7 +614,8 @@ function createPlayerStore() {
 				currentIndex,
 				newSourceType,
 				newTrackSourceId,
-				newFormat
+				newFormat,
+				plexRatingKey
 			);
 			if (r) {
 				queue = r;

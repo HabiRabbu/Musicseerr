@@ -877,6 +877,78 @@ export type NavidromePaginatedResponse = {
 	total: number;
 };
 
+export type PlexConnectionSettings = {
+	plex_url: string;
+	plex_token: string;
+	enabled: boolean;
+	music_library_ids: string[];
+	scrobble_to_plex: boolean;
+};
+
+export type PlexTrackInfo = {
+	plex_id: string;
+	title: string;
+	track_number: number;
+	duration_seconds: number;
+	disc_number: number;
+	album_name: string;
+	artist_name: string;
+	codec?: string | null;
+	bitrate?: number | null;
+	part_key?: string | null;
+};
+
+export type PlexAlbumSummary = {
+	plex_id: string;
+	name: string;
+	artist_name: string;
+	year?: number | null;
+	track_count: number;
+	image_url?: string | null;
+	musicbrainz_id?: string | null;
+	artist_musicbrainz_id?: string | null;
+};
+
+export type PlexAlbumDetail = PlexAlbumSummary & {
+	tracks: PlexTrackInfo[];
+	genres: string[];
+};
+
+export type PlexAlbumMatch = {
+	found: boolean;
+	plex_album_id?: string | null;
+	tracks: PlexTrackInfo[];
+};
+
+export type PlexArtistSummary = {
+	plex_id: string;
+	name: string;
+	image_url?: string | null;
+	musicbrainz_id?: string | null;
+};
+
+export type PlexSearchResponse = {
+	albums: PlexAlbumSummary[];
+	artists: PlexArtistSummary[];
+	tracks: PlexTrackInfo[];
+};
+
+export type PlexLibraryStats = {
+	total_tracks: number;
+	total_albums: number;
+	total_artists: number;
+};
+
+export type PlexPaginatedResponse = {
+	items: PlexAlbumSummary[];
+	total: number;
+};
+
+export type PlexLibrarySection = {
+	key: string;
+	title: string;
+};
+
 export type LocalTrackInfo = {
 	track_file_id: number;
 	title: string;
