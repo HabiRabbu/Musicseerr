@@ -12,7 +12,9 @@ export function abortAllPageRequests(): void {
 }
 
 export async function pageFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
-	if (typeof window === 'undefined') return fetch(input, init);
+	if (typeof window === 'undefined') {
+		throw new Error('Can never happen, we are running in SPA mode');
+	}
 	const navSignal = getNavigationSignal();
 	const existingSignal = init?.signal;
 	const signal = existingSignal ? AbortSignal.any([navSignal, existingSignal]) : navSignal;

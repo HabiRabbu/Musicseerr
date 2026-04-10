@@ -35,7 +35,7 @@ Frontend:
 
 ```bash
 cd frontend
-cp env.dev.example .env
+cp env.development.example .env.development
 pnpm install
 pnpm run dev
 ```

@@ -14,7 +14,7 @@ export const getHomeQuery = (getSource: Getter<MusicSource>) =>
 		staleTime: CACHE_TTL.HOME,
 		queryKey: keyFactory.home(getSource()),
 		queryFn: ({ signal }) =>
-			api.get<HomeResponse>(API.home(getSource()), {
+			api.global.get<HomeResponse>(API.home(getSource()), {
 				signal
 			})
 	}));

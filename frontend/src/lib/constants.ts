@@ -198,6 +198,7 @@ export const API = {
 	},
 	queue: () => '/api/v1/queue',
 	settings: () => '/api/v1/settings',
+	settingsPrimarySource: () => '/api/v1/settings/primary-source',
 	settingsNavidrome: () => '/api/v1/settings/navidrome',
 	settingsNavidromeVerify: () => '/api/v1/settings/navidrome/verify',
 	settingsLocalFiles: () => '/api/v1/settings/local-files',
