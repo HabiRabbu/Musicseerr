@@ -150,9 +150,6 @@ export type ArtistInfo = {
 	in_lidarr?: boolean;
 	monitored?: boolean;
 	auto_download?: boolean;
-	// albums: ReleaseGroup[];
-	// singles: ReleaseGroup[];
-	// eps: ReleaseGroup[];
 	release_group_count?: number;
 };
 
