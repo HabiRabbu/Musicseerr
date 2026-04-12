@@ -199,10 +199,17 @@ function getSourceQueueItems(
 	return buildQueueItemsFromLocal([...localTracks].sort(compareDiscTrack), meta);
 }
 
-export function buildSourceCallbacks(
-	matchGetter: () => JellyfinAlbumMatch | LocalAlbumMatch | NavidromeAlbumMatch | PlexAlbumMatch | null,
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- launcher generics vary by source
-	launcher: (tracks: any[], startIndex: number, shuffle: boolean, meta: PlaybackMeta) => void,
+export function buildSourceCallbacks<
+	TTrack extends { track_number: number; disc_number?: number | null; title: string },
+	TMatch extends { tracks: TTrack[] } | null
+>(
+	matchGetter: () => TMatch,
+	launcher: (
+		tracks: TTrack[],
+		startIndex: number | undefined,
+		shuffle: boolean | undefined,
+		meta: PlaybackMeta
+	) => void,
 	source: 'jellyfin' | 'local' | 'navidrome' | 'plex',
 	albumGetter: () => AlbumBasicInfo | null,
 	tracksGetters: {

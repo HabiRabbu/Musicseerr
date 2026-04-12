@@ -92,6 +92,7 @@ async def list_playlists(
                 total_duration=s.total_duration,
                 cover_urls=[_normalize_cover_url(u) for u in s.cover_urls] if s.cover_urls else [],
                 custom_cover_url=_custom_cover_url(s.id, s.cover_image_path),
+                source_ref=s.source_ref,
                 created_at=s.created_at,
                 updated_at=s.updated_at,
             )
@@ -120,6 +121,7 @@ async def create_playlist(
         id=playlist.id,
         name=playlist.name,
         custom_cover_url=_custom_cover_url(playlist.id, playlist.cover_image_path),
+        source_ref=playlist.source_ref,
         tracks=[],
         track_count=0,
         total_duration=None,
@@ -142,6 +144,7 @@ async def get_playlist(
         name=playlist.name,
         cover_urls=cover_urls,
         custom_cover_url=_custom_cover_url(playlist.id, playlist.cover_image_path),
+        source_ref=playlist.source_ref,
         tracks=track_responses,
         track_count=len(tracks),
         total_duration=total_duration or None,
@@ -165,6 +168,7 @@ async def update_playlist(
         name=playlist.name,
         cover_urls=cover_urls,
         custom_cover_url=_custom_cover_url(playlist.id, playlist.cover_image_path),
+        source_ref=playlist.source_ref,
         tracks=track_responses,
         track_count=len(tracks),
         total_duration=total_duration or None,
@@ -311,7 +315,7 @@ async def upload_cover(
     service: PlaylistServiceDep,
     cover_image: UploadFile = File(...),
 ) -> CoverUploadResponse:
-    max_size = 2 * 1024 * 1024  # 2 MB
+    max_size = 2 * 1024 * 1024
     chunk_size = 8192
     chunks: list[bytes] = []
     total = 0

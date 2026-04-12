@@ -49,7 +49,7 @@ class TestCreatePlaylist:
         service, repo = _make_service(tmp_path)
         result = await service.create_playlist("My Playlist")
         assert result.name == "Test"
-        repo.create_playlist.assert_called_once_with("My Playlist")
+        repo.create_playlist.assert_called_once_with("My Playlist", None)
 
     @pytest.mark.asyncio
     async def test_empty_name(self, tmp_path):
@@ -67,7 +67,7 @@ class TestCreatePlaylist:
     async def test_strips_whitespace(self, tmp_path):
         service, repo = _make_service(tmp_path)
         await service.create_playlist("  Hello  ")
-        repo.create_playlist.assert_called_once_with("Hello")
+        repo.create_playlist.assert_called_once_with("Hello", None)
 
 
 class TestGetPlaylist:

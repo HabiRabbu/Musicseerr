@@ -12,6 +12,7 @@ export interface SidebarData<TAlbum> {
 	recentAlbums: TAlbum[];
 	favoriteAlbums: TAlbum[];
 	genres: string[];
+	moods: string[];
 	stats: Record<string, unknown> | null;
 }
 
@@ -31,6 +32,9 @@ export interface LibraryAdapter<TAlbum> {
 		sortBy: string;
 		sortOrder: string;
 		genre?: string;
+		mood?: string;
+		decade?: string;
+		tag?: string;
 		search?: string;
 		signal: AbortSignal;
 	}): Promise<{ items: TAlbum[]; total: number }>;
@@ -58,16 +62,23 @@ export interface LibraryAdapter<TAlbum> {
 	descValue: string;
 	getDefaultSortOrder(field: string): string;
 	supportsGenres: boolean;
+	supportsMoods: boolean;
+	supportsDecades: boolean;
+	supportsTags: boolean;
 	supportsFavorites: boolean;
 	supportsShuffle: boolean;
 	errorMessage: string;
 }
 
-export function createLibraryController<TAlbum>(adapter: LibraryAdapter<TAlbum>) {
+export function createLibraryController<TAlbum>(
+	adapter: LibraryAdapter<TAlbum>,
+	options?: { initialSortBy?: string; initialSortOrder?: string },
+) {
 	let albums = $state<TAlbum[]>([]);
 	let recentAlbums = $state<TAlbum[]>([]);
 	let favoriteAlbums = $state<TAlbum[]>([]);
 	let genres = $state<string[]>([]);
+	let moods = $state<string[]>([]);
 	let stats = $state<Record<string, unknown> | null>(null);
 	let total = $state(0);
 	let loading = $state(true);
@@ -75,9 +86,14 @@ export function createLibraryController<TAlbum>(adapter: LibraryAdapter<TAlbum>)
 	let fetchError = $state('');
 	let fetchErrorCode = $state('');
 
-	let sortBy = $state(adapter.defaultSortBy);
-	let sortOrder = $state(adapter.ascValue);
+	let sortBy = $state(options?.initialSortBy ?? adapter.defaultSortBy);
+	let sortOrder = $state(
+		options?.initialSortOrder ?? (options?.initialSortBy ? adapter.getDefaultSortOrder(options.initialSortBy) : adapter.ascValue),
+	);
 	let selectedGenre = $state('');
+	let selectedMood = $state('');
+	let selectedDecade = $state('');
+	let selectedTag = $state('');
 	let searchQuery = $state('');
 	let searchTimeout: ReturnType<typeof setTimeout> | null = null;
 	let fetchId = 0;
@@ -93,7 +109,10 @@ export function createLibraryController<TAlbum>(adapter: LibraryAdapter<TAlbum>)
 	function getCacheKey(offset: number): string {
 		const search = searchQuery.trim() || '';
 		const genre = selectedGenre || '';
-		return `${sortBy}:${sortOrder}:${genre}:${search}:${PAGE_SIZE}:${offset}`;
+		const mood = selectedMood || '';
+		const decade = selectedDecade || '';
+		const tag = selectedTag || '';
+		return `${sortBy}:${sortOrder}:${genre}:${mood}:${decade}:${tag}:${search}:${PAGE_SIZE}:${offset}`;
 	}
 
 	async function fetchAlbums(reset = false): Promise<void> {
@@ -125,7 +144,6 @@ export function createLibraryController<TAlbum>(adapter: LibraryAdapter<TAlbum>)
 					loadingMore = false;
 					return;
 				}
-				// Stale: show cached data, but keep loadingMore true to prevent re-trigger
 				loading = false;
 			}
 
@@ -135,6 +153,9 @@ export function createLibraryController<TAlbum>(adapter: LibraryAdapter<TAlbum>)
 				sortBy,
 				sortOrder,
 				genre: selectedGenre || undefined,
+				mood: selectedMood || undefined,
+				decade: selectedDecade || undefined,
+				tag: selectedTag || undefined,
 				search: searchQuery.trim() || undefined,
 				signal
 			});
@@ -163,6 +184,7 @@ export function createLibraryController<TAlbum>(adapter: LibraryAdapter<TAlbum>)
 			recentAlbums = cached.data.recentAlbums;
 			favoriteAlbums = cached.data.favoriteAlbums;
 			genres = cached.data.genres;
+			moods = cached.data.moods ?? [];
 			stats = cached.data.stats;
 			if (!adapter.isSidebarCacheStale(cached.timestamp)) return;
 		}
@@ -173,11 +195,12 @@ export function createLibraryController<TAlbum>(adapter: LibraryAdapter<TAlbum>)
 		try {
 			const { data: result, hasFreshData } = await adapter.fetchSidebarData(
 				sidebarAbortController.signal,
-				{ recentAlbums, favoriteAlbums, genres, stats }
+				{ recentAlbums, favoriteAlbums, genres, moods, stats }
 			);
 			recentAlbums = result.recentAlbums;
 			favoriteAlbums = result.favoriteAlbums;
 			genres = result.genres;
+			moods = result.moods ?? [];
 			stats = result.stats;
 			if (hasFreshData) adapter.setSidebarCached(result);
 		} catch (e) {
@@ -209,6 +232,21 @@ export function createLibraryController<TAlbum>(adapter: LibraryAdapter<TAlbum>)
 
 	function handleGenreChange(value: string): void {
 		selectedGenre = value;
+		fetchAlbums(true);
+	}
+
+	function handleMoodChange(value: string): void {
+		selectedMood = value;
+		fetchAlbums(true);
+	}
+
+	function handleDecadeChange(value: string): void {
+		selectedDecade = value;
+		fetchAlbums(true);
+	}
+
+	function handleTagChange(value: string): void {
+		selectedTag = value;
 		fetchAlbums(true);
 	}
 
@@ -350,6 +388,9 @@ export function createLibraryController<TAlbum>(adapter: LibraryAdapter<TAlbum>)
 		get genres() {
 			return genres;
 		},
+		get moods() {
+			return moods;
+		},
 		get stats() {
 			return stats;
 		},
@@ -376,6 +417,15 @@ export function createLibraryController<TAlbum>(adapter: LibraryAdapter<TAlbum>)
 		},
 		get selectedGenre() {
 			return selectedGenre;
+		},
+		get selectedMood() {
+			return selectedMood;
+		},
+		get selectedDecade() {
+			return selectedDecade;
+		},
+		get selectedTag() {
+			return selectedTag;
 		},
 		get searchQuery() {
 			return searchQuery;
@@ -411,6 +461,9 @@ export function createLibraryController<TAlbum>(adapter: LibraryAdapter<TAlbum>)
 		handleSortChange,
 		toggleSortOrder,
 		handleGenreChange,
+		handleMoodChange,
+		handleDecadeChange,
+		handleTagChange,
 		handleSearch,
 		loadMore,
 		quickPlay,

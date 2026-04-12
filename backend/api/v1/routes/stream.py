@@ -232,6 +232,15 @@ async def navidrome_now_playing(
     return {"status": "ok" if ok else "error"}
 
 
+@router.post("/navidrome/{item_id}/stopped")
+async def navidrome_stopped(
+    item_id: str,
+    playback_service: NavidromePlaybackService = Depends(get_navidrome_playback_service),
+) -> dict[str, str]:
+    await playback_service.clear_now_playing(item_id)
+    return {"status": "ok"}
+
+
 @router.head("/plex/{part_key:path}")
 async def head_plex_audio(
     part_key: str,
@@ -277,4 +286,13 @@ async def plex_now_playing(
     playback_service: PlexPlaybackService = Depends(get_plex_playback_service),
 ) -> dict[str, str]:
     ok = await playback_service.report_now_playing(rating_key)
+    return {"status": "ok" if ok else "error"}
+
+
+@router.post("/plex/{rating_key}/stopped")
+async def plex_stopped(
+    rating_key: str,
+    playback_service: PlexPlaybackService = Depends(get_plex_playback_service),
+) -> dict[str, str]:
+    ok = await playback_service.report_stopped(rating_key)
     return {"status": "ok" if ok else "error"}

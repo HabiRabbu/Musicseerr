@@ -16,15 +16,19 @@ from infrastructure.resilience.retry import CircuitBreaker, with_retry
 from repositories.plex_models import (
     PlexAlbum,
     PlexArtist,
+    PlexHistoryEntry,
     PlexLibrarySection,
     PlexOAuthPin,
     PlexPlaylist,
+    PlexSession,
     PlexTrack,
     StreamProxyResult,
     parse_album,
     parse_artist,
     parse_library_sections,
+    parse_plex_history,
     parse_plex_response,
+    parse_plex_sessions,
     parse_playlist,
     parse_track,
 )
@@ -203,19 +207,23 @@ class PlexRepository:
         section_id: str,
         size: int = 100,
         offset: int = 0,
+        search: str = "",
     ) -> list[PlexArtist]:
-        cache_key = f"{PLEX_PREFIX}artists:{section_id}:{size}:{offset}"
+        cache_key = f"{PLEX_PREFIX}artists:{section_id}:{size}:{offset}:{search}"
         cached = await self._cache.get(cache_key)
         if cached is not None:
             return cached
 
+        params: dict[str, Any] = {
+            "type": 8,
+            "X-Plex-Container-Start": offset,
+            "X-Plex-Container-Size": size,
+        }
+        if search:
+            params["title"] = search
         container = await self._request(
             f"/library/sections/{section_id}/all",
-            params={
-                "type": 8,
-                "X-Plex-Container-Start": offset,
-                "X-Plex-Container-Size": size,
-            },
+            params=params,
         )
         raw = container.get("Metadata", [])
         artists = [parse_artist(a) for a in raw]
@@ -229,8 +237,10 @@ class PlexRepository:
         offset: int = 0,
         sort: str = "titleSort:asc",
         genre: str | None = None,
+        mood: str | None = None,
+        decade: str | None = None,
     ) -> tuple[list[PlexAlbum], int]:
-        cache_key = f"{PLEX_PREFIX}albums:{section_id}:{size}:{offset}:{sort}:{genre or ''}"
+        cache_key = f"{PLEX_PREFIX}albums:{section_id}:{size}:{offset}:{sort}:{genre or ''}:{mood or ''}:{decade or ''}"
         cached = await self._cache.get(cache_key)
         if cached is not None:
             return cached
@@ -243,6 +253,15 @@ class PlexRepository:
         }
         if genre:
             params["genre"] = genre
+        if mood:
+            params["mood"] = mood
+        if decade:
+            stripped = decade.rstrip("s")
+            try:
+                start = int(stripped)
+                params["year"] = ",".join(str(y) for y in range(start, start + 10))
+            except ValueError:
+                pass
 
         container = await self._request(
             f"/library/sections/{section_id}/all",
@@ -290,6 +309,41 @@ class PlexRepository:
         total = container.get("totalSize", 0)
         await self._cache.set(cache_key, total, self._ttl_list)
         return total
+
+    async def get_tracks(
+        self,
+        section_id: str,
+        size: int = 100,
+        offset: int = 0,
+        sort: str = "titleSort:asc",
+        search: str = "",
+        genre: str = "",
+    ) -> tuple[list[PlexTrack], int]:
+        cache_key = f"{PLEX_PREFIX}tracks:{section_id}:{size}:{offset}:{sort}:{search}:{genre}"
+        cached = await self._cache.get(cache_key)
+        if cached is not None:
+            return cached
+
+        params: dict[str, Any] = {
+            "type": 10,
+            "sort": sort,
+            "X-Plex-Container-Start": offset,
+            "X-Plex-Container-Size": size,
+        }
+        if search:
+            params["title"] = search
+        if genre:
+            params["genre"] = genre
+        container = await self._request(
+            f"/library/sections/{section_id}/all",
+            params=params,
+        )
+        raw = container.get("Metadata", [])
+        tracks = [parse_track(t) for t in raw]
+        total = container.get("totalSize", len(tracks))
+        result = (tracks, total)
+        await self._cache.set(cache_key, result, self._ttl_list)
+        return result
 
     async def get_album_tracks(self, rating_key: str) -> list[PlexTrack]:
         cache_key = f"{PLEX_PREFIX}album_tracks:{rating_key}"
@@ -439,6 +493,41 @@ class PlexRepository:
         await self._cache.set(cache_key, genres, self._ttl_genres)
         return genres
 
+    async def get_moods(self, section_id: str) -> list[str]:
+        cache_key = f"{PLEX_PREFIX}moods:{section_id}"
+        cached = await self._cache.get(cache_key)
+        if cached is not None:
+            return cached
+
+        container = await self._request(
+            f"/library/sections/{section_id}/mood",
+        )
+        raw = container.get("Directory", [])
+        moods = [m.get("title", "") for m in raw if m.get("title")]
+        await self._cache.set(cache_key, moods, self._ttl_genres)
+        return moods
+
+    async def get_hubs(
+        self, section_id: str, count: int = 10
+    ) -> list[dict[str, Any]]:
+        cache_key = f"{PLEX_PREFIX}hubs:{section_id}:{count}"
+        cached = await self._cache.get(cache_key)
+        if cached is not None:
+            return cached
+
+        try:
+            container = await self._request(
+                f"/hubs/sections/{section_id}",
+                params={"count": count},
+            )
+            hubs = container.get("Hub", [])
+            await self._cache.set(cache_key, hubs, ttl_seconds=1800)
+            return hubs
+        except Exception:  # noqa: BLE001
+            logger.warning("get_hubs failed for section %s", section_id, exc_info=True)
+            _record_degradation("Plex get_hubs failed")
+            return []
+
     async def scrobble(self, rating_key: str) -> bool:
         try:
             if not self._configured:
@@ -459,7 +548,7 @@ class PlexRepository:
             _record_degradation("Plex scrobble failed")
             return False
 
-    async def now_playing(self, rating_key: str) -> bool:
+    async def now_playing(self, rating_key: str, state: str = "playing") -> bool:
         try:
             if not self._configured:
                 return False
@@ -468,7 +557,7 @@ class PlexRepository:
                 url,
                 params={
                     "ratingKey": rating_key,
-                    "state": "playing",
+                    "state": state,
                     "key": f"/library/metadata/{rating_key}",
                 },
                 headers=self._build_headers(),
@@ -621,6 +710,37 @@ class PlexRepository:
         content_type = response.headers.get("content-type", "image/jpeg")
         return response.content, content_type
 
+    async def proxy_playlist_composite(self, rating_key: str, size: int = 500) -> tuple[bytes, str]:
+        if not self._configured:
+            raise ExternalServiceError("Plex not configured")
+
+        playlists = await self.get_playlists()
+        playlist = next((p for p in playlists if p.ratingKey == rating_key), None)
+        composite_path = playlist.composite if playlist and playlist.composite else f"/playlists/{rating_key}/composite"
+
+        url = f"{self._url}{composite_path}"
+        headers = self._build_headers()
+        headers["Accept"] = "image/*"
+        try:
+            response = await self._client.get(
+                url,
+                params={"width": size, "height": size},
+                headers=headers,
+                timeout=15.0,
+            )
+        except httpx.TimeoutException:
+            raise ExternalServiceError("Plex playlist composite request timed out")
+        except httpx.HTTPError:
+            raise ExternalServiceError("Plex playlist composite request failed")
+
+        if response.status_code != 200:
+            raise ExternalServiceError(
+                f"Plex playlist composite request failed ({response.status_code})"
+            )
+
+        content_type = response.headers.get("content-type", "image/jpeg")
+        return response.content, content_type
+
     async def validate_connection(self) -> tuple[bool, str]:
         if not self._configured:
             return False, "Plex URL or token not configured"
@@ -685,6 +805,60 @@ class PlexRepository:
             data = response.json()
             token = data.get("authToken")
             return token if token else None
+
+    async def get_sessions(self) -> list[PlexSession]:
+        if not self._configured:
+            return []
+        cache_key = f"{PLEX_PREFIX}sessions"
+        cached = await self._cache.get(cache_key)
+        if cached is not None:
+            return cached
+        try:
+            data = await self._request("/status/sessions")
+            sessions = parse_plex_sessions(data)
+            await self._cache.set(cache_key, sessions, 2)
+            return sessions
+        except (PlexAuthError, PlexApiError):
+            logger.warning("Plex sessions unavailable (may require admin token)")
+            _record_degradation("Plex sessions auth/api failure")
+            return []
+        except Exception:  # noqa: BLE001
+            logger.warning("Failed to fetch Plex sessions", exc_info=True)
+            _record_degradation("Plex sessions fetch failed")
+            return []
+
+    async def get_listening_history(
+        self,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> tuple[list[PlexHistoryEntry], int]:
+        if not self._configured:
+            return [], 0
+        cache_key = f"{PLEX_PREFIX}history:{limit}:{offset}"
+        cached = await self._cache.get(cache_key)
+        if cached is not None:
+            return cached
+        try:
+            data = await self._request(
+                "/status/sessions/history/all",
+                params={
+                    "X-Plex-Container-Start": offset,
+                    "X-Plex-Container-Size": limit,
+                    "sort": "viewedAt:desc",
+                },
+            )
+            entries, total = parse_plex_history(data)
+            result = (entries, total)
+            await self._cache.set(cache_key, result, 300)
+            return result
+        except (PlexAuthError, PlexApiError):
+            logger.warning("Plex history unavailable (may require admin token)")
+            _record_degradation("Plex history auth/api failure")
+            return [], 0
+        except Exception:  # noqa: BLE001
+            logger.warning("Failed to fetch Plex listening history", exc_info=True)
+            _record_degradation("Plex history fetch failed")
+            return [], 0
 
     async def clear_cache(self) -> None:
         await self._cache.clear_prefix(PLEX_PREFIX)

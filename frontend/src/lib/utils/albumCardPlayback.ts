@@ -84,27 +84,23 @@ function buildPlexItems(tracks: PlexTrackInfo[], meta: AlbumCardMeta): QueueItem
 	return tracks
 		.filter((t) => t.part_key)
 		.map((t) => {
-		return {
-			trackSourceId: t.part_key!,
-			trackName: t.title,
-			artistName: meta.artistName,
-			trackNumber: t.track_number,
-			albumId: meta.mbid,
-			albumName: meta.albumName,
-			coverUrl: cover,
-			sourceType: 'plex' as const,
-			artistId: meta.artistId,
-			streamUrl: API.stream.plex(t.part_key!),
-			format: normalizeCodec(t.codec),
-			plexRatingKey: t.plex_id
-		};
-	});
+			return {
+				trackSourceId: t.part_key!,
+				trackName: t.title,
+				artistName: meta.artistName,
+				trackNumber: t.track_number,
+				albumId: meta.mbid,
+				albumName: meta.albumName,
+				coverUrl: cover,
+				sourceType: 'plex' as const,
+				artistId: meta.artistId,
+				streamUrl: API.stream.plex(t.part_key!),
+				format: normalizeCodec(t.codec),
+				plexRatingKey: t.plex_id
+			};
+		});
 }
 
-/**
- * Probes configured sources in parallel and returns QueueItems from the
- * highest-priority source that has tracks (local > navidrome > jellyfin).
- */
 export async function fetchAlbumQueueItems(
 	meta: AlbumCardMeta,
 	signal?: AbortSignal

@@ -20,7 +20,7 @@ from repositories.playlist_repository import (
 logger = logging.getLogger(__name__)
 
 ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp"}
-MAX_COVER_SIZE = 2 * 1024 * 1024  # 2 MB
+MAX_COVER_SIZE = 2 * 1024 * 1024
 _MIME_TO_EXT = {"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp"}
 _SAFE_ID_RE = re.compile(r"^[a-f0-9\-]+$")
 VALID_SOURCE_TYPES = {"local", "jellyfin", "navidrome", "plex", "youtube", ""}
@@ -81,15 +81,21 @@ class PlaylistService:
         self._cache = cache
 
 
-    async def create_playlist(self, name: str) -> PlaylistRecord:
+    async def create_playlist(self, name: str, *, source_ref: str | None = None) -> PlaylistRecord:
         stripped = name.strip() if name else ""
         if not stripped:
             raise InvalidPlaylistDataError("Playlist name must not be empty")
         if len(stripped) > MAX_NAME_LENGTH:
             raise InvalidPlaylistDataError(f"Playlist name must not exceed {MAX_NAME_LENGTH} characters")
-        result = await self._repo.create_playlist(stripped)
-        logger.info("Playlist created: id=%s name=%s", result.id, result.name)
+        result = await self._repo.create_playlist(stripped, source_ref=source_ref)
+        logger.info("Playlist created: id=%s name=%s source_ref=%s", result.id, result.name, source_ref)
         return result
+
+    async def get_by_source_ref(self, source_ref: str) -> PlaylistRecord | None:
+        return await self._repo.get_by_source_ref(source_ref)
+
+    async def get_imported_source_ids(self, prefix: str) -> set[str]:
+        return await self._repo.get_imported_source_ids(prefix)
 
     async def get_playlist(self, playlist_id: str) -> PlaylistRecord:
         result = await self._repo.get_playlist(playlist_id)
@@ -488,7 +494,7 @@ class PlaylistService:
                 f"Invalid image type. Allowed: {', '.join(ALLOWED_IMAGE_TYPES)}"
             )
         if len(data) > MAX_COVER_SIZE:
-            raise InvalidPlaylistDataError("Image too large. Maximum size is 2 MB")  # defence-in-depth
+            raise InvalidPlaylistDataError("Image too large. Maximum size is 2 MB")
 
         ext = _MIME_TO_EXT.get(content_type, ".jpg")
         file_path = self._cover_dir / f"{playlist_id}{ext}"

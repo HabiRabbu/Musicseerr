@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Shuffle, Play, X, ListPlus, ListStart, ListMusic } from 'lucide-svelte';
+	import { Shuffle, Play, X, ListPlus, ListStart, ListMusic, Info } from 'lucide-svelte';
 	import { goto } from '$app/navigation';
 	import { API } from '$lib/constants';
 	import { playerStore } from '$lib/stores/player.svelte';
@@ -11,6 +11,7 @@
 	import type { MenuItem } from '$lib/components/ContextMenu.svelte';
 	import AddToPlaylistModal from '$lib/components/AddToPlaylistModal.svelte';
 	import AlbumImage from '$lib/components/AlbumImage.svelte';
+	import MetadataPanel from '$lib/components/MetadataPanel.svelte';
 	import {
 		buildQueueItem,
 		buildQueueItemsFromJellyfin,
@@ -18,6 +19,7 @@
 		buildQueueItemsFromNavidrome,
 		buildQueueItemsFromPlex,
 		compareDiscTrack,
+		normalizeCodec,
 		normalizeDiscNumber,
 		type TrackMeta,
 		type TrackSourceData
@@ -26,6 +28,8 @@
 	import { getCoverUrl } from '$lib/utils/errorHandling';
 	import { api } from '$lib/api/client';
 	import NowPlayingIndicator from '$lib/components/NowPlayingIndicator.svelte';
+	import AudioQualityBadge from '$lib/components/AudioQualityBadge.svelte';
+	import { Radio } from 'lucide-svelte';
 	import type {
 		JellyfinTrackInfo,
 		LocalTrackInfo,
@@ -63,6 +67,13 @@
 	let trackError = $state('');
 	let fetchId = 0;
 	let playlistModalRef = $state<{ open: (tracks: QueueItem[]) => void } | null>(null);
+	let mixLoading = $state(false);
+	let infoOpen = $state(false);
+	let infoNotes = $state('');
+	let infoLastfmUrl = $state('');
+	let infoMbid = $state('');
+	let infoImageUrl = $state('');
+	let infoLoading = $state(false);
 
 	let albumName = $derived(album?.name ?? '');
 	let artistName = $derived(album?.artist_name ?? '');
@@ -119,8 +130,7 @@
 			return (album as JellyfinAlbumSummary).artist_musicbrainz_id ?? null;
 		if (sourceType === 'navidrome')
 			return (album as NavidromeAlbumSummary).artist_musicbrainz_id ?? null;
-		if (sourceType === 'plex')
-			return (album as PlexAlbumSummary).artist_musicbrainz_id ?? null;
+		if (sourceType === 'plex') return (album as PlexAlbumSummary).artist_musicbrainz_id ?? null;
 		return (album as LocalAlbumSummary).artist_mbid ?? null;
 	}
 
@@ -173,7 +183,7 @@
 			}
 		} catch (e) {
 			if (id === fetchId)
-				trackError = e instanceof Error ? e.message : "Couldn't load the track list";
+				trackError = e instanceof Error ? e.message : "Couldn't load the track list.";
 		} finally {
 			if (id === fetchId) loadingTracks = false;
 		}
@@ -201,6 +211,58 @@
 		const target = artistMbid;
 		handleClose();
 		goto(`/artist/${target}`);
+	}
+
+	async function launchInstantMix() {
+		if (sourceType !== 'jellyfin' || !album || !('jellyfin_id' in album)) return;
+		mixLoading = true;
+		try {
+			const tracks = await api.get<JellyfinTrackInfo[]>(
+				API.jellyfinLibrary.instantMix(album.jellyfin_id)
+			);
+			if (tracks.length > 0) {
+				const items: QueueItem[] = tracks.map((t) => ({
+					trackSourceId: t.jellyfin_id,
+					trackName: t.title,
+					artistName: t.artist_name,
+					trackNumber: t.track_number,
+					discNumber: normalizeDiscNumber(t.disc_number),
+					albumId: t.album_id || '',
+					albumName: t.album_name,
+					coverUrl: t.album_id ? `/api/v1/jellyfin/image/${t.album_id}` : null,
+					sourceType: 'jellyfin' as const,
+					streamUrl: API.stream.jellyfin(t.jellyfin_id),
+					format: normalizeCodec(t.codec)
+				}));
+				playerStore.playQueue(items, 0, false);
+			}
+		} catch {
+			return;
+		} finally {
+			mixLoading = false;
+		}
+	}
+
+	async function openAlbumInfo() {
+		if (sourceType !== 'navidrome' || !album || !('navidrome_id' in album)) return;
+		infoLoading = true;
+		infoOpen = true;
+		try {
+			const info = await api.get<{
+				notes: string;
+				musicbrainz_id: string;
+				lastfm_url: string;
+				image_url: string;
+			}>(API.navidromeLibrary.albumInfo(album.navidrome_id));
+			infoNotes = info.notes;
+			infoLastfmUrl = info.lastfm_url;
+			infoMbid = info.musicbrainz_id;
+			infoImageUrl = info.image_url;
+		} catch {
+			infoNotes = '';
+		} finally {
+			infoLoading = false;
+		}
 	}
 
 	function playAll(shuffle: boolean = false): void {
@@ -520,7 +582,7 @@
 							{/if}
 						{/if}
 						{#if !mbid && albumName}
-							<span class="badge badge-sm badge-info badge-outline">Search only</span>
+							<span class="badge badge-sm badge-info badge-outline">Search result</span>
 						{/if}
 					</div>
 				</div>
@@ -540,6 +602,28 @@
 						<Shuffle class="h-4 w-4" />
 						Shuffle
 					</button>
+					{#if sourceType === 'jellyfin'}
+						<button
+							class="btn btn-sm btn-outline gap-1"
+							onclick={launchInstantMix}
+							disabled={mixLoading}
+						>
+							<span class:animate-pulse={mixLoading}>
+								<Radio class="h-4 w-4" />
+							</span>
+							Instant Mix
+						</button>
+					{/if}
+					{#if sourceType === 'navidrome'}
+						<button
+							class="btn btn-sm btn-ghost gap-1"
+							onclick={openAlbumInfo}
+							disabled={infoLoading}
+						>
+							<Info class="h-4 w-4" />
+							Info
+						</button>
+					{/if}
 					<ContextMenu items={getBulkMenuItems()} position="end" size="sm" />
 				{/if}
 			</div>
@@ -554,7 +638,7 @@
 				{:else if trackError}
 					<div role="alert" class="alert alert-error alert-soft">
 						<span>{trackError}</span>
-						<button class="btn btn-sm btn-ghost" onclick={fetchTracks}>Retry</button>
+						<button class="btn btn-sm btn-ghost" onclick={fetchTracks}>Try again</button>
 					</div>
 				{:else if trackCount > 0}
 					<div class="flex flex-col">
@@ -597,8 +681,20 @@
 										{/if}
 									{:else if sourceType === 'plex'}
 										{@const dur = plexTracks[i]?.duration_seconds}
+										{@const pt = plexTracks[i]}
 										{#if dur}
 											<span class="text-xs opacity-40 shrink-0">{formatDuration(dur)}</span>
+										{/if}
+										{#if pt}
+											<span class="hidden sm:inline-flex shrink-0">
+												<AudioQualityBadge
+													codec={pt.codec}
+													bitrate={pt.bitrate}
+													audioChannels={pt.audio_channels}
+													container={pt.container}
+													compact
+												/>
+											</span>
 										{/if}
 									{:else}
 										{@const lt = localTracks[i]}
@@ -623,15 +719,25 @@
 						{/each}
 					</div>
 				{:else}
-					<p class="text-sm opacity-50 text-center py-6">No tracks found</p>
+					<p class="text-sm opacity-50 text-center py-6">No tracks found for this album.</p>
 				{/if}
 			</div>
 		</div>
 
 		<form method="dialog" class="modal-backdrop">
-			<button onclick={handleClose}>close</button>
+			<button onclick={handleClose}>Close</button>
 		</form>
 	</dialog>
 {/if}
 
 <AddToPlaylistModal bind:this={playlistModalRef} />
+
+<MetadataPanel
+	bind:open={infoOpen}
+	title={albumName}
+	notes={infoNotes}
+	imageUrl={infoImageUrl}
+	lastfmUrl={infoLastfmUrl}
+	musicbrainzId={infoMbid}
+	onclose={() => (infoOpen = false)}
+/>

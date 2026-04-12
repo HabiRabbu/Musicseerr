@@ -218,33 +218,30 @@ export function buildQueueItemsFromLocal(tracks: LocalTrackInfo[], meta: TrackMe
 	}));
 }
 
-export function buildQueueItemsFromPlex(
-	tracks: PlexTrackInfo[],
-	meta: TrackMeta
-): QueueItem[] {
+export function buildQueueItemsFromPlex(tracks: PlexTrackInfo[], meta: TrackMeta): QueueItem[] {
 	const normalizedCoverUrl = getCoverUrl(meta.coverUrl, meta.albumId);
 	return tracks
 		.filter((t) => t.part_key)
 		.map((t) => {
-		const format = normalizeCodec(t.codec);
-		return {
-			trackSourceId: t.part_key!,
-			trackName: t.title,
-			artistName: meta.artistName,
-			trackNumber: t.track_number,
-			discNumber: normalizeDiscNumber(t.disc_number),
-			albumId: meta.albumId,
-			albumName: meta.albumName,
-			coverUrl: normalizedCoverUrl,
-			sourceType: 'plex' as const,
-			artistId: meta.artistId,
-			streamUrl: API.stream.plex(t.part_key!),
-			format,
-			availableSources: ['plex'] as SourceType[],
-			duration: t.duration_seconds,
-			plexRatingKey: t.plex_id
-		};
-	});
+			const format = normalizeCodec(t.codec);
+			return {
+				trackSourceId: t.part_key!,
+				trackName: t.title,
+				artistName: meta.artistName,
+				trackNumber: t.track_number,
+				discNumber: normalizeDiscNumber(t.disc_number),
+				albumId: meta.albumId,
+				albumName: meta.albumName,
+				coverUrl: normalizedCoverUrl,
+				sourceType: 'plex' as const,
+				artistId: meta.artistId,
+				streamUrl: API.stream.plex(t.part_key!),
+				format,
+				availableSources: ['plex'] as SourceType[],
+				duration: t.duration_seconds,
+				plexRatingKey: t.plex_id
+			};
+		});
 }
 
 export function buildQueueItemFromYouTube(track: YouTubeTrackLink, meta: TrackMeta): QueueItem {
@@ -305,4 +302,60 @@ export function playlistTrackToQueueItem(track: PlaylistTrack): QueueItem | null
 		playlistTrackId: track.id,
 		plexRatingKey: sourceType === 'plex' ? (track.plex_rating_key ?? undefined) : undefined
 	};
+}
+
+export function buildDiscoveryQueueFromNavidrome(tracks: NavidromeTrackInfo[]): QueueItem[] {
+	return tracks.map((t) => ({
+		trackSourceId: t.navidrome_id,
+		trackName: t.title,
+		artistName: t.artist_name,
+		trackNumber: t.track_number,
+		discNumber: normalizeDiscNumber(t.disc_number),
+		albumId: '',
+		albumName: t.album_name,
+		coverUrl: t.image_url ?? null,
+		sourceType: 'navidrome' as const,
+		streamUrl: API.stream.navidrome(t.navidrome_id),
+		format: normalizeCodec(t.codec),
+		availableSources: ['navidrome'] as SourceType[],
+		duration: t.duration_seconds
+	}));
+}
+
+export function buildDiscoveryQueueFromJellyfin(tracks: JellyfinTrackInfo[]): QueueItem[] {
+	return tracks.map((t) => ({
+		trackSourceId: t.jellyfin_id,
+		trackName: t.title,
+		artistName: t.artist_name,
+		trackNumber: t.track_number,
+		discNumber: normalizeDiscNumber(t.disc_number),
+		albumId: t.album_id ?? '',
+		albumName: t.album_name,
+		coverUrl: t.image_url ?? null,
+		sourceType: 'jellyfin' as const,
+		streamUrl: API.stream.jellyfin(t.jellyfin_id),
+		format: normalizeCodec(t.codec),
+		availableSources: ['jellyfin'] as SourceType[],
+		duration: t.duration_seconds
+	}));
+}
+
+export function buildDiscoveryQueueFromPlex(tracks: PlexTrackInfo[]): QueueItem[] {
+	return tracks
+		.filter((t) => t.part_key)
+		.map((t) => ({
+			trackSourceId: t.part_key!,
+			trackName: t.title,
+			artistName: t.artist_name,
+			trackNumber: t.track_number,
+			discNumber: normalizeDiscNumber(t.disc_number),
+			albumId: '',
+			albumName: t.album_name,
+			coverUrl: t.image_url ?? null,
+			sourceType: 'plex' as const,
+			streamUrl: API.stream.plex(t.part_key!),
+			format: normalizeCodec(t.codec),
+			availableSources: ['plex'] as SourceType[],
+			duration: t.duration_seconds
+		}));
 }

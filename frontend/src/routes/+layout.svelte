@@ -34,6 +34,9 @@
 	import { cancelPendingImages } from '$lib/utils/lazyImage';
 	import { abortAllPageRequests } from '$lib/utils/navigationAbort';
 	import { requestCountStore } from '$lib/stores/requestCountStore.svelte';
+	import { nowPlayingMerged } from '$lib/stores/nowPlayingMerged.svelte';
+	import { nowPlayingStore } from '$lib/stores/nowPlayingSessions.svelte';
+	import SidebarVisualiser from '$lib/components/SidebarVisualiser.svelte';
 	import { createNavigationProgressController } from '$lib/utils/navigationProgress';
 	import { fromStore } from 'svelte/store';
 	import {
@@ -99,7 +102,6 @@
 			eqStore.replayToEngine();
 		}
 
-		// Resume AudioContext on first user gesture (browser autoplay policy)
 		const resumeAudioContext = () => {
 			tryGetAudioEngine()?.resume();
 			cleanupResumeListeners?.();
@@ -128,12 +130,14 @@
 		};
 		deferInit(() => {
 			libraryStore.initialize();
-			void integrationStore.ensureLoaded();
 			void imageSettingsStore.load();
 			void restorePlayerSession();
 			void scrobbleManager.init();
 			requestCountStore.startPolling();
 			syncStatus.connect();
+		});
+		integrationStore.ensureLoaded().then(() => {
+			nowPlayingStore.start();
 		});
 	});
 
@@ -146,6 +150,7 @@
 		}
 		requestCountStore.stopPolling();
 		syncStatus.disconnect();
+		nowPlayingStore.stop();
 		unregisterPlaylistModal();
 	});
 
@@ -197,7 +202,7 @@
 				playerStore.resumeSession();
 			}
 		} catch {
-			// Ignore errors
+			return;
 		}
 	}
 
@@ -380,8 +385,20 @@
 								class="is-drawer-close:tooltip is-drawer-close:tooltip-right"
 								data-tip="Jellyfin"
 							>
-								<JellyfinIcon class="h-6 w-6 text-info" />
+								<div class="relative inline-flex">
+									<JellyfinIcon class="h-6 w-6 text-info" />
+									{#if nowPlayingMerged.isSourcePlaying('jellyfin')}
+										<span
+											class="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-primary animate-pulse"
+										></span>
+									{/if}
+								</div>
 								<span class="is-drawer-close:hidden">Jellyfin</span>
+								{#if nowPlayingMerged.isSourcePlaying('jellyfin')}
+									<div class="now-playing-bars now-playing-bars--sm ml-auto is-drawer-close:hidden">
+										<span></span><span></span><span></span>
+									</div>
+								{/if}
 							</a>
 						</li>
 					{:else if integrations.current.loaded}
@@ -397,8 +414,20 @@
 								class="is-drawer-close:tooltip is-drawer-close:tooltip-right"
 								data-tip="Navidrome"
 							>
-								<NavidromeIcon class="h-6 w-6 text-primary" />
+								<div class="relative inline-flex">
+									<NavidromeIcon class="h-6 w-6 text-primary" />
+									{#if nowPlayingMerged.isSourcePlaying('navidrome')}
+										<span
+											class="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-primary animate-pulse"
+										></span>
+									{/if}
+								</div>
 								<span class="is-drawer-close:hidden">Navidrome</span>
+								{#if nowPlayingMerged.isSourcePlaying('navidrome')}
+									<div class="now-playing-bars now-playing-bars--sm ml-auto is-drawer-close:hidden">
+										<span></span><span></span><span></span>
+									</div>
+								{/if}
 							</a>
 						</li>
 					{:else if integrations.current.loaded}
@@ -414,13 +443,28 @@
 								class="is-drawer-close:tooltip is-drawer-close:tooltip-right"
 								data-tip="Plex"
 							>
-								<PlexIcon class="h-6 w-6" style="color: rgb(var(--brand-plex))" />
+								<div class="relative inline-flex">
+									<PlexIcon class="h-6 w-6" style="color: rgb(var(--brand-plex))" />
+									{#if nowPlayingMerged.isSourcePlaying('plex')}
+										<span
+											class="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-primary animate-pulse"
+										></span>
+									{/if}
+								</div>
 								<span class="is-drawer-close:hidden">Plex</span>
+								{#if nowPlayingMerged.isSourcePlaying('plex')}
+									<div class="now-playing-bars now-playing-bars--sm ml-auto is-drawer-close:hidden">
+										<span></span><span></span><span></span>
+									</div>
+								{/if}
 							</a>
 						</li>
 					{:else if integrations.current.loaded}
 						<SidebarServiceHint label="Plex" settingsTab="plex">
-							{#snippet icon()}<PlexIcon class="h-6 w-6" style="color: rgb(var(--brand-plex))" />{/snippet}
+							{#snippet icon()}<PlexIcon
+									class="h-6 w-6"
+									style="color: rgb(var(--brand-plex))"
+								/>{/snippet}
 						</SidebarServiceHint>
 					{/if}
 
@@ -440,6 +484,8 @@
 							{#snippet icon()}<Headphones class="h-6 w-6 text-accent" />{/snippet}
 						</SidebarServiceHint>
 					{/if}
+
+					<SidebarVisualiser />
 
 					{#if lidarrConfigured}
 						<div class="divider my-0"></div>
@@ -494,13 +540,13 @@
 				bind:query={modalQuery}
 				onSearch={handleModalSearch}
 				onSelect={handleModalSuggestionSelect}
-				placeholder="Search albums or artists..."
+				placeholder="Search albums or artists"
 				autofocus={true}
 				id="modal-suggest"
 			/>
 		</div>
 		<form method="dialog" class="modal-backdrop">
-			<button aria-label="Close modal">close</button>
+			<button aria-label="Close modal">Close</button>
 		</form>
 	</dialog>
 
@@ -549,7 +595,7 @@
 			<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 			<!-- svelte-ignore a11y_click_events_have_key_events -->
 			<form method="dialog" class="modal-backdrop" onclick={() => errorModal.hide()}>
-				<button>close</button>
+				<button>Close</button>
 			</form>
 		</dialog>
 	{/if}

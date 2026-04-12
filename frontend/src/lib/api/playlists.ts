@@ -29,6 +29,7 @@ export interface PlaylistSummary {
 	total_duration: number | null;
 	cover_urls: string[];
 	custom_cover_url: string | null;
+	source_ref: string | null;
 	created_at: string;
 	updated_at: string;
 }

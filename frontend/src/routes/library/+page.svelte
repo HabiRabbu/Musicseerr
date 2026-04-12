@@ -132,9 +132,7 @@
 		try {
 			const data = await api.global.get<{ sync_frequency: string }>('/api/v1/settings/lidarr');
 			syncFrequencyLabel = FREQ_LABELS[data.sync_frequency] ?? null;
-		} catch {
-			// Silently omit frequency hint if settings can't be loaded
-		}
+		} catch {}
 	}
 
 	async function loadArtists() {
@@ -275,7 +273,7 @@
 			<div class="flex flex-col gap-1">
 				<span>{error}</span>
 				{#if isConnectionError}
-					<a href="/settings" class="link link-primary text-sm">Check Lidarr settings →</a>
+					<a href="/settings" class="link link-primary text-sm">Open Lidarr settings</a>
 				{/if}
 			</div>
 			<div class="flex gap-2">
@@ -308,7 +306,7 @@
 				{#if loadingStats}
 					<span class="skeleton h-4 w-64 inline-block"></span>
 				{:else}
-					{stats.artist_count} artists • {stats.album_count} albums • Last sync: {lastSyncText}
+					{stats.artist_count} artists, {stats.album_count} albums, last sync {lastSyncText}
 				{/if}
 			</p>
 			{#if syncFrequencyLabel}
@@ -342,7 +340,7 @@
 						stroke-linecap="round"
 						stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" /></svg
 					>
-					<span class="hidden sm:inline">Stop Sync</span>
+					<span class="hidden sm:inline">Stop sync</span>
 				</button>
 				{#if syncStatus.isDismissed}
 					<button
@@ -351,14 +349,14 @@
 						aria-label="Show sync progress"
 					>
 						<Eye class="h-4 w-4" />
-						<span class="hidden sm:inline">Show Progress</span>
+						<span class="hidden sm:inline">Show progress</span>
 					</button>
 				{/if}
 			{:else}
 				<button class="btn btn-sm btn-primary gap-1" onclick={syncLibrary} disabled={syncing}>
 					{#if syncing}
 						<Loader2 class="h-4 w-4 animate-spin" />
-						<span class="hidden sm:inline">Syncing...</span>
+						<span class="hidden sm:inline">Syncing</span>
 					{:else}
 						<RefreshCw class="h-4 w-4" />
 						<span class="hidden sm:inline">Sync Library</span>
@@ -373,7 +371,7 @@
 			<div class="flex items-center gap-2 text-sm text-base-content/70 mb-1">
 				<span>{syncStatus.phaseLabel}</span>
 				{#if syncStatus.totalItems > 0}
-					<span>— {syncStatus.processedItems}/{syncStatus.totalItems}</span>
+					<span>({syncStatus.processedItems}/{syncStatus.totalItems})</span>
 				{/if}
 			</div>
 			<progress class="progress progress-primary w-full" value={syncStatus.progress} max="100"
@@ -382,7 +380,7 @@
 	{/if}
 
 	{#if !isSearching}
-		<section class="mb-8">
+		<section class="mb-12">
 			<h2 class="text-2xl font-semibold mb-4">Recently Added</h2>
 			{#if loadingRecentlyAdded}
 				<div class="flex gap-4 p-4 bg-base-200 rounded-box overflow-x-auto scrollbar-hide">
@@ -409,7 +407,7 @@
 				</div>
 			{:else}
 				<div class="p-8 bg-base-200 rounded-box text-center text-base-content/50">
-					<p>No recently added items</p>
+					<p>Nothing recently added yet.</p>
 				</div>
 			{/if}
 		</section>
@@ -451,10 +449,10 @@
 		>
 			<option value="date_added:desc">Newest First</option>
 			<option value="date_added:asc">Oldest First</option>
-			<option value="title:asc">Title A–Z</option>
-			<option value="title:desc">Title Z–A</option>
-			<option value="artist:asc">Artist A–Z</option>
-			<option value="artist:desc">Artist Z–A</option>
+			<option value="title:asc">Title A-Z</option>
+			<option value="title:desc">Title Z-A</option>
+			<option value="artist:asc">Artist A-Z</option>
+			<option value="artist:desc">Artist Z-A</option>
 			<option value="year:desc">Year (Newest)</option>
 			<option value="year:asc">Year (Oldest)</option>
 		</select>
@@ -555,10 +553,9 @@
 
 	{#if !isSearching && !loadingArtists && !loadingAlbums && artists.length === 0 && albums.length === 0}
 		<div class="flex flex-col items-center justify-center min-h-50 text-center mt-8">
-			<div class="text-6xl mb-4">📚</div>
-			<h2 class="text-2xl font-semibold mb-2">No items in library</h2>
+			<h2 class="text-2xl font-semibold mb-2">Your library is empty</h2>
 			<p class="text-base-content/70 mb-4">
-				Your Lidarr library is empty or hasn't been synced yet.
+				Your Lidarr library is empty, or it hasn't synced yet.
 			</p>
 			{#if syncStatus.isActive}
 				<div class="flex flex-col items-center gap-3 w-full max-w-md">
@@ -591,7 +588,7 @@
 						<div class="flex items-center justify-center gap-2 text-sm text-base-content/70 mb-1">
 							<span>{syncStatus.phaseLabel}</span>
 							{#if syncStatus.totalItems > 0}
-								<span>— {syncStatus.processedItems}/{syncStatus.totalItems}</span>
+								<span>({syncStatus.processedItems}/{syncStatus.totalItems})</span>
 							{/if}
 						</div>
 						<progress class="progress progress-primary w-full" value={syncStatus.progress} max="100"

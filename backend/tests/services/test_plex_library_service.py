@@ -337,3 +337,75 @@ class TestLookupPlexId:
     def test_returns_none_when_not_cached(self):
         service, _, _ = _make_service()
         assert service.lookup_plex_id("mbid-missing") is None
+
+
+class TestGetRecentlyPlayed:
+    @pytest.mark.asyncio
+    async def test_returns_sorted_by_last_viewed(self):
+        service, repo, _ = _make_service()
+        a1 = _album(key="1", title="Older")
+        a1.lastViewedAt = 1000
+        a2 = _album(key="2", title="Newer")
+        a2.lastViewedAt = 2000
+        repo.get_recently_viewed = AsyncMock(return_value=[a1, a2])
+        result = await service.get_recently_played(limit=20)
+        assert len(result) == 2
+        assert result[0].plex_id == "2"
+        assert result[1].plex_id == "1"
+
+    @pytest.mark.asyncio
+    async def test_empty_when_no_sections(self):
+        service, _, _ = _make_service(configured=False)
+        result = await service.get_recently_played()
+        assert result == []
+
+    @pytest.mark.asyncio
+    async def test_filters_unknown_titles(self):
+        service, repo, _ = _make_service()
+        a = _album(key="1", title="Unknown")
+        a.lastViewedAt = 1000
+        repo.get_recently_viewed = AsyncMock(return_value=[a])
+        result = await service.get_recently_played()
+        assert result == []
+
+    @pytest.mark.asyncio
+    async def test_maps_last_viewed_at(self):
+        service, repo, _ = _make_service()
+        a = _album(key="1", title="Album")
+        a.lastViewedAt = 5000
+        repo.get_recently_viewed = AsyncMock(return_value=[a])
+        result = await service.get_recently_played()
+        assert len(result) == 1
+        assert result[0].last_viewed_at == 5000
+
+
+class TestGetRecentlyAddedAlbums:
+    @pytest.mark.asyncio
+    async def test_returns_sorted_by_added_at(self):
+        service, repo, _ = _make_service()
+        a1 = _album(key="1", title="Old")
+        a1.addedAt = 100
+        a2 = _album(key="2", title="New")
+        a2.addedAt = 200
+        repo.get_recently_added = AsyncMock(return_value=[a1, a2])
+        result = await service.get_recently_added_albums(limit=20)
+        assert len(result) == 2
+        assert result[0].plex_id == "2"
+        assert result[1].plex_id == "1"
+
+    @pytest.mark.asyncio
+    async def test_empty_when_no_sections(self):
+        service, _, _ = _make_service(configured=False)
+        result = await service.get_recently_added_albums()
+        assert result == []
+
+    @pytest.mark.asyncio
+    async def test_returns_plex_album_summaries(self):
+        service, repo, _ = _make_service()
+        a = _album(key="10", title="Fresh")
+        a.addedAt = 999
+        repo.get_recently_added = AsyncMock(return_value=[a])
+        result = await service.get_recently_added_albums()
+        assert len(result) == 1
+        assert isinstance(result[0], PlexAlbumSummary)
+        assert result[0].plex_id == "10"

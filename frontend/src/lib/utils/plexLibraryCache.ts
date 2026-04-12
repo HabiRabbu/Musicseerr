@@ -5,6 +5,7 @@ import { createLocalStorageCache } from '$lib/utils/localStorageCache';
 type PlexSidebarData = {
 	recentAlbums: PlexAlbumSummary[];
 	genres: string[];
+	moods: string[];
 	stats: PlexLibraryStats | null;
 };
 

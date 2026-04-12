@@ -6,40 +6,46 @@
 	import AddToPlaylistModal from '$lib/components/AddToPlaylistModal.svelte';
 	import SourceAlbumModal from '$lib/components/SourceAlbumModal.svelte';
 	import LibraryFilterBar from '$lib/components/LibraryFilterBar.svelte';
-	import { CircleX, Play, Shuffle } from 'lucide-svelte';
+	import { ChevronLeft, CircleX, Play, Shuffle } from 'lucide-svelte';
 	import { onMount, onDestroy } from 'svelte';
 
-	/* eslint-disable @typescript-eslint/no-explicit-any */
 	interface Props {
-		ctrl: LibraryController<any>;
+		ctrl: LibraryController<unknown>;
 		headerIcon: Snippet;
 		headerTitle: string;
 		recentLabel?: string;
+		moodLabel?: string;
 		statsPanel?: Snippet;
-		recentCardOverlay?: Snippet<[any]>;
-		cardTopLeftBadge: Snippet<[any]>;
-		cardTopRightExtra?: Snippet<[any]>;
-		cardBottomLeft?: Snippet<[any]>;
-		cardBodyExtra?: Snippet<[any]>;
+		recentCardOverlay?: Snippet<[unknown]>;
+		cardTopLeftBadge: Snippet<[unknown]>;
+		cardTopRightExtra?: Snippet<[unknown]>;
+		cardBottomLeft?: Snippet<[unknown]>;
+		cardBodyExtra?: Snippet<[unknown]>;
+		backHref?: string;
 		contextMenuBackdrop?: boolean;
+		decades?: string[];
+		tags?: string[];
 		emptyIcon: Snippet;
 		emptyTitle: string;
 		emptyDescription: string;
 	}
-	/* eslint-enable @typescript-eslint/no-explicit-any */
 
 	let {
 		ctrl,
 		headerIcon,
 		headerTitle,
-		recentLabel = 'Recently Played',
+		recentLabel = 'Recently played',
+		moodLabel = 'Mood',
 		statsPanel,
 		recentCardOverlay,
 		cardTopLeftBadge,
 		cardTopRightExtra,
 		cardBottomLeft,
 		cardBodyExtra,
+		backHref,
 		contextMenuBackdrop = false,
+		decades,
+		tags,
 		emptyIcon,
 		emptyTitle,
 		emptyDescription
@@ -53,6 +59,11 @@
 
 <div class="container mx-auto p-6">
 	<div class="flex items-center gap-3 mb-2">
+		{#if backHref}
+			<a href={backHref} class="btn btn-ghost btn-circle btn-sm" aria-label="Back">
+				<ChevronLeft class="h-5 w-5" />
+			</a>
+		{/if}
 		{@render headerIcon()}
 		<h1 class="text-2xl font-bold">{headerTitle}</h1>
 		{#if ctrl.stats}
@@ -124,7 +135,7 @@
 	{/if}
 
 	<div class="mb-6">
-		<h2 class="text-lg font-semibold mb-3 opacity-80">All Albums</h2>
+		<h2 class="text-lg font-semibold mb-3 opacity-80">All albums</h2>
 		<LibraryFilterBar
 			bind:searchQuery={ctrl.searchQuery}
 			onSearchInput={ctrl.handleSearch}
@@ -137,6 +148,16 @@
 			genres={a.supportsGenres ? ctrl.genres : undefined}
 			selectedGenre={a.supportsGenres ? ctrl.selectedGenre : undefined}
 			onGenreChange={a.supportsGenres ? ctrl.handleGenreChange : undefined}
+			moods={a.supportsMoods ? ctrl.moods : undefined}
+			selectedMood={a.supportsMoods ? ctrl.selectedMood : undefined}
+			onMoodChange={a.supportsMoods ? ctrl.handleMoodChange : undefined}
+			{moodLabel}
+			decades={a.supportsDecades ? decades : undefined}
+			selectedDecade={a.supportsDecades ? ctrl.selectedDecade : undefined}
+			onDecadeChange={a.supportsDecades ? ctrl.handleDecadeChange : undefined}
+			tags={a.supportsTags ? tags : undefined}
+			selectedTag={a.supportsTags ? ctrl.selectedTag : undefined}
+			onTagChange={a.supportsTags ? ctrl.handleTagChange : undefined}
 			resultCount={ctrl.loading ? null : ctrl.total}
 			loading={ctrl.loading}
 		/>
@@ -148,7 +169,7 @@
 			<div class="flex flex-col gap-1">
 				<span>{ctrl.fetchError}</span>
 				{#if ctrl.fetchErrorCode === 'CIRCUIT_BREAKER_OPEN' || /connection|DNS|not configured/i.test(ctrl.fetchError)}
-					<a href="/settings" class="link link-primary text-sm">Check your settings →</a>
+					<a href="/settings" class="link link-primary text-sm">Open settings</a>
 				{/if}
 			</div>
 			<button class="btn btn-sm btn-ghost" onclick={() => ctrl.fetchAlbums(true)}>Retry</button>
@@ -267,7 +288,7 @@
 					{#if ctrl.loadingMore}
 						<span class="loading loading-spinner loading-sm"></span>
 					{/if}
-					Load More
+					Show more
 				</button>
 			</div>
 		{/if}

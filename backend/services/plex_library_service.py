@@ -11,12 +11,29 @@ from api.v1.schemas.plex import (
     PlexAlbumDetail,
     PlexAlbumMatch,
     PlexAlbumSummary,
+    PlexAnalyticsItem,
+    PlexAnalyticsResponse,
+    PlexArtistIndexEntry,
+    PlexArtistIndexResponse,
     PlexArtistSummary,
+    PlexDiscoveryAlbum,
+    PlexDiscoveryHub,
+    PlexDiscoveryResponse,
+    PlexHistoryEntrySchema,
+    PlexHistoryResponse,
+    PlexHubResponse,
+    PlexImportResult,
     PlexLibraryStats,
+    PlexPlaylistDetail,
+    PlexPlaylistSummary,
+    PlexPlaylistTrack,
     PlexSearchResponse,
+    PlexSessionInfo,
+    PlexSessionsResponse,
     PlexTrackInfo,
 )
 from infrastructure.cover_urls import prefer_artist_cover_url, prefer_release_group_cover_url
+from core.exceptions import ExternalServiceError
 from repositories.plex_models import PlexAlbum, PlexArtist, PlexTrack, extract_mbid_from_guids
 from repositories.protocols.plex import PlexRepositoryProtocol
 from services.preferences_service import PreferencesService
@@ -49,6 +66,17 @@ def _normalize(text: str) -> str:
     return text
 
 
+def _parse_decade(decade: str | None) -> tuple[int | None, int]:
+    if not decade:
+        return None, 0
+    stripped = decade.rstrip("s")
+    try:
+        start = int(stripped)
+    except ValueError:
+        return None, 0
+    return start, start + 9
+
+
 def _sort_albums(albums: list[PlexAlbum], sort: str) -> list[PlexAlbum]:
     parts = sort.split(":", 1)
     field = parts[0] if parts else "titleSort"
@@ -61,6 +89,12 @@ def _sort_albums(albums: list[PlexAlbum], sort: str) -> list[PlexAlbum]:
         return sorted(albums, key=lambda a: a.addedAt, reverse=reverse)
     if field == "year":
         return sorted(albums, key=lambda a: a.year, reverse=reverse)
+    if field == "viewCount":
+        return sorted(albums, key=lambda a: a.viewCount, reverse=reverse)
+    if field == "userRating":
+        return sorted(albums, key=lambda a: a.userRating, reverse=reverse)
+    if field == "lastViewedAt":
+        return sorted(albums, key=lambda a: a.lastViewedAt, reverse=reverse)
     return sorted(albums, key=lambda a: a.title.lower(), reverse=reverse)
 
 
@@ -81,6 +115,8 @@ class PlexLibraryService:
         self._artist_mbid_cache: dict[str, str | tuple[None, float]] = {}
         self._mbid_to_plex_id: dict[str, str] = {}
         self._lidarr_album_index: dict[str, tuple[str, str]] = {}
+        self._analytics_cache: PlexAnalyticsResponse | None = None
+        self._analytics_cache_ts: float = 0.0
         self._lidarr_artist_index: dict[str, str] = {}
         self._dirty = False
         self._stats_cache: PlexLibraryStats | None = None
@@ -161,11 +197,15 @@ class PlexLibraryService:
     def _track_to_info(self, track: PlexTrack) -> PlexTrackInfo:
         codec: str | None = None
         bitrate: int | None = None
+        audio_channels: int | None = None
+        container: str | None = None
         part_key: str | None = None
         if track.Media:
             media = track.Media[0]
             codec = media.audioCodec or None
             bitrate = media.bitrate or None
+            audio_channels = media.audioChannels or None
+            container = media.container or None
             if media.Part:
                 part_key = media.Part[0].key
         return PlexTrackInfo(
@@ -178,7 +218,10 @@ class PlexLibraryService:
             artist_name=track.grandparentTitle,
             codec=codec,
             bitrate=bitrate,
+            audio_channels=audio_channels,
+            container=container,
             part_key=part_key,
+            image_url=f"/api/v1/plex/thumb/{track.parentRatingKey}" if track.parentRatingKey else None,
         )
 
     async def _album_to_summary(self, album: PlexAlbum) -> PlexAlbumSummary:
@@ -200,6 +243,7 @@ class PlexLibraryService:
             image_url=image_url,
             musicbrainz_id=mbid or None,
             artist_musicbrainz_id=artist_mbid,
+            last_viewed_at=album.lastViewedAt or 0,
         )
 
     async def _build_artist_summary(self, artist: PlexArtist) -> PlexArtistSummary:
@@ -219,14 +263,18 @@ class PlexLibraryService:
         offset: int = 0,
         sort: str = "titleSort:asc",
         genre: str | None = None,
+        mood: str | None = None,
+        decade: str | None = None,
     ) -> tuple[list[PlexAlbumSummary], int]:
         section_ids = self._get_configured_section_ids()
         if not section_ids:
             return [], 0
 
+        decade_start, decade_end = _parse_decade(decade)
+
         if len(section_ids) == 1:
             albums, total = await self._plex.get_albums(
-                section_id=section_ids[0], size=size, offset=offset, sort=sort, genre=genre,
+                section_id=section_ids[0], size=size, offset=offset, sort=sort, genre=genre, mood=mood, decade=decade,
             )
             filtered = [a for a in albums if a.title and a.title != "Unknown"]
             summaries = await asyncio.gather(*(self._album_to_summary(a) for a in filtered))
@@ -238,7 +286,7 @@ class PlexLibraryService:
         seen: set[str] = set()
         for sid in section_ids:
             albums, section_total = await self._plex.get_albums(
-                section_id=sid, size=fetch_limit, offset=0, sort=sort, genre=genre,
+                section_id=sid, size=fetch_limit, offset=0, sort=sort, genre=genre, mood=mood, decade=decade,
             )
             for a in albums:
                 if a.ratingKey not in seen:
@@ -247,6 +295,10 @@ class PlexLibraryService:
             total += section_total
 
         all_albums = _sort_albums(all_albums, sort)
+
+        if decade_start is not None:
+            all_albums = [a for a in all_albums if a.year and decade_start <= a.year <= decade_end]
+            total = len(all_albums)
 
         page = all_albums[offset : offset + size]
         filtered = [a for a in page if a.title and a.title != "Unknown"]
@@ -304,6 +356,56 @@ class PlexLibraryService:
 
         summaries = await asyncio.gather(*(self._build_artist_summary(a) for a in all_artists))
         return list(summaries)
+
+    async def browse_artists(
+        self,
+        size: int = 48,
+        offset: int = 0,
+        sort: str = "titleSort:asc",
+        search: str = "",
+    ) -> tuple[list[PlexArtistSummary], int]:
+        section_ids = self._get_configured_section_ids()
+        if not section_ids:
+            return [], 0
+
+        sid = section_ids[0]
+        artists = await self._plex.get_artists(section_id=sid, size=size, offset=offset, search=search)
+        total = await self._plex.get_artist_count(sid)
+        summaries = await asyncio.gather(*(self._build_artist_summary(a) for a in artists))
+        return list(summaries), total
+
+    async def get_artists_index(self) -> PlexArtistIndexResponse:
+        all_summaries = await self.get_artists()
+
+        groups: dict[str, list[PlexArtistSummary]] = {}
+        for artist in all_summaries:
+            letter = artist.name[0].upper() if artist.name else "#"
+            if not letter.isalpha():
+                letter = "#"
+            groups.setdefault(letter, []).append(artist)
+
+        entries = [
+            PlexArtistIndexEntry(name=letter, artists=artists)
+            for letter, artists in sorted(groups.items())
+        ]
+        return PlexArtistIndexResponse(index=entries)
+
+    async def browse_tracks(
+        self,
+        size: int = 48,
+        offset: int = 0,
+        sort: str = "titleSort:asc",
+        search: str = "",
+    ) -> tuple[list[PlexTrackInfo], int]:
+        section_ids = self._get_configured_section_ids()
+        if not section_ids:
+            return [], 0
+
+        sid = section_ids[0]
+        tracks, total = await self._plex.get_tracks(
+            section_id=sid, size=size, offset=offset, sort=sort, search=search
+        )
+        return [self._track_to_info(t) for t in tracks], total
 
     async def search(self, query: str) -> PlexSearchResponse:
         section_ids = self._get_configured_section_ids()
@@ -368,6 +470,39 @@ class PlexLibraryService:
         summaries = await asyncio.gather(*(self._album_to_summary(a) for a in filtered))
         return list(summaries)
 
+    async def get_recently_played(self, limit: int = 20) -> list[PlexAlbumSummary]:
+        section_ids = self._get_configured_section_ids()
+        if not section_ids:
+            return []
+
+        viewed: list[PlexAlbum] = []
+        for sid in section_ids:
+            albums = await self._plex.get_recently_viewed(section_id=sid, limit=limit)
+            viewed.extend(albums)
+
+        if not viewed:
+            return []
+
+        viewed.sort(key=lambda a: a.lastViewedAt, reverse=True)
+        filtered = [a for a in viewed[:limit] if a.title and a.title != "Unknown"]
+        summaries = await asyncio.gather(*(self._album_to_summary(a) for a in filtered))
+        return list(summaries)
+
+    async def get_recently_added_albums(self, limit: int = 20) -> list[PlexAlbumSummary]:
+        section_ids = self._get_configured_section_ids()
+        if not section_ids:
+            return []
+
+        added: list[PlexAlbum] = []
+        for sid in section_ids:
+            albums = await self._plex.get_recently_added(section_id=sid, limit=limit)
+            added.extend(albums)
+
+        added.sort(key=lambda a: a.addedAt, reverse=True)
+        filtered = [a for a in added[:limit] if a.title and a.title != "Unknown"]
+        summaries = await asyncio.gather(*(self._album_to_summary(a) for a in filtered))
+        return list(summaries)
+
     async def get_genres(self) -> list[str]:
         section_ids = self._get_configured_section_ids()
         if not section_ids:
@@ -379,6 +514,31 @@ class PlexLibraryService:
             all_genres.update(genres)
 
         return sorted(all_genres)
+
+    async def get_songs_by_genre(
+        self, genre: str, limit: int = 50, offset: int = 0
+    ) -> tuple[list[PlexTrackInfo], int]:
+        section_ids = self._get_configured_section_ids()
+        if not section_ids:
+            return [], 0
+        sid = section_ids[0]
+        tracks_raw, total = await self._plex.get_tracks(
+            section_id=sid, size=limit, offset=offset,
+            sort="titleSort:asc", genre=genre,
+        )
+        return [self._track_to_info(t) for t in tracks_raw], total
+
+    async def get_moods(self) -> list[str]:
+        section_ids = self._get_configured_section_ids()
+        if not section_ids:
+            return []
+
+        all_moods: set[str] = set()
+        for sid in section_ids:
+            moods = await self._plex.get_moods(section_id=sid)
+            all_moods.update(moods)
+
+        return sorted(all_moods)
 
     async def get_stats(self) -> PlexLibraryStats:
         stats_ttl = self._plex.stats_ttl
@@ -475,6 +635,230 @@ class PlexLibraryService:
 
         return PlexAlbumMatch(found=False)
 
+    async def list_playlists(self, limit: int = 50) -> list[PlexPlaylistSummary]:
+        raw = await self._plex.get_playlists()
+        summaries = []
+        for p in raw[:limit]:
+            cover = f"/api/v1/plex/playlist-thumb/{p.ratingKey}"
+            summaries.append(PlexPlaylistSummary(
+                id=p.ratingKey,
+                name=p.title,
+                track_count=p.leafCount,
+                duration_seconds=p.duration // 1000 if p.duration else 0,
+                is_smart=p.smart,
+                cover_url=cover,
+                updated_at=str(p.updatedAt) if p.updatedAt else "",
+            ))
+        return summaries
+
+    async def get_playlist_detail(self, playlist_id: str) -> PlexPlaylistDetail:
+        raw = await self._plex.get_playlists()
+        playlist = next((p for p in raw if p.ratingKey == playlist_id), None)
+        if playlist is None:
+            from core.exceptions import ResourceNotFoundError
+            raise ResourceNotFoundError(f"Plex playlist {playlist_id} not found")
+
+        items = await self._plex.get_playlist_items(playlist_id)
+        tracks = [
+            PlexPlaylistTrack(
+                id=t.ratingKey,
+                track_name=t.title,
+                artist_name=t.grandparentTitle,
+                album_name=t.parentTitle,
+                album_id=str(t.parentRatingKey) if t.parentRatingKey else "",
+                plex_rating_key=t.ratingKey,
+                duration_seconds=t.duration // 1000 if t.duration else 0,
+                track_number=t.index,
+                disc_number=t.parentIndex if t.parentIndex else 1,
+                cover_url=f"/api/v1/plex/thumb/{t.parentRatingKey}" if t.parentRatingKey else "",
+            )
+            for t in items
+        ]
+        cover = f"/api/v1/plex/playlist-thumb/{playlist.ratingKey}"
+        return PlexPlaylistDetail(
+            id=playlist.ratingKey,
+            name=playlist.title,
+            track_count=playlist.leafCount,
+            duration_seconds=playlist.duration // 1000 if playlist.duration else 0,
+            is_smart=playlist.smart,
+            cover_url=cover,
+            updated_at=str(playlist.updatedAt) if playlist.updatedAt else "",
+            tracks=tracks,
+        )
+
+    async def import_playlist(
+        self,
+        playlist_id: str,
+        playlist_service: 'PlaylistService',
+    ) -> PlexImportResult:
+        source_ref = f"plex:{playlist_id}"
+        existing = await playlist_service.get_by_source_ref(source_ref)
+        if existing:
+            return PlexImportResult(
+                musicseerr_playlist_id=existing.id,
+                already_imported=True,
+            )
+
+        detail = await self.get_playlist_detail(playlist_id)
+        try:
+            created = await playlist_service.create_playlist(detail.name, source_ref=source_ref)
+        except Exception:  # noqa: BLE001
+            re_check = await playlist_service.get_by_source_ref(source_ref)
+            if re_check:
+                return PlexImportResult(musicseerr_playlist_id=re_check.id, already_imported=True)
+            raise
+
+        track_dicts = []
+        failed = 0
+        for t in detail.tracks:
+            try:
+                track_dicts.append({
+                    "track_name": t.track_name,
+                    "artist_name": t.artist_name,
+                    "album_name": t.album_name,
+                    "duration": t.duration_seconds,
+                    "track_source_id": t.id,
+                    "source_type": "plex",
+                    "album_id": t.album_id,
+                    "plex_rating_key": t.plex_rating_key,
+                    "track_number": t.track_number,
+                    "disc_number": t.disc_number,
+                    "cover_url": t.cover_url,
+                })
+            except Exception:  # noqa: BLE001
+                failed += 1
+
+        if track_dicts:
+            try:
+                await playlist_service.add_tracks(created.id, track_dicts)
+            except Exception:  # noqa: BLE001
+                logger.error("Failed to add tracks during Plex playlist import %s", playlist_id, exc_info=True)
+                await playlist_service.delete_playlist(created.id)
+                raise ExternalServiceError(f"Failed to import Plex playlist {playlist_id}")
+
+        return PlexImportResult(
+            musicseerr_playlist_id=created.id,
+            tracks_imported=len(track_dicts),
+            tracks_failed=failed,
+        )
+
+    async def get_sessions(self) -> PlexSessionsResponse:
+        try:
+            raw_sessions = await self._plex.get_sessions()
+            sessions = [
+                PlexSessionInfo(
+                    session_id=s.session_id,
+                    user_name=s.user_name,
+                    track_title=s.track_title,
+                    artist_name=s.artist_name,
+                    album_name=s.album_name,
+                    cover_url=f"/api/v1/plex/thumb/{s.album_thumb}" if s.album_thumb else "",
+                    player_device=s.player_device,
+                    player_platform=s.player_platform,
+                    player_state=s.player_state,
+                    is_direct_play=s.is_direct_play,
+                    progress_ms=s.progress_ms,
+                    duration_ms=s.duration_ms,
+                    audio_codec=s.audio_codec,
+                    audio_channels=s.audio_channels,
+                    bitrate=s.bitrate,
+                )
+                for s in raw_sessions
+            ]
+            return PlexSessionsResponse(sessions=sessions)
+        except Exception:  # noqa: BLE001
+            logger.warning("get_sessions failed", exc_info=True)
+            return PlexSessionsResponse(sessions=[], available=False)
+
+    async def get_discovery_hubs(self, count: int = 10) -> PlexDiscoveryResponse:
+        section_ids = self._get_configured_section_ids()
+        if not section_ids:
+            return PlexDiscoveryResponse(hubs=[])
+        try:
+            raw_hubs = await self._plex.get_hubs(section_ids[0], count=count)
+        except Exception:  # noqa: BLE001
+            logger.warning("get_discovery_hubs failed", exc_info=True)
+            return PlexDiscoveryResponse(hubs=[])
+        hubs: list[PlexDiscoveryHub] = []
+        for hub in raw_hubs:
+            hub_type = hub.get("type", "")
+            title = hub.get("title", "")
+            if hub_type != "album":
+                continue
+            albums: list[PlexDiscoveryAlbum] = []
+            for item in hub.get("Metadata", []):
+                rating_key = str(item.get("ratingKey", ""))
+                image_url = (
+                    f"/api/v1/plex/thumb/{rating_key}" if item.get("thumb") else None
+                )
+                albums.append(PlexDiscoveryAlbum(
+                    plex_id=rating_key,
+                    name=item.get("title", ""),
+                    artist_name=item.get("parentTitle", ""),
+                    year=item.get("year"),
+                    image_url=image_url,
+                ))
+            if albums:
+                hubs.append(PlexDiscoveryHub(
+                    title=title,
+                    hub_type=hub_type,
+                    albums=albums,
+                ))
+        return PlexDiscoveryResponse(hubs=hubs)
+
+    async def get_hub_data(self) -> PlexHubResponse:
+        _HUB_TIMEOUT = 10
+
+        results = await asyncio.gather(
+            asyncio.wait_for(self.get_recently_played(limit=20), timeout=_HUB_TIMEOUT),
+            asyncio.wait_for(self.get_albums(size=12), timeout=_HUB_TIMEOUT),
+            asyncio.wait_for(self.get_stats(), timeout=_HUB_TIMEOUT),
+            asyncio.wait_for(self.get_recently_added_albums(limit=20), timeout=_HUB_TIMEOUT),
+            asyncio.wait_for(self.list_playlists(limit=20), timeout=_HUB_TIMEOUT),
+            asyncio.wait_for(self.get_genres(), timeout=_HUB_TIMEOUT),
+            return_exceptions=True,
+        )
+
+        all_failed = all(isinstance(r, BaseException) for r in results)
+        if all_failed:
+            raise ExternalServiceError("All Plex hub data requests failed")
+
+        recently_played = results[0] if not isinstance(results[0], BaseException) else []
+        if isinstance(results[0], BaseException):
+            logger.warning("Hub: get_recently_played failed: %s", results[0])
+
+        albums_result = results[1]
+        if isinstance(albums_result, BaseException):
+            logger.warning("Hub: get_albums failed: %s", albums_result)
+            all_albums_preview: list[PlexAlbumSummary] = []
+        else:
+            all_albums_preview = albums_result[0]
+
+        stats = results[2] if not isinstance(results[2], BaseException) else None
+        if isinstance(results[2], BaseException):
+            logger.warning("Hub: get_stats failed: %s", results[2])
+
+        recently_added = results[3] if not isinstance(results[3], BaseException) else []
+        if isinstance(results[3], BaseException):
+            logger.warning("Hub: get_recently_added_albums failed: %s", results[3])
+
+        playlists = results[4] if not isinstance(results[4], BaseException) else []
+        if isinstance(results[4], BaseException):
+            logger.warning("Hub: list_playlists failed: %s", results[4])
+
+        genres = results[5] if not isinstance(results[5], BaseException) else []
+        if isinstance(results[5], BaseException):
+            logger.warning("Hub: get_genres failed: %s", results[5])
+
+        return PlexHubResponse(
+            stats=stats,
+            recently_played=recently_played,
+            recently_added=recently_added,
+            all_albums_preview=all_albums_preview,
+            playlists=playlists,
+            genres=genres,
+        )
+
     async def warm_mbid_cache(self) -> None:
         if self._library_db:
             try:
@@ -523,3 +907,115 @@ class PlexLibraryService:
             logger.debug("Persisted dirty Plex MBID cache to disk")
         except Exception:  # noqa: BLE001
             logger.warning("Failed to persist dirty Plex MBID cache", exc_info=True)
+
+    async def get_history(
+        self, limit: int = 50, offset: int = 0
+    ) -> PlexHistoryResponse:
+        try:
+            entries, total = await self._plex.get_listening_history(limit=limit, offset=offset)
+        except Exception:  # noqa: BLE001
+            logger.warning("get_history failed", exc_info=True)
+            return PlexHistoryResponse(available=False)
+        items = [
+            PlexHistoryEntrySchema(
+                rating_key=e.rating_key,
+                track_title=e.track_title,
+                artist_name=e.artist_name,
+                album_name=e.album_name,
+                cover_url=f"/api/v1/plex/thumb/{e.album_rating_key}" if e.album_rating_key else "",
+                viewed_at=str(e.viewed_at),
+                device_name=e.device_name,
+            )
+            for e in entries
+        ]
+        return PlexHistoryResponse(
+            entries=items,
+            total=total,
+            limit=limit,
+            offset=offset,
+        )
+
+    async def get_analytics(self) -> PlexAnalyticsResponse:
+        from collections import Counter
+        import time as _time
+
+        if self._analytics_cache is not None and (_time.monotonic() - self._analytics_cache_ts) < 300:
+            return self._analytics_cache
+
+        max_entries = 5000
+        all_entries = []
+        offset = 0
+        batch_size = 500
+        total_available = 0
+        deadline = _time.monotonic() + 30
+
+        while len(all_entries) < max_entries:
+            if _time.monotonic() > deadline:
+                break
+            entries, total = await self._plex.get_listening_history(
+                limit=batch_size, offset=offset
+            )
+            if total > 0:
+                total_available = total
+            if not entries:
+                break
+            all_entries.extend(entries)
+            offset += batch_size
+            if offset >= total:
+                break
+
+        is_complete = len(all_entries) >= total_available or total_available <= max_entries
+
+        now = _time.time()
+        seven_days_ago = now - (7 * 86400)
+        thirty_days_ago = now - (30 * 86400)
+
+        artist_counts: Counter[str] = Counter()
+        album_counts: Counter[tuple[str, str]] = Counter()
+        track_counts: Counter[tuple[str, str]] = Counter()
+        total_ms = 0
+        last_7 = 0
+        last_30 = 0
+
+        for e in all_entries:
+            artist_counts[e.artist_name] += 1
+            album_counts[(e.album_name, e.artist_name)] += 1
+            track_counts[(e.track_title, e.artist_name)] += 1
+            total_ms += e.duration_ms
+
+            try:
+                viewed_ts = int(e.viewed_at)
+            except (ValueError, TypeError):
+                continue
+            if viewed_ts >= seven_days_ago:
+                last_7 += 1
+            if viewed_ts >= thirty_days_ago:
+                last_30 += 1
+
+        top_artists = [
+            PlexAnalyticsItem(name=name, play_count=count)
+            for name, count in artist_counts.most_common(10)
+        ]
+        top_albums = [
+            PlexAnalyticsItem(name=name, subtitle=artist, play_count=count)
+            for (name, artist), count in album_counts.most_common(10)
+        ]
+        top_tracks = [
+            PlexAnalyticsItem(name=name, subtitle=artist, play_count=count)
+            for (name, artist), count in track_counts.most_common(10)
+        ]
+
+        result = PlexAnalyticsResponse(
+            top_artists=top_artists,
+            top_albums=top_albums,
+            top_tracks=top_tracks,
+            total_listens=len(all_entries),
+            listens_last_7_days=last_7,
+            listens_last_30_days=last_30,
+            total_hours=round(total_ms / 3_600_000, 1),
+            is_complete=is_complete,
+            entries_analyzed=len(all_entries),
+        )
+        self._analytics_cache = result
+        self._analytics_cache_ts = _time.monotonic()
+        return result

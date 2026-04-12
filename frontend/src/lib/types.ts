@@ -764,8 +764,10 @@ export type JellyfinTrackInfo = {
 	duration_seconds: number;
 	album_name: string;
 	artist_name: string;
+	album_id?: string;
 	codec?: string | null;
 	bitrate?: number | null;
+	image_url?: string | null;
 };
 
 export type JellyfinAlbumMatch = {
@@ -783,6 +785,7 @@ export type JellyfinAlbumSummary = {
 	image_url?: string | null;
 	musicbrainz_id?: string | null;
 	artist_musicbrainz_id?: string | null;
+	play_count?: number;
 };
 
 export type JellyfinPaginatedResponse = {
@@ -810,6 +813,30 @@ export type JellyfinArtistSummary = {
 	image_url?: string | null;
 	album_count: number;
 	musicbrainz_id?: string | null;
+	play_count?: number;
+};
+
+export type JellyfinArtistPage = {
+	items: JellyfinArtistSummary[];
+	total: number;
+	offset: number;
+	limit: number;
+};
+
+export type JellyfinArtistIndexEntry = {
+	name: string;
+	artists: JellyfinArtistSummary[];
+};
+
+export type JellyfinArtistIndexResponse = {
+	index: JellyfinArtistIndexEntry[];
+};
+
+export type JellyfinTrackPage = {
+	items: JellyfinTrackInfo[];
+	total: number;
+	offset: number;
+	limit: number;
 };
 
 export type NavidromeConnectionSettings = {
@@ -829,6 +856,7 @@ export type NavidromeTrackInfo = {
 	artist_name: string;
 	codec?: string | null;
 	bitrate?: number | null;
+	image_url?: string | null;
 };
 
 export type NavidromeAlbumSummary = {
@@ -866,6 +894,39 @@ export type NavidromeSearchResponse = {
 	tracks: NavidromeTrackInfo[];
 };
 
+export type NavidromeArtistIndexEntry = {
+	name: string;
+	artists: NavidromeArtistSummary[];
+};
+
+export type NavidromeArtistIndexResponse = {
+	index: NavidromeArtistIndexEntry[];
+};
+
+export type NavidromeArtistPage = {
+	items: NavidromeArtistSummary[];
+	total: number;
+	offset: number;
+	limit: number;
+};
+
+export type NavidromeTrackPage = {
+	items: NavidromeTrackInfo[];
+	total: number;
+	offset: number;
+	limit: number;
+};
+
+export type NavidromeGenreSongsResponse = {
+	songs: NavidromeTrackInfo[];
+	genre: string;
+};
+
+export type NavidromeMusicFolder = {
+	id: string;
+	name: string;
+};
+
 export type NavidromeLibraryStats = {
 	total_tracks: number;
 	total_albums: number;
@@ -895,7 +956,10 @@ export type PlexTrackInfo = {
 	artist_name: string;
 	codec?: string | null;
 	bitrate?: number | null;
+	audio_channels?: number | null;
+	container?: string | null;
 	part_key?: string | null;
+	image_url?: string | null;
 };
 
 export type PlexAlbumSummary = {
@@ -907,6 +971,7 @@ export type PlexAlbumSummary = {
 	image_url?: string | null;
 	musicbrainz_id?: string | null;
 	artist_musicbrainz_id?: string | null;
+	last_viewed_at?: number;
 };
 
 export type PlexAlbumDetail = PlexAlbumSummary & {
@@ -944,9 +1009,110 @@ export type PlexPaginatedResponse = {
 	total: number;
 };
 
+export type PlexArtistPage = {
+	items: PlexArtistSummary[];
+	total: number;
+	offset: number;
+	limit: number;
+};
+
+export type PlexArtistIndexEntry = {
+	name: string;
+	artists: PlexArtistSummary[];
+};
+
+export type PlexArtistIndexResponse = {
+	index: PlexArtistIndexEntry[];
+};
+
+export type PlexTrackPage = {
+	items: PlexTrackInfo[];
+	total: number;
+	offset: number;
+	limit: number;
+};
+
 export type PlexLibrarySection = {
 	key: string;
 	title: string;
+};
+
+export type HubStat = {
+	label: string;
+	value: number | null;
+	href?: string;
+};
+
+export type BrowseHeroCard = {
+	label: string;
+	value: number | null;
+	href: string;
+	subtitle?: string;
+	colorScheme: 'primary' | 'secondary' | 'accent';
+	icon: 'disc' | 'users' | 'music';
+};
+
+export type ArtistIndexArtist = {
+	id: string;
+	name: string;
+	image_url?: string | null;
+	album_count?: number;
+	musicbrainz_id?: string | null;
+};
+
+export type ArtistIndexEntry = {
+	name: string;
+	artists: ArtistIndexArtist[];
+};
+
+export type PlexHubResponse = {
+	stats: PlexLibraryStats | null;
+	recently_played: PlexAlbumSummary[];
+	recently_added: PlexAlbumSummary[];
+	all_albums_preview: PlexAlbumSummary[];
+	playlists: SourcePlaylistSummary[];
+	genres: string[];
+};
+
+export type PlexDiscoveryAlbum = {
+	plex_id: string;
+	name: string;
+	artist_name: string;
+	year?: number | null;
+	image_url?: string | null;
+};
+
+export type PlexDiscoveryHub = {
+	title: string;
+	hub_type: string;
+	albums: PlexDiscoveryAlbum[];
+};
+
+export type PlexDiscoveryResponse = {
+	hubs: PlexDiscoveryHub[];
+};
+
+export type NavidromeHubResponse = {
+	stats: NavidromeLibraryStats | null;
+	recently_played: NavidromeAlbumSummary[];
+	favorites: NavidromeAlbumSummary[];
+	favorite_artists: NavidromeArtistSummary[];
+	favorite_tracks: NavidromeTrackInfo[];
+	all_albums_preview: NavidromeAlbumSummary[];
+	playlists: SourcePlaylistSummary[];
+	genres: string[];
+};
+
+export type JellyfinHubResponse = {
+	stats: JellyfinLibraryStats | null;
+	recently_played: JellyfinAlbumSummary[];
+	recently_added: JellyfinAlbumSummary[];
+	favorites: JellyfinAlbumSummary[];
+	most_played_artists: JellyfinArtistSummary[];
+	most_played_albums: JellyfinAlbumSummary[];
+	all_albums_preview: JellyfinAlbumSummary[];
+	playlists: SourcePlaylistSummary[];
+	genres: string[];
 };
 
 export type LocalTrackInfo = {
@@ -1104,4 +1270,216 @@ export type LastFmAlbumEnrichment = {
 	listeners: number;
 	playcount: number;
 	url?: string | null;
+};
+
+export type SourcePlaylistSummary = {
+	id: string;
+	name: string;
+	track_count: number;
+	duration_seconds: number;
+	cover_url: string;
+	is_smart?: boolean;
+	is_imported?: boolean;
+	owner?: string;
+	is_public?: boolean;
+	updated_at?: string;
+	created_at?: string;
+};
+
+export type SourcePlaylistTrack = {
+	id: string;
+	track_name: string;
+	artist_name: string;
+	album_name: string;
+	album_id: string;
+	artist_id?: string;
+	plex_rating_key?: string;
+	duration_seconds: number;
+	track_number: number;
+	disc_number: number;
+	cover_url: string;
+};
+
+export type SourcePlaylistDetail = {
+	id: string;
+	name: string;
+	track_count: number;
+	duration_seconds: number;
+	cover_url: string;
+	is_smart?: boolean;
+	updated_at?: string;
+	created_at?: string;
+	tracks: SourcePlaylistTrack[];
+};
+
+export type SourceImportResult = {
+	musicseerr_playlist_id: string;
+	tracks_imported: number;
+	tracks_failed: number;
+	already_imported: boolean;
+};
+
+export type PlexSessionInfo = {
+	session_id: string;
+	user_name: string;
+	track_title: string;
+	artist_name: string;
+	album_name: string;
+	cover_url: string;
+	player_device: string;
+	player_platform: string;
+	player_state: string;
+	is_direct_play: boolean;
+	progress_ms: number;
+	duration_ms: number;
+	audio_codec: string;
+	audio_channels: number;
+	bitrate: number;
+};
+
+export type PlexSessionsResponse = {
+	sessions: PlexSessionInfo[];
+	available: boolean;
+};
+
+export type NavidromeNowPlayingEntry = {
+	user_name: string;
+	minutes_ago: number;
+	player_name: string;
+	track_name: string;
+	artist_name: string;
+	album_name: string;
+	album_id: string;
+	cover_art_id: string;
+	duration_seconds: number;
+	estimated_position_seconds?: number;
+};
+
+export type NavidromeNowPlayingResponse = {
+	entries: NavidromeNowPlayingEntry[];
+};
+
+export type JellyfinSessionInfo = {
+	session_id: string;
+	user_name: string;
+	device_name: string;
+	client_name: string;
+	track_name: string;
+	artist_name: string;
+	album_name: string;
+	album_id: string;
+	cover_url: string;
+	position_seconds: number;
+	duration_seconds: number;
+	is_paused: boolean;
+	play_method: string;
+	audio_codec: string;
+	bitrate: number;
+};
+
+export type JellyfinSessionsResponse = {
+	sessions: JellyfinSessionInfo[];
+};
+
+export type NowPlayingSession = {
+	id: string;
+	user_name: string;
+	track_name: string;
+	artist_name: string;
+	album_name: string;
+	cover_url: string;
+	device_name: string;
+	is_paused: boolean;
+	source?: 'jellyfin' | 'navidrome' | 'plex';
+	progress_ms?: number;
+	duration_ms?: number;
+	audio_codec?: string;
+	bitrate?: number;
+	_isLocal?: boolean;
+};
+
+export type NavidromeArtistInfo = {
+	navidrome_id: string;
+	name: string;
+	biography: string;
+	image_url: string;
+	similar_artists: NavidromeArtistSummary[];
+};
+
+export type PlexHistoryEntry = {
+	rating_key: string;
+	track_title: string;
+	artist_name: string;
+	album_name: string;
+	cover_url: string;
+	viewed_at: string;
+	device_name: string;
+};
+
+export type PlexHistoryResponse = {
+	entries: PlexHistoryEntry[];
+	total: number;
+	limit: number;
+	offset: number;
+	available: boolean;
+};
+
+export type PlexAnalyticsItem = {
+	name: string;
+	subtitle: string;
+	play_count: number;
+	cover_url: string | null;
+};
+
+export type PlexAnalyticsResponse = {
+	top_artists: PlexAnalyticsItem[];
+	top_albums: PlexAnalyticsItem[];
+	top_tracks: PlexAnalyticsItem[];
+	total_listens: number;
+	listens_last_7_days: number;
+	listens_last_30_days: number;
+	total_hours: number;
+	is_complete: boolean;
+	entries_analyzed: number;
+};
+
+export type NavidromeAlbumInfo = {
+	album_id: string;
+	notes: string;
+	musicbrainz_id: string;
+	lastfm_url: string;
+	image_url: string;
+};
+
+export type LyricLine = {
+	text: string;
+	start_seconds: number | null;
+};
+
+export type NavidromeLyricsResponse = {
+	text: string;
+	is_synced: boolean;
+	lines: LyricLine[];
+};
+
+export type JellyfinLyricsLine = {
+	text: string;
+	start_seconds: number | null;
+};
+
+export type JellyfinLyricsResponse = {
+	lines: JellyfinLyricsLine[];
+	is_synced: boolean;
+	lyrics_text: string;
+};
+
+export type JellyfinFavoritesExpanded = {
+	albums: JellyfinAlbumSummary[];
+	artists: JellyfinArtistSummary[];
+};
+
+export type JellyfinFilterFacets = {
+	years: number[];
+	tags: string[];
+	studios: string[];
 };

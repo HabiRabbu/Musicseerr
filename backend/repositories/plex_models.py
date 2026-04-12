@@ -55,6 +55,8 @@ class PlexAlbum(msgspec.Struct):
     thumb: str = ""
     addedAt: int = 0
     lastViewedAt: int = 0
+    viewCount: int = 0
+    userRating: float = 0.0
     leafCount: int = 0
     Genre: list[PlexGenreTag] = msgspec.field(default_factory=list)
     Guid: list[PlexGuid] = msgspec.field(default_factory=list)
@@ -80,6 +82,9 @@ class PlexPlaylist(msgspec.Struct):
     leafCount: int = 0
     duration: int = 0
     playlistType: str = ""
+    smart: bool = False
+    updatedAt: int = 0
+    composite: str = ""
 
 
 class PlexLibrarySection(msgspec.Struct):
@@ -142,6 +147,8 @@ def parse_album(data: dict[str, Any]) -> PlexAlbum:
         thumb=data.get("thumb", ""),
         addedAt=data.get("addedAt", 0),
         lastViewedAt=data.get("lastViewedAt", 0),
+        viewCount=data.get("viewCount", 0),
+        userRating=float(data.get("userRating", 0.0)),
         leafCount=data.get("leafCount", 0),
         Genre=_parse_genre_tags(data.get("Genre", [])),
         Guid=_parse_guids(data.get("Guid", [])),
@@ -195,6 +202,9 @@ def parse_playlist(data: dict[str, Any]) -> PlexPlaylist:
         leafCount=data.get("leafCount", 0),
         duration=data.get("duration", 0),
         playlistType=data.get("playlistType", ""),
+        smart=bool(data.get("smart", False)),
+        updatedAt=data.get("updatedAt", 0),
+        composite=data.get("composite", ""),
     )
 
 
@@ -215,3 +225,89 @@ def extract_mbid_from_guids(guids: list[PlexGuid], prefix: str = "mbid://") -> s
         if guid.id.startswith(prefix):
             return guid.id[len(prefix):]
     return ""
+
+
+class PlexSession(msgspec.Struct):
+    session_id: str = ""
+    user_name: str = ""
+    track_title: str = ""
+    artist_name: str = ""
+    album_name: str = ""
+    album_thumb: str = ""
+    player_device: str = ""
+    player_platform: str = ""
+    player_state: str = ""
+    is_direct_play: bool = True
+    transcode_decision: str = ""
+    progress_ms: int = 0
+    duration_ms: int = 0
+    audio_codec: str = ""
+    audio_channels: int = 0
+    bitrate: int = 0
+
+
+class PlexHistoryEntry(msgspec.Struct):
+    rating_key: str = ""
+    track_title: str = ""
+    artist_name: str = ""
+    album_name: str = ""
+    album_rating_key: str = ""
+    viewed_at: int = 0
+    duration_ms: int = 0
+    device_name: str = ""
+    player_platform: str = ""
+
+
+def parse_plex_history(data: dict[str, Any]) -> tuple[list[PlexHistoryEntry], int]:
+    """Extract audio-only history from Plex /status/sessions/history/all."""
+    container = data.get("MediaContainer", data)
+    total = container.get("totalSize", container.get("size", 0))
+    entries: list[PlexHistoryEntry] = []
+    for item in container.get("Metadata", []):
+        if item.get("type") != "track":
+            continue
+        entries.append(PlexHistoryEntry(
+            rating_key=str(item.get("ratingKey", "")),
+            track_title=item.get("title", ""),
+            artist_name=item.get("grandparentTitle", ""),
+            album_name=item.get("parentTitle", ""),
+            album_rating_key=str(item.get("parentRatingKey", "")),
+            viewed_at=item.get("viewedAt", 0),
+            duration_ms=item.get("duration", 0),
+            device_name=item.get("Player", {}).get("title", "") if isinstance(item.get("Player"), dict) else "",
+            player_platform=item.get("Player", {}).get("platform", "") if isinstance(item.get("Player"), dict) else "",
+        ))
+    return entries, total
+
+
+def parse_plex_sessions(data: dict[str, Any]) -> list[PlexSession]:
+    """Extract audio-only sessions from a Plex /status/sessions response."""
+    container = data.get("MediaContainer", data)
+    sessions: list[PlexSession] = []
+    for track in container.get("Metadata", []):
+        if track.get("type") != "track":
+            continue
+        user = track.get("User", {})
+        player = track.get("Player", {})
+        transcode = track.get("TranscodeSession", {})
+        session = track.get("Session", {})
+        is_direct = player.get("local", False) or transcode.get("videoDecision") is None
+        sessions.append(PlexSession(
+            session_id=session.get("id", ""),
+            user_name=user.get("title", ""),
+            track_title=track.get("title", ""),
+            artist_name=track.get("grandparentTitle", ""),
+            album_name=track.get("parentTitle", ""),
+            album_thumb=track.get("parentRatingKey", ""),
+            player_device=player.get("title", ""),
+            player_platform=player.get("platform", ""),
+            player_state=player.get("state", "playing"),
+            is_direct_play="directplay" in transcode.get("audioDecision", "directplay").lower(),
+            transcode_decision=transcode.get("audioDecision", ""),
+            progress_ms=track.get("viewOffset", 0),
+            duration_ms=track.get("duration", 0),
+            audio_codec=transcode.get("audioCodec", track.get("Media", [{}])[0].get("audioCodec", "") if track.get("Media") else ""),
+            audio_channels=track.get("Media", [{}])[0].get("audioChannels", 0) if track.get("Media") else 0,
+            bitrate=track.get("Media", [{}])[0].get("bitrate", 0) if track.get("Media") else 0,
+        ))
+    return sessions

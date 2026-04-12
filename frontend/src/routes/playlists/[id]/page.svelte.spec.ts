@@ -3,6 +3,10 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import type { PlaylistDetail, PlaylistTrack } from '$lib/api/playlists';
 
+vi.mock('$env/dynamic/public', () => ({
+	env: { PUBLIC_API_URL: '' }
+}));
+
 const mockFetchPlaylist = vi.fn();
 const mockDeletePlaylist = vi.fn();
 const mockRemoveTrackFromPlaylist = vi.fn();
@@ -91,6 +95,7 @@ function makePlaylist(overrides: Partial<PlaylistDetail> = {}): PlaylistDetail {
 		total_duration: 480,
 		cover_urls: [],
 		custom_cover_url: null,
+		source_ref: null,
 		created_at: '2026-01-01T00:00:00Z',
 		updated_at: '2026-01-02T00:00:00Z',
 		tracks: [
@@ -126,9 +131,7 @@ describe('Playlist detail page', () => {
 		mockGoto.mockReset();
 		try {
 			localStorage.clear();
-		} catch {
-			/* ignore in non-browser */
-		}
+		} catch {}
 	});
 
 	it('renders header with playlist name, track count, and duration', async () => {
@@ -309,7 +312,6 @@ describe('Playlist detail page', () => {
 			.element(page.getByRole('heading', { name: 'My Playlist', level: 1 }))
 			.toBeVisible();
 
-		// Modal exists in DOM but is not visible until opened
 		await expect.element(page.getByText(/This will permanently remove/)).not.toBeVisible();
 		expect(mockDeletePlaylist).not.toHaveBeenCalled();
 	});

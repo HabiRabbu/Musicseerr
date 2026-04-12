@@ -8,8 +8,11 @@
 	import PlexIcon from '$lib/components/PlexIcon.svelte';
 	import QueueDrawer from '$lib/components/QueueDrawer.svelte';
 	import EqPanel from '$lib/components/EqPanel.svelte';
+	import LyricsPanel from '$lib/components/LyricsPanel.svelte';
+	import AudioQualityBadge from '$lib/components/AudioQualityBadge.svelte';
 	import NowPlayingIndicator from '$lib/components/NowPlayingIndicator.svelte';
 	import { getCoverUrl } from '$lib/utils/errorHandling';
+	import { API } from '$lib/constants';
 	import {
 		X,
 		Music,
@@ -24,13 +27,78 @@
 		Check,
 		CircleX,
 		ListMusic,
-		SlidersHorizontal
+		SlidersHorizontal,
+		Music2
 	} from 'lucide-svelte';
 
 	let coverImgError = $state(false);
 	let lastCoverKey = '';
 	let eqPanelOpen = $state(false);
 	let queueDrawerOpen = $state(false);
+	import type { LyricLine } from '$lib/types';
+
+	let lyricsPanelOpen = $state(false);
+	let lyricsText = $state('');
+	let lyricsLines: LyricLine[] = $state([]);
+	let lyricsIsSynced = $state(false);
+	let lyricsLoading = $state(false);
+	let lyricsError = $state(false);
+
+	const supportsLyrics = $derived(
+		playerStore.nowPlaying?.sourceType === 'navidrome' ||
+			playerStore.nowPlaying?.sourceType === 'jellyfin'
+	);
+
+	async function fetchLyrics() {
+		const np = playerStore.nowPlaying;
+		if (!np?.trackSourceId) return;
+		lyricsLoading = true;
+		lyricsError = false;
+		try {
+			let url: string;
+			if (np.sourceType === 'navidrome') {
+				url = API.navidromeLibrary.lyrics(np.trackSourceId, np.artistName, np.trackName);
+			} else if (np.sourceType === 'jellyfin') {
+				url = API.jellyfinLibrary.lyrics(np.trackSourceId);
+			} else {
+				return;
+			}
+			const res = await fetch(url);
+			if (!res.ok) {
+				lyricsText = '';
+				lyricsLines = [];
+				lyricsIsSynced = false;
+				if (res.status !== 404) lyricsError = true;
+				return;
+			}
+			const data = await res.json();
+			if (np.sourceType === 'navidrome') {
+				lyricsText = data.text ?? '';
+				lyricsIsSynced = data.is_synced ?? false;
+				lyricsLines = data.lines ?? [];
+			} else {
+				lyricsText = data.lyrics_text ?? '';
+				lyricsIsSynced = data.is_synced ?? false;
+				lyricsLines = data.lines ?? [];
+			}
+		} catch {
+			lyricsText = '';
+			lyricsLines = [];
+			lyricsIsSynced = false;
+			lyricsError = true;
+		} finally {
+			lyricsLoading = false;
+		}
+	}
+
+	function toggleLyrics() {
+		if (lyricsPanelOpen) {
+			lyricsPanelOpen = false;
+			return;
+		}
+		fetchLyrics();
+		lyricsPanelOpen = true;
+	}
 
 	function formatTime(seconds: number): string {
 		if (!seconds || isNaN(seconds)) return '0:00';
@@ -158,8 +226,11 @@
 							Track {playerStore.currentTrackNumber} of {playerStore.queueLength}
 						</p>
 					{/if}
+					{#if playerStore.nowPlaying.format}
+						<AudioQualityBadge codec={playerStore.nowPlaying.format} compact />
+					{/if}
 					{#if playerStore.playbackState === 'error'}
-						<p class="text-xs text-error truncate">Track unavailable</p>
+						<p class="text-xs text-error truncate">This track isn't available right now.</p>
 					{/if}
 				</div>
 			</div>
@@ -242,7 +313,7 @@
 					>
 				</div>
 				{#if !playerStore.isSeekable}
-					<p class="text-[10px] text-base-content/60">Seeking unavailable for this stream format</p>
+					<p class="text-[10px] text-base-content/60">This stream doesn't support seeking.</p>
 				{/if}
 			</div>
 
@@ -262,6 +333,20 @@
 						{/if}
 					</button>
 				</div>
+
+				{#if supportsLyrics}
+					<div class="tooltip tooltip-left" data-tip="Lyrics">
+						<button
+							class="btn btn-ghost btn-sm btn-circle"
+							class:text-accent={lyricsPanelOpen}
+							class:loading={lyricsLoading}
+							onclick={toggleLyrics}
+							aria-label="Toggle lyrics"
+						>
+							<Music2 class="h-4 w-4" />
+						</button>
+					</div>
+				{/if}
 
 				<div
 					class="tooltip tooltip-left"
@@ -356,4 +441,16 @@
 
 	<QueueDrawer bind:open={queueDrawerOpen} onclose={() => (queueDrawerOpen = false)} />
 	<EqPanel bind:open={eqPanelOpen} onclose={() => (eqPanelOpen = false)} />
+	<LyricsPanel
+		bind:open={lyricsPanelOpen}
+		{lyricsText}
+		lines={lyricsLines}
+		isSynced={lyricsIsSynced}
+		isLoading={lyricsLoading}
+		hasError={lyricsError}
+		currentTime={playerStore.progress}
+		trackName={playerStore.nowPlaying?.trackName ?? ''}
+		artistName={playerStore.nowPlaying?.artistName ?? ''}
+		onclose={() => (lyricsPanelOpen = false)}
+	/>
 {/if}

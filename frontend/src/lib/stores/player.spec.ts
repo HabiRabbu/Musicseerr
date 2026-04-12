@@ -823,7 +823,6 @@ describe('beforeunload beacon', () => {
 	let addEventListenerSpy: ReturnType<typeof vi.fn>;
 	let removeEventListenerSpy: ReturnType<typeof vi.fn>;
 	let sendBeaconMock: ReturnType<typeof vi.fn>;
-	// eslint-disable-next-line @typescript-eslint/no-unused-vars
 	let jellyfinApi: {
 		startSession: ReturnType<typeof vi.fn>;
 		reportProgress: ReturnType<typeof vi.fn>;

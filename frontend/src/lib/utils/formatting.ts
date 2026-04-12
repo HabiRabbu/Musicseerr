@@ -33,8 +33,9 @@ export function formatDuration(ms?: number | null): string {
 
 export function formatDurationSec(sec?: number | null): string {
 	if (!sec && sec !== 0) return '--:--';
-	const minutes = Math.floor(sec / 60);
-	const seconds = sec % 60;
+	const total = Math.floor(sec);
+	const minutes = Math.floor(total / 60);
+	const seconds = total % 60;
 	return `${minutes}:${seconds.toString().padStart(2, '0')}`;
 }
 

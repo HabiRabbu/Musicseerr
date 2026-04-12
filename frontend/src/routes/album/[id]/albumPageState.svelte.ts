@@ -1,6 +1,7 @@
 import { browser } from '$app/environment';
 import { get } from 'svelte/store';
 import { untrack } from 'svelte';
+import { SvelteMap } from 'svelte/reactivity';
 import type {
 	AlbumBasicInfo,
 	AlbumTracksInfo,
@@ -111,8 +112,9 @@ export function createAlbumPageState(albumIdGetter: () => string) {
 	let artistInLidarr = $state(false);
 	let artistMonitored = $state(false);
 
-	// eslint-disable-next-line svelte/prefer-svelte-reactivity -- derived Map is recreated each time, reactive by nature
-	const trackLinkMap = $derived(new Map(trackLinks.map((tl) => [getDiscTrackKey(tl), tl])));
+	const trackLinkMap = $derived.by(
+		() => new SvelteMap(trackLinks.map((tl) => [getDiscTrackKey(tl), tl]))
+	);
 	const jellyfinTracks = $derived([...(jellyfinMatch?.tracks ?? [])].sort(compareDiscTrack));
 	const localTracks = $derived([...(localMatch?.tracks ?? [])].sort(compareDiscTrack));
 	const navidromeTracks = $derived([...(navidromeMatch?.tracks ?? [])].sort(compareDiscTrack));
@@ -305,7 +307,6 @@ export function createAlbumPageState(albumIdGetter: () => string) {
 			albumSourceMatchCache.set({ ...existing, [cacheField]: result }, albumId);
 		} catch (e) {
 			if (isAbortError(e)) return;
-			console.error(`Failed to fetch ${label} album data:`, e);
 		} finally {
 			if (!signal.aborted) loadingSetter(false);
 		}
@@ -334,7 +335,6 @@ export function createAlbumPageState(albumIdGetter: () => string) {
 			}
 		} catch (e) {
 			if (isAbortError(e)) return;
-			console.error('Failed to fetch Last.fm album data:', e);
 		} finally {
 			if (!signal.aborted) loadingLastfm = false;
 		}
@@ -352,8 +352,8 @@ export function createAlbumPageState(albumIdGetter: () => string) {
 			if (signal.aborted) return;
 			artistInLidarr = info.in_lidarr ?? false;
 			artistMonitored = info.monitored ?? false;
-		} catch (e) {
-			console.debug('Artist monitoring fetch failed:', e);
+		} catch {
+			return;
 		}
 	}
 
@@ -367,7 +367,6 @@ export function createAlbumPageState(albumIdGetter: () => string) {
 		artistInLidarr = false;
 		artistMonitored = false;
 
-		// Fire source matches that only need albumId immediately (before basic loads)
 		if (refreshSourceMatch) {
 			void (async () => {
 				try {
@@ -395,7 +394,7 @@ export function createAlbumPageState(albumIdGetter: () => string) {
 							'local'
 						);
 				} catch {
-					/* ignore integration loading errors */
+					return;
 				}
 			})();
 		}
@@ -413,7 +412,6 @@ export function createAlbumPageState(albumIdGetter: () => string) {
 		if (refreshDiscovery) void doFetchDiscovery(albumId, signal);
 		if (!refreshBasic) void doFetchYouTube(albumId, signal);
 		if (refreshLastfm) void doFetchLastFm(albumId, signal);
-		// Navidrome match needs album title/artist - fire after basic loads
 		if (refreshSourceMatch) {
 			void (async () => {
 				try {
@@ -451,7 +449,7 @@ export function createAlbumPageState(albumIdGetter: () => string) {
 							'plex'
 						);
 				} catch {
-					/* ignore integration loading errors */
+					return;
 				}
 			})();
 		}
@@ -466,7 +464,12 @@ export function createAlbumPageState(albumIdGetter: () => string) {
 	}
 
 	function hasAnySourceFound(): boolean {
-		return !!(jellyfinMatch?.found || localMatch?.found || navidromeMatch?.found || plexMatch?.found);
+		return !!(
+			jellyfinMatch?.found ||
+			localMatch?.found ||
+			navidromeMatch?.found ||
+			plexMatch?.found
+		);
 	}
 
 	async function forceLoadAlbum(albumId: string): Promise<void> {
@@ -486,7 +489,7 @@ export function createAlbumPageState(albumIdGetter: () => string) {
 				albumBasicCache.set(album, albumId);
 			}
 		} catch {
-			/* refresh endpoint failure is non-fatal, loadAlbum will re-fetch */
+			void signal.aborted;
 		}
 
 		if (signal.aborted) return;

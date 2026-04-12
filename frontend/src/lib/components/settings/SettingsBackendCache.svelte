@@ -7,8 +7,8 @@
 
 <div class="alert alert-info alert-soft mb-4">
 	<span class="text-sm"
-		>These settings control how long server-side cache entries stay fresh for everyone. Lower
-		values refresh data sooner. Higher values put less load on upstream services.</span
+		>These settings control how long shared server cache entries stay fresh. Lower values update
+		sooner. Higher values put less load on upstream services.</span
 	>
 </div>
 <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 pt-2">

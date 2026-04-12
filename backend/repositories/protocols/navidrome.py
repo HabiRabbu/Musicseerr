@@ -4,8 +4,14 @@ from typing import TYPE_CHECKING, Protocol
 
 from repositories.navidrome_models import (
     SubsonicAlbum,
+    SubsonicAlbumInfo,
     SubsonicArtist,
+    SubsonicArtistIndex,
+    SubsonicArtistInfo,
     SubsonicGenre,
+    SubsonicLyrics,
+    SubsonicMusicFolder,
+    SubsonicNowPlayingEntry,
     SubsonicPlaylist,
     SubsonicSearchResult,
     SubsonicSong,
@@ -58,6 +64,17 @@ class NavidromeRepositoryProtocol(Protocol):
     async def get_genres(self) -> list[SubsonicGenre]:
         ...
 
+    async def get_artists_index(self) -> list[SubsonicArtistIndex]:
+        ...
+
+    async def get_songs_by_genre(
+        self, genre: str, count: int = 50, offset: int = 0
+    ) -> list[SubsonicSong]:
+        ...
+
+    async def get_music_folders(self) -> list[SubsonicMusicFolder]:
+        ...
+
     async def get_playlists(self) -> list[SubsonicPlaylist]:
         ...
 
@@ -90,4 +107,29 @@ class NavidromeRepositoryProtocol(Protocol):
         ...
 
     async def now_playing(self, id: str) -> bool:
+        ...
+
+    async def get_now_playing(self) -> list[SubsonicNowPlayingEntry]:
+        ...
+
+    async def get_top_songs(
+        self, artist_name: str, count: int = 20
+    ) -> list[SubsonicSong]:
+        ...
+
+    async def get_similar_songs(
+        self, song_id: str, count: int = 20
+    ) -> list[SubsonicSong]:
+        ...
+
+    async def get_artist_info(self, artist_id: str) -> SubsonicArtistInfo | None:
+        ...
+
+    async def get_album_info(self, album_id: str) -> SubsonicAlbumInfo | None:
+        ...
+
+    async def get_lyrics(self, artist: str, title: str) -> SubsonicLyrics | None:
+        ...
+
+    async def get_lyrics_by_song_id(self, song_id: str) -> SubsonicLyrics | None:
         ...

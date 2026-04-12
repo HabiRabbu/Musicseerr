@@ -133,7 +133,7 @@
 	<div class="card-body">
 		<h2 class="card-title text-2xl">Plex Connection</h2>
 		<p class="text-base-content/70 mb-4">
-			Connect Plex for music streaming, library browsing, and scrobbling.
+			Connect Plex to browse your library, play music, and keep your listening history in sync.
 		</p>
 
 		{#if form.loading}
@@ -151,7 +151,7 @@
 						type="url"
 						bind:value={form.data.plex_url}
 						class="input input-bordered w-full"
-						placeholder="http://localhost:32400"
+						placeholder="http://plex-server:32400"
 					/>
 				</div>
 
@@ -167,17 +167,13 @@
 							class="input input-bordered join-item flex-1"
 							placeholder="Paste your Plex token"
 						/>
-						<button
-							type="button"
-							class="btn join-item"
-							onclick={() => (showToken = !showToken)}
-						>
+						<button type="button" class="btn join-item" onclick={() => (showToken = !showToken)}>
 							{showToken ? 'Hide' : 'Show'}
 						</button>
 					</div>
 					<div class="label">
 						<span class="label-text-alt text-base-content/50">
-							Use OAuth below or paste in a token.
+							Sign in with Plex below, or paste a token here.
 						</span>
 					</div>
 				</div>
@@ -185,10 +181,10 @@
 				<div class="flex items-center gap-3">
 					{#if oauthPending}
 						<span class="loading loading-spinner loading-sm"></span>
-						<span class="text-sm text-base-content/70">Waiting for Plex sign-in...</span>
+						<span class="text-sm text-base-content/70">Finish signing in to Plex to continue.</span>
 						{#if oauthUrl}
 							<a href={oauthUrl} target="_blank" rel="noopener" class="link link-primary text-sm">
-								Open again
+								Open sign-in page
 							</a>
 						{/if}
 						<button type="button" class="btn btn-ghost btn-xs" onclick={cancelOAuth}>
@@ -209,7 +205,7 @@
 				{#if hasCredentials || libraries.length > 0 || loadingLibraries}
 					<div class="form-control w-full">
 						<label class="label">
-							<span class="label-text">Music Libraries</span>
+							<span class="label-text">Music libraries</span>
 							<button
 								type="button"
 								class="btn btn-xs btn-ghost"
@@ -237,12 +233,12 @@
 							</div>
 						{:else}
 							<p class="text-sm text-base-content/50">
-								Test the connection to load your libraries.
+								Run a connection test to load your Plex libraries.
 							</p>
 						{/if}
 						<div class="label">
 							<span class="label-text-alt text-base-content/50">
-								Pick the Plex libraries that contain music.
+								Choose the Plex libraries that contain your music.
 							</span>
 						</div>
 					</div>
@@ -257,9 +253,7 @@
 						/>
 						<div>
 							<span class="label-text font-medium">Scrobble to Plex</span>
-							<p class="text-xs text-base-content/50">
-								Mark tracks as played in Plex.
-							</p>
+							<p class="text-xs text-base-content/50">Send your listening history back to Plex.</p>
 						</div>
 					</label>
 				</div>
@@ -280,18 +274,17 @@
 							type="checkbox"
 							bind:checked={form.data.enabled}
 							class="toggle toggle-primary"
-							disabled={(!form.testResult?.valid && !form.wasAlreadyEnabled) ||
-								!hasLibrarySelected}
+							disabled={(!form.testResult?.valid && !form.wasAlreadyEnabled) || !hasLibrarySelected}
 						/>
 						<div>
-							<span class="label-text font-medium">Enable Plex Integration</span>
+							<span class="label-text font-medium">Enable Plex integration</span>
 							<p class="text-xs text-base-content/50">
 								{#if !hasLibrarySelected}
 									Select at least one music library.
 								{:else if !form.testResult?.valid && !form.wasAlreadyEnabled}
-									Test the connection before enabling Plex.
+									Test the connection before turning Plex on.
 								{:else}
-									Stream music and browse your Plex library.
+									Browse and play your Plex music here.
 								{/if}
 							</p>
 						</div>
@@ -318,13 +311,13 @@
 						{#if form.testing}
 							<span class="loading loading-spinner loading-sm"></span>
 						{/if}
-						Test Connection
+						Test connection
 					</button>
 					<button type="button" class="btn btn-primary" onclick={save} disabled={form.saving}>
 						{#if form.saving}
 							<span class="loading loading-spinner loading-sm"></span>
 						{/if}
-						Save Settings
+						Save settings
 					</button>
 				</div>
 			</div>

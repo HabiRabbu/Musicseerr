@@ -5,9 +5,11 @@ from typing import Any, Protocol, TYPE_CHECKING
 from repositories.plex_models import (
     PlexAlbum,
     PlexArtist,
+    PlexHistoryEntry,
     PlexLibrarySection,
     PlexOAuthPin,
     PlexPlaylist,
+    PlexSession,
     PlexTrack,
 )
 
@@ -44,6 +46,8 @@ class PlexRepositoryProtocol(Protocol):
         offset: int = 0,
         sort: str = "titleSort:asc",
         genre: str | None = None,
+        mood: str | None = None,
+        decade: str | None = None,
     ) -> tuple[list[PlexAlbum], int]:
         ...
 
@@ -86,10 +90,18 @@ class PlexRepositoryProtocol(Protocol):
     async def get_genres(self, section_id: str) -> list[str]:
         ...
 
+    async def get_moods(self, section_id: str) -> list[str]:
+        ...
+
+    async def get_hubs(
+        self, section_id: str, count: int = 10
+    ) -> list[dict[str, Any]]:
+        ...
+
     async def scrobble(self, rating_key: str) -> bool:
         ...
 
-    async def now_playing(self, rating_key: str) -> bool:
+    async def now_playing(self, rating_key: str, state: str = "playing") -> bool:
         ...
 
     def build_stream_url(self, track: PlexTrack) -> str:
@@ -104,6 +116,9 @@ class PlexRepositoryProtocol(Protocol):
         ...
 
     async def proxy_thumb(self, rating_key: str, size: int = 500) -> tuple[bytes, str]:
+        ...
+
+    async def proxy_playlist_composite(self, rating_key: str, size: int = 500) -> tuple[bytes, str]:
         ...
 
     async def validate_connection(self) -> tuple[bool, str]:
@@ -131,4 +146,12 @@ class PlexRepositoryProtocol(Protocol):
         detail_ttl: int | None = None,
         stats_ttl: int | None = None,
     ) -> None:
+        ...
+
+    async def get_sessions(self) -> list[PlexSession]:
+        ...
+
+    async def get_listening_history(
+        self, limit: int = 50, offset: int = 0
+    ) -> tuple[list[PlexHistoryEntry], int]:
         ...

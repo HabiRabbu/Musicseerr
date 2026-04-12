@@ -34,11 +34,19 @@ export async function reportPlexScrobble(ratingKey: string): Promise<void> {
 }
 
 export async function reportPlexNowPlaying(ratingKey: string): Promise<void> {
-	if (!(await loadScrobblePreference())) return;
 	try {
 		await api.global.post(API.stream.plexNowPlaying(ratingKey));
 	} catch (e) {
 		const detail = e instanceof ApiError ? String(e.status) : 'network error';
 		console.warn(`[Plex] now-playing failed: ${detail}`);
+	}
+}
+
+export async function reportPlexStopped(ratingKey: string): Promise<void> {
+	try {
+		await api.global.post(API.stream.plexStopped(ratingKey));
+	} catch (e) {
+		const detail = e instanceof ApiError ? String(e.status) : 'network error';
+		console.warn(`[Plex] stopped report failed: ${detail}`);
 	}
 }

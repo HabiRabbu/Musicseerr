@@ -29,6 +29,7 @@ class PlaylistSummaryResponse(AppStruct):
     total_duration: int | None = None
     cover_urls: list[str] = msgspec.field(default_factory=list)
     custom_cover_url: str | None = None
+    source_ref: str | None = None
     created_at: str = ""
     updated_at: str = ""
 
@@ -39,6 +40,7 @@ class PlaylistDetailResponse(AppStruct):
     name: str
     cover_urls: list[str] = msgspec.field(default_factory=list)
     custom_cover_url: str | None = None
+    source_ref: str | None = None
     tracks: list[PlaylistTrackResponse] = msgspec.field(default_factory=list)
     track_count: int = 0
     total_duration: int | None = None

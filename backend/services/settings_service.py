@@ -158,7 +158,7 @@ class SettingsService:
                 metadata_profiles=[],
                 root_folders=[]
             )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.exception(f"Failed to verify Lidarr connection: {e}")
             return LidarrVerifyResponse(
                 success=False,
@@ -196,7 +196,7 @@ class SettingsService:
                 users = [JellyfinUser(id=u.id, name=u.name) for u in jf_users]
             
             return JellyfinVerifyResult(success=success, message=message, users=users)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.exception(f"Failed to verify Jellyfin connection: {e}")
             return JellyfinVerifyResult(
                 success=False,
@@ -225,7 +225,7 @@ class SettingsService:
                 valid, message = await temp_repo.validate_username(settings.username)
 
             return ListenBrainzVerifyResult(valid=valid, message=message)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.exception(f"Failed to verify ListenBrainz connection: {e}")
             return ListenBrainzVerifyResult(
                 valid=False,
@@ -558,7 +558,7 @@ class SettingsService:
                 valid=False,
                 message="Navidrome didn't respond. Check the URL and credentials.",
             )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.exception("Failed to verify Navidrome connection: %s", e)
             return NavidromeVerifyResult(
                 valid=False,
@@ -580,7 +580,7 @@ class SettingsService:
             )
             valid, message = await temp_repo.verify_api_key(settings.api_key.strip())
             return YouTubeVerifyResult(valid=valid, message=message)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.exception("Failed to verify YouTube connection: %s", e)
             return YouTubeVerifyResult(
                 valid=False,
@@ -626,7 +626,7 @@ class SettingsService:
                 return LastFmVerifyResult(valid=True, message=session_message)
 
             return LastFmVerifyResult(valid=valid, message=message)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.exception("Failed to verify Last.fm connection: %s", e)
             return LastFmVerifyResult(
                 valid=False, message="Couldn't finish the Last.fm connection test"
@@ -667,10 +667,10 @@ class SettingsService:
                 try:
                     sections = await temp_repo.get_music_libraries()
                     libs = [(s.key, s.title) for s in sections]
-                except Exception:
+                except Exception:  # noqa: BLE001
                     logger.warning("Plex verify succeeded but library fetch failed")
             return PlexVerifyResult(valid=ok, message=message, libraries=libs)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.exception("Failed to verify Plex connection: %s", e)
             return PlexVerifyResult(
                 valid=False,

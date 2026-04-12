@@ -7,7 +7,10 @@ import { updateDiscoveryCacheTTL } from '$lib/stores/discoveryCache';
 import { updateDiscoverQueueCacheTTL } from '$lib/utils/discoverQueueCache';
 import { updateSearchCacheTTL } from '$lib/stores/search';
 import { updateJellyfinSidebarCacheTTL } from '$lib/utils/jellyfinLibraryCache';
-import { updatePlexSidebarCacheTTL, updatePlexAlbumsListCacheTTL } from '$lib/utils/plexLibraryCache';
+import {
+	updatePlexSidebarCacheTTL,
+	updatePlexAlbumsListCacheTTL
+} from '$lib/utils/plexLibraryCache';
 import { updateLocalFilesSidebarCacheTTL } from '$lib/utils/localFilesCache';
 import { libraryStore } from '$lib/stores/library';
 import { recentlyAddedStore } from '$lib/stores/recentlyAdded';
@@ -82,8 +85,9 @@ export async function initCacheTTLs(): Promise<void> {
 				(data.discover_queue_auto_generate as boolean) ?? DEFAULTS.discoverQueueAutoGenerate
 		};
 		applyTTLs(resolved);
-	} catch (e) {
-		console.warn('[cacheTtl] Failed to load cache TTL settings, using defaults', e);
+	} catch {
+		resolved = { ...DEFAULTS };
+		applyTTLs(resolved);
 	}
 }
 

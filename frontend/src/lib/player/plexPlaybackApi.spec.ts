@@ -30,7 +30,8 @@ vi.mock('$lib/constants', () => ({
 	API: {
 		stream: {
 			plexScrobble: (key: string) => `/api/v1/stream/plex/${key}/scrobble`,
-			plexNowPlaying: (key: string) => `/api/v1/stream/plex/${key}/now-playing`
+			plexNowPlaying: (key: string) => `/api/v1/stream/plex/${key}/now-playing`,
+			plexStopped: (key: string) => `/api/v1/stream/plex/${key}/stopped`
 		},
 		settingsPlex: () => '/api/v1/settings/plex'
 	}
@@ -39,13 +40,14 @@ vi.mock('$lib/constants', () => ({
 import {
 	reportPlexScrobble,
 	reportPlexNowPlaying,
+	reportPlexStopped,
 	isPlexScrobbleEnabled,
 	resetPlexScrobblePreference
 } from './plexPlaybackApi';
 
 describe('plexPlaybackApi', () => {
 	beforeEach(() => {
-		vi.clearAllMocks();
+		vi.resetAllMocks();
 		resetPlexScrobblePreference();
 	});
 
@@ -93,9 +95,8 @@ describe('plexPlaybackApi', () => {
 	});
 
 	describe('reportPlexNowPlaying', () => {
-		it('calls now-playing endpoint when enabled', async () => {
+		it('calls now-playing endpoint unconditionally', async () => {
 			expect.assertions(1);
-			mockGet.mockResolvedValueOnce({ scrobble_to_plex: true });
 			mockPost.mockResolvedValueOnce(undefined);
 
 			await reportPlexNowPlaying('67890');
@@ -103,19 +104,9 @@ describe('plexPlaybackApi', () => {
 			expect(mockPost).toHaveBeenCalledWith('/api/v1/stream/plex/67890/now-playing');
 		});
 
-		it('does not call now-playing when disabled', async () => {
-			expect.assertions(1);
-			mockGet.mockResolvedValueOnce({ scrobble_to_plex: false });
-
-			await reportPlexNowPlaying('67890');
-
-			expect(mockPost).not.toHaveBeenCalled();
-		});
-
 		it('warns on error without throwing', async () => {
 			expect.assertions(1);
 			const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-			mockGet.mockResolvedValueOnce({ scrobble_to_plex: true });
 			mockPost.mockRejectedValueOnce(new Error('timeout'));
 
 			await reportPlexNowPlaying('67890');
@@ -160,16 +151,37 @@ describe('plexPlaybackApi', () => {
 	});
 
 	describe('preference caching', () => {
-		it('fetches only once across multiple calls', async () => {
+		it('fetches only once across multiple scrobble calls', async () => {
 			expect.assertions(1);
 			mockGet.mockResolvedValueOnce({ scrobble_to_plex: true });
 			mockPost.mockResolvedValue(undefined);
 
 			await reportPlexScrobble('a');
 			await reportPlexScrobble('b');
-			await reportPlexNowPlaying('c');
 
 			expect(mockGet).toHaveBeenCalledTimes(1);
+		});
+	});
+
+	describe('reportPlexStopped', () => {
+		it('calls stopped endpoint', async () => {
+			expect.assertions(1);
+			mockPost.mockResolvedValueOnce(undefined);
+
+			await reportPlexStopped('99999');
+
+			expect(mockPost).toHaveBeenCalledWith('/api/v1/stream/plex/99999/stopped');
+		});
+
+		it('warns on error without throwing', async () => {
+			expect.assertions(1);
+			const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+			mockPost.mockRejectedValueOnce(new Error('fail'));
+
+			await reportPlexStopped('99999');
+
+			expect(warnSpy).toHaveBeenCalled();
+			warnSpy.mockRestore();
 		});
 	});
 });
