@@ -60,7 +60,7 @@ NPM    ?= pnpm
 	frontend-test-monitored-artists \
 	frontend-test-playlist-detail \
 	frontend-test-queuehelpers \
-	project-map rebuild \
+	rebuild \
 	test tests check lint ci
 
 # Help
@@ -259,9 +259,6 @@ frontend-test-queuehelpers: ## Run queue helper regressions
 	cd "$(FRONTEND_DIR)" && $(NPM) exec vitest run --project server src/lib/player/queueHelpers.spec.ts
 
 # Utilities
-
-project-map: ## Refresh the project map block
-	cd "$(ROOT_DIR)" && $(PYTHON) scripts/gen-project-map.py
 
 rebuild: ## Rebuild the application
 	cd "$(ROOT_DIR)" && ./manage.sh --rebuild

@@ -46,9 +46,10 @@
 		credsPersisted = !!(form.data?.api_key && form.data?.shared_secret);
 	}
 
-	async function save() {
+	async function save(): Promise<boolean> {
 		const ok = await form.save();
 		if (ok && form.data?.api_key && form.data?.shared_secret) credsPersisted = true;
+		return ok;
 	}
 
 	async function saveAndTest() {
@@ -128,9 +129,7 @@
 <div class="card bg-base-200">
 	<div class="card-body">
 		<h2 class="card-title text-2xl">Last.fm</h2>
-		<p class="text-base-content/70 mb-4">
-			Connect Last.fm to track listens and improve recommendations.
-		</p>
+		<p class="text-base-content/70 mb-4">Connect Last.fm to scrobble listens and improve recommendations.</p>
 
 		{#if form.loading}
 			<div class="flex justify-center items-center py-12">
@@ -138,7 +137,7 @@
 			</div>
 		{:else if form.data}
 			<ul class="steps steps-horizontal w-full mb-6">
-				<li class="step" class:step-primary={step1Complete}>API Credentials</li>
+				<li class="step" class:step-primary={step1Complete}>API credentials</li>
 				<li class="step" class:step-primary={step2Complete}>Authorize</li>
 				<li class="step" class:step-primary={step3Complete}>Enable</li>
 			</ul>
@@ -160,13 +159,11 @@
 			{#if showForm}
 				<div class="space-y-6">
 					<div class="space-y-4">
-						<h3 class="text-lg font-semibold">Step 1 — API Credentials</h3>
+						<h3 class="text-lg font-semibold">Step 1: API credentials</h3>
 
 						{#if !step1Complete}
 							<div class="bg-base-300 rounded-lg p-4 space-y-2">
-								<p class="text-sm font-medium">
-									You will need a Last.fm API key and shared secret:
-								</p>
+								<p class="text-sm font-medium">You'll need a Last.fm API key and shared secret:</p>
 								<ol class="list-decimal list-inside text-sm space-y-1 text-base-content/70">
 									<li>
 										<a
@@ -183,7 +180,7 @@
 									<li>
 										Copy the <strong>API Key</strong> and <strong>Shared Secret</strong> from that page
 									</li>
-									<li>Paste them here, then click <strong>Save &amp; Test</strong></li>
+									<li>Paste them here, then select <strong>Save &amp; Test</strong></li>
 								</ol>
 							</div>
 						{/if}
@@ -197,7 +194,7 @@
 								type="text"
 								bind:value={form.data.api_key}
 								class="input input-bordered w-full"
-								placeholder="Your Last.fm API key"
+								placeholder="Last.fm API key"
 							/>
 							{#if step1Complete}
 								<div class="label">
@@ -224,7 +221,7 @@
 									type={showSecret ? 'text' : 'password'}
 									bind:value={form.data.shared_secret}
 									class="input input-bordered join-item flex-1"
-									placeholder="Your Last.fm shared secret"
+								placeholder="Last.fm shared secret"
 								/>
 								<button
 									type="button"
@@ -278,7 +275,7 @@
 					{#if step1Complete}
 						<div class="divider"></div>
 						<div class="space-y-4">
-							<h3 class="text-lg font-semibold">Step 2 — Authorize</h3>
+							<h3 class="text-lg font-semibold">Step 2: Authorize</h3>
 
 							{#if step2Complete && !pendingToken}
 								<div class="alert alert-success">
@@ -297,9 +294,7 @@
 									Re-authorize
 								</button>
 							{:else if !pendingToken}
-								<p class="text-sm text-base-content/70">
-									Open Last.fm in a new tab, approve access, then come back here.
-								</p>
+								<p class="text-sm text-base-content/70">Open Last.fm in a new tab, approve access, then return here.</p>
 								<button
 									type="button"
 									class="btn btn-primary"
@@ -317,9 +312,7 @@
 							{#if pendingToken}
 								<div class="card bg-base-300">
 									<div class="card-body p-4 space-y-3">
-										<p class="text-sm">
-											Once you have approved access in Last.fm, finish the connection here.
-										</p>
+										<p class="text-sm">Once you've approved access in Last.fm, finish connecting it here.</p>
 										<div class="flex gap-2">
 											<button
 												type="button"
@@ -355,7 +348,7 @@
 					{#if step2Complete || form.data.enabled}
 						<div class="divider"></div>
 						<div class="space-y-4">
-							<h3 class="text-lg font-semibold">Step 3 — Enable</h3>
+							<h3 class="text-lg font-semibold">Step 3: Enable</h3>
 
 							<div class="form-control">
 								<label class="label cursor-pointer justify-start gap-4">
@@ -363,6 +356,13 @@
 										type="checkbox"
 										bind:checked={form.data.enabled}
 										class="toggle toggle-primary"
+										onchange={async () => {
+											if (!form.data) return;
+											const prev = !form.data.enabled;
+											const ok = await save();
+											if (!ok && form.data) form.data.enabled = prev;
+										}}
+										disabled={form.saving}
 									/>
 									<div>
 										<span class="label-text font-medium">Enable Last.fm</span>
@@ -370,7 +370,7 @@
 											{#if form.data.enabled && !step2Complete}
 												Last.fm is turned on, but the account connection still needs to be finished.
 											{:else}
-												Use Last.fm for scrobbling, recommendations, and extra music details.
+												Use Last.fm for scrobbling, recommendations, and richer music details.
 											{/if}
 										</p>
 									</div>
