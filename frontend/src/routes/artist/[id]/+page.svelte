@@ -42,7 +42,6 @@
 		data.primarySource
 	);
 
-	let error: string | null = $state(null);
 	let showToast = $state(false);
 	let toastMessage = 'Added to Library';
 	let showArtistRemovedModal = $state(false);
@@ -92,6 +91,16 @@
 	}));
 	const lastfmEnrichment = $derived(lastFmEnrichmentQuery.data);
 	const loadingLastfm = $derived(lastFmEnrichmentQuery.isLoading);
+
+	let error: string | null = $derived.by(() => {
+		if (artistBasicQuery.error) {
+			return 'Failed to load artist information.';
+		}
+		if (artistExtendedQuery.error) {
+			return 'Failed to load extended artist information.';
+		}
+		return null;
+	});
 
 	const artist = $derived.by(() => {
 		if (!artistBasic) return null;
@@ -158,7 +167,6 @@
 			});
 
 			if (result.success && artist) {
-				// TODO: update the specific release in the cache instead of refetching everything
 				await updateArtistReleaseInCache(data.artistId, {
 					id: releaseId,
 					requested: true

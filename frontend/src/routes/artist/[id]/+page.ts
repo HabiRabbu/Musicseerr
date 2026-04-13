@@ -1,11 +1,9 @@
-import { ArtistQueryKeyFactory } from '$lib/queries/artist/ArtistQueryKeyFactory';
+import { getBasicArtistQueryOptions } from '$lib/queries/artist/ArtistQueries.svelte';
 import { queryClient } from '$lib/queries/QueryClient';
 import type { PageLoad } from './$types';
 
 export const load: PageLoad = async ({ params }) => {
-	queryClient.prefetchQuery({
-		queryKey: ArtistQueryKeyFactory.basic(params.id)
-	});
+	queryClient.prefetchQuery(getBasicArtistQueryOptions(params.id));
 
 	return {
 		artistId: params.id

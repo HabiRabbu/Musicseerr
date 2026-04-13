@@ -119,12 +119,10 @@ class SettingsService:
             ]
 
             root_folders_raw = await temp_repo.get_root_folders()
-            logger.info(f"Fetched {len(root_folders_raw)} root folders from Lidarr during verification")
             root_folders = [
                  LidarrRootFolderSummary(id=str(r.get("id", "")), path=str(r.get("path", "")))
                 for r in root_folders_raw
             ]
-            logger.info(f"Parsed {len(root_folders)} root folders from Lidarr during verification")
 
             return LidarrVerifyResponse(
                 success=True,

@@ -120,7 +120,7 @@ export type ExternalLink = {
 	category?: string;
 };
 
-export type ArtistInfo = {
+export type ArtistInfoBasic = {
 	name: string;
 	musicbrainz_id: string;
 	disambiguation?: string | null;
@@ -131,8 +131,6 @@ export type ArtistInfo = {
 		end?: string | null;
 		ended?: boolean;
 	} | null;
-	description?: string | null;
-	image?: string | null;
 	fanart_url?: string | null;
 	banner_url?: string | null;
 	thumb_url?: string | null;
@@ -152,6 +150,13 @@ export type ArtistInfo = {
 	auto_download?: boolean;
 	release_group_count?: number;
 };
+
+export type ArtistInfoExtended = {
+	description?: string | null;
+	image?: string | null;
+};
+
+export type ArtistInfo = ArtistInfoBasic & ArtistInfoExtended;
 
 export type ArtistReleases = {
 	albums: ReleaseGroup[];

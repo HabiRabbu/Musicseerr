@@ -146,10 +146,9 @@ export const API = {
 			`/api/v1/artists/${id}/top-songs?count=${count}&source=${source}`,
 		topAlbums: (id: string, source: MusicSource, count: number = 10) =>
 			`/api/v1/artists/${id}/top-albums?count=${count}&source=${source}`,
-		lastFmEnrichtment: (id: string, artistName: string) => {
+		lastFmEnrichment: (id: string, artistName: string) => {
 			const params = new URLSearchParams({ artist_name: artistName });
-			return `/api/v1/artists/${id}/lastfm?${params.toString()}
-      `;
+			return `/api/v1/artists/${id}/lastfm?${params.toString()}`;
 		}
 	},
 	album: {

@@ -1,10 +1,11 @@
 import { API, CACHE_TTL } from '$lib/constants';
-import { createInfiniteQuery, createQuery } from '@tanstack/svelte-query';
+import { createInfiniteQuery, createQuery, queryOptions } from '@tanstack/svelte-query';
 import type { Getter } from 'runed';
 import { ArtistQueryKeyFactory } from './ArtistQueryKeyFactory';
 import { api } from '$lib/api/client';
 import type {
-	ArtistInfo,
+	ArtistInfoBasic,
+	ArtistInfoExtended,
 	ArtistReleases,
 	LastFmArtistEnrichment,
 	ReleaseGroup,
@@ -17,22 +18,25 @@ import { integrationStore } from '$lib/stores/integration';
 import { get } from 'svelte/store';
 import { setQueryDataWithPersister } from '../QueryClient';
 
-export const getBasicArtistQuery = (getArtistId: Getter<string>) =>
-	createQuery(() => ({
+export const getBasicArtistQueryOptions = (artistId: string) =>
+	queryOptions({
 		staleTime: CACHE_TTL.ARTIST_DETAIL_BASIC,
-		queryKey: ArtistQueryKeyFactory.basic(getArtistId()),
+		queryKey: ArtistQueryKeyFactory.basic(artistId),
 		queryFn: ({ signal }) =>
-			api.global.get<ArtistInfo>(API.artist.basic(getArtistId()), {
+			api.global.get<ArtistInfoBasic>(API.artist.basic(artistId), {
 				signal
 			})
-	}));
+	});
+
+export const getBasicArtistQuery = (getArtistId: Getter<string>) =>
+	createQuery(() => getBasicArtistQueryOptions(getArtistId()));
 
 export const getExtendedArtistQuery = (getArtistId: Getter<string>) =>
 	createQuery(() => ({
 		staleTime: CACHE_TTL.ARTIST_DETAIL_EXTENDED,
 		queryKey: ArtistQueryKeyFactory.extended(getArtistId()),
 		queryFn: ({ signal }) =>
-			api.global.get<ArtistInfo>(API.artist.extended(getArtistId()), {
+			api.global.get<ArtistInfoExtended>(API.artist.extended(getArtistId()), {
 				signal
 			})
 	}));
@@ -91,12 +95,9 @@ export const getArtistLastFmEnrichmentQuery = (
 			staleTime: CACHE_TTL.ARTIST_DETAIL_LASTFM,
 			queryKey: ArtistQueryKeyFactory.lastFmEnrichment(artistId, artistName),
 			queryFn: ({ signal }) =>
-				api.global.get<LastFmArtistEnrichment>(
-					API.artist.lastFmEnrichtment(artistId, artistName!),
-					{
-						signal
-					}
-				),
+				api.global.get<LastFmArtistEnrichment>(API.artist.lastFmEnrichment(artistId, artistName!), {
+					signal
+				}),
 			enabled: () => !!artistName && get(integrationStore).lastfm
 		};
 	});
@@ -142,10 +143,10 @@ export const updateArtistReleaseInCache = (
 			};
 
 			return {
+				...page,
 				albums: page.albums.map(updateRelease),
 				singles: page.singles.map(updateRelease),
-				eps: page.eps.map(updateRelease),
-				has_more: page.has_more
+				eps: page.eps.map(updateRelease)
 			};
 		});
 		return { ...prevData, pages: updatedPages };
