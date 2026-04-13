@@ -58,7 +58,7 @@ import {
 	getTrackContextMenuItems as getTrackContextMenuItemsImpl,
 	buildSourceCallbacks
 } from './albumPlaybackHandlers';
-import { queryClient } from '$lib/queries/QueryClient';
+import { invalidateQueriesWithPersister } from '$lib/queries/QueryClient';
 import { ArtistQueryKeyFactory } from '$lib/queries/artist/ArtistQueryKeyFactory';
 
 export interface SourceCallbacks {
@@ -542,8 +542,8 @@ export function createAlbumPageState(albumIdGetter: () => string) {
 			if (aid && abortController) void fetchArtistMonitoringState(aid, abortController.signal);
 			if (opts?.monitorArtist && aid) {
 				monitoredArtistsStore.addPendingMonitor(aid, opts.autoDownloadArtist ?? false);
-				queryClient.invalidateQueries({ queryKey: ArtistQueryKeyFactory.basic(aid) });
-				queryClient.invalidateQueries({ queryKey: ArtistQueryKeyFactory.releases(aid) });
+				invalidateQueriesWithPersister({ queryKey: ArtistQueryKeyFactory.basic(aid) });
+				invalidateQueriesWithPersister({ queryKey: ArtistQueryKeyFactory.releases(aid) });
 			}
 		}
 	});

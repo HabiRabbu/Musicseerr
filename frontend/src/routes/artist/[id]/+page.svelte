@@ -28,7 +28,7 @@
 		updateArtistReleaseInCache
 	} from '$lib/queries/artist/ArtistQueries.svelte';
 	import type { PageProps } from './$types';
-	import { queryClient } from '$lib/queries/QueryClient';
+	import { invalidateQueriesWithPersister } from '$lib/queries/QueryClient';
 	import { ArtistQueryKeyFactory } from '$lib/queries/artist/ArtistQueryKeyFactory';
 	import { PAGE_SOURCE_KEYS } from '$lib/constants';
 	import { PersistedState } from 'runed';
@@ -153,7 +153,7 @@
 
 	async function handleRefreshClick() {
 		// Will also invalidate the extended query
-		queryClient.invalidateQueries({ queryKey: ArtistQueryKeyFactory.basic(data.artistId) });
+		invalidateQueriesWithPersister({ queryKey: ArtistQueryKeyFactory.basic(data.artistId) });
 	}
 
 	async function handleRequest(releaseId: string, releaseTitle?: string) {
@@ -188,7 +188,7 @@
 			removedArtistName = result.artist_name || artist.name;
 			showArtistRemovedModal = true;
 		}
-		queryClient.invalidateQueries({ queryKey: ArtistQueryKeyFactory.basic(data.artistId) });
+		invalidateQueriesWithPersister({ queryKey: ArtistQueryKeyFactory.basic(data.artistId) });
 	}
 
 	const tocSections = $derived.by<ArtistTocSection[]>(() => {
