@@ -135,7 +135,7 @@
 		<div class="mt-16 flex flex-col items-center justify-center px-4">
 			<CircleAlert class="mb-4 h-10 w-10 text-base-content/50" />
 			<p class="text-base-content/70">
-				{discoverQuery.error.message ?? 'Failed to load Home data'}
+				{discoverQuery.error.message ?? 'Failed to load Discover data'}
 			</p>
 			<button class="btn btn-primary mt-4" onclick={() => discoverQuery.refetch()}>Try Again</button
 			>
