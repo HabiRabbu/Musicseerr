@@ -4,11 +4,15 @@ import { api } from '$lib/api/client';
 export async function reportNavidromeScrobble(itemId: string): Promise<void> {
 	try {
 		await api.global.post<{ status: string }>(API.stream.navidromeScrobble(itemId));
-	} catch {}
+	} catch {
+		// best-effort scrobble
+	}
 }
 
 export async function reportNavidromeNowPlaying(itemId: string): Promise<void> {
 	try {
 		await api.global.post(API.stream.navidromeNowPlaying(itemId));
-	} catch {}
+	} catch {
+		// best-effort now-playing report
+	}
 }

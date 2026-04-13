@@ -26,7 +26,9 @@ async function load(): Promise<void> {
 			directRemoteImagesEnabled: data.direct_remote_images_enabled ?? true
 		});
 		lastFetch = now;
-	} catch {}
+	} catch {
+		// use defaults on fetch failure
+	}
 }
 
 export const imageSettingsStore = {

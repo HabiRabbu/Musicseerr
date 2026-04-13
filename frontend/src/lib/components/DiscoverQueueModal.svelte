@@ -175,7 +175,9 @@
 			if (queue.length === 0) {
 				await fetchNewQueue();
 			}
-		} catch {}
+		} catch {
+			// ignore fetch failures
+		}
 	}
 
 	async function enrichCurrentAndNext() {
@@ -264,7 +266,9 @@
 				},
 				{ signal: abortController?.signal }
 			);
-		} catch {}
+		} catch {
+			// ignore request failure
+		}
 
 		queue = queue.filter((_, i) => i !== currentIndex);
 		if (currentIndex >= queue.length) currentIndex = Math.max(0, queue.length - 1);
@@ -320,7 +324,9 @@
 			ytQuota = await api.get<YouTubeQuotaStatus>(API.discoverQueueYoutubeQuota(), {
 				signal: abortController?.signal
 			});
-		} catch {}
+		} catch {
+			// ignore quota fetch failure
+		}
 	}
 
 	async function handleYtSearch() {

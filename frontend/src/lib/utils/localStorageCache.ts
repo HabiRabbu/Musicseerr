@@ -73,7 +73,7 @@ export function createLocalStorageCache<T>(
 		return key.startsWith(keyPrefix);
 	}
 
-	function isQuotaExceededError(error: unknown): boolean {
+	function _isQuotaExceededError(error: unknown): boolean {
 		if (!(error instanceof DOMException)) return false;
 		return (
 			error.code === 22 ||
@@ -169,7 +169,6 @@ export function createLocalStorageCache<T>(
 			enforceMaxEntriesLimit();
 			return;
 		}
-
 	}
 
 	function remove(suffix?: string): void {

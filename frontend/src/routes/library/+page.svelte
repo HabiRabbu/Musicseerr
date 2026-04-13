@@ -132,7 +132,9 @@
 		try {
 			const data = await api.global.get<{ sync_frequency: string }>('/api/v1/settings/lidarr');
 			syncFrequencyLabel = FREQ_LABELS[data.sync_frequency] ?? null;
-		} catch {}
+		} catch {
+			// ignore settings fetch failure
+		}
 	}
 
 	async function loadArtists() {

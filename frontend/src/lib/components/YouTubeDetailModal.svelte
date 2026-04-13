@@ -107,7 +107,7 @@
 			const data = await api.global.get<YouTubeTrackLink[]>(API.youtube.trackLinks(albumId));
 			if (id !== fetchId) return;
 			tracks = data.sort(compareDiscTrack);
-		} catch (e) {
+		} catch (_e) {
 			if (id === fetchId) {
 				trackError = true;
 			}

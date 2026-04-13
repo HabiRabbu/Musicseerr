@@ -16,7 +16,9 @@ async function loadPreferences(): Promise<void> {
 	try {
 		const prefs = await api.global.get<UserPreferences>(`${API_BASE}/settings/preferences`);
 		set(prefs);
-	} catch {}
+	} catch {
+		// use defaults on fetch failure
+	}
 }
 
 async function savePreferences(prefs: UserPreferences): Promise<boolean> {

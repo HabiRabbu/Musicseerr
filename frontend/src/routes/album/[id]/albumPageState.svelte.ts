@@ -337,7 +337,9 @@ export function createAlbumPageState(albumIdGetter: () => string) {
 			if (signal.aborted) return;
 			artistInLidarr = info.in_lidarr ?? false;
 			artistMonitored = info.monitored ?? false;
-		} catch {}
+		} catch {
+			// ignore monitoring state fetch failure
+		}
 	}
 
 	async function loadAlbum(albumId: string) {
@@ -377,7 +379,9 @@ export function createAlbumPageState(albumIdGetter: () => string) {
 							albumId,
 							'local'
 						);
-				} catch {}
+				} catch {
+					// ignore source match failure
+				}
 			})();
 		}
 
@@ -416,7 +420,9 @@ export function createAlbumPageState(albumIdGetter: () => string) {
 							albumId,
 							'navidrome'
 						);
-				} catch {}
+				} catch {
+					// ignore navidrome match failure
+				}
 			})();
 		}
 	}
@@ -449,7 +455,9 @@ export function createAlbumPageState(albumIdGetter: () => string) {
 				extractServiceStatus(album);
 				albumBasicCache.set(album, albumId);
 			}
-		} catch {}
+		} catch {
+			// ignore refresh failure
+		}
 
 		if (signal.aborted) return;
 		await loadAlbum(albumId);
