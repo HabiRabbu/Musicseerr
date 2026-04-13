@@ -1,6 +1,7 @@
-<script lang="ts">
+<script lang="ts" generics="TAlbum extends JellyfinAlbumSummary | LocalAlbumSummary | NavidromeAlbumSummary | PlexAlbumSummary">
 	import type { Snippet } from 'svelte';
 	import type { LibraryController } from '$lib/utils/libraryController.svelte';
+	import type { JellyfinAlbumSummary, LocalAlbumSummary, NavidromeAlbumSummary, PlexAlbumSummary } from '$lib/types';
 	import AlbumImage from '$lib/components/AlbumImage.svelte';
 	import ContextMenu from '$lib/components/ContextMenu.svelte';
 	import AddToPlaylistModal from '$lib/components/AddToPlaylistModal.svelte';
@@ -10,17 +11,17 @@
 	import { onMount, onDestroy } from 'svelte';
 
 	interface Props {
-		ctrl: LibraryController<unknown>;
+		ctrl: LibraryController<TAlbum>;
 		headerIcon: Snippet;
 		headerTitle: string;
 		recentLabel?: string;
 		moodLabel?: string;
 		statsPanel?: Snippet;
-		recentCardOverlay?: Snippet<[unknown]>;
-		cardTopLeftBadge: Snippet<[unknown]>;
-		cardTopRightExtra?: Snippet<[unknown]>;
-		cardBottomLeft?: Snippet<[unknown]>;
-		cardBodyExtra?: Snippet<[unknown]>;
+		recentCardOverlay?: Snippet<[TAlbum]>;
+		cardTopLeftBadge: Snippet<[TAlbum]>;
+		cardTopRightExtra?: Snippet<[TAlbum]>;
+		cardBottomLeft?: Snippet<[TAlbum]>;
+		cardBodyExtra?: Snippet<[TAlbum]>;
 		backHref?: string;
 		contextMenuBackdrop?: boolean;
 		decades?: string[];

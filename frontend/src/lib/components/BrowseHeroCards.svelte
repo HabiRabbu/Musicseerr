@@ -47,7 +47,7 @@
 
 	let hoveredIndex = $state<number | null>(null);
 	let cardEls: HTMLAnchorElement[] = [];
-	const cardCount = cards.length;
+	let cardCount = $derived(cards.length);
 	let tiltStyles: string[] = $state(Array(cardCount).fill(''));
 	let specularStyles: string[] = $state(Array(cardCount).fill(''));
 
