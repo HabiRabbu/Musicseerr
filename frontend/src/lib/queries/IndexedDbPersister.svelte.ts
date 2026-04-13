@@ -34,7 +34,6 @@ export function createIDBStorage(): AsyncStorage<PersistedQuery> {
 		setItem: async (key: string, value: PersistedQuery) => {
 			// In some cases, a svelte state proxy value appears in the query state, which cannot be stored in IndexedDB.
 			// To work around this, we can snapshot the value before storing it.
-			console.debug('Setting item in IndexedDB', key, value);
 			try {
 				await set(key, $state.snapshot(value));
 			} catch (e) {
