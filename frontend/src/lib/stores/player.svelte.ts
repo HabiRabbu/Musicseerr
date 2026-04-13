@@ -15,8 +15,14 @@ import {
 } from '$lib/player/jellyfinPlaybackApi';
 import {
 	reportNavidromeScrobble,
-	reportNavidromeNowPlaying
+	reportNavidromeNowPlaying,
+	reportNavidromeStopped
 } from '$lib/player/navidromePlaybackApi';
+import {
+	reportPlexScrobble,
+	reportPlexNowPlaying,
+	reportPlexStopped
+} from '$lib/player/plexPlaybackApi';
 import { playbackToast } from '$lib/stores/playbackToast.svelte';
 import {
 	getStoredVolume,
@@ -118,7 +124,8 @@ function createPlayerStore() {
 	const handleBeforeUnload = createBeforeUnloadHandler(
 		() => ({ jellyfinItem: getJellyfinItem(), currentItem: queue[currentIndex] ?? null, progress }),
 		API.stream.jellyfinStop,
-		API.stream.navidromeScrobble
+		API.stream.navidromeScrobble,
+		API.stream.plexScrobble
 	);
 
 	function getNextIndex(): number | null {
@@ -130,6 +137,9 @@ function createPlayerStore() {
 	function getJellyfinItem(): QueueItem | null {
 		const item = queue[currentIndex];
 		return item?.sourceType === 'jellyfin' ? item : null;
+	}
+	function getCurrentItem(): QueueItem | null {
+		return queue[currentIndex] ?? null;
 	}
 	function persist(): void {
 		doPersistSession(nowPlaying, queue, currentIndex, progress, shuffleEnabled, shuffleOrder);
@@ -145,11 +155,17 @@ function createPlayerStore() {
 		window.removeEventListener('beforeunload', handleBeforeUnload);
 		beforeUnloadRegistered = false;
 	}
-	async function stopJellyfinSession(item: QueueItem | null, posSeconds: number): Promise<void> {
+	async function stopPreviousSession(item: QueueItem | null, posSeconds: number): Promise<void> {
 		progressReporter.stop();
 		unregisterBeforeUnload();
-		if (!item || item.sourceType !== 'jellyfin' || !item.playSessionId) return;
-		await reportJellyfinStop(item.trackSourceId, item.playSessionId, posSeconds);
+		if (!item) return;
+		if (item.sourceType === 'jellyfin' && item.playSessionId) {
+			await reportJellyfinStop(item.trackSourceId, item.playSessionId, posSeconds);
+		} else if (item.sourceType === 'navidrome') {
+			void reportNavidromeStopped(item.trackSourceId);
+		} else if (item.sourceType === 'plex' && item.plexRatingKey) {
+			void reportPlexStopped(item.plexRatingKey);
+		}
 	}
 
 	function applyResetState(): void {
@@ -191,6 +207,14 @@ function createPlayerStore() {
 				loadUrl: url
 			};
 		}
+		if (item.sourceType === 'plex') {
+			isSeekable = true;
+			if (item.plexRatingKey) void reportPlexNowPlaying(item.plexRatingKey);
+			return {
+				source: createPlaybackSource('plex', { url: url!, seekable: true }),
+				loadUrl: url
+			};
+		}
 		isSeekable = true;
 		return {
 			source: createPlaybackSource('jellyfin', { url: url!, seekable: true }),
@@ -227,7 +251,7 @@ function createPlayerStore() {
 		playbackState = 'loading';
 		progress = 0;
 		duration = 0;
-		await stopJellyfinSession(prevItem, prevProgress);
+		await stopPreviousSession(prevItem, prevProgress);
 		currentSource?.destroy();
 		const gen = ++loadGeneration;
 		let source: PlaybackSource,
@@ -264,13 +288,13 @@ function createPlayerStore() {
 		playbackState = 'error';
 		const trackName = nowPlaying?.trackName ?? 'Unknown track';
 		if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
-			playbackToast.show('Multiple tracks failed — playback stopped', 'error');
+			playbackToast.show('Several tracks failed, so playback stopped.', 'error');
 			applyResetState();
 			return;
 		}
 		const nextIdx = getNextIndex();
 		if (nextIdx !== null) {
-			playbackToast.show(`"${trackName}" unavailable — skipping…`, 'warning');
+			playbackToast.show(`"${trackName}" is unavailable, skipping...`, 'warning');
 			errorSkipTimeout = setTimeout(() => {
 				errorSkipTimeout = null;
 				if (gen === loadGeneration) void loadQueueItem(nextIdx);
@@ -309,9 +333,12 @@ function createPlayerStore() {
 					void reportJellyfinProgress(jf.trackSourceId, jf.playSessionId, progress, true);
 			}
 			if (state === 'ended') {
-				const ci = queue[currentIndex] ?? null;
-				void stopJellyfinSession(getJellyfinItem(), progress);
-				if (ci?.sourceType === 'navidrome') void reportNavidromeScrobble(ci.trackSourceId);
+				const endedItem = getCurrentItem();
+				void stopPreviousSession(endedItem, progress);
+				if (endedItem?.sourceType === 'plex' && endedItem.plexRatingKey)
+					void reportPlexScrobble(endedItem.plexRatingKey);
+				else if (endedItem?.sourceType === 'navidrome')
+					void reportNavidromeScrobble(endedItem.trackSourceId);
 				const nextIdx = getNextIndex();
 				if (nextIdx !== null) {
 					void loadQueueItem(nextIdx).then(() => {
@@ -414,7 +441,7 @@ function createPlayerStore() {
 		},
 
 		playAlbum(source: PlaybackSource, metadata: NowPlaying): void {
-			void stopJellyfinSession(getJellyfinItem(), progress);
+			void stopPreviousSession(getCurrentItem(), progress);
 			currentSource?.destroy();
 			const gen = ++loadGeneration;
 			currentSource = source;
@@ -500,6 +527,27 @@ function createPlayerStore() {
 			shuffleOrder = r.newShuffleOrder;
 			persist();
 			showQueueMutationToast('queue', items.length);
+		},
+
+		appendQueueSilent(items: QueueItem[]): void {
+			if (items.length === 0) return;
+			const r = addMultipleItems(queue, items, shuffleEnabled, shuffleOrder);
+			queue = r.newQueue;
+			shuffleOrder = r.newShuffleOrder;
+			persist();
+		},
+
+		regenerateShuffleOrder(): void {
+			if (!shuffleEnabled || queue.length === 0) return;
+			const allIndices = Array.from({ length: queue.length }, (_, i) => i);
+			const upcoming = allIndices.filter((i) => i !== currentIndex && i > currentIndex);
+			const played = allIndices.filter((i) => i < currentIndex);
+			for (let i = upcoming.length - 1; i > 0; i--) {
+				const j = Math.floor(Math.random() * (i + 1));
+				[upcoming[i], upcoming[j]] = [upcoming[j], upcoming[i]];
+			}
+			shuffleOrder = [...played, currentIndex, ...upcoming];
+			persist();
 		},
 
 		playNext(item: QueueItem): void {
@@ -590,7 +638,8 @@ function createPlayerStore() {
 			playlistTrackId: string,
 			newSourceType: SourceType,
 			newTrackSourceId: string,
-			newFormat?: string
+			newFormat?: string,
+			plexRatingKey?: string
 		): void {
 			const r = updateItemByPlaylistTrackId(
 				queue,
@@ -598,7 +647,8 @@ function createPlayerStore() {
 				currentIndex,
 				newSourceType,
 				newTrackSourceId,
-				newFormat
+				newFormat,
+				plexRatingKey
 			);
 			if (r) {
 				queue = r;
@@ -615,12 +665,27 @@ function createPlayerStore() {
 			const jf = getJellyfinItem();
 			if (jf?.playSessionId)
 				void reportJellyfinProgress(jf.trackSourceId, jf.playSessionId, progress, true);
+			const item = getCurrentItem();
+			if (item?.sourceType === 'plex' && item.plexRatingKey)
+				void reportPlexStopped(item.plexRatingKey);
+			if (item?.sourceType === 'navidrome') void reportNavidromeStopped(item.trackSourceId);
 			persist();
 		},
 
 		togglePlay(): void {
-			if (isPlaying) currentSource?.pause();
-			else currentSource?.play();
+			if (isPlaying) {
+				currentSource?.pause();
+				const jf = getJellyfinItem();
+				if (jf?.playSessionId)
+					void reportJellyfinProgress(jf.trackSourceId, jf.playSessionId, progress, true);
+				const item = getCurrentItem();
+				if (item?.sourceType === 'plex' && item.plexRatingKey)
+					void reportPlexStopped(item.plexRatingKey);
+				if (item?.sourceType === 'navidrome') void reportNavidromeStopped(item.trackSourceId);
+				persist();
+			} else {
+				currentSource?.play();
+			}
 		},
 		seekTo(seconds: number): void {
 			currentSource?.seekTo(seconds);
@@ -636,7 +701,7 @@ function createPlayerStore() {
 		},
 
 		stop(): void {
-			void stopJellyfinSession(getJellyfinItem(), progress);
+			void stopPreviousSession(getCurrentItem(), progress);
 			if (errorSkipTimeout) {
 				clearTimeout(errorSkipTimeout);
 				errorSkipTimeout = null;
@@ -660,7 +725,7 @@ function createPlayerStore() {
 			shuffleOrder = resume.shuffleOrder;
 			isPlayerVisible = true;
 			consecutiveErrors = 0;
-			void stopJellyfinSession(getJellyfinItem(), progress);
+			void stopPreviousSession(getCurrentItem(), progress);
 			currentSource?.destroy();
 			currentIndex = resume.currentIndex;
 			playbackState = 'loading';

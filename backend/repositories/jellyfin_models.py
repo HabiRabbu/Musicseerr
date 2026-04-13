@@ -28,6 +28,7 @@ class JellyfinItem(msgspec.Struct):
     sort_name: str | None = None
     album_count: int | None = None
     child_count: int | None = None
+    date_created: str | None = None
 
 
 class JellyfinUser(msgspec.Struct):
@@ -77,6 +78,7 @@ def parse_item(item: dict[str, Any]) -> JellyfinItem:
         sort_name=item.get("SortName"),
         album_count=item.get("AlbumCount"),
         child_count=item.get("ChildCount"),
+        date_created=item.get("DateCreated"),
     )
 
 
@@ -95,3 +97,82 @@ def parse_user(user: dict[str, Any]) -> JellyfinUser:
         id=user.get("Id", ""),
         name=user.get("Name", "Unknown")
     )
+
+
+class JellyfinSession(msgspec.Struct):
+    session_id: str = ""
+    user_name: str = ""
+    device_name: str = ""
+    client_name: str = ""
+    now_playing_name: str = ""
+    now_playing_artist: str = ""
+    now_playing_album: str = ""
+    now_playing_album_id: str = ""
+    now_playing_item_id: str = ""
+    now_playing_image_tag: str = ""
+    position_ticks: int = 0
+    runtime_ticks: int = 0
+    is_paused: bool = False
+    is_muted: bool = False
+    play_method: str = ""
+    audio_codec: str = ""
+    bitrate: int = 0
+
+
+class JellyfinLyricLine(msgspec.Struct):
+    text: str = ""
+    start: int | None = None
+
+
+class JellyfinLyrics(msgspec.Struct):
+    lines: list[JellyfinLyricLine] = msgspec.field(default_factory=list)
+
+
+def parse_lyrics(data: dict[str, Any]) -> JellyfinLyrics | None:
+    """Extract lyrics from a Jellyfin GET /Audio/{id}/Lyrics response (LyricDto)."""
+    raw_lines = data.get("Lyrics", [])
+    if not raw_lines:
+        return None
+    lines: list[JellyfinLyricLine] = []
+    for line in raw_lines:
+        lines.append(JellyfinLyricLine(
+            text=line.get("Text", ""),
+            start=line.get("Start"),
+        ))
+    return JellyfinLyrics(lines=lines)
+
+
+def parse_jellyfin_sessions(data: list[dict[str, Any]]) -> list[JellyfinSession]:
+    """Filter to audio-only sessions with an active NowPlayingItem."""
+    sessions: list[JellyfinSession] = []
+    for s in data:
+        npi = s.get("NowPlayingItem")
+        if npi is None:
+            continue
+        if npi.get("Type", "") != "Audio":
+            continue
+        play_state = s.get("PlayState", {})
+        transcode = s.get("TranscodingInfo", {})
+        artists = npi.get("Artists", [])
+        artist_str = ", ".join(artists) if artists else npi.get("AlbumArtist", "")
+        image_tags = npi.get("ImageTags", {})
+        sessions.append(JellyfinSession(
+            session_id=s.get("Id", ""),
+            user_name=s.get("UserName", ""),
+            device_name=s.get("DeviceName", ""),
+            client_name=s.get("Client", ""),
+            now_playing_name=npi.get("Name", ""),
+            now_playing_artist=artist_str,
+            now_playing_album=npi.get("Album", ""),
+            now_playing_album_id=npi.get("AlbumId", ""),
+            now_playing_item_id=npi.get("Id", ""),
+            now_playing_image_tag=image_tags.get("Primary", ""),
+            position_ticks=play_state.get("PositionTicks", 0) or 0,
+            runtime_ticks=npi.get("RunTimeTicks", 0) or 0,
+            is_paused=play_state.get("IsPaused", False),
+            is_muted=play_state.get("IsMuted", False),
+            play_method=transcode.get("Type", play_state.get("PlayMethod", "")),
+            audio_codec=transcode.get("AudioCodec", _extract_codec(npi) or ""),
+            bitrate=npi.get("Bitrate", 0) or 0,
+        ))
+    return sessions

@@ -10,7 +10,10 @@
 	import PlaylistMosaic from '$lib/components/PlaylistMosaic.svelte';
 	import ContextMenu from '$lib/components/ContextMenu.svelte';
 	import type { MenuItem } from '$lib/components/ContextMenu.svelte';
-	import { Play, Shuffle, Pencil, Check, X } from 'lucide-svelte';
+	import { Play, Shuffle, Pencil, Check, X, Tv } from 'lucide-svelte';
+	import NavidromeIcon from '$lib/components/NavidromeIcon.svelte';
+	import PlexIcon from '$lib/components/PlexIcon.svelte';
+	import { getSourceColor, getSourceLabel } from '$lib/utils/sources';
 
 	interface Props {
 		playlist: PlaylistDetail;
@@ -23,6 +26,10 @@
 	let { playlist, onplayall, onshuffleall, ondeleteclick, onplaylistupdate }: Props = $props();
 
 	import { Trash2 } from 'lucide-svelte';
+
+	let sourceType = $derived(playlist.source_ref?.split(':')[0] ?? null);
+	let sourceColor = $derived(sourceType ? getSourceColor(sourceType) : null);
+	let sourceLabel = $derived(sourceType ? getSourceLabel(sourceType) : null);
 
 	let editingName = $state(false);
 	let nameInput = $state('');
@@ -81,9 +88,9 @@
 					updated_at: updated.updated_at
 				})
 			);
-			toastStore.show({ message: 'Playlist renamed', type: 'success' });
+			toastStore.show({ message: 'Playlist renamed.', type: 'success' });
 		} catch {
-			toastStore.show({ message: "Couldn't rename the playlist", type: 'error' });
+			toastStore.show({ message: "Couldn't rename that playlist.", type: 'error' });
 		} finally {
 			savingName = false;
 		}
@@ -109,12 +116,12 @@
 		if (!file) return;
 
 		if (!file.type.match(/^image\/(jpeg|png|webp)$/)) {
-			toastStore.show({ message: 'Please select a JPEG, PNG, or WebP image', type: 'error' });
+			toastStore.show({ message: 'Choose a JPEG, PNG, or WebP image.', type: 'error' });
 			input.value = '';
 			return;
 		}
 		if (file.size > 2 * 1024 * 1024) {
-			toastStore.show({ message: 'Image must be under 2MB', type: 'error' });
+			toastStore.show({ message: 'The image must be smaller than 2 MB.', type: 'error' });
 			input.value = '';
 			return;
 		}
@@ -128,9 +135,9 @@
 					custom_cover_url: result.cover_url + '?t=' + Date.now()
 				})
 			);
-			toastStore.show({ message: 'Cover updated', type: 'success' });
+			toastStore.show({ message: 'Cover updated.', type: 'success' });
 		} catch {
-			toastStore.show({ message: "Couldn't upload the cover", type: 'error' });
+			toastStore.show({ message: "Couldn't upload that cover image.", type: 'error' });
 		} finally {
 			if (coverPreview) {
 				URL.revokeObjectURL(coverPreview);
@@ -145,16 +152,16 @@
 		try {
 			await deletePlaylistCover(playlist.id);
 			onplaylistupdate(buildUpdatedPlaylist({ custom_cover_url: null }));
-			toastStore.show({ message: 'Cover removed', type: 'success' });
+			toastStore.show({ message: 'Cover removed.', type: 'success' });
 		} catch {
-			toastStore.show({ message: "Couldn't remove the cover", type: 'error' });
+			toastStore.show({ message: "Couldn't remove that cover image.", type: 'error' });
 		}
 	}
 
 	function getHeaderMenuItems(): MenuItem[] {
 		return [
 			{
-				label: 'Delete Playlist',
+				label: 'Delete playlist',
 				icon: Trash2,
 				className: 'text-error',
 				onclick: ondeleteclick
@@ -268,11 +275,27 @@
 		<div class="flex flex-wrap items-center gap-2 text-sm text-base-content/60">
 			<span>{playlist.track_count} track{playlist.track_count === 1 ? '' : 's'}</span>
 			{#if playlist.total_duration}
-				<span class="opacity-50">•</span>
+				<span class="opacity-50">-</span>
 				<span>{formatTotalDurationSec(playlist.total_duration)}</span>
 			{/if}
-			<span class="opacity-50">•</span>
+			<span class="opacity-50">-</span>
 			<span>Created {formatRelativeTime(new Date(playlist.created_at))}</span>
+			{#if sourceType && sourceColor && sourceLabel}
+				<span class="opacity-50">-</span>
+				<span
+					class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium"
+					style="background: color-mix(in srgb, {sourceColor} 15%, transparent); color: {sourceColor};"
+				>
+					{#if sourceType === 'jellyfin'}
+						<Tv class="h-3 w-3" />
+					{:else if sourceType === 'navidrome'}
+						<NavidromeIcon class="h-3 w-3" />
+					{:else if sourceType === 'plex'}
+						<PlexIcon class="h-3 w-3" />
+					{/if}
+					Imported from {sourceLabel}
+				</span>
+			{/if}
 		</div>
 
 		<div class="flex items-center gap-3 pt-4">

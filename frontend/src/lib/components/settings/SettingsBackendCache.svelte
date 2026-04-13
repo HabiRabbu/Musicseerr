@@ -7,8 +7,8 @@
 
 <div class="alert alert-info alert-soft mb-4">
 	<span class="text-sm"
-		>Server-side TTLs control API/data cache freshness for all clients. Lower values fetch from
-		upstream services more often; higher values reduce backend/API load.</span
+		>These settings control how long shared server cache entries stay fresh. Lower values update
+		sooner. Higher values put less load on upstream services.</span
 	>
 </div>
 <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 pt-2">
@@ -120,6 +120,38 @@
 		label="Jellyfin Stats (Backend)"
 		description="Default: 10 minutes"
 		bind:value={data.cache_ttl_jellyfin_library_stats}
+		min={1}
+		max={60}
+		unit="min"
+	/>
+	<SettingsNumberField
+		label="Plex Albums (Backend)"
+		description="Default: 5 minutes"
+		bind:value={data.cache_ttl_plex_albums}
+		min={1}
+		max={60}
+		unit="min"
+	/>
+	<SettingsNumberField
+		label="Plex Search (Backend)"
+		description="Default: 2 minutes"
+		bind:value={data.cache_ttl_plex_search}
+		min={1}
+		max={60}
+		unit="min"
+	/>
+	<SettingsNumberField
+		label="Plex Genres (Backend)"
+		description="Default: 60 minutes"
+		bind:value={data.cache_ttl_plex_genres}
+		min={1}
+		max={1440}
+		unit="min"
+	/>
+	<SettingsNumberField
+		label="Plex Stats (Backend)"
+		description="Default: 10 minutes"
+		bind:value={data.cache_ttl_plex_stats}
 		min={1}
 		max={60}
 		unit="min"

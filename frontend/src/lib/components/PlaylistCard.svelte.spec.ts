@@ -11,6 +11,7 @@ const basePlaylist: PlaylistSummary = {
 	total_duration: 1234,
 	cover_urls: ['a.jpg', 'b.jpg'],
 	custom_cover_url: null,
+	source_ref: null,
 	created_at: '2026-01-01T00:00:00Z',
 	updated_at: '2026-01-02T00:00:00Z'
 };
@@ -52,6 +53,6 @@ describe('PlaylistCard.svelte', () => {
 		const subtitle = page.getByText(/5 tracks/);
 		await expect.element(subtitle).toBeInTheDocument();
 		const el = await subtitle.element();
-		expect(el.textContent).not.toContain('·');
+		expect(el.textContent).not.toContain(' - ');
 	});
 });

@@ -5,7 +5,9 @@ import type {
 	LocalAlbumMatch,
 	LocalTrackInfo,
 	NavidromeAlbumMatch,
-	NavidromeTrackInfo
+	NavidromeTrackInfo,
+	PlexAlbumMatch,
+	PlexTrackInfo
 } from '$lib/types';
 import type { QueueItem, PlaybackMeta } from '$lib/player/types';
 import type { TrackMeta, TrackSourceData } from '$lib/player/queueHelpers';
@@ -14,6 +16,7 @@ import {
 	buildQueueItemsFromJellyfin,
 	buildQueueItemsFromLocal,
 	buildQueueItemsFromNavidrome,
+	buildQueueItemsFromPlex,
 	compareDiscTrack,
 	normalizeDiscNumber
 } from '$lib/player/queueHelpers';
@@ -21,6 +24,7 @@ import { getCoverUrl } from '$lib/utils/errorHandling';
 import { launchJellyfinPlayback } from '$lib/player/launchJellyfinPlayback';
 import { launchLocalPlayback } from '$lib/player/launchLocalPlayback';
 import { launchNavidromePlayback } from '$lib/player/launchNavidromePlayback';
+import { launchPlexPlayback } from '$lib/player/launchPlexPlayback';
 import { playerStore } from '$lib/stores/player.svelte';
 import type { MenuItem } from '$lib/components/ContextMenu.svelte';
 import { ListPlus, ListStart, ListMusic } from 'lucide-svelte';
@@ -88,18 +92,20 @@ export function playSource<
 }
 
 export function playSourceTrack(
-	source: 'jellyfin' | 'local' | 'navidrome',
+	source: 'jellyfin' | 'local' | 'navidrome' | 'plex',
 	trackPosition: number,
 	discNumber: number,
 	title: string,
 	album: AlbumBasicInfo,
 	jellyfinMatch: JellyfinAlbumMatch | null,
 	localMatch: LocalAlbumMatch | null,
-	navidromeMatch: NavidromeAlbumMatch | null
+	navidromeMatch: NavidromeAlbumMatch | null,
+	plexMatch: PlexAlbumMatch | null
 ): void {
 	const opts = { startTrack: trackPosition, startDisc: discNumber, startTitle: title };
 	if (source === 'jellyfin') playSource(jellyfinMatch, launchJellyfinPlayback, album, opts);
 	else if (source === 'local') playSource(localMatch, launchLocalPlayback, album, opts);
+	else if (source === 'plex') playSource(plexMatch, launchPlexPlayback, album, opts);
 	else playSource(navidromeMatch, launchNavidromePlayback, album, opts);
 }
 
@@ -108,7 +114,8 @@ export function buildTrackQueueItem(
 	album: AlbumBasicInfo,
 	resolvedLocal: LocalTrackInfo | null,
 	resolvedJellyfin: JellyfinTrackInfo | null,
-	resolvedNavidrome: NavidromeTrackInfo | null = null
+	resolvedNavidrome: NavidromeTrackInfo | null = null,
+	resolvedPlex: PlexTrackInfo | null = null
 ): QueueItem | null {
 	const sourceData: TrackSourceData = {
 		trackPosition: track.position,
@@ -118,10 +125,12 @@ export function buildTrackQueueItem(
 			resolvedLocal?.duration_seconds ??
 			resolvedNavidrome?.duration_seconds ??
 			resolvedJellyfin?.duration_seconds ??
+			resolvedPlex?.duration_seconds ??
 			undefined,
 		localTrack: resolvedLocal,
 		navidromeTrack: resolvedNavidrome,
-		jellyfinTrack: resolvedJellyfin
+		jellyfinTrack: resolvedJellyfin,
+		plexTrack: resolvedPlex
 	};
 	return buildQueueItem(getTrackMeta(album), sourceData);
 }
@@ -132,6 +141,7 @@ export function getTrackContextMenuItems(
 	resolvedLocal: LocalTrackInfo | null,
 	resolvedJellyfin: JellyfinTrackInfo | null,
 	resolvedNavidrome: NavidromeTrackInfo | null,
+	resolvedPlex: PlexTrackInfo | null,
 	playlistModalRef: { open: (tracks: QueueItem[]) => void } | null
 ): MenuItem[] {
 	const queueItem = buildTrackQueueItem(
@@ -139,7 +149,8 @@ export function getTrackContextMenuItems(
 		album,
 		resolvedLocal,
 		resolvedJellyfin,
-		resolvedNavidrome
+		resolvedNavidrome,
+		resolvedPlex
 	);
 	const hasSource = queueItem !== null;
 	return [
@@ -171,30 +182,41 @@ export function getTrackContextMenuItems(
 }
 
 function getSourceQueueItems(
-	source: 'jellyfin' | 'local' | 'navidrome',
+	source: 'jellyfin' | 'local' | 'navidrome' | 'plex',
 	album: AlbumBasicInfo,
 	jellyfinTracks: JellyfinTrackInfo[],
 	localTracks: LocalTrackInfo[],
-	navidromeTracks: NavidromeTrackInfo[]
+	navidromeTracks: NavidromeTrackInfo[],
+	plexTracks: PlexTrackInfo[]
 ): QueueItem[] {
 	const meta = getTrackMeta(album);
 	if (source === 'jellyfin')
 		return buildQueueItemsFromJellyfin([...jellyfinTracks].sort(compareDiscTrack), meta);
 	if (source === 'navidrome')
 		return buildQueueItemsFromNavidrome([...navidromeTracks].sort(compareDiscTrack), meta);
+	if (source === 'plex')
+		return buildQueueItemsFromPlex([...plexTracks].sort(compareDiscTrack), meta);
 	return buildQueueItemsFromLocal([...localTracks].sort(compareDiscTrack), meta);
 }
 
-export function buildSourceCallbacks(
-	matchGetter: () => JellyfinAlbumMatch | LocalAlbumMatch | NavidromeAlbumMatch | null,
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- launcher generics vary by source
-	launcher: (tracks: any[], startIndex: number, shuffle: boolean, meta: PlaybackMeta) => void,
-	source: 'jellyfin' | 'local' | 'navidrome',
+export function buildSourceCallbacks<
+	TTrack extends { track_number: number; disc_number?: number | null; title: string },
+	TMatch extends { tracks: TTrack[] } | null
+>(
+	matchGetter: () => TMatch,
+	launcher: (
+		tracks: TTrack[],
+		startIndex: number | undefined,
+		shuffle: boolean | undefined,
+		meta: PlaybackMeta
+	) => void,
+	source: 'jellyfin' | 'local' | 'navidrome' | 'plex',
 	albumGetter: () => AlbumBasicInfo | null,
 	tracksGetters: {
 		jellyfin: () => JellyfinTrackInfo[];
 		local: () => LocalTrackInfo[];
 		navidrome: () => NavidromeTrackInfo[];
+		plex: () => PlexTrackInfo[];
 	},
 	playlistModalRefGetter: () => { open: (tracks: QueueItem[]) => void } | null
 ): SourceCallbacks {
@@ -215,7 +237,8 @@ export function buildSourceCallbacks(
 				a,
 				tracksGetters.jellyfin(),
 				tracksGetters.local(),
-				tracksGetters.navidrome()
+				tracksGetters.navidrome(),
+				tracksGetters.plex()
 			);
 			if (items.length > 0) playerStore.addMultipleToQueue(items);
 		},
@@ -227,7 +250,8 @@ export function buildSourceCallbacks(
 				a,
 				tracksGetters.jellyfin(),
 				tracksGetters.local(),
-				tracksGetters.navidrome()
+				tracksGetters.navidrome(),
+				tracksGetters.plex()
 			);
 			if (items.length > 0) playerStore.playMultipleNext(items);
 		},
@@ -239,7 +263,8 @@ export function buildSourceCallbacks(
 				a,
 				tracksGetters.jellyfin(),
 				tracksGetters.local(),
-				tracksGetters.navidrome()
+				tracksGetters.navidrome(),
+				tracksGetters.plex()
 			);
 			if (items.length > 0) playlistModalRefGetter()?.open(items);
 		}

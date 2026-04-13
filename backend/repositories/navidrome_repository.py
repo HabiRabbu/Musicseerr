@@ -16,16 +16,28 @@ from infrastructure.resilience.retry import with_retry, CircuitBreaker
 from repositories.navidrome_models import (
     StreamProxyResult as StreamProxyResult,
     SubsonicAlbum,
+    SubsonicAlbumInfo,
     SubsonicArtist,
+    SubsonicArtistIndex,
+    SubsonicArtistInfo,
     SubsonicGenre,
+    SubsonicLyrics,
+    SubsonicMusicFolder,
+    SubsonicNowPlayingEntry,
     SubsonicPlaylist,
     SubsonicSearchResult,
     SubsonicSong,
     parse_album,
+    parse_album_info,
     parse_artist,
+    parse_artist_info,
     parse_genre,
+    parse_lyrics,
+    parse_now_playing_entries,
+    parse_similar_songs,
     parse_song,
     parse_subsonic_response,
+    parse_top_songs,
 )
 from infrastructure.degradation import try_get_degradation_context
 from infrastructure.integration_result import IntegrationResult
@@ -262,8 +274,10 @@ class NavidromeRepository:
         size: int = 20,
         offset: int = 0,
         genre: str | None = None,
+        from_year: int | None = None,
+        to_year: int | None = None,
     ) -> list[SubsonicAlbum]:
-        cache_key = f"{NAVIDROME_PREFIX}albums:{type}:{size}:{offset}:{genre or ''}"
+        cache_key = f"{NAVIDROME_PREFIX}albums:{type}:{size}:{offset}:{genre or ''}:{from_year}:{to_year}"
         cached = await self._cache.get(cache_key)
         if cached is not None:
             return cached
@@ -271,6 +285,9 @@ class NavidromeRepository:
         params: dict[str, Any] = {"type": type, "size": size, "offset": offset}
         if genre and type == "byGenre":
             params["genre"] = genre
+        if type == "byYear":
+            params["fromYear"] = from_year if from_year is not None else 0
+            params["toYear"] = to_year if to_year is not None else 9999
         resp = await self._request(
             "/rest/getAlbumList2",
             params,
@@ -385,6 +402,75 @@ class NavidromeRepository:
         await self._cache.set(cache_key, genres, self._ttl_genres)
         return genres
 
+    async def get_artists_index(self) -> list[SubsonicArtistIndex]:
+        cache_key = "navidrome:artists_index"
+        cached = await self._cache.get(cache_key)
+        if cached is not None:
+            return cached
+
+        resp = await self._request("/rest/getArtists")
+        index_data: list[SubsonicArtistIndex] = []
+        for idx in resp.get("artists", {}).get("index", []):
+            artists = [parse_artist(a) for a in idx.get("artist", [])]
+            index_data.append(SubsonicArtistIndex(name=idx.get("name", ""), artists=artists))
+        await self._cache.set(cache_key, index_data, self._ttl_list)
+        return index_data
+
+    async def get_songs_by_genre(
+        self, genre: str, count: int = 50, offset: int = 0
+    ) -> list[SubsonicSong]:
+        cache_key = f"navidrome:songs_by_genre:{genre}:{count}:{offset}"
+        cached = await self._cache.get(cache_key)
+        if cached is not None:
+            return cached
+
+        resp = await self._request(
+            "/rest/getSongsByGenre",
+            {"genre": genre, "count": count, "offset": offset},
+        )
+        raw = resp.get("songsByGenre", {}).get("song", [])
+        songs = [parse_song(s) for s in raw]
+        await self._cache.set(cache_key, songs, self._ttl_list)
+        return songs
+
+    async def search_songs(
+        self, query: str = "", count: int = 50, offset: int = 0
+    ) -> list[SubsonicSong]:
+        cache_key = f"{NAVIDROME_PREFIX}songs_browse:{query}:{count}:{offset}"
+        cached = await self._cache.get(cache_key)
+        if cached is not None:
+            return cached
+
+        resp = await self._request(
+            "/rest/search3",
+            {
+                "query": query or '""',
+                "artistCount": 0,
+                "albumCount": 0,
+                "songCount": count,
+                "songOffset": offset,
+            },
+        )
+        sr = resp.get("searchResult3", {})
+        songs = [parse_song(s) for s in sr.get("song", [])]
+        await self._cache.set(cache_key, songs, self._ttl_list)
+        return songs
+
+    async def get_music_folders(self) -> list[SubsonicMusicFolder]:
+        cache_key = "navidrome:music_folders"
+        cached = await self._cache.get(cache_key)
+        if cached is not None:
+            return cached
+
+        resp = await self._request("/rest/getMusicFolders")
+        raw = resp.get("musicFolders", {}).get("musicFolder", [])
+        folders = [
+            SubsonicMusicFolder(id=str(f.get("id", "")), name=f.get("name", ""))
+            for f in raw
+        ]
+        await self._cache.set(cache_key, folders, self._ttl_list)
+        return folders
+
     async def get_playlists(self) -> list[SubsonicPlaylist]:
         cache_key = "navidrome:playlists"
         cached = await self._cache.get(cache_key)
@@ -464,6 +550,152 @@ class NavidromeRepository:
             logger.warning("Navidrome now-playing report failed", exc_info=True)
             _record_degradation("Navidrome now-playing report failed")
             return False
+
+    async def get_now_playing(self) -> list[SubsonicNowPlayingEntry]:
+        if not self._configured:
+            return []
+        cache_key = f"{NAVIDROME_PREFIX}now_playing"
+        cached = await self._cache.get(cache_key)
+        if cached is not None:
+            return cached
+        try:
+            data = await self._request("/rest/getNowPlaying")
+            entries = parse_now_playing_entries(data)
+            await self._cache.set(cache_key, entries, 2)
+            return entries
+        except Exception:  # noqa: BLE001
+            logger.warning("Failed to fetch Navidrome now-playing", exc_info=True)
+            _record_degradation("Navidrome getNowPlaying failed")
+            return []
+
+    async def get_top_songs(
+        self,
+        artist_name: str,
+        count: int = 20,
+    ) -> list[SubsonicSong]:
+        if not self._configured:
+            return []
+        cache_key = f"{NAVIDROME_PREFIX}top_songs:{artist_name}:{count}"
+        cached = await self._cache.get(cache_key)
+        if cached is not None:
+            return cached
+        try:
+            data = await self._request("/rest/getTopSongs", {"artist": artist_name, "count": count})
+            songs = parse_top_songs(data)
+            await self._cache.set(cache_key, songs, 900)
+            return songs
+        except Exception:  # noqa: BLE001
+            logger.debug("Navidrome getTopSongs returned empty for %s (Last.fm may not be configured)", artist_name)
+            _record_degradation("Navidrome getTopSongs failed")
+            return []
+
+    async def get_similar_songs(
+        self,
+        song_id: str,
+        count: int = 20,
+    ) -> list[SubsonicSong]:
+        if not self._configured:
+            return []
+        cache_key = f"{NAVIDROME_PREFIX}similar_songs:{song_id}:{count}"
+        cached = await self._cache.get(cache_key)
+        if cached is not None:
+            return cached
+        try:
+            data = await self._request("/rest/getSimilarSongs2", {"id": song_id, "count": count})
+            songs = parse_similar_songs(data)
+            await self._cache.set(cache_key, songs, 900)
+            return songs
+        except Exception:  # noqa: BLE001
+            logger.debug("Navidrome getSimilarSongs2 returned empty for %s", song_id)
+            _record_degradation("Navidrome getSimilarSongs2 failed")
+            return []
+
+    async def get_artist_info(self, artist_id: str) -> SubsonicArtistInfo | None:
+        if not self._configured:
+            return None
+        cache_key = f"{NAVIDROME_PREFIX}artist_info:{artist_id}"
+        cached = await self._cache.get(cache_key)
+        if cached is not None:
+            return cached
+        try:
+            data = await self._request("/rest/getArtistInfo2", {"id": artist_id})
+            info = parse_artist_info(data)
+            await self._cache.set(cache_key, info, 1800)
+            return info
+        except Exception:  # noqa: BLE001
+            logger.debug("Navidrome getArtistInfo2 returned empty for %s", artist_id)
+            _record_degradation("Navidrome getArtistInfo2 failed")
+            return None
+
+    async def get_album_info(self, album_id: str) -> SubsonicAlbumInfo | None:
+        if not self._configured:
+            return None
+        cache_key = f"{NAVIDROME_PREFIX}album_info:{album_id}"
+        cached = await self._cache.get(cache_key)
+        if cached is not None:
+            return cached
+        try:
+            data = await self._request("/rest/getAlbumInfo2", {"id": album_id})
+            info = parse_album_info(data)
+            await self._cache.set(cache_key, info, 1800)
+            return info
+        except Exception:  # noqa: BLE001
+            logger.debug("Navidrome getAlbumInfo2 returned empty for %s", album_id)
+            _record_degradation("Navidrome getAlbumInfo2 failed")
+            return None
+
+    async def get_lyrics(self, artist: str, title: str) -> SubsonicLyrics | None:
+        if not self._configured:
+            return None
+        cache_key = f"{NAVIDROME_PREFIX}lyrics:{artist}:{title}"
+        cached = await self._cache.get(cache_key)
+        if cached is not None:
+            return cached
+        try:
+            data = await self._request("/rest/getLyrics", {"artist": artist, "title": title})
+            lyrics = parse_lyrics(data)
+            if lyrics:
+                await self._cache.set(cache_key, lyrics, 3600)
+            return lyrics
+        except Exception:  # noqa: BLE001
+            logger.debug("Navidrome getLyrics returned empty for %s - %s", artist, title)
+            return None
+
+    async def get_lyrics_by_song_id(self, song_id: str) -> SubsonicLyrics | None:
+        if not self._configured:
+            return None
+        cache_key = f"{NAVIDROME_PREFIX}lyrics_by_id:{song_id}"
+        cached = await self._cache.get(cache_key)
+        if cached is not None:
+            return cached
+        try:
+            from repositories.navidrome_models import SubsonicLyricLine
+
+            data = await self._request("/rest/getLyricsBySongId", {"id": song_id})
+            lyric_list = data.get("lyricsList", {}).get("structuredLyrics", [])
+            if not lyric_list:
+                return None
+            best = lyric_list[0]
+            raw_lines = best.get("line", [])
+            synced = best.get("synced", False)
+            lines = [
+                SubsonicLyricLine(
+                    value=l.get("value", ""),
+                    start=l.get("start") if synced else None,
+                )
+                for l in raw_lines
+            ]
+            has_text = any(l.value.strip() for l in lines)
+            has_timing = any(l.start is not None for l in lines)
+            if not has_text and not has_timing:
+                return None
+            text = "\n".join(l.value for l in lines)
+            lyrics = SubsonicLyrics(value=text, lines=lines, is_synced=synced)
+            await self._cache.set(cache_key, lyrics, 3600)
+            return lyrics
+        except Exception:  # noqa: BLE001
+            logger.debug("Navidrome getLyricsBySongId not supported or empty for %s", song_id)
+            return None
 
     async def validate_connection(self) -> tuple[bool, str]:
         if not self._configured:

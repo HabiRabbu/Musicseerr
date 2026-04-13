@@ -4,6 +4,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from api.v1.schemas.navidrome import NavidromeArtistSummary, NavidromeTrackInfo
 from repositories.navidrome_models import (
     SubsonicAlbum,
     SubsonicArtist,
@@ -87,7 +88,6 @@ class TestGetAlbumDetail:
         assert result.navidrome_id == "a1"
         assert result.track_count == 2
         assert result.tracks[0].title == "Comfortably Numb"
-        # Navidrome-native MBID is NOT exposed; only Lidarr-resolved MBIDs are canonical
         assert result.musicbrainz_id is None
 
     @pytest.mark.asyncio
@@ -205,14 +205,13 @@ class TestGetStats:
     async def test_aggregates_counts(self):
         service, repo = _make_service()
         repo.get_artists = AsyncMock(return_value=[_artist(), _artist(id="ar2")])
-        repo.get_album_list = AsyncMock(return_value=[_album()])
-        repo.get_genres = AsyncMock(return_value=[
-            SubsonicGenre(name="Rock", songCount=50),
-            SubsonicGenre(name="Pop", songCount=30),
+        repo.get_album_list = AsyncMock(return_value=[
+            _album(id="al1", song_count=50),
+            _album(id="al2", song_count=30),
         ])
         result = await service.get_stats()
         assert result.total_artists == 2
-        assert result.total_albums == 1
+        assert result.total_albums == 2
         assert result.total_tracks == 80
 
 
@@ -296,12 +295,11 @@ class TestLidarrAlbumMatching:
         service._lidarr_album_index = {}
         result1 = await service._resolve_album_mbid("Missing", "Artist")
         assert result1 is None
-        # Second call should hit negative cache
         service._lidarr_album_index = {
             f"{_normalize('Missing')}:{_normalize('Artist')}": ("mbid-late", "mbid-a"),
         }
         result2 = await service._resolve_album_mbid("Missing", "Artist")
-        assert result2 is None  # Still negative-cached
+        assert result2 is None
 
     @pytest.mark.asyncio
     async def test_empty_name_returns_none(self):
@@ -375,10 +373,8 @@ class TestWarmMbidCacheLifecycle:
     @pytest.mark.asyncio
     async def test_negative_cache_overridden_when_lidarr_match_exists(self):
         service, repo, cache = _make_service_with_cache()
-        # Seed a negative cache entry
         key = f"{_normalize('Buzz')}:{_normalize('NIKI')}"
         service._album_mbid_cache[key] = (None, 0.0)
-        # Lidarr now has a match
         cache.get_all_albums_for_matching = AsyncMock(return_value=[
             ("Buzz", "NIKI", "mbid-buzz", "mbid-niki"),
         ])
@@ -412,11 +408,55 @@ class TestWarmMbidCacheLifecycle:
         key = f"{_normalize('Album')}:{_normalize('Artist')}"
         cache.load_navidrome_album_mbid_index = AsyncMock(return_value={key: "mbid-disk"})
         cache.load_navidrome_artist_mbid_index = AsyncMock(return_value={_normalize("Artist"): "mbid-ar-disk"})
-        # Provide Navidrome albums so reconciliation keeps disk entries and reverse index is built
         repo.get_album_list = AsyncMock(return_value=[_album(id="nd-1", name="Album", artist="Artist")])
         await service.warm_mbid_cache()
-        # Disk cache should be loaded even though Lidarr index is empty
         assert service._album_mbid_cache[key] == "mbid-disk"
         assert service._artist_mbid_cache[_normalize("Artist")] == "mbid-ar-disk"
-        # Reverse index should be built from disk cache (M2 fix)
         assert service._mbid_to_navidrome_id.get("mbid-disk") == "nd-1"
+
+
+class TestHubFavoritesExpansion:
+    @pytest.mark.asyncio
+    async def test_hub_includes_favorite_artists_and_tracks(self):
+        service, repo = _make_service()
+        starred = SubsonicSearchResult(
+            album=[_album(id="a1", name="Fav Album")],
+            artist=[_artist(id="ar1", name="Fav Artist")],
+            song=[_song(id="s1", title="Fav Song")],
+        )
+        repo.get_starred = AsyncMock(return_value=starred)
+        repo.get_album_list = AsyncMock(return_value=[])
+        repo.get_artists = AsyncMock(return_value=[])
+        repo.get_genres = AsyncMock(return_value=[])
+        hub = await service.get_hub_data()
+        assert len(hub.favorites) == 1
+        assert len(hub.favorite_artists) == 1
+        assert len(hub.favorite_tracks) == 1
+        assert isinstance(hub.favorite_artists[0], NavidromeArtistSummary)
+        assert isinstance(hub.favorite_tracks[0], NavidromeTrackInfo)
+        assert hub.favorite_artists[0].name == "Fav Artist"
+        assert hub.favorite_tracks[0].title == "Fav Song"
+
+    @pytest.mark.asyncio
+    async def test_hub_favorites_empty_when_no_starred(self):
+        service, repo = _make_service()
+        repo.get_starred = AsyncMock(return_value=SubsonicSearchResult())
+        repo.get_album_list = AsyncMock(return_value=[])
+        repo.get_artists = AsyncMock(return_value=[])
+        repo.get_genres = AsyncMock(return_value=[])
+        hub = await service.get_hub_data()
+        assert hub.favorites == []
+        assert hub.favorite_artists == []
+        assert hub.favorite_tracks == []
+
+    @pytest.mark.asyncio
+    async def test_hub_favorites_graceful_on_error(self):
+        service, repo = _make_service()
+        repo.get_starred = AsyncMock(side_effect=Exception("network error"))
+        repo.get_album_list = AsyncMock(return_value=[])
+        repo.get_artists = AsyncMock(return_value=[])
+        repo.get_genres = AsyncMock(return_value=[])
+        hub = await service.get_hub_data()
+        assert hub.favorites == []
+        assert hub.favorite_artists == []
+        assert hub.favorite_tracks == []

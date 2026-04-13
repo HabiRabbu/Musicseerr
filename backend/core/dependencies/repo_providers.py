@@ -1,4 +1,4 @@
-"""Tier 3 — Repository providers and infrastructure services."""
+"""Tier 3: repository providers and infrastructure services."""
 
 from __future__ import annotations
 
@@ -121,6 +121,33 @@ def get_navidrome_repository() -> "NavidromeRepository":
         search_ttl=getattr(adv, "cache_ttl_navidrome_search", 120),
         genres_ttl=getattr(adv, "cache_ttl_navidrome_genres", 3600),
         detail_ttl=getattr(adv, "cache_ttl_navidrome_albums", 300),
+    )
+    return repo
+
+
+@singleton
+def get_plex_repository() -> "PlexRepository":
+    from repositories.plex_repository import PlexRepository
+
+    cache = get_cache()
+    http_client = _get_configured_http_client()
+    preferences = get_preferences_service()
+    plex_settings = preferences.get_plex_connection_raw()
+    repo = PlexRepository(http_client=http_client, cache=cache)
+    if plex_settings.enabled:
+        client_id = preferences.get_setting("plex_client_id") or ""
+        repo.configure(
+            url=plex_settings.plex_url,
+            token=plex_settings.plex_token,
+            client_id=client_id,
+        )
+    adv = preferences.get_advanced_settings()
+    repo.configure_cache_ttls(
+        list_ttl=adv.cache_ttl_plex_albums,
+        search_ttl=adv.cache_ttl_plex_search,
+        genres_ttl=adv.cache_ttl_plex_genres,
+        detail_ttl=adv.cache_ttl_plex_albums,
+        stats_ttl=adv.cache_ttl_plex_stats,
     )
     return repo
 

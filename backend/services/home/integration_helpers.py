@@ -48,6 +48,15 @@ class HomeIntegrationHelpers:
             and bool(nd_settings.password)
         )
 
+    def is_plex_enabled(self) -> bool:
+        plex_settings = self._preferences.get_plex_connection()
+        return (
+            plex_settings.enabled
+            and bool(plex_settings.plex_url)
+            and bool(plex_settings.plex_token)
+            and bool(plex_settings.music_library_ids)
+        )
+
     def is_lastfm_enabled(self) -> bool:
         return self._preferences.is_lastfm_enabled()
 

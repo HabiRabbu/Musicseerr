@@ -1,4 +1,4 @@
-"""Slim HomeService facade — preserves constructor signature, delegates to sub-services."""
+"""Slim HomeService facade that preserves the constructor signature and delegates to sub-services."""
 
 from __future__ import annotations
 
@@ -87,6 +87,7 @@ class HomeService:
             localfiles=self._helpers.is_local_files_enabled(),
             lastfm=self._helpers.is_lastfm_enabled(),
             navidrome=self._helpers.is_navidrome_enabled(),
+            plex=self._helpers.is_plex_enabled(),
         )
 
     async def get_genre_artist(

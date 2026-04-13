@@ -21,6 +21,7 @@ from repositories.youtube import YouTubeRepository
 from repositories.lastfm_repository import LastFmRepository
 from repositories.playlist_repository import PlaylistRepository
 from repositories.navidrome_repository import NavidromeRepository
+from repositories.plex_repository import PlexRepository
 from services.preferences_service import PreferencesService
 from services.search_service import SearchService
 from services.search_enrichment_service import SearchEnrichmentService
@@ -44,6 +45,8 @@ from services.local_files_service import LocalFilesService
 from services.jellyfin_library_service import JellyfinLibraryService
 from services.navidrome_library_service import NavidromeLibraryService
 from services.navidrome_playback_service import NavidromePlaybackService
+from services.plex_library_service import PlexLibraryService
+from services.plex_playback_service import PlexPlaybackService
 from services.playlist_service import PlaylistService
 from services.lastfm_auth_service import LastFmAuthService
 from services.scrobble_service import ScrobbleService
@@ -68,6 +71,7 @@ from .repo_providers import (
     get_playlist_repository,
     get_request_history_store,
     get_navidrome_repository,
+    get_plex_repository,
 )
 from .service_providers import (
     get_search_service,
@@ -95,6 +99,8 @@ from .service_providers import (
     get_jellyfin_library_service,
     get_navidrome_library_service,
     get_navidrome_playback_service,
+    get_plex_library_service,
+    get_plex_playback_service,
 )
 
 
@@ -139,4 +145,7 @@ PlaylistServiceDep = Annotated[PlaylistService, Depends(get_playlist_service)]
 NavidromeRepositoryDep = Annotated[NavidromeRepository, Depends(get_navidrome_repository)]
 NavidromeLibraryServiceDep = Annotated[NavidromeLibraryService, Depends(get_navidrome_library_service)]
 NavidromePlaybackServiceDep = Annotated[NavidromePlaybackService, Depends(get_navidrome_playback_service)]
+PlexRepositoryDep = Annotated[PlexRepository, Depends(get_plex_repository)]
+PlexLibraryServiceDep = Annotated[PlexLibraryService, Depends(get_plex_library_service)]
+PlexPlaybackServiceDep = Annotated[PlexPlaybackService, Depends(get_plex_playback_service)]
 CacheStatusServiceDep = Annotated[CacheStatusService, Depends(get_cache_status_service)]

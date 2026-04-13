@@ -8,7 +8,9 @@
 		LocalAlbumMatch,
 		LocalTrackInfo,
 		NavidromeAlbumMatch,
-		NavidromeTrackInfo
+		NavidromeTrackInfo,
+		PlexAlbumMatch,
+		PlexTrackInfo
 	} from '$lib/types';
 	import type { MenuItem } from '$lib/components/ContextMenu.svelte';
 	import type { RenderedTrackSection } from './albumTrackResolvers';
@@ -24,6 +26,7 @@
 	import JellyfinIcon from '$lib/components/JellyfinIcon.svelte';
 	import LocalFilesIcon from '$lib/components/LocalFilesIcon.svelte';
 	import NavidromeIcon from '$lib/components/NavidromeIcon.svelte';
+	import PlexIcon from '$lib/components/PlexIcon.svelte';
 
 	interface Props {
 		album: AlbumBasicInfo;
@@ -32,20 +35,24 @@
 		jellyfinMatch: JellyfinAlbumMatch | null;
 		localMatch: LocalAlbumMatch | null;
 		navidromeMatch: NavidromeAlbumMatch | null;
+		plexMatch: PlexAlbumMatch | null;
 		jellyfinTrackMap: Map<string, JellyfinTrackInfo>;
 		localTrackMap: Map<string, LocalTrackInfo>;
 		navidromeTrackMap: Map<string, NavidromeTrackInfo>;
+		plexTrackMap: Map<string, PlexTrackInfo>;
 		jellyfinTracks: JellyfinTrackInfo[];
 		localTracks: LocalTrackInfo[];
 		navidromeTracks: NavidromeTrackInfo[];
+		plexTracks: PlexTrackInfo[];
 		trackLinks: YouTubeTrackLink[];
 		youtubeEnabled: boolean;
 		youtubeApiConfigured: boolean;
 		jellyfinEnabled: boolean;
 		localfilesEnabled: boolean;
 		navidromeEnabled: boolean;
+		plexEnabled: boolean;
 		onPlaySourceTrack: (
-			source: 'jellyfin' | 'local' | 'navidrome',
+			source: 'jellyfin' | 'local' | 'navidrome' | 'plex',
 			trackPosition: number,
 			discNumber: number,
 			title: string
@@ -56,7 +63,8 @@
 			track: { position: number; disc_number?: number | null; title: string },
 			resolvedLocal: LocalTrackInfo | null,
 			resolvedJellyfin: JellyfinTrackInfo | null,
-			resolvedNavidrome: NavidromeTrackInfo | null
+			resolvedNavidrome: NavidromeTrackInfo | null,
+			resolvedPlex: PlexTrackInfo | null
 		) => MenuItem[];
 	}
 
@@ -67,18 +75,22 @@
 		jellyfinMatch,
 		localMatch,
 		navidromeMatch,
+		plexMatch,
 		jellyfinTrackMap,
 		localTrackMap,
 		navidromeTrackMap,
+		plexTrackMap,
 		jellyfinTracks,
 		localTracks,
 		navidromeTracks,
+		plexTracks,
 		trackLinks,
 		youtubeEnabled,
 		youtubeApiConfigured,
 		jellyfinEnabled,
 		localfilesEnabled,
 		navidromeEnabled,
+		plexEnabled,
 		onPlaySourceTrack,
 		onTrackGenerated,
 		onQuotaUpdate,
@@ -124,6 +136,13 @@
 					navidromeTrackMap,
 					navidromeTracks
 				)}
+				{@const plexTrack = resolveSourceTrack(
+					trackDiscNumber,
+					track.position,
+					row.globalIndex,
+					plexTrackMap,
+					plexTracks
+				)}
 				{@const isCurrentlyPlaying =
 					playerStore.nowPlaying?.albumId === album.musicbrainz_id &&
 					(playerStore.currentQueueItem?.discNumber ?? 1) === trackDiscNumber &&
@@ -132,6 +151,7 @@
 				{@const showJellyfinBtn = jellyfinEnabled && jellyfinMatch?.found}
 				{@const showLocalBtn = localfilesEnabled && localMatch?.found}
 				{@const showNavidromeBtn = navidromeEnabled && navidromeMatch?.found}
+				{@const showPlexBtn = plexEnabled && plexMatch?.found}
 				<li
 					class="list-row group hover:bg-base-300/50 transition-colors p-3 sm:p-4"
 					style={isCurrentlyPlaying ? `background-color: ${colors.accent}20;` : ''}
@@ -163,7 +183,7 @@
 							{formatDuration(track.length)}
 						</div>
 
-						{#if youtubeEnabled || showJellyfinBtn || showLocalBtn || showNavidromeBtn}
+						{#if youtubeEnabled || showJellyfinBtn || showLocalBtn || showNavidromeBtn || showPlexBtn}
 							<div class="flex items-center gap-1.5 shrink-0 ml-auto">
 								{#if youtubeEnabled}
 									<TrackPlayButton
@@ -225,13 +245,28 @@
 									</TrackSourceButton>
 								{/if}
 
+								{#if showPlexBtn}
+									<TrackSourceButton
+										available={plexTrack !== null}
+										sourceColor="rgb(var(--brand-plex))"
+										onclick={() =>
+											onPlaySourceTrack('plex', track.position, trackDiscNumber, track.title)}
+										ariaLabel={plexTrack ? 'Play on Plex' : 'Not available on Plex'}
+									>
+										{#snippet icon()}
+											<PlexIcon class="h-4 w-4" />
+										{/snippet}
+									</TrackSourceButton>
+								{/if}
+
 								<div>
 									<ContextMenu
 										items={getTrackContextMenuItems(
 											track,
 											localTrack,
 											jellyfinTrack,
-											navidromeTrack
+											navidromeTrack,
+											plexTrack
 										)}
 										position="end"
 										size="xs"

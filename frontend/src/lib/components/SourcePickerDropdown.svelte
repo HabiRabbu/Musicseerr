@@ -5,6 +5,7 @@
 	import LocalFilesIcon from '$lib/components/LocalFilesIcon.svelte';
 	import YouTubeIcon from '$lib/components/YouTubeIcon.svelte';
 	import NavidromeIcon from '$lib/components/NavidromeIcon.svelte';
+	import PlexIcon from '$lib/components/PlexIcon.svelte';
 
 	interface Props {
 		currentSource: string;
@@ -47,6 +48,8 @@
 		<LocalFilesIcon class={cls} />
 	{:else if source === 'youtube'}
 		<YouTubeIcon class={cls} />
+	{:else if source === 'plex'}
+		<PlexIcon class={cls} />
 	{/if}
 {/snippet}
 

@@ -15,6 +15,7 @@
 	import { getGreeting } from '$lib/utils/homeCache';
 	import { removeQueueCachedData } from '$lib/utils/discoverQueueCache';
 	import { isDismissed } from '$lib/utils/dismissedPrompts';
+	import HomeSectionNowPlaying from '$lib/components/HomeSectionNowPlaying.svelte';
 	import { getHomeQuery } from '$lib/queries/HomeQuery.svelte';
 	import type { PageProps } from './$types';
 	import { PersistedState } from 'runed';
@@ -187,31 +188,14 @@
 				<div
 					class="card bg-linear-to-br from-accent/20 via-accent/10 to-base-200 border-2 border-accent/40 shadow-xl relative overflow-hidden"
 				>
-					<div class="absolute inset-0 pointer-events-none overflow-hidden" aria-hidden="true">
-						<span class="absolute left-[15%] bottom-4 text-accent/10 text-2xl animate-note-float"
-							>♪</span
-						>
-						<span
-							class="absolute left-[40%] bottom-8 text-primary/10 text-lg animate-note-float"
-							style="animation-delay: 2s;">♫</span
-						>
-						<span
-							class="absolute right-[20%] bottom-2 text-accent/10 text-xl animate-note-float"
-							style="animation-delay: 4s;">♪</span
-						>
-						<span
-							class="absolute right-[35%] bottom-6 text-primary/10 text-2xl animate-note-float"
-							style="animation-delay: 1s;">♩</span
-						>
-					</div>
 					<div class="card-body items-center text-center py-12 stagger-fade-in">
 						<Music class="h-16 w-16 mb-4 animate-float text-accent" />
 						<h2 class="card-title text-3xl sm:text-4xl lg:text-5xl font-bold mb-2">
 							Welcome to <span class="text-primary">Musicseerr</span>!
 						</h2>
 						<p class="text-base-content/70 max-w-lg mb-6">
-							To get started, connect your Lidarr server. This is required to manage your music
-							library, request albums, and track your collection.
+							Get started by connecting your Lidarr server. You need it to manage your library,
+							request albums, and keep track of your collection.
 						</p>
 						<div class="flex flex-wrap justify-center gap-2 mb-6">
 							{#each lidarrPrompt.features as feature (feature)}
@@ -233,6 +217,8 @@
 					{/each}
 				</div>
 			{/if}
+
+			<HomeSectionNowPlaying />
 
 			{#if loading && !homeData}
 				<section>
@@ -334,10 +320,10 @@
 						Welcome to <span class="text-primary">Musicseerr</span>
 					</h2>
 					<p class="mb-6 max-w-md px-4 text-center text-sm text-base-content/70 sm:text-base">
-						Your music library appears to be empty. Add some albums in Lidarr to get started, or
-						connect additional services for personalized recommendations.
+						Your library looks empty. Add a few albums in Lidarr to get started, or connect more
+						services for recommendations.
 					</p>
-					<a href="/settings" class="btn btn-primary"> Settings </a>
+					<a href="/settings" class="btn btn-primary">Open settings</a>
 				</div>
 			{/if}
 		</div>

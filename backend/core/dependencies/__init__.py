@@ -26,6 +26,7 @@ from .repo_providers import (  # noqa: F401
     get_listenbrainz_repository,
     get_jellyfin_repository,
     get_navidrome_repository,
+    get_plex_repository,
     get_coverart_repository,
     get_youtube_repo,
     get_audiodb_repository,
@@ -65,6 +66,8 @@ from .service_providers import (  # noqa: F401
     get_jellyfin_library_service,
     get_navidrome_library_service,
     get_navidrome_playback_service,
+    get_plex_library_service,
+    get_plex_playback_service,
 )
 
 from .type_aliases import (  # noqa: F401
@@ -109,6 +112,9 @@ from .type_aliases import (  # noqa: F401
     NavidromeRepositoryDep,
     NavidromeLibraryServiceDep,
     NavidromePlaybackServiceDep,
+    PlexRepositoryDep,
+    PlexLibraryServiceDep,
+    PlexPlaybackServiceDep,
     CacheStatusServiceDep,
 )
 

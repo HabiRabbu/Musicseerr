@@ -21,3 +21,12 @@ export async function reportNavidromeNowPlaying(itemId: string): Promise<void> {
 		console.warn(`[Navidrome] now-playing failed: ${detail}`);
 	}
 }
+
+export async function reportNavidromeStopped(itemId: string): Promise<void> {
+	try {
+		await api.global.post(API.stream.navidromeStopped(itemId));
+	} catch (e) {
+		const detail = e instanceof ApiError ? String(e.status) : 'network error';
+		console.warn(`[Navidrome] stopped report failed: ${detail}`);
+	}
+}

@@ -7,8 +7,8 @@
 
 <div class="alert alert-info alert-soft mb-4">
 	<span class="text-sm"
-		>Choose how long pages stay fresh in your browser. Lower values update sooner. Higher values
-		feel faster when you come back.</span
+		>Choose how long pages stay fresh in your browser. Lower values check for updates sooner. Higher
+		values can make repeat visits feel faster.</span
 	>
 </div>
 <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 pt-2">
@@ -72,6 +72,14 @@
 		label="Jellyfin Sidebar"
 		description="Default: 2 minutes"
 		bind:value={data.frontend_ttl_jellyfin_sidebar}
+		min={1}
+		max={60}
+		unit="min"
+	/>
+	<SettingsNumberField
+		label="Plex Sidebar"
+		description="Default: 2 minutes"
+		bind:value={data.frontend_ttl_plex_sidebar}
 		min={1}
 		max={60}
 		unit="min"

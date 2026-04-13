@@ -22,7 +22,7 @@ def _coerce_positive_int(value: object, field_name: str) -> int:
 
 def _mask_api_key(key: str) -> str:
     if len(key) > 3:
-        return f"***…{key[-3:]}"
+        return f"***...{key[-3:]}"
     return "***"
 
 
@@ -53,6 +53,10 @@ class AdvancedSettings(AppStruct):
     cache_ttl_navidrome_search: int = 120
     cache_ttl_navidrome_genres: int = 3600
     cache_ttl_navidrome_stats: int = 600
+    cache_ttl_plex_albums: int = 300
+    cache_ttl_plex_search: int = 120
+    cache_ttl_plex_genres: int = 3600
+    cache_ttl_plex_stats: int = 600
     http_timeout: int = 10
     http_connect_timeout: int = 5
     http_max_connections: int = 200
@@ -92,6 +96,7 @@ class AdvancedSettings(AppStruct):
     frontend_ttl_search: int = 300000
     frontend_ttl_local_files_sidebar: int = 120000
     frontend_ttl_jellyfin_sidebar: int = 120000
+    frontend_ttl_plex_sidebar: int = 120000
     frontend_ttl_playlist_sources: int = 900000
     audiodb_enabled: bool = True
     audiodb_name_search_fallback: bool = False
@@ -136,6 +141,10 @@ class AdvancedSettings(AppStruct):
             "cache_ttl_navidrome_search": (60, 3600),
             "cache_ttl_navidrome_genres": (60, 86400),
             "cache_ttl_navidrome_stats": (60, 3600),
+            "cache_ttl_plex_albums": (60, 3600),
+            "cache_ttl_plex_search": (60, 3600),
+            "cache_ttl_plex_genres": (60, 86400),
+            "cache_ttl_plex_stats": (60, 3600),
             "http_timeout": (5, 60),
             "http_connect_timeout": (1, 30),
             "http_max_connections": (50, 500),
@@ -178,6 +187,7 @@ class AdvancedSettings(AppStruct):
             "frontend_ttl_search": (60000, 3600000),
             "frontend_ttl_local_files_sidebar": (60000, 3600000),
             "frontend_ttl_jellyfin_sidebar": (60000, 3600000),
+            "frontend_ttl_plex_sidebar": (60000, 3600000),
             "frontend_ttl_playlist_sources": (60000, 3600000),
             "cache_ttl_audiodb_found": (3600, 2592000),
             "cache_ttl_audiodb_not_found": (3600, 604800),
@@ -202,6 +212,7 @@ class FrontendCacheTTLs(AppStruct):
     search: int = 300000
     local_files_sidebar: int = 120000
     jellyfin_sidebar: int = 120000
+    plex_sidebar: int = 120000
     playlist_sources: int = 900000
     discover_queue_polling_interval: int = 4000
     discover_queue_auto_generate: bool = True
@@ -228,6 +239,10 @@ class AdvancedSettingsFrontend(AppStruct):
     cache_ttl_navidrome_search: int = 2
     cache_ttl_navidrome_genres: int = 60
     cache_ttl_navidrome_stats: int = 10
+    cache_ttl_plex_albums: int = 5
+    cache_ttl_plex_search: int = 2
+    cache_ttl_plex_genres: int = 60
+    cache_ttl_plex_stats: int = 10
     http_timeout: int = 10
     http_connect_timeout: int = 5
     http_max_connections: int = 200
@@ -266,6 +281,7 @@ class AdvancedSettingsFrontend(AppStruct):
     frontend_ttl_search: int = 5
     frontend_ttl_local_files_sidebar: int = 2
     frontend_ttl_jellyfin_sidebar: int = 2
+    frontend_ttl_plex_sidebar: int = 2
     frontend_ttl_playlist_sources: int = 15
     audiodb_enabled: bool = True
     audiodb_name_search_fallback: bool = False
@@ -309,6 +325,10 @@ class AdvancedSettingsFrontend(AppStruct):
             "cache_ttl_navidrome_search",
             "cache_ttl_navidrome_genres",
             "cache_ttl_navidrome_stats",
+            "cache_ttl_plex_albums",
+            "cache_ttl_plex_search",
+            "cache_ttl_plex_genres",
+            "cache_ttl_plex_stats",
             "cache_ttl_audiodb_found",
             "cache_ttl_audiodb_not_found",
             "cache_ttl_audiodb_library",
@@ -343,6 +363,10 @@ class AdvancedSettingsFrontend(AppStruct):
             "cache_ttl_navidrome_search": (1, 60),
             "cache_ttl_navidrome_genres": (1, 1440),
             "cache_ttl_navidrome_stats": (1, 60),
+            "cache_ttl_plex_albums": (1, 60),
+            "cache_ttl_plex_search": (1, 60),
+            "cache_ttl_plex_genres": (1, 1440),
+            "cache_ttl_plex_stats": (1, 60),
             "http_timeout": (5, 60),
             "http_connect_timeout": (1, 30),
             "http_max_connections": (50, 500),
@@ -379,6 +403,7 @@ class AdvancedSettingsFrontend(AppStruct):
             "frontend_ttl_search": (1, 60),
             "frontend_ttl_local_files_sidebar": (1, 60),
             "frontend_ttl_jellyfin_sidebar": (1, 60),
+            "frontend_ttl_plex_sidebar": (1, 60),
             "frontend_ttl_playlist_sources": (1, 60),
             "cache_ttl_audiodb_found": (1, 720),
             "cache_ttl_audiodb_not_found": (1, 168),
@@ -422,6 +447,10 @@ class AdvancedSettingsFrontend(AppStruct):
             cache_ttl_navidrome_search=settings.cache_ttl_navidrome_search // 60,
             cache_ttl_navidrome_genres=settings.cache_ttl_navidrome_genres // 60,
             cache_ttl_navidrome_stats=settings.cache_ttl_navidrome_stats // 60,
+            cache_ttl_plex_albums=settings.cache_ttl_plex_albums // 60,
+            cache_ttl_plex_search=settings.cache_ttl_plex_search // 60,
+            cache_ttl_plex_genres=settings.cache_ttl_plex_genres // 60,
+            cache_ttl_plex_stats=settings.cache_ttl_plex_stats // 60,
             http_timeout=settings.http_timeout,
             http_connect_timeout=settings.http_connect_timeout,
             http_max_connections=settings.http_max_connections,
@@ -460,6 +489,7 @@ class AdvancedSettingsFrontend(AppStruct):
             frontend_ttl_search=settings.frontend_ttl_search // 60000,
             frontend_ttl_local_files_sidebar=settings.frontend_ttl_local_files_sidebar // 60000,
             frontend_ttl_jellyfin_sidebar=settings.frontend_ttl_jellyfin_sidebar // 60000,
+            frontend_ttl_plex_sidebar=settings.frontend_ttl_plex_sidebar // 60000,
             frontend_ttl_playlist_sources=settings.frontend_ttl_playlist_sources // 60000,
             audiodb_enabled=settings.audiodb_enabled,
             audiodb_name_search_fallback=settings.audiodb_name_search_fallback,
@@ -504,6 +534,10 @@ class AdvancedSettingsFrontend(AppStruct):
             cache_ttl_navidrome_search=self.cache_ttl_navidrome_search * 60,
             cache_ttl_navidrome_genres=self.cache_ttl_navidrome_genres * 60,
             cache_ttl_navidrome_stats=self.cache_ttl_navidrome_stats * 60,
+            cache_ttl_plex_albums=self.cache_ttl_plex_albums * 60,
+            cache_ttl_plex_search=self.cache_ttl_plex_search * 60,
+            cache_ttl_plex_genres=self.cache_ttl_plex_genres * 60,
+            cache_ttl_plex_stats=self.cache_ttl_plex_stats * 60,
             http_timeout=self.http_timeout,
             http_connect_timeout=self.http_connect_timeout,
             http_max_connections=self.http_max_connections,
@@ -542,6 +576,7 @@ class AdvancedSettingsFrontend(AppStruct):
             frontend_ttl_search=self.frontend_ttl_search * 60000,
             frontend_ttl_local_files_sidebar=self.frontend_ttl_local_files_sidebar * 60000,
             frontend_ttl_jellyfin_sidebar=self.frontend_ttl_jellyfin_sidebar * 60000,
+            frontend_ttl_plex_sidebar=self.frontend_ttl_plex_sidebar * 60000,
             frontend_ttl_playlist_sources=self.frontend_ttl_playlist_sources * 60000,
             audiodb_enabled=self.audiodb_enabled,
             audiodb_name_search_fallback=self.audiodb_name_search_fallback,
