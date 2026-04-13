@@ -60,8 +60,8 @@ NPM    ?= pnpm
 	frontend-test-monitored-artists \
 	frontend-test-playlist-detail \
 	frontend-test-queuehelpers \
-	project-map rebuild \
-	test tests check lint ci
+	rebuild \
+	test tests check lint format ci
 
 # Help
 
@@ -260,9 +260,6 @@ frontend-test-queuehelpers: ## Run queue helper regressions
 
 # Utilities
 
-project-map: ## Refresh the project map block
-	cd "$(ROOT_DIR)" && $(PYTHON) scripts/gen-project-map.py
-
 rebuild: ## Rebuild the application
 	cd "$(ROOT_DIR)" && ./manage.sh --rebuild
 
@@ -275,5 +272,9 @@ tests: test ## Alias for 'test'
 check: backend-test frontend-check ## Run backend tests and frontend type checks
 
 lint: backend-lint frontend-lint ## Run linting targets
+
+format: ## Auto-format backend (ruff --fix) and frontend (prettier)
+	cd "$(ROOT_DIR)" && $(BACKEND_VENV_DIR)/bin/ruff check --fix backend
+	cd "$(FRONTEND_DIR)" && $(NPM) run format
 
 ci: backend-test backend-lint frontend-check frontend-lint frontend-format-check frontend-test-server ## Run the local CI checks

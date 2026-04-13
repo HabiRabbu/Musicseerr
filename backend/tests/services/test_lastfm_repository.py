@@ -88,6 +88,14 @@ class TestHandleErrorResponse:
         with pytest.raises(ExternalServiceError, match="Last.fm error \\(999\\)"):
             repo._handle_error_response({"error": 999, "message": "weird"})
 
+    def test_error_17_raises_configuration_error(self):
+        repo = _make_repo()
+        with pytest.raises(ConfigurationError, match="re-authorize Last.fm"):
+            repo._handle_error_response({
+                "error": 17,
+                "message": "Login: User required to be logged in",
+            })
+
 
 class TestConfigureMethod:
     def test_configure_updates_credentials(self):
@@ -105,6 +113,123 @@ class TestConstructorDefaults:
         assert repo._api_key == ""
         assert repo._shared_secret == ""
         assert repo._session_key == ""
+
+
+class TestCanSignProperty:
+    def test_true_when_both_credentials_present(self):
+        repo = _make_repo(shared_secret="sec", session_key="sk")
+        assert repo._can_sign is True
+
+    def test_false_without_shared_secret(self):
+        repo = _make_repo(shared_secret="", session_key="sk")
+        assert repo._can_sign is False
+
+    def test_false_without_session_key(self):
+        repo = _make_repo(shared_secret="sec", session_key="")
+        assert repo._can_sign is False
+
+    def test_false_with_neither(self):
+        repo = _make_repo(shared_secret="", session_key="")
+        assert repo._can_sign is False
+
+    def test_configure_enables_can_sign(self):
+        repo = _make_repo(shared_secret="", session_key="")
+        assert repo._can_sign is False
+        repo.configure(api_key="k", shared_secret="s", session_key="sk")
+        assert repo._can_sign is True
+
+
+class TestSignedUserRequests:
+    @pytest.mark.asyncio
+    async def test_get_recent_tracks_sends_signed_request(self):
+        cache = _make_cache()
+        http_client = AsyncMock(spec=httpx.AsyncClient)
+        http_client.get = AsyncMock(
+            return_value=MagicMock(
+                status_code=200,
+                json=lambda: {"recenttracks": {"track": []}},
+                text="",
+            )
+        )
+        repo = LastFmRepository(
+            http_client=http_client,
+            cache=cache,
+            api_key="key",
+            shared_secret="sec",
+            session_key="sk-1",
+        )
+        await repo.get_user_recent_tracks("user1")
+        call_params = http_client.get.call_args.kwargs.get("params", {})
+        assert "api_sig" in call_params
+        assert call_params["sk"] == "sk-1"
+
+    @pytest.mark.asyncio
+    async def test_get_recent_tracks_unsigned_without_session_key(self):
+        cache = _make_cache()
+        http_client = AsyncMock(spec=httpx.AsyncClient)
+        http_client.get = AsyncMock(
+            return_value=MagicMock(
+                status_code=200,
+                json=lambda: {"recenttracks": {"track": []}},
+                text="",
+            )
+        )
+        repo = LastFmRepository(
+            http_client=http_client,
+            cache=cache,
+            api_key="key",
+        )
+        await repo.get_user_recent_tracks("user1")
+        call_params = http_client.get.call_args.kwargs.get("params", {})
+        assert "api_sig" not in call_params
+        assert "sk" not in call_params
+
+    @pytest.mark.asyncio
+    async def test_get_top_artists_sends_signed_request(self):
+        cache = _make_cache()
+        http_client = AsyncMock(spec=httpx.AsyncClient)
+        http_client.get = AsyncMock(
+            return_value=MagicMock(
+                status_code=200,
+                json=lambda: {"topartists": {"artist": []}},
+                text="",
+            )
+        )
+        repo = LastFmRepository(
+            http_client=http_client,
+            cache=cache,
+            api_key="key",
+            shared_secret="sec",
+            session_key="sk-1",
+        )
+        await repo.get_user_top_artists("user1")
+        call_params = http_client.get.call_args.kwargs.get("params", {})
+        assert "api_sig" in call_params
+        assert call_params["sk"] == "sk-1"
+
+    @pytest.mark.asyncio
+    async def test_error_17_through_signed_request_raises_configuration_error(self):
+        cache = _make_cache()
+        http_client = AsyncMock(spec=httpx.AsyncClient)
+        http_client.get = AsyncMock(
+            return_value=MagicMock(
+                status_code=200,
+                json=lambda: {
+                    "error": 17,
+                    "message": "Login: User required to be logged in",
+                },
+                text="",
+            )
+        )
+        repo = LastFmRepository(
+            http_client=http_client,
+            cache=cache,
+            api_key="key",
+            shared_secret="sec",
+            session_key="sk-1",
+        )
+        with pytest.raises(ConfigurationError, match="re-authorize Last.fm"):
+            await repo.get_user_recent_tracks("user1")
 
 
 class TestUpdateNowPlaying:

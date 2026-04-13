@@ -24,9 +24,10 @@
 	const fullyConnected = $derived(step1Complete && step2Complete);
 	const showForm = $derived(!fullyConnected || showDetails);
 
-	async function save() {
+	async function save(): Promise<boolean> {
 		const ok = await form.save();
 		if (ok) dataPersisted = true;
+		return ok;
 	}
 
 	async function test() {
@@ -53,7 +54,7 @@
 	<div class="card-body">
 		<h2 class="card-title text-2xl">ListenBrainz</h2>
 		<p class="text-base-content/70 mb-4">
-			Connect to ListenBrainz for personalized recommendations and listening stats.
+			Connect ListenBrainz for tailored recommendations and listening stats.
 		</p>
 
 		{#if form.loading}
@@ -83,11 +84,11 @@
 			{#if showForm}
 				<div class="space-y-6">
 					<div class="space-y-4">
-						<h3 class="text-lg font-semibold">Step 1 — Credentials</h3>
+						<h3 class="text-lg font-semibold">Step 1: Credentials</h3>
 
 						{#if !step1Complete}
 							<div class="bg-base-300 rounded-lg p-4 space-y-2 text-sm">
-								<p class="font-medium">To get started:</p>
+								<p class="font-medium">Getting started:</p>
 								<ol class="list-decimal list-inside space-y-1 text-base-content/70">
 									<li>
 										Create a free account at
@@ -103,7 +104,7 @@
 										</a>
 									</li>
 									<li>Enter your username below</li>
-									<li>Optionally add your User Token for private statistics</li>
+									<li>Add a User Token if you want private listening stats</li>
 								</ol>
 							</div>
 						{/if}
@@ -117,7 +118,7 @@
 								type="text"
 								bind:value={form.data.username}
 								class="input input-bordered w-full"
-								placeholder="Your ListenBrainz username"
+								placeholder="ListenBrainz username"
 							/>
 						</div>
 
@@ -131,7 +132,7 @@
 									type={showToken ? 'text' : 'password'}
 									bind:value={form.data.user_token}
 									class="input input-bordered join-item flex-1"
-									placeholder="For private statistics"
+									placeholder="Needed for private stats"
 								/>
 								<button
 									type="button"
@@ -143,7 +144,7 @@
 							</div>
 							<label class="label">
 								<span class="label-text-alt text-base-content/50">
-									Find your token at
+									Get your token from
 									<a
 										href="https://listenbrainz.org/settings/"
 										target="_blank"
@@ -197,7 +198,7 @@
 					{#if step1Complete || form.data.enabled}
 						<div class="divider"></div>
 						<div class="space-y-4">
-							<h3 class="text-lg font-semibold">Step 2 — Enable</h3>
+							<h3 class="text-lg font-semibold">Step 2: Enable</h3>
 
 							<div class="form-control">
 								<label class="label cursor-pointer justify-start gap-4">
@@ -205,15 +206,22 @@
 										type="checkbox"
 										bind:checked={form.data.enabled}
 										class="toggle toggle-primary"
+										onchange={async () => {
+											if (!form.data) return;
+											const prev = !form.data.enabled;
+											const ok = await save();
+											if (!ok && form.data) form.data.enabled = prev;
+										}}
+										disabled={form.saving}
 									/>
 									<div>
-										<span class="label-text font-medium">Enable ListenBrainz Integration</span>
+										<span class="label-text font-medium">Enable ListenBrainz</span>
 										<p class="text-xs text-base-content/50">
 											{#if form.data.enabled && !step1Complete}
-												Integration is enabled but credentials are incomplete. Consider updating
-												your username above.
+												ListenBrainz is on, but your username is still missing. Add it above to
+												finish setup.
 											{:else}
-												Show personalized recommendations and listening stats on the home page.
+												Show tailored recommendations and listening stats on the home page.
 											{/if}
 										</p>
 									</div>
@@ -235,9 +243,9 @@
 						<div class="divider"></div>
 						<div class="alert alert-info">
 							<span>
-								To scrobble your listening activity to ListenBrainz,
+								To scrobble your listening to ListenBrainz,
 								<a href="/settings?tab=scrobbling" class="link font-medium"
-									>enable it in the Scrobbling tab →</a
+									>turn it on in the Scrobbling tab</a
 								>
 							</span>
 						</div>

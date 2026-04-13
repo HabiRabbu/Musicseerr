@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { getApiUrl } from '$lib/api/api-utils';
-	import { browser } from '$app/environment';
 	import { preferencesStore } from '$lib/stores/preferences';
 	import { integrationStore } from '$lib/stores/integration';
 	import type {
@@ -9,6 +8,8 @@
 		LidarrMetadataProfilePreferences,
 		MetadataProfile
 	} from '$lib/types';
+	import { invalidateQueriesWithPersister } from '$lib/queries/QueryClient';
+	import { ArtistQueryKeyFactory } from '$lib/queries/artist/ArtistQueryKeyFactory';
 
 	let preferences: UserPreferences = $state({
 		primary_types: [],
@@ -200,10 +201,9 @@
 		if (success) {
 			saveMessage = 'Settings saved Artist pages and search results will refresh automatically.';
 
-			if (browser) {
-				window.dispatchEvent(new CustomEvent('artist-refresh'));
-				window.dispatchEvent(new CustomEvent('search-refresh'));
-			}
+			// Invalidate artist queries since these preferences affect which releases are shown on artist pages and search results
+			invalidateQueriesWithPersister({ queryKey: ArtistQueryKeyFactory.prefix });
+			window.dispatchEvent(new CustomEvent('search-refresh'));
 
 			setTimeout(() => {
 				saveMessage = '';

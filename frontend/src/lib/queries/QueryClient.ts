@@ -1,6 +1,8 @@
 import { browser } from '$app/environment';
 import {
 	type InferDataFromTag,
+	type InvalidateOptions,
+	type InvalidateQueryFilters,
 	QueryClient,
 	type QueryFilters,
 	type QueryKey,
@@ -53,6 +55,15 @@ export const setQueryDataWithPersister = async <
 		options
 	);
 	await queryPersister.persistQueryByKey(queryKey, queryClient);
+};
+
+export const invalidateQueriesWithPersister = async <TTaggedQueryKey extends QueryKey = QueryKey>(
+	filters?: InvalidateQueryFilters<TTaggedQueryKey>,
+	options?: InvalidateOptions
+) => {
+	await queryPersister.removeQueries(filters);
+	// eslint-disable-next-line no-restricted-syntax
+	await queryClient.invalidateQueries<TTaggedQueryKey>(filters, options);
 };
 
 /**

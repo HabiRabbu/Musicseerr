@@ -32,7 +32,6 @@ import {
 	albumSourceMatchCache
 } from '$lib/utils/albumDetailCache';
 import { hydrateDetailCacheEntry } from '$lib/utils/detailCacheHydration';
-import { artistBasicCache } from '$lib/utils/artistDetailCache';
 import { compareDiscTrack, getDiscTrackKey } from '$lib/player/queueHelpers';
 import type { QueueItem } from '$lib/player/types';
 import { launchJellyfinPlayback } from '$lib/player/launchJellyfinPlayback';
@@ -59,6 +58,8 @@ import {
 	getTrackContextMenuItems as getTrackContextMenuItemsImpl,
 	buildSourceCallbacks
 } from './albumPlaybackHandlers';
+import { invalidateQueriesWithPersister } from '$lib/queries/QueryClient';
+import { ArtistQueryKeyFactory } from '$lib/queries/artist/ArtistQueryKeyFactory';
 
 export interface SourceCallbacks {
 	onPlayAll: () => void;
@@ -541,7 +542,8 @@ export function createAlbumPageState(albumIdGetter: () => string) {
 			if (aid && abortController) void fetchArtistMonitoringState(aid, abortController.signal);
 			if (opts?.monitorArtist && aid) {
 				monitoredArtistsStore.addPendingMonitor(aid, opts.autoDownloadArtist ?? false);
-				artistBasicCache.remove(aid);
+				invalidateQueriesWithPersister({ queryKey: ArtistQueryKeyFactory.basic(aid) });
+				invalidateQueriesWithPersister({ queryKey: ArtistQueryKeyFactory.releases(aid) });
 			}
 		}
 	});

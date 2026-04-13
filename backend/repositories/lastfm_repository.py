@@ -71,8 +71,9 @@ LASTFM_ERROR_MAP: dict[int, tuple[type[Exception], str]] = {
     9: (ConfigurationError, "Session key expired - please re-authorize with Last.fm"),
     10: (ConfigurationError, "Invalid API key - check your Last.fm API key"),
     11: (ExternalServiceError, "Last.fm service is temporarily offline"),
-    26: (ConfigurationError, "API key has been suspended - contact Last.fm support"),
     14: (TokenNotAuthorizedError, "Token not yet authorized"),
+    17: (ConfigurationError, "Authentication required - re-authorize Last.fm or make your listening history public"),
+    26: (ConfigurationError, "API key has been suspended - contact Last.fm support"),
     29: (ExternalServiceError, "Rate limit exceeded"),
 }
 
@@ -106,6 +107,10 @@ class LastFmRepository:
         self._api_key = api_key
         self._shared_secret = shared_secret
         self._session_key = session_key
+
+    @property
+    def _can_sign(self) -> bool:
+        return bool(self._shared_secret) and bool(self._session_key)
 
     def configure(self, api_key: str, shared_secret: str, session_key: str = "") -> None:
         self._api_key = api_key
@@ -320,6 +325,7 @@ class LastFmRepository:
         data = await self._request(
             "user.getTopArtists",
             params={"user": username, "period": period, "limit": str(limit)},
+            signed=self._can_sign,
         )
         artists = [
             parse_top_artist(item)
@@ -340,6 +346,7 @@ class LastFmRepository:
         data = await self._request(
             "user.getTopAlbums",
             params={"user": username, "period": period, "limit": str(limit)},
+            signed=self._can_sign,
         )
         albums = [
             parse_top_album(item)
@@ -360,6 +367,7 @@ class LastFmRepository:
         data = await self._request(
             "user.getTopTracks",
             params={"user": username, "period": period, "limit": str(limit)},
+            signed=self._can_sign,
         )
         tracks = [
             parse_top_track(item)
@@ -378,6 +386,7 @@ class LastFmRepository:
         data = await self._request(
             "user.getRecentTracks",
             params={"user": username, "limit": str(limit), "extended": "0"},
+            signed=self._can_sign,
         )
         tracks = [
             parse_recent_track(item)
@@ -396,6 +405,7 @@ class LastFmRepository:
         data = await self._request(
             "user.getLovedTracks",
             params={"user": username, "limit": str(limit)},
+            signed=self._can_sign,
         )
         tracks = [
             parse_loved_track(item)
@@ -414,6 +424,7 @@ class LastFmRepository:
         data = await self._request(
             "user.getWeeklyArtistChart",
             params={"user": username},
+            signed=self._can_sign,
         )
         artists = [
             parse_top_artist(item)
@@ -432,6 +443,7 @@ class LastFmRepository:
         data = await self._request(
             "user.getWeeklyAlbumChart",
             params={"user": username},
+            signed=self._can_sign,
         )
         albums = [
             parse_weekly_album_chart_item(item)

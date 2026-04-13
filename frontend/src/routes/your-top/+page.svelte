@@ -1,22 +1,25 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
 	import TimeRangeView from '$lib/components/TimeRangeView.svelte';
-	import SourceSwitcher from '$lib/components/SourceSwitcher.svelte';
-	import { musicSourceStore, type MusicSource } from '$lib/stores/musicSource';
+	import { type MusicSource } from '$lib/stores/musicSource';
 	import { Disc3 } from 'lucide-svelte';
+	import { PersistedState } from 'runed';
+	import { PAGE_SOURCE_KEYS } from '$lib/constants';
+	import type { PageProps } from './$types';
+	import SimpleSourceSwitcher from '$lib/components/SimpleSourceSwitcher.svelte';
 
-	let source: MusicSource | null = $state(null);
+	const { data }: PageProps = $props();
 
-	onMount(async () => {
-		await musicSourceStore.load();
-		source = musicSourceStore.getPageSource('yourTop');
-	});
+	// svelte-ignore state_referenced_locally
+	let activeSource = new PersistedState<MusicSource>(
+		PAGE_SOURCE_KEYS['yourTop'],
+		data.primarySource
+	);
 
 	function handleSourceChange(nextSource: MusicSource) {
-		source = nextSource;
+		activeSource.current = nextSource;
 	}
 
-	let sourceLabel = $derived(source === 'lastfm' ? 'Last.fm' : 'ListenBrainz');
+	let sourceLabel = $derived(activeSource.current === 'lastfm' ? 'Last.fm' : 'ListenBrainz');
 </script>
 
 <svelte:head>
@@ -25,14 +28,17 @@
 
 <div class="space-y-4 px-4 sm:px-6 lg:px-8">
 	<div class="flex justify-end">
-		<SourceSwitcher pageKey="yourTop" onSourceChange={handleSourceChange} />
+		<SimpleSourceSwitcher
+			currentSource={activeSource.current}
+			onSourceChange={handleSourceChange}
+		/>
 	</div>
 	<TimeRangeView
 		itemType="album"
 		endpoint="/api/v1/home/your-top/albums"
 		title="Your Top Albums"
 		subtitle={`Your most listened albums on ${sourceLabel}`}
-		{source}
+		source={activeSource.current}
 		errorIcon={Disc3}
 	/>
 </div>

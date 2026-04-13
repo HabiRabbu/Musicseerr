@@ -78,7 +78,8 @@ export const CACHE_TTL_GROUPS = {
 		ALBUM_DETAIL_SOURCE_MATCH: 5 * 60 * 1000,
 		ARTIST_DETAIL_BASIC: 5 * 60 * 1000,
 		ARTIST_DETAIL_EXTENDED: 30 * 60 * 1000,
-		ARTIST_DETAIL_LASTFM: 30 * 60 * 1000
+		ARTIST_DETAIL_LASTFM: 30 * 60 * 1000,
+		ARTIST_DISCOVERY: 5 * 60 * 1000
 	},
 	charts: {
 		TIME_RANGE_OVERVIEW: 2 * 60 * 1000,
@@ -138,7 +139,17 @@ export const API = {
 		basic: (id: string) => `/api/v1/artists/${id}`,
 		extended: (id: string) => `/api/v1/artists/${id}/extended`,
 		releases: (id: string, offset: number, limit: number) =>
-			`/api/v1/artists/${id}/releases?offset=${offset}&limit=${limit}`
+			`/api/v1/artists/${id}/releases?offset=${offset}&limit=${limit}`,
+		similarArtists: (id: string, source: MusicSource, count: number = 15) =>
+			`/api/v1/artists/${id}/similar?count=${count}&source=${source}`,
+		topSongs: (id: string, source: MusicSource, count: number = 10) =>
+			`/api/v1/artists/${id}/top-songs?count=${count}&source=${source}`,
+		topAlbums: (id: string, source: MusicSource, count: number = 10) =>
+			`/api/v1/artists/${id}/top-albums?count=${count}&source=${source}`,
+		lastFmEnrichment: (id: string, artistName: string) => {
+			const params = new URLSearchParams({ artist_name: artistName });
+			return `/api/v1/artists/${id}/lastfm?${params.toString()}`;
+		}
 	},
 	album: {
 		basic: (id: string) => `/api/v1/albums/${id}`,

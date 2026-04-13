@@ -2,8 +2,8 @@ import { api } from '$lib/api/client';
 import { API, CACHE_TTL } from '$lib/constants';
 import type { MusicSource } from '$lib/stores/musicSource';
 import type { HomeResponse } from '$lib/types';
-import type { Getter } from '$lib/utils/typeHelpers';
 import { createQuery } from '@tanstack/svelte-query';
+import type { Getter } from 'runed';
 
 const keyFactory = {
 	home: (source: MusicSource) => ['home', source] as const
