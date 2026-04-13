@@ -48,6 +48,8 @@ from api.v1.routes import navidrome_library as navidrome_library_routes
 from api.v1.routes import local_library as local_library_routes
 from api.v1.routes import lastfm as lastfm_routes
 from api.v1.routes import scrobble as scrobble_routes
+from api.v1.routes import plex_library as plex_library_routes
+from api.v1.routes import plex_auth as plex_auth_routes
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -193,6 +195,17 @@ async def lifespan(app: FastAPI):
         )
         TaskRegistry.get_instance().register("navidrome-mbid-warmup", nav_mbid_task)
 
+    plex_settings = preferences_service.get_plex_connection()
+    if plex_settings.enabled:
+        from core.tasks import warm_plex_mbid_cache
+        plex_mbid_task = asyncio.create_task(warm_plex_mbid_cache())
+        plex_mbid_task.add_done_callback(
+            lambda t: None if t.cancelled() else (
+                logger.error("Plex MBID cache warming failed: %s", t.exception()) if t.exception() else None
+            )
+        )
+        TaskRegistry.get_instance().register("plex-mbid-warmup", plex_mbid_task)
+
     from core.dependencies import get_requests_page_service
     requests_page_service = get_requests_page_service()
 
@@ -319,6 +332,8 @@ v1_router.include_router(requests_page_routes.router)
 v1_router.include_router(stream_routes.router)
 v1_router.include_router(jellyfin_library_routes.router)
 v1_router.include_router(navidrome_library_routes.router)
+v1_router.include_router(plex_library_routes.router)
+v1_router.include_router(plex_auth_routes.router)
 v1_router.include_router(local_library_routes.router)
 v1_router.include_router(lastfm_routes.router)
 v1_router.include_router(scrobble_routes.router)

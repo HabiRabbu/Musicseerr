@@ -1,4 +1,4 @@
-"""Tests for Phase 7: AudioDB settings — API key masking, round-trips, validation."""
+"""Tests for AudioDB settings, API key masking, round-trips, and validation."""
 
 import pytest
 import msgspec
@@ -13,10 +13,10 @@ from api.v1.schemas.advanced_settings import (
 
 class TestMaskApiKey:
     def test_long_key_shows_last_three(self) -> None:
-        assert _mask_api_key("myapikey123") == "***…123"
+        assert _mask_api_key("myapikey123") == "***...123"
 
     def test_four_char_key(self) -> None:
-        assert _mask_api_key("1234") == "***…234"
+        assert _mask_api_key("1234") == "***...234"
 
     def test_three_char_key_fully_masked(self) -> None:
         assert _mask_api_key("123") == "***"
@@ -33,7 +33,7 @@ class TestMaskApiKey:
 
 class TestIsMaskedApiKey:
     def test_masked_with_suffix(self) -> None:
-        assert _is_masked_api_key("***…123") is True
+        assert _is_masked_api_key("***...123") is True
 
     def test_masked_short(self) -> None:
         assert _is_masked_api_key("***") is True
@@ -55,7 +55,7 @@ class TestApiKeyRoundTrip:
     def test_from_backend_masks_long_key(self) -> None:
         backend = AdvancedSettings(audiodb_api_key="secretkey")
         frontend = AdvancedSettingsFrontend.from_backend(backend)
-        assert frontend.audiodb_api_key == "***…key"
+        assert frontend.audiodb_api_key == "***...key"
 
     def test_from_backend_masks_default_key(self) -> None:
         backend = AdvancedSettings(audiodb_api_key="123")
@@ -63,9 +63,9 @@ class TestApiKeyRoundTrip:
         assert frontend.audiodb_api_key == "***"
 
     def test_to_backend_passes_masked_key_through(self) -> None:
-        frontend = AdvancedSettingsFrontend(audiodb_api_key="***…key")
+        frontend = AdvancedSettingsFrontend(audiodb_api_key="***...key")
         backend = frontend.to_backend()
-        assert backend.audiodb_api_key == "***…key"
+        assert backend.audiodb_api_key == "***...key"
 
     def test_to_backend_passes_new_plaintext_key(self) -> None:
         frontend = AdvancedSettingsFrontend(audiodb_api_key="newkey456")

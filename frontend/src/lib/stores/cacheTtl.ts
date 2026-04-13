@@ -7,6 +7,10 @@ import { updateDiscoveryCacheTTL } from '$lib/stores/discoveryCache';
 import { updateDiscoverQueueCacheTTL } from '$lib/utils/discoverQueueCache';
 import { updateSearchCacheTTL } from '$lib/stores/search';
 import { updateJellyfinSidebarCacheTTL } from '$lib/utils/jellyfinLibraryCache';
+import {
+	updatePlexSidebarCacheTTL,
+	updatePlexAlbumsListCacheTTL
+} from '$lib/utils/plexLibraryCache';
 import { updateLocalFilesSidebarCacheTTL } from '$lib/utils/localFilesCache';
 import { libraryStore } from '$lib/stores/library';
 import { recentlyAddedStore } from '$lib/stores/recentlyAdded';
@@ -20,6 +24,7 @@ export interface CacheTTLs {
 	search: number;
 	localFilesSidebar: number;
 	jellyfinSidebar: number;
+	plexSidebar: number;
 	playlistSources: number;
 	discoverQueuePollingInterval: number;
 	discoverQueueAutoGenerate: boolean;
@@ -34,6 +39,7 @@ const DEFAULTS: CacheTTLs = {
 	search: CACHE_TTL.SEARCH,
 	localFilesSidebar: CACHE_TTL.LOCAL_FILES_SIDEBAR,
 	jellyfinSidebar: CACHE_TTL.JELLYFIN_SIDEBAR,
+	plexSidebar: CACHE_TTL.PLEX_SIDEBAR,
 	playlistSources: CACHE_TTL.PLAYLIST_SOURCES,
 	discoverQueuePollingInterval: 4000,
 	discoverQueueAutoGenerate: true
@@ -52,6 +58,8 @@ function applyTTLs(ttls: CacheTTLs): void {
 	updateSearchCacheTTL(ttls.search);
 	updateLocalFilesSidebarCacheTTL(ttls.localFilesSidebar);
 	updateJellyfinSidebarCacheTTL(ttls.jellyfinSidebar);
+	updatePlexSidebarCacheTTL(ttls.plexSidebar);
+	updatePlexAlbumsListCacheTTL(ttls.plexSidebar);
 }
 
 export async function initCacheTTLs(): Promise<void> {
@@ -69,6 +77,7 @@ export async function initCacheTTLs(): Promise<void> {
 			search: (data.search as number) ?? DEFAULTS.search,
 			localFilesSidebar: (data.local_files_sidebar as number) ?? DEFAULTS.localFilesSidebar,
 			jellyfinSidebar: (data.jellyfin_sidebar as number) ?? DEFAULTS.jellyfinSidebar,
+			plexSidebar: (data.plex_sidebar as number) ?? DEFAULTS.plexSidebar,
 			playlistSources: (data.playlist_sources as number) ?? DEFAULTS.playlistSources,
 			discoverQueuePollingInterval:
 				(data.discover_queue_polling_interval as number) ?? DEFAULTS.discoverQueuePollingInterval,
@@ -77,7 +86,8 @@ export async function initCacheTTLs(): Promise<void> {
 		};
 		applyTTLs(resolved);
 	} catch {
-		// use defaults on fetch failure
+		resolved = { ...DEFAULTS };
+		applyTTLs(resolved);
 	}
 }
 

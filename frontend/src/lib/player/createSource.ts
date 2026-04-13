@@ -21,6 +21,9 @@ export function createPlaybackSource(type: SourceType, opts?: NativeSourceOption
 		case 'navidrome':
 			if (!opts) throw new Error('Navidrome playback source requires url and seekable options');
 			return new NativeAudioSource('navidrome', opts);
+		case 'plex':
+			if (!opts) throw new Error('Plex playback source requires url and seekable options');
+			return new NativeAudioSource('plex', opts);
 		default: {
 			const _exhaustive: never = type;
 			throw new Error(`Unknown source type: ${_exhaustive}`);

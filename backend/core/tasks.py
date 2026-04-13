@@ -346,13 +346,27 @@ async def warm_navidrome_mbid_cache() -> None:
         await asyncio.sleep(14400)  # Re-warm every 4 hours
 
 
+async def warm_plex_mbid_cache() -> None:
+    from core.dependencies import get_plex_library_service
+
+    await asyncio.sleep(15)
+    while True:
+        try:
+            service = get_plex_library_service()
+            await service.warm_mbid_cache()
+            await service.persist_if_dirty()
+        except Exception as e:
+            logger.error("Plex MBID cache warming failed: %s", e, exc_info=True)
+        await asyncio.sleep(14400)
+
+
 async def warm_artist_discovery_cache_periodically(
     artist_discovery_service: 'ArtistDiscoveryService',
     library_db: 'LibraryDB',
     interval: int = 14400,
     delay: float = 0.5,
 ) -> None:
-    await asyncio.sleep(300)  # Wait for Phase 1.5 sync to finish first
+    await asyncio.sleep(300)  # Allow initial library sync to complete before warming caches
 
     while True:
         try:
@@ -574,8 +588,6 @@ def start_request_status_sync_task(
     return task
 
 
-# --- Orphan cover demotion ---
-
 async def demote_orphaned_covers_periodically(
     cover_disk_cache: 'CoverDiskCache',
     library_db: 'LibraryDB',
@@ -618,8 +630,6 @@ def start_orphan_cover_demotion_task(
     TaskRegistry.get_instance().register("orphan-cover-demotion", task)
     return task
 
-
-# --- Store pruning (request history + ignored releases + youtube orphans) ---
 
 async def prune_stores_periodically(
     request_history: 'RequestHistoryStore',

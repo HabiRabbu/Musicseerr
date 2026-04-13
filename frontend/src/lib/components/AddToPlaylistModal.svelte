@@ -86,7 +86,7 @@
 				membership = await checkTrackMembership(trackIdentifiers);
 			}
 		} catch {
-			fetchError = "Couldn't load playlists";
+			fetchError = "Couldn't load your playlists.";
 		} finally {
 			loading = false;
 		}
@@ -122,14 +122,14 @@
 			const addedCount = trackData.length;
 			if (existingIndices.size > 0) {
 				showStatus(
-					`Added ${addedCount} new track${addedCount === 1 ? '' : 's'} to '${playlist.name}' (${existingIndices.size} already existed)`,
+					`Added ${addedCount} track${addedCount === 1 ? '' : 's'} to "${playlist.name}". ${existingIndices.size} ${existingIndices.size === 1 ? 'track was' : 'tracks were'} already in it.`,
 					'success'
 				);
 			} else {
-				showStatus(`Added to '${playlist.name}'`, 'success');
+				showStatus(`Added tracks to "${playlist.name}".`, 'success');
 			}
 		} catch {
-			showStatus("Couldn't add those tracks", 'error');
+			showStatus("Couldn't add those tracks.", 'error');
 		} finally {
 			addingSet.delete(playlist.id);
 		}
@@ -154,15 +154,16 @@
 					total_duration: detail.total_duration,
 					cover_urls: detail.cover_urls,
 					custom_cover_url: detail.custom_cover_url,
+					source_ref: detail.source_ref,
 					created_at: detail.created_at,
 					updated_at: detail.updated_at
 				},
 				...playlists
 			];
 			newName = '';
-			showStatus(`Created '${name}' and added tracks`, 'success');
+			showStatus(`Created "${name}" and added the tracks.`, 'success');
 		} catch {
-			showStatus("Couldn't create the playlist", 'error');
+			showStatus("Couldn't create that playlist.", 'error');
 		} finally {
 			creating = false;
 		}
@@ -181,14 +182,14 @@
 
 <dialog bind:this={dialogEl} class="modal">
 	<div class="modal-box max-w-md">
-		<h3 class="text-lg font-bold">Add to Playlist</h3>
+		<h3 class="text-lg font-bold">Add to playlist</h3>
 		<p class="text-sm text-base-content/60 mt-1">{trackLabel}</p>
 
 		<div class="flex items-center gap-2 mt-4">
 			<input
 				type="text"
 				class="input input-sm flex-1"
-				placeholder="New playlist name..."
+				placeholder="New playlist name"
 				bind:value={newName}
 				onkeydown={handleKeydown}
 				disabled={creating}
@@ -220,7 +221,7 @@
 				<span>{fetchError}</span>
 			</div>
 		{:else if playlists.length === 0}
-			<p class="text-center text-base-content/50 py-4">No playlists yet</p>
+			<p class="text-center text-base-content/50 py-4">You haven't created any playlists yet.</p>
 		{:else}
 			<div class="max-h-64 overflow-y-auto">
 				{#each playlists as playlist (playlist.id)}
@@ -237,12 +238,12 @@
 							<button
 								class="btn btn-ghost btn-sm btn-circle text-success"
 								disabled
-								aria-label="Already in playlist"
+								aria-label="Already added"
 							>
 								<Check class="h-4 w-4" />
 							</button>
 						{:else if addingSet.has(playlist.id)}
-							<button class="btn btn-ghost btn-sm btn-circle" disabled aria-label="Adding">
+							<button class="btn btn-ghost btn-sm btn-circle" disabled aria-label="Adding tracks">
 								<span class="loading loading-spinner loading-sm"></span>
 							</button>
 						{:else if someTracksExist(playlist.id)}
@@ -250,8 +251,10 @@
 								class="btn btn-ghost btn-sm btn-circle text-warning"
 								onclick={() => handleAdd(playlist)}
 								disabled={!canAdd}
-								aria-label="Add new tracks to {playlist.name}"
-								title="{existingCount(playlist.id)} of {trackCount} already in playlist"
+								aria-label="Add the remaining tracks to {playlist.name}"
+								title="{existingCount(
+									playlist.id
+								)} of {trackCount} tracks are already in this playlist"
 							>
 								<CircleCheck class="h-4 w-4" />
 							</button>
@@ -284,11 +287,11 @@
 				</div>
 			{/if}
 			<form method="dialog">
-				<button class="btn btn-ghost">Done</button>
+				<button class="btn btn-ghost">Close</button>
 			</form>
 		</div>
 	</div>
 	<form method="dialog" class="modal-backdrop">
-		<button>close</button>
+		<button>Close</button>
 	</form>
 </dialog>

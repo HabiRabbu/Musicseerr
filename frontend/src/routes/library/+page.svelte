@@ -109,15 +109,15 @@
 
 	const FREQ_LABELS: Record<string, string> = {
 		manual: 'Manual sync only',
-		'5min': 'Syncs automatically every 5 minutes',
-		'10min': 'Syncs automatically every 10 minutes',
-		'30min': 'Syncs automatically every 30 minutes',
-		'1hr': 'Syncs automatically every hour',
-		'6hr': 'Syncs automatically every 6 hours',
-		'12hr': 'Syncs automatically every 12 hours',
-		'24hr': 'Syncs automatically every 24 hours',
-		'3d': 'Syncs automatically every 3 days',
-		'7d': 'Syncs automatically every 7 days'
+		'5min': 'Auto-syncs every 5 minutes',
+		'10min': 'Auto-syncs every 10 minutes',
+		'30min': 'Auto-syncs every 30 minutes',
+		'1hr': 'Auto-syncs every hour',
+		'6hr': 'Auto-syncs every 6 hours',
+		'12hr': 'Auto-syncs every 12 hours',
+		'24hr': 'Auto-syncs every 24 hours',
+		'3d': 'Auto-syncs every 3 days',
+		'7d': 'Auto-syncs every 7 days'
 	};
 
 	onMount(() => {
@@ -133,7 +133,7 @@
 			const data = await api.global.get<{ sync_frequency: string }>('/api/v1/settings/lidarr');
 			syncFrequencyLabel = FREQ_LABELS[data.sync_frequency] ?? null;
 		} catch {
-			// ignore settings fetch failure
+			// non-critical; use default label
 		}
 	}
 
@@ -144,6 +144,7 @@
 			artists = data.artists;
 		} catch (e) {
 			if (isAbortError(e)) return;
+			console.error("Couldn't load artists:", e);
 		} finally {
 			loadingArtists = false;
 		}
@@ -165,6 +166,7 @@
 		} catch (e) {
 			if (isAbortError(e)) return;
 			if (id !== albumsFetchId) return;
+			console.error("Couldn't load albums:", e);
 			if (e instanceof ApiError) {
 				error = e.message;
 				errorCode = e.code;
@@ -181,6 +183,7 @@
 			stats = await api.get<LibraryStats>('/api/v1/library/stats');
 		} catch (e) {
 			if (isAbortError(e)) return;
+			console.error('Failed to load stats:', e);
 		} finally {
 			loadingStats = false;
 		}
@@ -208,6 +211,7 @@
 			syncStatus.checkStatus();
 			await loadLibrary();
 		} catch (e) {
+			console.error('Sync failed:', e);
 			if (e instanceof ApiError) {
 				error = e.message;
 				errorCode = e.code;
@@ -271,7 +275,7 @@
 			<div class="flex flex-col gap-1">
 				<span>{error}</span>
 				{#if isConnectionError}
-					<a href="/settings" class="link link-primary text-sm">Check Lidarr settings</a>
+					<a href="/settings" class="link link-primary text-sm">Open Lidarr settings</a>
 				{/if}
 			</div>
 			<div class="flex gap-2">
@@ -304,7 +308,7 @@
 				{#if loadingStats}
 					<span class="skeleton h-4 w-64 inline-block"></span>
 				{:else}
-					{stats.artist_count} artists, {stats.album_count} albums. Last synced {lastSyncText}
+					{stats.artist_count} artists, {stats.album_count} albums, last sync {lastSyncText}
 				{/if}
 			</p>
 			{#if syncFrequencyLabel}
@@ -338,7 +342,7 @@
 						stroke-linecap="round"
 						stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" /></svg
 					>
-					<span class="hidden sm:inline">Stop Sync</span>
+					<span class="hidden sm:inline">Stop sync</span>
 				</button>
 				{#if syncStatus.isDismissed}
 					<button
@@ -347,14 +351,14 @@
 						aria-label="Show sync progress"
 					>
 						<Eye class="h-4 w-4" />
-						<span class="hidden sm:inline">Show Progress</span>
+						<span class="hidden sm:inline">Show progress</span>
 					</button>
 				{/if}
 			{:else}
 				<button class="btn btn-sm btn-primary gap-1" onclick={syncLibrary} disabled={syncing}>
 					{#if syncing}
 						<Loader2 class="h-4 w-4 animate-spin" />
-						<span class="hidden sm:inline">Syncing...</span>
+						<span class="hidden sm:inline">Syncing</span>
 					{:else}
 						<RefreshCw class="h-4 w-4" />
 						<span class="hidden sm:inline">Sync Library</span>
@@ -378,7 +382,7 @@
 	{/if}
 
 	{#if !isSearching}
-		<section class="mb-8">
+		<section class="mb-12">
 			<h2 class="text-2xl font-semibold mb-4">Recently Added</h2>
 			{#if loadingRecentlyAdded}
 				<div class="flex gap-4 p-4 bg-base-200 rounded-box overflow-x-auto scrollbar-hide">
@@ -405,7 +409,7 @@
 				</div>
 			{:else}
 				<div class="p-8 bg-base-200 rounded-box text-center text-base-content/50">
-					<p>No recently added items</p>
+					<p>Nothing recently added yet.</p>
 				</div>
 			{/if}
 		</section>
@@ -551,9 +555,9 @@
 
 	{#if !isSearching && !loadingArtists && !loadingAlbums && artists.length === 0 && albums.length === 0}
 		<div class="flex flex-col items-center justify-center min-h-50 text-center mt-8">
-			<h2 class="text-2xl font-semibold mb-2">No items in library</h2>
+			<h2 class="text-2xl font-semibold mb-2">Your library is empty</h2>
 			<p class="text-base-content/70 mb-4">
-				Your Lidarr library is empty or hasn't been synced yet.
+				Your Lidarr library is empty, or it hasn't synced yet.
 			</p>
 			{#if syncStatus.isActive}
 				<div class="flex flex-col items-center gap-3 w-full max-w-md">

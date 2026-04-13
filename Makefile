@@ -30,19 +30,27 @@ NPM    ?= pnpm
 	backend-test-config-validation \
 	backend-test-coverart-audiodb \
 	backend-test-dedup-cancellation \
+	backend-test-discovery \
+	backend-test-deep-discovery \
 	backend-test-discovery-precache \
 	backend-test-exception-handling \
 	backend-test-home \
+	backend-test-now-playing \
 	backend-test-home-genre \
 	backend-test-infra-hardening \
+	backend-test-jellyfin \
 	backend-test-jellyfin-proxy \
 	backend-test-library-pagination \
 	backend-test-lidarr-url \
 	backend-test-local-files-fallback \
 	backend-test-monitoring-cache \
+	backend-test-navidrome \
 	backend-test-multidisc \
 	backend-test-mus15-status-race \
 	backend-test-performance \
+	backend-test-plex \
+	backend-test-plex-repository \
+	backend-test-plex-routes \
 	backend-test-playlist \
 	backend-test-request-queue \
 	backend-test-request-service \
@@ -52,23 +60,24 @@ NPM    ?= pnpm
 	backend-test-sync-generation \
 	backend-test-sync-resume \
 	backend-test-sync-watchdog \
+	backend-test-content-enrichment \
+	backend-test-peer-review-fixes \
 	test-audiodb-all test-mus14-all test-sync-all \
 	frontend-install frontend-build frontend-browser-install \
 	frontend-format-check frontend-check frontend-lint frontend-test frontend-test-server \
 	frontend-test-album-page \
 	frontend-test-audiodb-images \
+	frontend-test-jellyfin \
 	frontend-test-monitored-artists \
+	frontend-test-navidrome \
+	frontend-test-plex \
 	frontend-test-playlist-detail \
 	frontend-test-queuehelpers \
 	rebuild \
 	test tests check lint format ci
 
-# Help
-
 help: ## Show available targets
 	@grep -E '^[a-zA-Z0-9_.-]+:.*## ' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*## "}; {printf "%-34s %s\n", $$1, $$2}'
-
-# Backend: virtualenv
 
 $(BACKEND_VENV_DIR):
 	cd "$(BACKEND_DIR)" && test -f .virtualenv.pyz || curl -fsSLo .virtualenv.pyz https://bootstrap.pypa.io/virtualenv.pyz
@@ -81,17 +90,11 @@ $(BACKEND_VENV_STAMP): $(BACKEND_DIR)/requirements.txt $(BACKEND_DIR)/requiremen
 
 backend-venv: $(BACKEND_VENV_STAMP) ## Create or refresh the backend virtualenv
 
-# Backend: lint
-
 backend-lint: $(BACKEND_VENV_STAMP) ## Run backend Ruff checks
 	cd "$(ROOT_DIR)" && $(BACKEND_VENV_DIR)/bin/ruff check backend
 
-# Backend: full test suite
-
 backend-test: $(BACKEND_VENV_STAMP) ## Run all backend tests
 	$(PYTEST)
-
-# Backend: focused test targets
 
 backend-test-album-refresh: $(BACKEND_VENV_STAMP) ## Run album refresh endpoint tests
 	$(PYTEST) tests/routes/test_album_refresh.py tests/services/test_navidrome_cache_invalidation.py -v
@@ -135,11 +138,20 @@ backend-test-coverart-audiodb: $(BACKEND_VENV_STAMP) ## Run AudioDB coverart pro
 backend-test-dedup-cancellation: $(BACKEND_VENV_STAMP) ## Run deduplicator cancellation tests
 	$(PYTEST) tests/infrastructure/test_dedup_cancellation.py tests/infrastructure/test_disconnect.py -v
 
+backend-test-discovery: $(BACKEND_VENV_STAMP) ## Run discovery service and route tests
+	$(PYTEST) tests/services/test_discovery.py tests/routes/test_discovery_routes.py -v
+
 backend-test-discovery-precache: $(BACKEND_VENV_STAMP) ## Run artist discovery precache tests
 	$(PYTEST) tests/services/test_discovery_precache_progress.py tests/services/test_discovery_precache_lock.py tests/infrastructure/test_retry_non_breaking.py -v
 
 backend-test-exception-handling: $(BACKEND_VENV_STAMP) ## Run exception-handling regressions
 	$(PYTEST) tests/routes/test_scrobble_routes.py tests/routes/test_scrobble_settings_routes.py tests/test_error_leakage.py tests/test_background_task_logging.py
+
+backend-test-now-playing: $(BACKEND_VENV_STAMP) ## Run now-playing service and route tests
+	$(PYTEST) tests/services/test_now_playing.py tests/routes/test_now_playing_routes.py -v
+
+backend-test-deep-discovery: $(BACKEND_VENV_STAMP) ## Run deep discovery and analytics tests
+	$(PYTEST) tests/services/test_deep_discovery.py -v
 
 backend-test-home: $(BACKEND_VENV_STAMP) ## Run home page backend tests
 	$(PYTEST) tests/services/test_home_service.py tests/routes/test_home_routes.py
@@ -149,6 +161,9 @@ backend-test-home-genre: $(BACKEND_VENV_STAMP) ## Run home genre decoupling test
 
 backend-test-infra-hardening: $(BACKEND_VENV_STAMP) ## Run infrastructure hardening tests
 	$(PYTEST) tests/infrastructure/test_circuit_breaker_sync.py tests/infrastructure/test_disk_cache_periodic.py tests/infrastructure/test_retry_non_breaking.py
+
+backend-test-jellyfin: $(BACKEND_VENV_STAMP) ## Run all Jellyfin integration backend tests
+	$(PYTEST) tests/repositories/test_jellyfin_playback_url.py tests/services/test_jellyfin_playback_service.py tests/services/test_jellyfin_library_service.py tests/routes/test_stream_routes.py -v
 
 backend-test-jellyfin-proxy: $(BACKEND_VENV_STAMP) ## Run Jellyfin stream proxy tests
 	$(PYTEST) tests/routes/test_stream_routes.py -v
@@ -167,6 +182,9 @@ backend-test-monitoring-cache: $(BACKEND_VENV_STAMP) ## Run artist monitoring ca
 
 backend-test-multidisc: $(BACKEND_VENV_STAMP) ## Run multi-disc album tests
 	$(PYTEST) tests/services/test_album_utils.py tests/services/test_album_service.py tests/infrastructure/test_cache_layer_followups.py
+
+backend-test-navidrome: $(BACKEND_VENV_STAMP) ## Run all Navidrome integration backend tests
+	$(PYTEST) tests/repositories/test_navidrome_repository.py tests/services/test_navidrome_library_service.py tests/services/test_navidrome_playback_service.py tests/services/test_navidrome_cache_invalidation.py tests/services/test_navidrome_stream_proxy.py tests/routes/test_navidrome_routes.py -v
 
 backend-test-mus15-status-race: $(BACKEND_VENV_STAMP) ## Run MUS-15 status race condition tests
 	$(PYTEST) tests/test_mus15_status_race.py -v
@@ -189,6 +207,24 @@ backend-test-search-top-result: $(BACKEND_VENV_STAMP) ## Run search top result d
 backend-test-security: $(BACKEND_VENV_STAMP) ## Run security regression tests
 	$(PYTEST) tests/test_rate_limiter_middleware.py tests/test_url_validation.py tests/test_error_leakage.py
 
+backend-test-source-playlists: $(BACKEND_VENV_STAMP) ## Run source playlist import tests (Plex, Navidrome, Jellyfin)
+	$(PYTEST) tests/services/test_source_playlist_import.py -v
+
+backend-test-content-enrichment: $(BACKEND_VENV_STAMP) ## Run content enrichment tests (lyrics, album info, audio quality)
+	$(PYTEST) tests/services/test_content_enrichment.py -v
+
+backend-test-peer-review-fixes: $(BACKEND_VENV_STAMP) ## Run peer review fix regression tests
+	$(PYTEST) tests/test_peer_review_fixes.py -v
+
+backend-test-plex: $(BACKEND_VENV_STAMP) ## Run all Plex integration backend tests
+	$(PYTEST) tests/repositories/test_plex_repository.py tests/services/test_plex_playback_service.py tests/services/test_plex_library_service.py tests/routes/test_plex_routes.py tests/routes/test_plex_settings.py tests/routes/test_plex_auth.py tests/services/test_plex_integration_status.py tests/services/test_plex_settings_lifecycle.py -v
+
+backend-test-plex-repository: $(BACKEND_VENV_STAMP) ## Run Plex repository unit tests
+	$(PYTEST) tests/repositories/test_plex_repository.py -v
+
+backend-test-plex-routes: $(BACKEND_VENV_STAMP) ## Run Plex route and settings tests
+	$(PYTEST) tests/routes/test_plex_routes.py tests/routes/test_plex_settings.py tests/routes/test_plex_auth.py -v
+
 backend-test-sync-coordinator: $(BACKEND_VENV_STAMP) ## Run sync coordinator tests (cooldown, dedup)
 	$(PYTEST) tests/test_sync_coordinator.py -v
 
@@ -201,16 +237,12 @@ backend-test-sync-resume: $(BACKEND_VENV_STAMP) ## Run sync resume-on-failure te
 backend-test-sync-watchdog: $(BACKEND_VENV_STAMP) ## Run adaptive watchdog timeout tests
 	$(PYTEST) tests/test_sync_watchdog.py -v
 
-# Backend: aggregate test targets
-
 test-audiodb-all: backend-test-audiodb backend-test-audiodb-prewarm backend-test-audiodb-settings backend-test-coverart-audiodb backend-test-audiodb-phase8 backend-test-audiodb-phase9 frontend-test-audiodb-images ## Run every AudioDB test target
 
 test-mus14-all: backend-test-request-queue backend-test-artist-lock backend-test-request-service ## Run all MUS-14 request system tests
 	$(PYTEST) tests/repositories/test_lidarr_library_cache.py -v
 
-test-sync-all: backend-test-sync-watchdog backend-test-sync-resume backend-test-audiodb-parallel backend-test-sync-generation ## Run all sync robustness tests
-
-# Frontend: setup
+test-sync-all: backend-test-sync-watchdog backend-test-sync-resume backend-test-audiodb-parallel backend-test-sync-generation ## Run all sync reliability tests
 
 frontend-install: ## Install frontend npm dependencies
 	cd "$(FRONTEND_DIR)" && $(NPM) install
@@ -221,8 +253,6 @@ frontend-build: ## Run frontend production build
 frontend-browser-install: ## Install Playwright Chromium for browser tests
 	cd "$(FRONTEND_DIR)" && $(NPM) exec playwright install chromium
 
-# Frontend: lint & checks
-
 frontend-format-check: ## Run frontend formatting checks
 	cd "$(FRONTEND_DIR)" && $(NPM) run format:check
 
@@ -232,15 +262,11 @@ frontend-check: ## Run frontend type checks
 frontend-lint: ## Run frontend linting
 	cd "$(FRONTEND_DIR)" && $(NPM) run lint
 
-# Frontend: full test suite
-
 frontend-test: ## Run the frontend vitest suite (all projects, needs Playwright)
 	cd "$(FRONTEND_DIR)" && $(NPM) run test
 
 frontend-test-server: ## Run frontend server-project tests only (no Playwright)
 	cd "$(FRONTEND_DIR)" && $(NPM) exec vitest run --project server
-
-# Frontend: focused test targets
 
 frontend-test-album-page: ## Run the album page browser test
 	cd "$(FRONTEND_DIR)" && $(NPM) exec vitest run --project client src/routes/album/[id]/page.svelte.spec.ts
@@ -258,12 +284,17 @@ frontend-test-playlist-detail: ## Run playlist page browser tests
 frontend-test-queuehelpers: ## Run queue helper regressions
 	cd "$(FRONTEND_DIR)" && $(NPM) exec vitest run --project server src/lib/player/queueHelpers.spec.ts
 
-# Utilities
+frontend-test-plex: ## Run Plex frontend tests
+	cd "$(FRONTEND_DIR)" && $(NPM) exec vitest run --project server src/lib/player/plexPlaybackApi.spec.ts src/lib/player/launchPlexPlayback.spec.ts
+
+frontend-test-navidrome: ## Run Navidrome frontend tests
+	cd "$(FRONTEND_DIR)" && $(NPM) exec vitest run --project server src/lib/player/queueHelpers.spec.ts
+
+frontend-test-jellyfin: ## Run Jellyfin frontend tests
+	cd "$(FRONTEND_DIR)" && $(NPM) exec vitest run --project server src/lib/player/jellyfinPlaybackApi.spec.ts
 
 rebuild: ## Rebuild the application
 	cd "$(ROOT_DIR)" && ./manage.sh --rebuild
-
-# Aggregate targets
 
 test: backend-test frontend-test ## Run backend and frontend tests
 

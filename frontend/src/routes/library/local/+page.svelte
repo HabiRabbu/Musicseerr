@@ -59,6 +59,7 @@
 					recentAlbums: recentRes.status === 'fulfilled' ? recentRes.value : current.recentAlbums,
 					favoriteAlbums: [],
 					genres: [],
+					moods: [],
 					stats:
 						statsRes.status === 'fulfilled'
 							? (statsRes.value as unknown as Record<string, unknown>)
@@ -106,6 +107,7 @@
 					recentAlbums: c.data.recentAlbums,
 					favoriteAlbums: [],
 					genres: [],
+					moods: [],
 					stats: c.data.stats as unknown as Record<string, unknown> | null
 				} as SidebarData<LocalAlbumSummary>,
 				timestamp: c.timestamp
@@ -128,6 +130,9 @@
 		descValue: 'desc',
 		getDefaultSortOrder: (field) => (field === 'name' ? 'asc' : 'desc'),
 		supportsGenres: false,
+		supportsMoods: false,
+		supportsDecades: false,
+		supportsTags: false,
 		supportsFavorites: false,
 		supportsShuffle: true,
 		errorMessage: "Couldn't reach the local files service"
@@ -143,7 +148,7 @@
 	recentLabel="Recently Added"
 	contextMenuBackdrop
 	emptyTitle="No local files found"
-	emptyDescription="Make sure your music directory is mounted and configured in Settings."
+	emptyDescription="Check that your music folder is mounted and set up in Settings."
 >
 	{#snippet headerIcon()}
 		<Headphones class="h-8 w-8 text-accent" />

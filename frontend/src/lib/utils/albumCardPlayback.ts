@@ -11,9 +11,11 @@ import type {
 	JellyfinAlbumMatch,
 	LocalAlbumMatch,
 	NavidromeAlbumMatch,
+	PlexAlbumMatch,
 	JellyfinTrackInfo,
 	LocalTrackInfo,
-	NavidromeTrackInfo
+	NavidromeTrackInfo,
+	PlexTrackInfo
 } from '$lib/types';
 
 export interface AlbumCardMeta {
@@ -24,7 +26,7 @@ export interface AlbumCardMeta {
 	artistId?: string;
 }
 
-type SourceResult = { source: 'local' | 'navidrome' | 'jellyfin'; items: QueueItem[] };
+type SourceResult = { source: 'local' | 'navidrome' | 'jellyfin' | 'plex'; items: QueueItem[] };
 
 function buildLocalItems(tracks: LocalTrackInfo[], meta: AlbumCardMeta): QueueItem[] {
 	const cover = getCoverUrl(meta.coverUrl, meta.mbid);
@@ -77,10 +79,28 @@ function buildJellyfinItems(tracks: JellyfinTrackInfo[], meta: AlbumCardMeta): Q
 	}));
 }
 
-/**
- * Probes configured sources in parallel and returns QueueItems from the
- * highest-priority source that has tracks (local > navidrome > jellyfin).
- */
+function buildPlexItems(tracks: PlexTrackInfo[], meta: AlbumCardMeta): QueueItem[] {
+	const cover = getCoverUrl(meta.coverUrl, meta.mbid);
+	return tracks
+		.filter((t) => t.part_key)
+		.map((t) => {
+			return {
+				trackSourceId: t.part_key!,
+				trackName: t.title,
+				artistName: meta.artistName,
+				trackNumber: t.track_number,
+				albumId: meta.mbid,
+				albumName: meta.albumName,
+				coverUrl: cover,
+				sourceType: 'plex' as const,
+				artistId: meta.artistId,
+				streamUrl: API.stream.plex(t.part_key!),
+				format: normalizeCodec(t.codec),
+				plexRatingKey: t.plex_id
+			};
+		});
+}
+
 export async function fetchAlbumQueueItems(
 	meta: AlbumCardMeta,
 	signal?: AbortSignal
@@ -133,10 +153,33 @@ export async function fetchAlbumQueueItems(
 		);
 	}
 
+	if (status.plex) {
+		const plexUrl = new URL(API.plexLibrary.albumMatch(meta.mbid), window.location.origin);
+		if (meta.albumName) plexUrl.searchParams.set('name', meta.albumName);
+		if (meta.artistName) plexUrl.searchParams.set('artist', meta.artistName);
+		probes.push(
+			api.global
+				.get<PlexAlbumMatch>(plexUrl.toString(), { signal })
+				.then((data) => {
+					if (!data?.found || data.tracks.length === 0) return null;
+					return {
+						source: 'plex' as const,
+						items: buildPlexItems(data.tracks, meta)
+					};
+				})
+				.catch(() => null)
+		);
+	}
+
 	if (probes.length === 0) return [];
 
 	const results = await Promise.all(probes);
-	const priority: Array<'local' | 'navidrome' | 'jellyfin'> = ['local', 'navidrome', 'jellyfin'];
+	const priority: Array<'local' | 'navidrome' | 'jellyfin' | 'plex'> = [
+		'local',
+		'navidrome',
+		'jellyfin',
+		'plex'
+	];
 	for (const src of priority) {
 		const hit = results.find((r) => r?.source === src);
 		if (hit) return hit.items;

@@ -15,6 +15,16 @@
 		genres?: string[];
 		selectedGenre?: string;
 		onGenreChange?: (value: string) => void;
+		moods?: string[];
+		selectedMood?: string;
+		onMoodChange?: (value: string) => void;
+		moodLabel?: string;
+		decades?: string[];
+		selectedDecade?: string;
+		onDecadeChange?: (value: string) => void;
+		tags?: string[];
+		selectedTag?: string;
+		onTagChange?: (value: string) => void;
 		resultCount?: number | null;
 		loading?: boolean;
 	}
@@ -22,7 +32,7 @@
 	let {
 		searchQuery = $bindable(),
 		onSearchInput,
-		placeholder = 'Search albums...',
+		placeholder = 'Search albums',
 		ariaLabel = 'Search albums',
 		sortOptions,
 		sortBy,
@@ -33,6 +43,16 @@
 		genres,
 		selectedGenre,
 		onGenreChange,
+		moods,
+		selectedMood,
+		onMoodChange,
+		moodLabel = 'Mood',
+		decades,
+		selectedDecade,
+		onDecadeChange,
+		tags,
+		selectedTag,
+		onTagChange,
 		resultCount,
 		loading = false
 	}: Props = $props();
@@ -40,7 +60,12 @@
 	let isSearching = $derived(searchQuery.trim().length > 0);
 	let hasSortControls = $derived(sortOptions && sortOptions.length > 0);
 	let hasGenreFilter = $derived(genres && genres.length > 0);
-	let hasSecondRow = $derived(hasSortControls || hasGenreFilter || resultCount != null);
+	let hasMoodFilter = $derived(moods && moods.length > 0);
+	let hasDecadeChips = $derived(decades && decades.length > 0);
+	let hasTagChips = $derived(tags && tags.length > 0);
+	let hasSecondRow = $derived(
+		hasSortControls || hasGenreFilter || hasMoodFilter || resultCount != null
+	);
 	let isAscending = $derived(sortOrder === ascValue);
 
 	function clearSearch(): void {
@@ -56,6 +81,11 @@
 	function handleGenreSelect(e: Event): void {
 		const value = (e.target as HTMLSelectElement).value;
 		onGenreChange?.(value);
+	}
+
+	function handleMoodSelect(e: Event): void {
+		const value = (e.target as HTMLSelectElement).value;
+		onMoodChange?.(value);
 	}
 </script>
 
@@ -120,9 +150,23 @@
 					onchange={handleGenreSelect}
 					aria-label="Filter by genre"
 				>
-					<option value="">All Genres</option>
+					<option value="">All genres</option>
 					{#each genres! as genre (genre)}
 						<option value={genre} selected={selectedGenre === genre}>{genre}</option>
+					{/each}
+				</select>
+			{/if}
+
+			{#if hasMoodFilter}
+				<select
+					class="select select-sm rounded-full bg-base-200/50 border-base-content/10
+						focus:border-primary transition-all duration-200"
+					onchange={handleMoodSelect}
+					aria-label="Filter by {moodLabel.toLowerCase()}"
+				>
+					<option value="">All {moodLabel.toLowerCase()}s</option>
+					{#each moods! as mood (mood)}
+						<option value={mood} selected={selectedMood === mood}>{mood}</option>
 					{/each}
 				</select>
 			{/if}
@@ -130,6 +174,56 @@
 			{#if resultCount != null && !loading}
 				<span class="text-sm text-base-content/50">{resultCount} results</span>
 			{/if}
+		</div>
+	{/if}
+
+	{#if hasDecadeChips}
+		<div class="flex flex-wrap gap-2 mt-3" role="group" aria-label="Filter by decade">
+			<button
+				type="button"
+				class="btn btn-xs rounded-full {selectedDecade === ''
+					? 'btn-primary'
+					: 'btn-ghost bg-base-200/50'}"
+				onclick={() => onDecadeChange?.('')}
+			>
+				All
+			</button>
+			{#each decades! as decade (decade)}
+				<button
+					type="button"
+					class="btn btn-xs rounded-full {selectedDecade === decade
+						? 'btn-primary'
+						: 'btn-ghost bg-base-200/50'}"
+					onclick={() => onDecadeChange?.(decade)}
+				>
+					{decade}
+				</button>
+			{/each}
+		</div>
+	{/if}
+
+	{#if hasTagChips}
+		<div class="flex flex-wrap gap-2 mt-3" role="group" aria-label="Filter by tag">
+			<button
+				type="button"
+				class="btn btn-xs rounded-full {selectedTag === ''
+					? 'btn-primary'
+					: 'btn-ghost bg-base-200/50'}"
+				onclick={() => onTagChange?.('')}
+			>
+				All tags
+			</button>
+			{#each tags! as tag (tag)}
+				<button
+					type="button"
+					class="btn btn-xs rounded-full {selectedTag === tag
+						? 'btn-primary'
+						: 'btn-ghost bg-base-200/50'}"
+					onclick={() => onTagChange?.(tag)}
+				>
+					{tag}
+				</button>
+			{/each}
 		</div>
 	{/if}
 </div>

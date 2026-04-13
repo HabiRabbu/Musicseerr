@@ -7,7 +7,8 @@
 		YouTubeQuotaStatus,
 		JellyfinAlbumMatch,
 		LocalAlbumMatch,
-		NavidromeAlbumMatch
+		NavidromeAlbumMatch,
+		PlexAlbumMatch
 	} from '$lib/types';
 	import type { SourceCallbacks } from './albumPageState.svelte';
 	import AlbumYouTubeBar from '$lib/components/AlbumYouTubeBar.svelte';
@@ -15,6 +16,7 @@
 	import JellyfinIcon from '$lib/components/JellyfinIcon.svelte';
 	import LocalFilesIcon from '$lib/components/LocalFilesIcon.svelte';
 	import NavidromeIcon from '$lib/components/NavidromeIcon.svelte';
+	import PlexIcon from '$lib/components/PlexIcon.svelte';
 
 	interface Props {
 		album: AlbumBasicInfo;
@@ -24,17 +26,21 @@
 		jellyfinMatch: JellyfinAlbumMatch | null;
 		localMatch: LocalAlbumMatch | null;
 		navidromeMatch: NavidromeAlbumMatch | null;
+		plexMatch: PlexAlbumMatch | null;
 		loadingJellyfin: boolean;
 		loadingLocal: boolean;
 		loadingNavidrome: boolean;
+		loadingPlex: boolean;
 		youtubeEnabled: boolean;
 		youtubeApiConfigured: boolean;
 		jellyfinEnabled: boolean;
 		localfilesEnabled: boolean;
 		navidromeEnabled: boolean;
+		plexEnabled: boolean;
 		jellyfinCallbacks: SourceCallbacks;
 		localCallbacks: SourceCallbacks;
 		navidromeCallbacks: SourceCallbacks;
+		plexCallbacks: SourceCallbacks;
 		onTrackLinksUpdate: (links: YouTubeTrackLink[]) => void;
 		onAlbumLinkUpdate: (link: YouTubeLink) => void;
 		onQuotaUpdate: (q: YouTubeQuotaStatus) => void;
@@ -48,17 +54,21 @@
 		jellyfinMatch,
 		localMatch,
 		navidromeMatch,
+		plexMatch,
 		loadingJellyfin,
 		loadingLocal,
 		loadingNavidrome,
+		loadingPlex,
 		youtubeEnabled,
 		youtubeApiConfigured,
 		jellyfinEnabled,
 		localfilesEnabled,
 		navidromeEnabled,
+		plexEnabled,
 		jellyfinCallbacks,
 		localCallbacks,
 		navidromeCallbacks,
+		plexCallbacks,
 		onTrackLinksUpdate,
 		onAlbumLinkUpdate,
 		onQuotaUpdate
@@ -144,6 +154,28 @@
 		>
 			{#snippet icon()}
 				<NavidromeIcon class="h-5 w-5" />
+			{/snippet}
+		</AlbumSourceBar>
+	{/if}
+{/if}
+
+{#if plexEnabled}
+	{#if loadingPlex}
+		<div class="skeleton h-14 w-full rounded-box"></div>
+	{:else if plexMatch?.found}
+		<AlbumSourceBar
+			sourceLabel="Plex"
+			sourceColor="rgb(var(--brand-plex))"
+			trackCount={plexMatch.tracks.length}
+			totalTracks={tracksInfo.tracks.length}
+			onPlayAll={plexCallbacks.onPlayAll}
+			onShuffle={plexCallbacks.onShuffle}
+			onAddAllToQueue={plexCallbacks.onAddAllToQueue}
+			onPlayAllNext={plexCallbacks.onPlayAllNext}
+			onAddAllToPlaylist={plexCallbacks.onAddAllToPlaylist}
+		>
+			{#snippet icon()}
+				<PlexIcon class="h-5 w-5" />
 			{/snippet}
 		</AlbumSourceBar>
 	{/if}

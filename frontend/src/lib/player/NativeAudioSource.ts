@@ -4,7 +4,7 @@ import { getAudioElement } from './audioElement';
 const LOAD_TIMEOUT_MS = 15_000;
 const STALL_TIMEOUT_MS = 15_000;
 
-type NativeSourceType = 'jellyfin' | 'local' | 'navidrome';
+type NativeSourceType = 'jellyfin' | 'local' | 'navidrome' | 'plex';
 
 export class NativeAudioSource implements PlaybackSource {
 	readonly type: NativeSourceType;

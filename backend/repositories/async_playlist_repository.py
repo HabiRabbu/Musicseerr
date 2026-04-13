@@ -19,11 +19,17 @@ class AsyncPlaylistRepository:
     def __init__(self, repo: PlaylistRepository):
         self._repo = repo
 
-    async def create_playlist(self, name: str) -> PlaylistRecord:
-        return await asyncio.to_thread(self._repo.create_playlist, name)
+    async def create_playlist(self, name: str, source_ref: str | None = None) -> PlaylistRecord:
+        return await asyncio.to_thread(self._repo.create_playlist, name, source_ref)
 
     async def get_playlist(self, playlist_id: str) -> Optional[PlaylistRecord]:
         return await asyncio.to_thread(self._repo.get_playlist, playlist_id)
+
+    async def get_by_source_ref(self, source_ref: str) -> Optional[PlaylistRecord]:
+        return await asyncio.to_thread(self._repo.get_by_source_ref, source_ref)
+
+    async def get_imported_source_ids(self, prefix: str) -> set[str]:
+        return await asyncio.to_thread(self._repo.get_imported_source_ids, prefix)
 
     async def get_all_playlists(self) -> list[PlaylistSummaryRecord]:
         return await asyncio.to_thread(self._repo.get_all_playlists)
@@ -69,10 +75,11 @@ class AsyncPlaylistRepository:
         source_type: Optional[str] = None,
         available_sources: Optional[list[str]] = None,
         track_source_id: Optional[str] = None,
+        plex_rating_key: Optional[str] = _UNSET,
     ) -> Optional[PlaylistTrackRecord]:
         return await asyncio.to_thread(
             self._repo.update_track_source, playlist_id, track_id,
-            source_type, available_sources, track_source_id,
+            source_type, available_sources, track_source_id, plex_rating_key,
         )
 
     async def batch_update_available_sources(

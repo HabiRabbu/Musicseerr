@@ -1,6 +1,6 @@
 from typing import Any, Protocol
 
-from repositories.jellyfin_models import JellyfinItem, JellyfinUser, PlaybackUrlResult
+from repositories.jellyfin_models import JellyfinItem, JellyfinLyrics, JellyfinSession, JellyfinUser, PlaybackUrlResult
 from repositories.navidrome_models import StreamProxyResult
 
 
@@ -57,6 +57,9 @@ class JellyfinRepositoryProtocol(Protocol):
     async def get_genres(self, user_id: str | None = None, ttl_seconds: int = 3600) -> list[str]:
         ...
 
+    async def get_filter_facets(self, user_id: str | None = None, ttl_seconds: int = 3600) -> dict[str, Any]:
+        ...
+
     async def get_artists_by_genre(
         self, genre: str, user_id: str | None = None, limit: int = 50
     ) -> list[JellyfinItem]:
@@ -75,6 +78,9 @@ class JellyfinRepositoryProtocol(Protocol):
         sort_by: str = "SortName",
         sort_order: str = "Ascending",
         genre: str | None = None,
+        year: int | None = None,
+        tags: str | None = None,
+        studios: str | None = None,
     ) -> tuple[list[JellyfinItem], int]:
         ...
 
@@ -139,4 +145,45 @@ class JellyfinRepositoryProtocol(Protocol):
     async def proxy_get_stream(
         self, item_id: str, range_header: str | None = None
     ) -> StreamProxyResult:
+        ...
+
+    async def get_instant_mix(
+        self, item_id: str, limit: int = 50
+    ) -> list[JellyfinItem]:
+        ...
+
+    async def get_instant_mix_by_artist(
+        self, artist_id: str, limit: int = 50
+    ) -> list[JellyfinItem]:
+        ...
+
+    async def get_instant_mix_by_genre(
+        self, genre_name: str, limit: int = 50
+    ) -> list[JellyfinItem]:
+        ...
+
+    async def get_sessions(self) -> list[JellyfinSession]:
+        ...
+
+    async def get_similar_items(
+        self, item_id: str, limit: int = 10
+    ) -> list[JellyfinItem]:
+        ...
+
+    async def get_lyrics(self, item_id: str) -> JellyfinLyrics | None:
+        ...
+
+    async def get_playlists(
+        self, user_id: str | None = None, limit: int = 50
+    ) -> list[JellyfinItem]:
+        ...
+
+    async def get_playlist(
+        self, playlist_id: str, user_id: str | None = None
+    ) -> JellyfinItem | None:
+        ...
+
+    async def get_playlist_items(
+        self, playlist_id: str, user_id: str | None = None, limit: int = 1000
+    ) -> list[JellyfinItem]:
         ...

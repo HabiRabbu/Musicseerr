@@ -6,6 +6,7 @@ interface IntegrationStatus {
 	lidarr: boolean;
 	jellyfin: boolean;
 	navidrome: boolean;
+	plex: boolean;
 	listenbrainz: boolean;
 	youtube: boolean;
 	youtube_api: boolean;
@@ -19,6 +20,7 @@ function createIntegrationStore() {
 		lidarr: false,
 		jellyfin: false,
 		navidrome: false,
+		plex: false,
 		listenbrainz: false,
 		youtube: false,
 		youtube_api: false,
@@ -41,6 +43,7 @@ function createIntegrationStore() {
 				lidarr: false,
 				jellyfin: false,
 				navidrome: false,
+				plex: false,
 				listenbrainz: false,
 				youtube: false,
 				youtube_api: false,

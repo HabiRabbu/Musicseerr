@@ -16,6 +16,8 @@ from api.v1.schemas.settings import (
     LidarrRootFolderSummary,
     NAVIDROME_PASSWORD_MASK,
     LASTFM_SECRET_MASK,
+    PlexConnectionSettings,
+    PLEX_TOKEN_MASK,
 )
 from core.config import Settings, get_settings
 from core.exceptions import ExternalServiceError
@@ -25,6 +27,7 @@ from infrastructure.cache.cache_keys import (
     JELLYFIN_PREFIX,
     LOCAL_FILES_PREFIX,
     SOURCE_RESOLUTION_PREFIX,
+    PLEX_PREFIX,
     musicbrainz_prefixes,
     listenbrainz_prefixes,
     lastfm_prefixes,
@@ -51,6 +54,12 @@ class ListenBrainzVerifyResult(msgspec.Struct):
 class NavidromeVerifyResult(msgspec.Struct):
     valid: bool
     message: str
+
+
+class PlexVerifyResult(msgspec.Struct):
+    valid: bool
+    message: str
+    libraries: list[tuple[str, str]] = []
 
 
 class YouTubeVerifyResult(msgspec.Struct):
@@ -135,11 +144,11 @@ class SettingsService:
             detail = str(e)
             logger.warning(f"Lidarr connection test failed: {detail}")
             if "No address associated with hostname" in detail or "Name or service not known" in detail:
-                hint = "We could not resolve that hostname. Make sure the container can reach it."
+                hint = "DNS resolution failed. Check that the hostname is reachable from inside the container"
             elif "Connection refused" in detail:
-                hint = "Connection refused. Check the port and make sure Lidarr is running."
+                hint = "Connection refused. Check the port and make sure Lidarr is running"
             elif "timed out" in detail.lower() or "timeout" in detail.lower():
-                hint = "Connection timed out. Check your network or firewall settings."
+                hint = "Connection timed out. Check your network and firewall settings"
             else:
                 hint = detail
             return LidarrVerifyResponse(
@@ -149,7 +158,7 @@ class SettingsService:
                 metadata_profiles=[],
                 root_folders=[]
             )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.exception(f"Failed to verify Lidarr connection: {e}")
             return LidarrVerifyResponse(
                 success=False,
@@ -187,7 +196,7 @@ class SettingsService:
                 users = [JellyfinUser(id=u.id, name=u.name) for u in jf_users]
             
             return JellyfinVerifyResult(success=success, message=message, users=users)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.exception(f"Failed to verify Jellyfin connection: {e}")
             return JellyfinVerifyResult(
                 success=False,
@@ -216,7 +225,7 @@ class SettingsService:
                 valid, message = await temp_repo.validate_username(settings.username)
 
             return ListenBrainzVerifyResult(valid=valid, message=message)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.exception(f"Failed to verify ListenBrainz connection: {e}")
             return ListenBrainzVerifyResult(
                 valid=False,
@@ -229,6 +238,7 @@ class SettingsService:
         total += await self._cache.clear_prefix(ALBUM_INFO_PREFIX)
         for prefix in musicbrainz_prefixes():
             total += await self._cache.clear_prefix(prefix)
+        logger.info(f"Cleared {total} cache entries for preference change")
         return total
 
     async def clear_home_cache(self) -> int:
@@ -240,17 +250,18 @@ class SettingsService:
             total += await self._cache.clear_prefix(prefix)
         for prefix in lastfm_prefixes():
             total += await self._cache.clear_prefix(prefix)
+        logger.info(f"Cleared {total} home/discover/integration cache entries")
         return total
 
     async def clear_local_files_cache(self) -> int:
         cleared = await self._cache.clear_prefix(LOCAL_FILES_PREFIX)
+        logger.info(f"Cleared {cleared} local files cache entries")
         return cleared
 
     async def clear_source_resolution_cache(self) -> int:
         cleared = await self._cache.clear_prefix(SOURCE_RESOLUTION_PREFIX)
+        logger.info(f"Cleared {cleared} source-resolution cache entries")
         return cleared
-
-    # Lifecycle methods, one for each integration settings change.
 
     async def on_jellyfin_settings_changed(self) -> None:
         """Full cache/state reset when Jellyfin settings change."""
@@ -270,6 +281,7 @@ class SettingsService:
         await mbid_store.clear_jellyfin_mbid_index()
         await self.clear_home_cache()
         await self.clear_source_resolution_cache()
+        logger.info("Jellyfin settings change: all caches/singletons reset")
 
     async def on_navidrome_settings_changed(self, enabled: bool = False) -> None:
         """Full cache/state reset when Navidrome settings change."""
@@ -302,6 +314,7 @@ class SettingsService:
                     registry.register("navidrome-mbid-warmup", _nav_task)
                 except RuntimeError:
                     pass
+        logger.info("Navidrome settings change: all caches/singletons reset")
 
     async def on_lastfm_settings_changed(self) -> None:
         """Full cache/state reset when Last.fm settings change."""
@@ -315,6 +328,7 @@ class SettingsService:
         get_lastfm_auth_service.cache_clear()
         clear_lastfm_dependent_caches()
         await self.clear_home_cache()
+        logger.info("Last.fm settings change: all caches/singletons reset")
 
     async def on_listenbrainz_settings_changed(self) -> None:
         """Full cache/state reset when ListenBrainz settings change."""
@@ -323,22 +337,26 @@ class SettingsService:
         ListenBrainzRepository.reset_circuit_breaker()
         clear_listenbrainz_dependent_caches()
         await self.clear_home_cache()
+        logger.info("ListenBrainz settings change: all caches/singletons reset")
 
     async def on_youtube_settings_changed(self) -> None:
         """Reset YouTube singleton and clear home caches when settings change."""
         from core.dependencies import get_youtube_repo
         get_youtube_repo.cache_clear()
         await self.clear_home_cache()
+        logger.info("YouTube settings change: singleton reset, home caches cleared")
 
     async def on_coverart_settings_changed(self) -> None:
         """Reset coverart singleton when settings change."""
         from core.dependencies import get_coverart_repository
         get_coverart_repository.cache_clear()
+        logger.info("Coverart settings change: singleton reset")
 
     async def on_local_files_settings_changed(self) -> None:
         """Full cache reset when local files settings change."""
         await self.clear_local_files_cache()
         await self.clear_source_resolution_cache()
+        logger.info("Local files settings change: caches reset")
 
     async def on_lidarr_settings_changed(self) -> None:
         """Full cache reset when Lidarr settings change."""
@@ -356,6 +374,8 @@ class SettingsService:
             home_service.clear_genre_disk_cache()
         except Exception:  # noqa: BLE001
             logger.debug("Genre disk cache cleanup skipped (home service unavailable)")
+
+        logger.info("Lidarr settings change: home, lidarr, library and genre caches reset")
 
     def _create_lidarr_repo(self) -> "LidarrRepository":
         from repositories.lidarr import LidarrRepository
@@ -498,9 +518,8 @@ class SettingsService:
                 f"Failed to update Lidarr metadata profile: {e}"
             )
 
+        logger.info(f"Updated Lidarr metadata profile '{result.get('name')}' (ID: {resolved_id})")
         return self._lidarr_profile_to_preferences(result)
-
-    # Verification methods for Navidrome, YouTube, and Last.fm.
 
     async def verify_navidrome(
         self, settings: NavidromeConnectionSettings
@@ -539,7 +558,7 @@ class SettingsService:
                 valid=False,
                 message="Navidrome didn't respond. Check the URL and credentials.",
             )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.exception("Failed to verify Navidrome connection: %s", e)
             return NavidromeVerifyResult(
                 valid=False,
@@ -561,7 +580,7 @@ class SettingsService:
             )
             valid, message = await temp_repo.verify_api_key(settings.api_key.strip())
             return YouTubeVerifyResult(valid=valid, message=message)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.exception("Failed to verify YouTube connection: %s", e)
             return YouTubeVerifyResult(
                 valid=False,
@@ -607,8 +626,102 @@ class SettingsService:
                 return LastFmVerifyResult(valid=True, message=session_message)
 
             return LastFmVerifyResult(valid=valid, message=message)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.exception("Failed to verify Last.fm connection: %s", e)
             return LastFmVerifyResult(
                 valid=False, message="Couldn't finish the Last.fm connection test"
             )
+
+    async def verify_plex(
+        self, settings: PlexConnectionSettings
+    ) -> PlexVerifyResult:
+        try:
+            from infrastructure.validators import validate_service_url
+            validate_service_url(settings.plex_url, label="Plex URL")
+
+            from repositories.plex_repository import PlexRepository
+
+            PlexRepository.reset_circuit_breaker()
+
+            app_settings = get_settings()
+            http_client = get_http_client(app_settings)
+            temp_cache = InMemoryCache(max_entries=100)
+
+            token = settings.plex_token
+            if token == PLEX_TOKEN_MASK:
+                raw = self._preferences_service.get_plex_connection_raw()
+                token = raw.plex_token
+
+            client_id = self._preferences_service.get_setting("plex_client_id") or ""
+
+            temp_repo = PlexRepository(http_client=http_client, cache=temp_cache)
+            temp_repo.configure(
+                url=settings.plex_url,
+                token=token,
+                client_id=client_id,
+            )
+
+            ok, message = await temp_repo.validate_connection()
+            libs: list[tuple[str, str]] = []
+            if ok:
+                try:
+                    sections = await temp_repo.get_music_libraries()
+                    libs = [(s.key, s.title) for s in sections]
+                except Exception:  # noqa: BLE001
+                    logger.warning("Plex verify succeeded but library fetch failed")
+            return PlexVerifyResult(valid=ok, message=message, libraries=libs)
+        except Exception as e:  # noqa: BLE001
+            logger.exception("Failed to verify Plex connection: %s", e)
+            return PlexVerifyResult(
+                valid=False,
+                message="Couldn't finish the Plex connection test",
+            )
+
+    async def on_plex_settings_changed(self, enabled: bool = False) -> None:
+        """Full cache/state reset when Plex settings change."""
+        from repositories.plex_repository import PlexRepository
+        from core.dependencies import (
+            get_plex_repository, get_plex_library_service,
+            get_plex_playback_service, get_home_service,
+            get_home_charts_service, get_mbid_store,
+        )
+        PlexRepository.reset_circuit_breaker()
+        get_plex_repository.cache_clear()
+        get_plex_library_service.cache_clear()
+        get_plex_playback_service.cache_clear()
+        get_home_service.cache_clear()
+        get_home_charts_service.cache_clear()
+        mbid_store = get_mbid_store()
+        await mbid_store.clear_plex_mbid_indexes()
+        new_repo = get_plex_repository()
+        await new_repo.clear_cache()
+        await self.clear_home_cache()
+        await self.clear_source_resolution_cache()
+        if enabled:
+            import asyncio
+            from core.tasks import warm_plex_mbid_cache
+            from core.task_registry import TaskRegistry
+            registry = TaskRegistry.get_instance()
+            if not registry.is_running("plex-mbid-warmup"):
+                _plex_task = asyncio.create_task(warm_plex_mbid_cache())
+                try:
+                    registry.register("plex-mbid-warmup", _plex_task)
+                except RuntimeError:
+                    pass
+        logger.info("Plex settings change: all caches/singletons reset")
+
+    async def get_plex_libraries(self) -> list[tuple[str, str]]:
+        raw = self._preferences_service.get_plex_connection_raw()
+        if not raw.plex_url or not raw.plex_token:
+            raise ValueError("Plex is not configured")
+
+        from repositories.plex_repository import PlexRepository
+
+        app_settings = get_settings()
+        http_client = get_http_client(app_settings)
+        temp_cache = InMemoryCache(max_entries=100)
+        client_id = self._preferences_service.get_setting("plex_client_id") or ""
+        temp_repo = PlexRepository(http_client=http_client, cache=temp_cache)
+        temp_repo.configure(url=raw.plex_url, token=raw.plex_token, client_id=client_id)
+        sections = await temp_repo.get_music_libraries()
+        return [(s.key, s.title) for s in sections]

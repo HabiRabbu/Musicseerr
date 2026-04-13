@@ -20,7 +20,7 @@ from api.v1.schemas.playlists import (
     UpdatePlaylistRequest,
     UpdateTrackRequest,
 )
-from core.dependencies import JellyfinLibraryServiceDep, LocalFilesServiceDep, NavidromeLibraryServiceDep, PlaylistServiceDep
+from core.dependencies import JellyfinLibraryServiceDep, LocalFilesServiceDep, NavidromeLibraryServiceDep, PlexLibraryServiceDep, PlaylistServiceDep
 from core.exceptions import PlaylistNotFoundError
 from infrastructure.msgspec_fastapi import MsgSpecBody, MsgSpecRoute
 
@@ -71,6 +71,7 @@ def _track_to_response(t) -> PlaylistTrackResponse:
         disc_number=t.disc_number,
         duration=t.duration,
         created_at=t.created_at,
+        plex_rating_key=getattr(t, "plex_rating_key", None),
     )
 
 
@@ -88,6 +89,7 @@ async def list_playlists(
                 total_duration=s.total_duration,
                 cover_urls=[_normalize_cover_url(u) for u in s.cover_urls] if s.cover_urls else [],
                 custom_cover_url=_custom_cover_url(s.id, s.cover_image_path),
+                source_ref=s.source_ref,
                 created_at=s.created_at,
                 updated_at=s.updated_at,
             )
@@ -116,6 +118,7 @@ async def create_playlist(
         id=playlist.id,
         name=playlist.name,
         custom_cover_url=_custom_cover_url(playlist.id, playlist.cover_image_path),
+        source_ref=playlist.source_ref,
         tracks=[],
         track_count=0,
         total_duration=None,
@@ -138,6 +141,7 @@ async def get_playlist(
         name=playlist.name,
         cover_urls=cover_urls,
         custom_cover_url=_custom_cover_url(playlist.id, playlist.cover_image_path),
+        source_ref=playlist.source_ref,
         tracks=track_responses,
         track_count=len(tracks),
         total_duration=total_duration or None,
@@ -161,6 +165,7 @@ async def update_playlist(
         name=playlist.name,
         cover_urls=cover_urls,
         custom_cover_url=_custom_cover_url(playlist.id, playlist.cover_image_path),
+        source_ref=playlist.source_ref,
         tracks=track_responses,
         track_count=len(tracks),
         total_duration=total_duration or None,
@@ -203,6 +208,7 @@ async def add_tracks(
             "track_number": t.track_number,
             "disc_number": t.disc_number,
             "duration": int(t.duration) if t.duration is not None else None,
+            "plex_rating_key": t.plex_rating_key,
         }
         for t in body.tracks
     ]
@@ -266,6 +272,7 @@ async def update_track(
     jf_service: JellyfinLibraryServiceDep,
     local_service: LocalFilesServiceDep,
     nd_service: NavidromeLibraryServiceDep,
+    plex_service: PlexLibraryServiceDep,
     body: UpdateTrackRequest = MsgSpecBody(UpdateTrackRequest),
 ) -> PlaylistTrackResponse:
     result = await service.update_track_source(
@@ -275,6 +282,7 @@ async def update_track(
         jf_service=jf_service,
         local_service=local_service,
         nd_service=nd_service,
+        plex_service=plex_service,
     )
     return _track_to_response(result)
 
@@ -289,9 +297,11 @@ async def resolve_sources(
     jf_service: JellyfinLibraryServiceDep,
     local_service: LocalFilesServiceDep,
     nd_service: NavidromeLibraryServiceDep,
+    plex_service: PlexLibraryServiceDep,
 ) -> ResolveSourcesResponse:
     sources = await service.resolve_track_sources(
-        playlist_id, jf_service=jf_service, local_service=local_service, nd_service=nd_service,
+        playlist_id, jf_service=jf_service, local_service=local_service,
+        nd_service=nd_service, plex_service=plex_service,
     )
     return ResolveSourcesResponse(sources=sources)
 
@@ -302,7 +312,7 @@ async def upload_cover(
     service: PlaylistServiceDep,
     cover_image: UploadFile = File(...),
 ) -> CoverUploadResponse:
-    max_size = 2 * 1024 * 1024  # 2 MB
+    max_size = 2 * 1024 * 1024
     chunk_size = 8192
     chunks: list[bytes] = []
     total = 0

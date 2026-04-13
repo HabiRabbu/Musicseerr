@@ -14,9 +14,13 @@ from infrastructure.constants import BROWSER_AUDIO_DEVICE_PROFILE
 from infrastructure.resilience.retry import with_retry, CircuitBreaker
 from repositories.jellyfin_models import (
     JellyfinItem,
+    JellyfinLyrics,
+    JellyfinSession,
     JellyfinUser,
     PlaybackUrlResult,
     parse_item,
+    parse_jellyfin_sessions,
+    parse_lyrics as parse_jellyfin_lyrics,
     parse_user,
 )
 from repositories.navidrome_models import StreamProxyResult
@@ -249,7 +253,7 @@ class JellyfinRepository:
             return items
         except ExternalServiceError:
             raise
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.error(f"{error_msg}: {e}")
             if raise_on_error:
                 raise ExternalServiceError(f"{error_msg}: {e}") from e
@@ -352,6 +356,30 @@ class JellyfinRepository:
             _record_degradation(f"Failed to get genres: {e}")
             return []
 
+    async def get_filter_facets(self, user_id: str | None = None, ttl_seconds: int = 3600) -> dict[str, Any]:
+        uid = user_id or self._user_id
+        cache_key = f"{JELLYFIN_PREFIX}filter_facets:{uid}"
+        cached = await self._cache.get(cache_key)
+        if cached:
+            return cached
+        params: dict[str, Any] = {"includeItemTypes": "MusicAlbum"}
+        if uid:
+            params["userId"] = uid
+        try:
+            result = await self._get("/Items/Filters", params=params)
+            if not result:
+                return {"years": [], "tags": [], "studios": []}
+            years = sorted(result.get("Years", []), reverse=True)
+            tags = sorted(result.get("Tags", []))
+            studios = sorted(s for s in result.get("Studios", []) if s)
+            facets = {"years": years, "tags": tags, "studios": studios}
+            await self._cache.set(cache_key, facets, ttl_seconds=ttl_seconds)
+            return facets
+        except Exception as e:  # noqa: BLE001
+            logger.error("Failed to get filter facets: %s", e)
+            _record_degradation(f"Failed to get filter facets: {e}")
+            return {"years": [], "tags": [], "studios": []}
+
     async def get_artists_by_genre(self, genre: str, user_id: str | None = None, limit: int = 50) -> list[JellyfinItem]:
         uid = user_id or self._user_id
         params: dict[str, Any] = {"genres": genre, "limit": limit, "enableUserData": "true"}
@@ -378,6 +406,36 @@ class JellyfinRepository:
         
         return url
 
+    async def proxy_image(self, item_id: str, size: int = 500) -> tuple[bytes, str]:
+        if not self._base_url or not self._api_key:
+            raise ExternalServiceError("Jellyfin not configured")
+
+        url = f"{self._base_url}/Items/{item_id}/Images/Primary"
+        params: dict[str, Any] = {
+            "maxWidth": size,
+            "maxHeight": size,
+            "quality": 90,
+        }
+        try:
+            response = await self._client.get(
+                url,
+                params=params,
+                headers={"X-Emby-Token": self._api_key},
+                timeout=15.0,
+            )
+        except httpx.TimeoutException:
+            raise ExternalServiceError("Jellyfin image request timed out")
+        except httpx.HTTPError:
+            raise ExternalServiceError("Jellyfin image request failed")
+
+        if response.status_code != 200:
+            raise ExternalServiceError(
+                f"Jellyfin image request failed ({response.status_code})"
+            )
+
+        content_type = response.headers.get("content-type", "image/jpeg")
+        return response.content, content_type
+
     async def _post(
         self,
         endpoint: str,
@@ -392,6 +450,9 @@ class JellyfinRepository:
         sort_by: str = "SortName",
         sort_order: str = "Ascending",
         genre: str | None = None,
+        year: int | None = None,
+        tags: str | None = None,
+        studios: str | None = None,
     ) -> tuple[list[JellyfinItem], int]:
         uid = self._user_id
         params: dict[str, Any] = {
@@ -408,7 +469,13 @@ class JellyfinRepository:
             params["userId"] = uid
         if genre:
             params["genres"] = genre
-        cache_key = f"{JELLYFIN_PREFIX}albums:{uid}:{limit}:{offset}:{sort_by}:{sort_order}:{genre}"
+        if year:
+            params["years"] = str(year)
+        if tags:
+            params["tags"] = tags
+        if studios:
+            params["studios"] = studios
+        cache_key = f"{JELLYFIN_PREFIX}albums:{uid}:{limit}:{offset}:{sort_by}:{sort_order}:{genre}:{year}:{tags}:{studios}"
         cached = await self._cache.get(cache_key)
         if cached:
             return cached
@@ -500,20 +567,89 @@ class JellyfinRepository:
         return None
 
     async def get_artists(
-        self, limit: int = 50, offset: int = 0
-    ) -> list[JellyfinItem]:
+        self, limit: int = 50, offset: int = 0,
+        sort_by: str = "SortName", sort_order: str = "Ascending",
+        search: str = "",
+    ) -> tuple[list[JellyfinItem], int]:
         params: dict[str, Any] = {
             "limit": limit,
             "startIndex": offset,
+            "sortBy": sort_by,
+            "sortOrder": sort_order,
             "enableUserData": "true",
             "Fields": "ProviderIds",
         }
         if self._user_id:
             params["userId"] = self._user_id
-        cache_key = f"{JELLYFIN_PREFIX}artists:{self._user_id}:{limit}:{offset}"
-        return await self._fetch_items(
-            "/Artists", cache_key, params, "Failed to get artists", ttl=120
-        )
+        if search:
+            params["searchTerm"] = search
+        cache_key = f"{JELLYFIN_PREFIX}artists:{self._user_id}:{limit}:{offset}:{sort_by}:{sort_order}:{search}"
+        cached = await self._cache.get(cache_key)
+        if cached is not None:
+            return cached
+
+        try:
+            result = await self._get("/Artists", params=params)
+            if not result:
+                return [], 0
+            raw_items = result.get("Items", [])
+            total = result.get("TotalRecordCount", len(raw_items))
+            items = [parse_item(i) for i in raw_items]
+            pair = (items, total)
+            if items:
+                await self._cache.set(cache_key, pair, ttl_seconds=120)
+            return pair
+        except Exception as e:  # noqa: BLE001
+            logger.error("Failed to get artists: %s", e)
+            _record_degradation(f"Failed to get artists: {e}")
+            return [], 0
+
+    async def get_tracks(
+        self,
+        limit: int = 50,
+        offset: int = 0,
+        sort_by: str = "SortName",
+        sort_order: str = "Ascending",
+        search: str = "",
+        genre: str = "",
+    ) -> tuple[list[JellyfinItem], int]:
+        uid = self._user_id
+        params: dict[str, Any] = {
+            "includeItemTypes": "Audio",
+            "recursive": "true",
+            "sortBy": sort_by,
+            "sortOrder": sort_order,
+            "limit": limit,
+            "startIndex": offset,
+            "enableUserData": "true",
+            "Fields": "ProviderIds",
+        }
+        if uid:
+            params["userId"] = uid
+        if search:
+            params["searchTerm"] = search
+        if genre:
+            params["genres"] = genre
+        cache_key = f"{JELLYFIN_PREFIX}tracks:{uid}:{limit}:{offset}:{sort_by}:{sort_order}:{search}:{genre}"
+        cached = await self._cache.get(cache_key)
+        if cached is not None:
+            return cached
+
+        try:
+            result = await self._get("/Items", params=params)
+            if not result:
+                return [], 0
+            raw_items = result.get("Items", [])
+            total = result.get("TotalRecordCount", len(raw_items))
+            items = [parse_item(i) for i in raw_items]
+            pair = (items, total)
+            if items:
+                await self._cache.set(cache_key, pair, ttl_seconds=120)
+            return pair
+        except Exception as e:  # noqa: BLE001
+            logger.error("Failed to get tracks: %s", e)
+            _record_degradation(f"Failed to get tracks: {e}")
+            return [], 0
 
     async def build_mbid_index(self) -> dict[str, str]:
         cache_key = f"{JELLYFIN_PREFIX}mbid_index:{self._user_id or 'default'}"
@@ -633,6 +769,256 @@ class JellyfinRepository:
             _record_degradation(f"Failed to get library stats: {e}")
 
         return stats
+
+    async def get_playlists(
+        self,
+        user_id: str | None = None,
+        limit: int = 50,
+    ) -> list[JellyfinItem]:
+        uid = user_id or self._user_id
+        cache_key = f"{JELLYFIN_PREFIX}playlists:{uid}:{limit}"
+        cached = await self._cache.get(cache_key)
+        if cached is not None:
+            return cached
+        params: dict[str, Any] = {
+            "IncludeItemTypes": "Playlist",
+            "MediaTypes": "Audio",
+            "Recursive": "true",
+            "Limit": limit,
+            "SortBy": "SortName",
+            "SortOrder": "Ascending",
+            "Fields": "ChildCount,DateCreated",
+        }
+        if uid:
+            params["UserId"] = uid
+        try:
+            result = await self._get("/Items", params=params)
+            if not result:
+                return []
+            raw_items = result.get("Items", [])
+            items = [parse_item(i) for i in raw_items]
+            await self._cache.set(cache_key, items, ttl_seconds=300)
+            return items
+        except Exception as e:  # noqa: BLE001
+            logger.error(f"Failed to get Jellyfin playlists: {e}")
+            _record_degradation(f"Failed to get playlists: {e}")
+            return []
+
+    async def get_playlist(
+        self,
+        playlist_id: str,
+        user_id: str | None = None,
+    ) -> JellyfinItem | None:
+        uid = user_id or self._user_id
+        params: dict[str, Any] = {
+            "Fields": "ChildCount,DateCreated,ProviderIds",
+        }
+        if uid:
+            params["UserId"] = uid
+        try:
+            result = await self._get(f"/Items/{playlist_id}", params=params)
+            if not result:
+                return None
+            return parse_item(result)
+        except Exception as e:  # noqa: BLE001
+            logger.error("Failed to get Jellyfin playlist %s: %s", playlist_id, e)
+            _record_degradation(f"Failed to get playlist detail: {e}")
+            return None
+
+    async def get_playlist_items(
+        self,
+        playlist_id: str,
+        user_id: str | None = None,
+        limit: int = 1000,
+    ) -> list[JellyfinItem]:
+        uid = user_id or self._user_id
+        cache_key = f"{JELLYFIN_PREFIX}playlist:{playlist_id}"
+        cached = await self._cache.get(cache_key)
+        if cached is not None:
+            return cached
+        params: dict[str, Any] = {
+            "Limit": limit,
+            "Fields": "ProviderIds",
+            "EnableUserData": "true",
+        }
+        if uid:
+            params["UserId"] = uid
+        try:
+            result = await self._get(f"/Playlists/{playlist_id}/Items", params=params)
+            if not result:
+                return []
+            raw_items = result.get("Items", [])
+            items = [parse_item(i) for i in raw_items if i.get("Type") == "Audio"]
+            await self._cache.set(cache_key, items, ttl_seconds=120)
+            return items
+        except Exception as e:  # noqa: BLE001
+            logger.error(f"Failed to get Jellyfin playlist items for {playlist_id}: {e}")
+            _record_degradation(f"Failed to get playlist items: {e}")
+            return []
+
+    async def get_instant_mix(
+        self,
+        item_id: str,
+        limit: int = 50,
+    ) -> list[JellyfinItem]:
+        uid = self._user_id
+        cache_key = f"{JELLYFIN_PREFIX}instant_mix:{item_id}:{limit}"
+        cached = await self._cache.get(cache_key)
+        if cached is not None:
+            return cached
+        params: dict[str, Any] = {
+            "Limit": limit,
+            "Fields": "ProviderIds",
+            "EnableUserData": "true",
+        }
+        if uid:
+            params["UserId"] = uid
+        try:
+            result = await self._get(f"/Items/{item_id}/InstantMix", params=params)
+            if not result:
+                return []
+            raw_items = result.get("Items", [])
+            items = [parse_item(i) for i in raw_items]
+            await self._cache.set(cache_key, items, ttl_seconds=600)
+            return items
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"Failed to get instant mix for {item_id}: {e}")
+            _record_degradation(f"Failed to get instant mix: {e}")
+            return []
+
+    async def get_instant_mix_by_artist(
+        self,
+        artist_id: str,
+        limit: int = 50,
+    ) -> list[JellyfinItem]:
+        uid = self._user_id
+        cache_key = f"{JELLYFIN_PREFIX}instant_mix_artist:{artist_id}:{limit}"
+        cached = await self._cache.get(cache_key)
+        if cached is not None:
+            return cached
+        params: dict[str, Any] = {
+            "Limit": limit,
+            "Fields": "ProviderIds",
+            "EnableUserData": "true",
+        }
+        if uid:
+            params["UserId"] = uid
+        try:
+            result = await self._get(f"/Artists/{artist_id}/InstantMix", params=params)
+            if not result:
+                return []
+            raw_items = result.get("Items", [])
+            items = [parse_item(i) for i in raw_items]
+            await self._cache.set(cache_key, items, ttl_seconds=600)
+            return items
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"Failed to get artist instant mix for {artist_id}: {e}")
+            _record_degradation(f"Failed to get artist instant mix: {e}")
+            return []
+
+    async def get_instant_mix_by_genre(
+        self,
+        genre_name: str,
+        limit: int = 50,
+    ) -> list[JellyfinItem]:
+        uid = self._user_id
+        cache_key = f"{JELLYFIN_PREFIX}instant_mix_genre:{genre_name}:{limit}"
+        cached = await self._cache.get(cache_key)
+        if cached is not None:
+            return cached
+        params: dict[str, Any] = {
+            "Limit": limit,
+            "Fields": "ProviderIds",
+            "EnableUserData": "true",
+        }
+        if uid:
+            params["UserId"] = uid
+        try:
+            encoded_genre = genre_name.replace("/", "%2F")
+            result = await self._get(f"/MusicGenres/{encoded_genre}/InstantMix", params=params)
+            if not result:
+                return []
+            raw_items = result.get("Items", [])
+            items = [parse_item(i) for i in raw_items]
+            await self._cache.set(cache_key, items, ttl_seconds=600)
+            return items
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"Failed to get genre instant mix for {genre_name}: {e}")
+            _record_degradation(f"Failed to get genre instant mix: {e}")
+            return []
+
+    async def get_similar_items(
+        self,
+        item_id: str,
+        limit: int = 10,
+    ) -> list[JellyfinItem]:
+        cache_key = f"{JELLYFIN_PREFIX}similar:{item_id}:{limit}"
+        cached = await self._cache.get(cache_key)
+        if cached is not None:
+            return cached
+        params: dict[str, Any] = {
+            "Limit": limit,
+            "Fields": "ProviderIds",
+            "EnableUserData": "true",
+        }
+        uid = self._user_id
+        if uid:
+            params["UserId"] = uid
+        try:
+            result = await self._get(f"/Items/{item_id}/Similar", params=params)
+            if not result:
+                return []
+            raw_items = result.get("Items", [])
+            items = [parse_item(i) for i in raw_items]
+            await self._cache.set(cache_key, items, ttl_seconds=1800)
+            return items
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"Failed to get similar items for {item_id}: {e}")
+            _record_degradation(f"Failed to get similar items: {e}")
+            return []
+
+    async def get_lyrics(self, item_id: str) -> JellyfinLyrics | None:
+        cache_key = f"{JELLYFIN_PREFIX}lyrics:{item_id}"
+        cached = await self._cache.get(cache_key)
+        if cached is not None:
+            return cached
+        try:
+            result = await self._get(f"/Audio/{item_id}/Lyrics")
+            if not result:
+                return None
+            lyrics = parse_jellyfin_lyrics(result)
+            if lyrics:
+                await self._cache.set(cache_key, lyrics, 3600)
+            return lyrics
+        except httpx.HTTPStatusError as exc:
+            logger.warning("Jellyfin lyrics HTTP %s for item %s", exc.response.status_code, item_id)
+            return None
+        except (httpx.HTTPError, msgspec.DecodeError) as exc:
+            logger.warning("Jellyfin lyrics fetch/decode error for item %s: %s", item_id, exc)
+            return None
+        except Exception:  # noqa: BLE001
+            logger.warning("Unexpected error fetching lyrics for item %s", item_id, exc_info=True)
+            return None
+
+    async def get_sessions(self) -> list[JellyfinSession]:
+        if not self.is_configured():
+            return []
+        uid = self._user_id or "default"
+        cache_key = f"{JELLYFIN_PREFIX}sessions:{uid}"
+        cached = await self._cache.get(cache_key)
+        if cached is not None:
+            return cached
+        try:
+            result = await self._request("GET", "/Sessions")
+            if not result or not isinstance(result, list):
+                return []
+            sessions = parse_jellyfin_sessions(result)
+            await self._cache.set(cache_key, sessions, 2)
+            return sessions
+        except Exception:  # noqa: BLE001
+            logger.warning("Failed to fetch Jellyfin sessions", exc_info=True)
+            _record_degradation("Jellyfin sessions fetch failed")
+            return []
 
     async def get_playback_info(self, item_id: str) -> dict[str, Any]:
         params: dict[str, Any] = {}
@@ -838,7 +1224,7 @@ class JellyfinRepository:
                 media_type=resp_headers.get("Content-Type", "audio/mpeg"),
                 body_chunks=_stream_body(),
             )
-        except Exception:
+        except Exception:  # noqa: BLE001
             if upstream_resp:
                 await upstream_resp.aclose()
             await client.aclose()

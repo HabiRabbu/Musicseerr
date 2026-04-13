@@ -9,7 +9,8 @@ import type {
 	YouTubeTrackLink,
 	JellyfinAlbumMatch,
 	LocalAlbumMatch,
-	NavidromeAlbumMatch
+	NavidromeAlbumMatch,
+	PlexAlbumMatch
 } from '$lib/types';
 import { createLocalStorageCache } from '$lib/utils/localStorageCache';
 
@@ -29,6 +30,7 @@ export type AlbumSourceMatchCachePayload = {
 	jellyfin: JellyfinAlbumMatch | null;
 	local: LocalAlbumMatch | null;
 	navidrome: NavidromeAlbumMatch | null;
+	plex: PlexAlbumMatch | null;
 };
 
 export const albumBasicCache = createLocalStorageCache<AlbumBasicInfo>(

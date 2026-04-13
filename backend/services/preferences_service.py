@@ -19,6 +19,8 @@ from api.v1.schemas.settings import (
     LASTFM_SECRET_MASK,
     NavidromeConnectionSettings,
     NAVIDROME_PASSWORD_MASK,
+    PlexConnectionSettings,
+    PLEX_TOKEN_MASK,
 )
 from api.v1.schemas.profile import ProfileSettings
 from api.v1.schemas.advanced_settings import AdvancedSettings
@@ -211,6 +213,53 @@ class PreferencesService:
             logger.error("Failed to save Navidrome connection settings: %s", e)
             raise ConfigurationError(f"Failed to save Navidrome connection settings: {e}")
 
+    def get_plex_connection(self) -> PlexConnectionSettings:
+        config = self._load_config()
+        plex_data = config.get("plex_settings", {})
+        settings = PlexConnectionSettings(
+            plex_url=plex_data.get("plex_url", ""),
+            plex_token=plex_data.get("plex_token", ""),
+            enabled=plex_data.get("enabled", False),
+            music_library_ids=plex_data.get("music_library_ids", []),
+            scrobble_to_plex=plex_data.get("scrobble_to_plex", True),
+        )
+        if settings.plex_token:
+            settings.plex_token = PLEX_TOKEN_MASK
+        return settings
+
+    def get_plex_connection_raw(self) -> PlexConnectionSettings:
+        config = self._load_config()
+        plex_data = config.get("plex_settings", {})
+        return PlexConnectionSettings(
+            plex_url=plex_data.get("plex_url", ""),
+            plex_token=plex_data.get("plex_token", ""),
+            enabled=plex_data.get("enabled", False),
+            music_library_ids=plex_data.get("music_library_ids", []),
+            scrobble_to_plex=plex_data.get("scrobble_to_plex", True),
+        )
+
+    def save_plex_connection(self, settings: PlexConnectionSettings) -> None:
+        try:
+            config = self._load_config().copy()
+            current_data = config.get("plex_settings", {})
+
+            token = settings.plex_token
+            if token == PLEX_TOKEN_MASK:
+                token = current_data.get("plex_token", "")
+
+            config["plex_settings"] = {
+                "plex_url": settings.plex_url,
+                "plex_token": token,
+                "enabled": settings.enabled,
+                "music_library_ids": settings.music_library_ids,
+                "scrobble_to_plex": settings.scrobble_to_plex,
+            }
+            self._save_config(config)
+            logger.info("Saved Plex connection settings to %s", self._config_path)
+        except Exception as e:  # noqa: BLE001
+            logger.error("Failed to save Plex connection settings: %s", e)
+            raise ConfigurationError(f"Failed to save Plex connection settings: {e}")
+
     def get_listenbrainz_connection(self) -> ListenBrainzConnectionSettings:
         config = self._load_config()
         lb_data = config.get("listenbrainz_settings", {})
@@ -371,3 +420,19 @@ class PreferencesService:
             internal[key] = value
         config["_internal"] = internal
         self._save_config(config)
+
+    def get_or_create_setting(self, key: str, factory: Any) -> Any:
+        """Atomically get or create an internal setting under the cache lock."""
+        with self._cache_lock:
+            config = self._load_config()
+            internal = config.get("_internal", {})
+            value = internal.get(key)
+            if value:
+                return value
+            value = factory() if callable(factory) else factory
+            config = config.copy()
+            internal = internal.copy()
+            internal[key] = value
+            config["_internal"] = internal
+            self._save_config(config)
+            return value

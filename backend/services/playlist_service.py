@@ -4,7 +4,7 @@ import re
 from collections import defaultdict
 from difflib import SequenceMatcher
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 from core.exceptions import InvalidPlaylistDataError, PlaylistNotFoundError, SourceResolutionError
 from infrastructure.cache.cache_keys import SOURCE_RESOLUTION_PREFIX
@@ -20,10 +20,10 @@ from repositories.playlist_repository import (
 logger = logging.getLogger(__name__)
 
 ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp"}
-MAX_COVER_SIZE = 2 * 1024 * 1024  # 2 MB
+MAX_COVER_SIZE = 2 * 1024 * 1024
 _MIME_TO_EXT = {"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp"}
 _SAFE_ID_RE = re.compile(r"^[a-f0-9\-]+$")
-VALID_SOURCE_TYPES = {"local", "jellyfin", "navidrome", "youtube", ""}
+VALID_SOURCE_TYPES = {"local", "jellyfin", "navidrome", "plex", "youtube", ""}
 MAX_NAME_LENGTH = 100
 
 _SOURCE_TYPE_ALIASES = {
@@ -31,6 +31,7 @@ _SOURCE_TYPE_ALIASES = {
     "howler": "local",
     "jellyfin": "jellyfin",
     "navidrome": "navidrome",
+    "plex": "plex",
     "youtube": "youtube",
     "": "",
 }
@@ -80,14 +81,20 @@ class PlaylistService:
         self._cache = cache
 
 
-    async def create_playlist(self, name: str) -> PlaylistRecord:
+    async def create_playlist(self, name: str, *, source_ref: str | None = None) -> PlaylistRecord:
         stripped = name.strip() if name else ""
         if not stripped:
             raise InvalidPlaylistDataError("Playlist name must not be empty")
         if len(stripped) > MAX_NAME_LENGTH:
             raise InvalidPlaylistDataError(f"Playlist name must not exceed {MAX_NAME_LENGTH} characters")
-        result = await self._repo.create_playlist(stripped)
+        result = await self._repo.create_playlist(stripped, source_ref=source_ref)
         return result
+
+    async def get_by_source_ref(self, source_ref: str) -> PlaylistRecord | None:
+        return await self._repo.get_by_source_ref(source_ref)
+
+    async def get_imported_source_ids(self, prefix: str) -> set[str]:
+        return await self._repo.get_imported_source_ids(prefix)
 
     async def get_playlist(self, playlist_id: str) -> PlaylistRecord:
         result = await self._repo.get_playlist(playlist_id)
@@ -201,6 +208,7 @@ class PlaylistService:
         jf_service: object = None,
         local_service: object = None,
         nd_service: object = None,
+        plex_service: object = None,
     ) -> PlaylistTrackRecord:
         if source_type is not None and source_type not in _SOURCE_TYPE_ALIASES:
             raise InvalidPlaylistDataError(
@@ -219,18 +227,28 @@ class PlaylistService:
                 normalized_available_sources.append(_SOURCE_TYPE_ALIASES[source])
 
         new_track_source_id: Optional[str] = None
+        new_plex_rating_key_resolved = False
+        new_plex_rating_key: Optional[str] = None
         if normalized_source:
             current_track = await self._repo.get_track(playlist_id, track_id)
             if current_track is None:
                 raise PlaylistNotFoundError(f"Track {track_id} not found in playlist {playlist_id}")
             if normalized_source != current_track.source_type:
-                new_track_source_id = await self._resolve_new_source_id(
+                new_track_source_id, new_plex_rating_key = await self._resolve_new_source_id(
                     current_track, normalized_source, jf_service, local_service, nd_service,
+                    plex_service,
                 )
+                new_plex_rating_key_resolved = True
+
+        repo_kwargs: dict[str, Any] = {
+            "track_source_id": new_track_source_id,
+        }
+        if new_plex_rating_key_resolved:
+            repo_kwargs["plex_rating_key"] = new_plex_rating_key
 
         result = await self._repo.update_track_source(
             playlist_id, track_id, normalized_source, normalized_available_sources,
-            track_source_id=new_track_source_id,
+            **repo_kwargs,
         )
         if result is None:
             raise PlaylistNotFoundError(f"Track {track_id} not found in playlist {playlist_id}")
@@ -251,6 +269,7 @@ class PlaylistService:
         jf_service: object = None,
         local_service: object = None,
         nd_service: object = None,
+        plex_service: object = None,
     ) -> dict[str, list[str]]:
         await self.get_playlist(playlist_id)
         tracks = await self._repo.get_tracks(playlist_id)
@@ -268,8 +287,8 @@ class PlaylistService:
         result: dict[str, list[str]] = {}
         for album_id, album_tracks in album_groups.items():
             representative = album_tracks[0]
-            jf_by_num, local_by_num, nd_by_num = await self._resolve_album_sources(
-                album_id, jf_service, local_service, nd_service,
+            jf_by_num, local_by_num, nd_by_num, plex_by_num = await self._resolve_album_sources(
+                album_id, jf_service, local_service, nd_service, plex_service,
                 album_name=representative.album_name or "",
                 artist_name=representative.artist_name or "",
             )
@@ -289,6 +308,10 @@ class PlaylistService:
                 nd_track = nd_by_num.get(t.track_number)
                 if nd_track and _fuzzy_name_match(t.track_name, nd_track[0]):
                     sources.add("navidrome")
+
+                plex_track = plex_by_num.get(t.track_number)
+                if plex_track and _fuzzy_name_match(t.track_name, plex_track[0]):
+                    sources.add("plex")
 
                 result[t.id] = sorted(sources)
 
@@ -314,24 +337,34 @@ class PlaylistService:
         jf_service: object,
         local_service: object,
         nd_service: object = None,
+        plex_service: object = None,
         album_name: str = "",
         artist_name: str = "",
-    ) -> tuple[dict[int, tuple[str, str]], dict[int, tuple[str, str]], dict[int, tuple[str, str]]]:
+    ) -> tuple[dict[int, tuple[str, str]], dict[int, tuple[str, str]], dict[int, tuple[str, str]], dict[int, tuple[str, str, str]]]:
         cache_key = f"{SOURCE_RESOLUTION_PREFIX}:{album_id}"
         if self._cache:
             cached = await self._cache.get(cache_key)
             if cached is not None:
                 if len(cached) == 2:
-                    return (_normalize_source_map(cached[0]), _normalize_source_map(cached[1]), {})
+                    return (_normalize_source_map(cached[0]), _normalize_source_map(cached[1]), {}, {})
+                if len(cached) == 3:
+                    return (
+                        _normalize_source_map(cached[0]),
+                        _normalize_source_map(cached[1]),
+                        _normalize_source_map(cached[2]),
+                        {},
+                    )
                 return (
                     _normalize_source_map(cached[0]),
                     _normalize_source_map(cached[1]),
                     _normalize_source_map(cached[2]),
+                    _normalize_source_map(cached[3]),
                 )
 
         jf_by_num: dict[int, tuple[str, str]] = {}
         local_by_num: dict[int, tuple[str, str]] = {}
         nd_by_num: dict[int, tuple[str, str]] = {}
+        plex_by_num: dict[int, tuple[str, str, str]] = {}
 
         if jf_service is not None:
             try:
@@ -368,7 +401,20 @@ class PlaylistService:
             except Exception:  # noqa: BLE001
                 logger.debug("Navidrome source resolution failed for album %s", album_id, exc_info=True)
 
-        resolved = (jf_by_num, local_by_num, nd_by_num)
+        if plex_service is not None:
+            try:
+                match = await plex_service.get_album_match(
+                    album_id=album_id, album_name=album_name, artist_name=artist_name,
+                )
+                if match.found:
+                    for t in match.tracks:
+                        key = _safe_track_number(t.track_number)
+                        if key is not None:
+                            plex_by_num[key] = (t.title, t.part_key or t.plex_id, t.plex_id)
+            except Exception:  # noqa: BLE001
+                logger.debug("Plex source resolution failed for album %s", album_id, exc_info=True)
+
+        resolved = (jf_by_num, local_by_num, nd_by_num, plex_by_num)
         if self._cache:
             await self._cache.set(cache_key, resolved, ttl_seconds=3600)
         return resolved
@@ -380,14 +426,16 @@ class PlaylistService:
         jf_service: object,
         local_service: object,
         nd_service: object = None,
-    ) -> str:
+        plex_service: object = None,
+    ) -> tuple[str, str | None]:
+        """Return (source_id, plex_rating_key_or_none)."""
         if not track.album_id or track.track_number is None:
             raise SourceResolutionError(
                 f"Cannot switch source for track '{track.track_name}': missing album_id or track_number"
             )
 
-        jf_by_num, local_by_num, nd_by_num = await self._resolve_album_sources(
-            track.album_id, jf_service, local_service, nd_service,
+        jf_by_num, local_by_num, nd_by_num, plex_by_num = await self._resolve_album_sources(
+            track.album_id, jf_service, local_service, nd_service, plex_service,
             album_name=track.album_name or "",
             artist_name=track.artist_name or "",
         )
@@ -395,7 +443,7 @@ class PlaylistService:
         if new_source_type == "jellyfin":
             match_info = jf_by_num.get(track.track_number)
             if match_info and _fuzzy_name_match(track.track_name, match_info[0]):
-                return match_info[1]
+                return (match_info[1], None)
             raise SourceResolutionError(
                 f"Track '{track.track_name}' not found in Jellyfin for album {track.album_id}"
             )
@@ -403,7 +451,7 @@ class PlaylistService:
         if new_source_type == "local":
             match_info = local_by_num.get(track.track_number)
             if match_info and _fuzzy_name_match(track.track_name, match_info[0]):
-                return match_info[1]
+                return (match_info[1], None)
             raise SourceResolutionError(
                 f"Track '{track.track_name}' not found in local files for album {track.album_id}"
             )
@@ -411,9 +459,17 @@ class PlaylistService:
         if new_source_type == "navidrome":
             match_info = nd_by_num.get(track.track_number)
             if match_info and _fuzzy_name_match(track.track_name, match_info[0]):
-                return match_info[1]
+                return (match_info[1], None)
             raise SourceResolutionError(
                 f"Track '{track.track_name}' not found in Navidrome for album {track.album_id}"
+            )
+
+        if new_source_type == "plex":
+            match_info = plex_by_num.get(track.track_number)
+            if match_info and _fuzzy_name_match(track.track_name, match_info[0]):
+                return (match_info[1], match_info[2])
+            raise SourceResolutionError(
+                f"Track '{track.track_name}' not found in Plex for album {track.album_id}"
             )
 
         raise SourceResolutionError(f"Unsupported source type for resolution: {new_source_type}")
@@ -430,7 +486,7 @@ class PlaylistService:
                 f"Invalid image type. Allowed: {', '.join(ALLOWED_IMAGE_TYPES)}"
             )
         if len(data) > MAX_COVER_SIZE:
-            raise InvalidPlaylistDataError("Image too large. Maximum size is 2 MB")  # defence-in-depth
+            raise InvalidPlaylistDataError("Image too large. Maximum size is 2 MB")
 
         ext = _MIME_TO_EXT.get(content_type, ".jpg")
         file_path = self._cover_dir / f"{playlist_id}{ext}"

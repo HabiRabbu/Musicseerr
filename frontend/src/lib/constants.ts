@@ -15,6 +15,8 @@ export const CACHE_KEY_GROUPS = {
 		JELLYFIN_ALBUMS_LIST: 'musicseerr_jellyfin_albums_list',
 		NAVIDROME_SIDEBAR: 'musicseerr_navidrome_sidebar',
 		NAVIDROME_ALBUMS_LIST: 'musicseerr_navidrome_albums_list',
+		PLEX_SIDEBAR: 'musicseerr_plex_sidebar',
+		PLEX_ALBUMS_LIST: 'musicseerr_plex_albums_list',
 		LOCAL_FILES_ALBUMS_LIST: 'musicseerr_local_files_albums_list'
 	},
 	detail: {
@@ -66,6 +68,8 @@ export const CACHE_TTL_GROUPS = {
 		JELLYFIN_ALBUMS_LIST: 2 * 60 * 1000,
 		NAVIDROME_SIDEBAR: 2 * 60 * 1000,
 		NAVIDROME_ALBUMS_LIST: 2 * 60 * 1000,
+		PLEX_SIDEBAR: 2 * 60 * 1000,
+		PLEX_ALBUMS_LIST: 2 * 60 * 1000,
 		LOCAL_FILES_ALBUMS_LIST: 2 * 60 * 1000,
 		PLAYLIST_SOURCES: 15 * 60 * 1000
 	},
@@ -214,6 +218,11 @@ export const API = {
 	settingsPrimarySource: () => '/api/v1/settings/primary-source',
 	settingsNavidrome: () => '/api/v1/settings/navidrome',
 	settingsNavidromeVerify: () => '/api/v1/settings/navidrome/verify',
+	settingsPlex: () => '/api/v1/settings/plex',
+	settingsPlexVerify: () => '/api/v1/settings/plex/verify',
+	settingsPlexLibraries: () => '/api/v1/settings/plex/libraries',
+	plexAuthPin: () => '/api/v1/plex/auth/pin',
+	plexAuthPoll: (pinId: number) => `/api/v1/plex/auth/poll?pin_id=${pinId}`,
 	settingsLocalFiles: () => '/api/v1/settings/local-files',
 	settingsLocalFilesVerify: () => '/api/v1/settings/local-files/verify',
 	profile: {
@@ -247,6 +256,11 @@ export const API = {
 		navidrome: (id: string) => `/api/v1/stream/navidrome/${id}`,
 		navidromeScrobble: (id: string) => `/api/v1/stream/navidrome/${id}/scrobble`,
 		navidromeNowPlaying: (id: string) => `/api/v1/stream/navidrome/${id}/now-playing`,
+		navidromeStopped: (id: string) => `/api/v1/stream/navidrome/${id}/stopped`,
+		plex: (partKey: string) => `/api/v1/stream/plex/${partKey}`,
+		plexScrobble: (ratingKey: string) => `/api/v1/stream/plex/${ratingKey}/scrobble`,
+		plexNowPlaying: (ratingKey: string) => `/api/v1/stream/plex/${ratingKey}/now-playing`,
+		plexStopped: (ratingKey: string) => `/api/v1/stream/plex/${ratingKey}/stopped`,
 		local: (trackId: number | string) => `/api/v1/stream/local/${trackId}`
 	},
 	jellyfinLibrary: {
@@ -256,10 +270,16 @@ export const API = {
 			offset = 0,
 			sortBy = 'SortName',
 			genre?: string,
-			sortOrder = 'Ascending'
+			sortOrder = 'Ascending',
+			year?: number,
+			tags?: string,
+			studios?: string
 		) => {
 			let url = `/api/v1/jellyfin/albums?limit=${limit}&offset=${offset}&sort_by=${sortBy}&sort_order=${sortOrder}`;
 			if (genre) url += `&genre=${encodeURIComponent(genre)}`;
+			if (year) url += `&year=${year}`;
+			if (tags) url += `&tags=${encodeURIComponent(tags)}`;
+			if (studios) url += `&studios=${encodeURIComponent(studios)}`;
 			return url;
 		},
 		albumDetail: (id: string) => `/api/v1/jellyfin/albums/${id}`,
@@ -269,7 +289,46 @@ export const API = {
 		recent: () => '/api/v1/jellyfin/recent',
 		favorites: () => '/api/v1/jellyfin/favorites',
 		genres: () => '/api/v1/jellyfin/genres',
-		stats: () => '/api/v1/jellyfin/stats'
+		stats: () => '/api/v1/jellyfin/stats',
+		hub: () => '/api/v1/jellyfin/hub',
+		recentlyAdded: (limit = 20) => `/api/v1/jellyfin/recently-added?limit=${limit}`,
+		mostPlayedArtists: (limit = 10) => `/api/v1/jellyfin/most-played/artists?limit=${limit}`,
+		mostPlayedAlbums: (limit = 10) => `/api/v1/jellyfin/most-played/albums?limit=${limit}`,
+		playlists: (limit = 50) => `/api/v1/jellyfin/playlists?limit=${limit}`,
+		playlistDetail: (id: string) => `/api/v1/jellyfin/playlists/${id}`,
+		playlistImport: (id: string) => `/api/v1/jellyfin/playlists/${id}/import`,
+		instantMix: (itemId: string, limit = 50) =>
+			`/api/v1/jellyfin/instant-mix/${itemId}?limit=${limit}`,
+		instantMixByArtist: (artistId: string, limit = 50) =>
+			`/api/v1/jellyfin/instant-mix/artist/${artistId}?limit=${limit}`,
+		instantMixByGenre: (genre: string, limit = 50) =>
+			`/api/v1/jellyfin/instant-mix/genre?genre=${encodeURIComponent(genre)}&limit=${limit}`,
+		sessions: () => '/api/v1/jellyfin/sessions',
+		similar: (itemId: string, limit = 10) => `/api/v1/jellyfin/similar/${itemId}?limit=${limit}`,
+		lyrics: (itemId: string) => `/api/v1/jellyfin/lyrics/${itemId}`,
+		favoritesExpanded: (limit = 50) => `/api/v1/jellyfin/favorites/expanded?limit=${limit}`,
+		filters: () => '/api/v1/jellyfin/filters',
+		artistsBrowse: (
+			limit = 48,
+			offset = 0,
+			sortBy = 'SortName',
+			sortOrder = 'Ascending',
+			search = ''
+		) => {
+			let url = `/api/v1/jellyfin/artists/browse?limit=${limit}&offset=${offset}&sort_by=${sortBy}&sort_order=${sortOrder}`;
+			if (search) url += `&search=${encodeURIComponent(search)}`;
+			return url;
+		},
+		tracks: (limit = 48, offset = 0, sortBy = 'SortName', sortOrder = 'Ascending', search = '') => {
+			let url = `/api/v1/jellyfin/tracks?limit=${limit}&offset=${offset}&sort_by=${sortBy}&sort_order=${sortOrder}`;
+			if (search) url += `&search=${encodeURIComponent(search)}`;
+			return url;
+		},
+		artistsIndex: () => '/api/v1/jellyfin/artists/index',
+		genreSongs: (genres: string | string[], limit = 50, offset = 0) => {
+			const g = Array.isArray(genres) ? genres.join('|') : genres;
+			return `/api/v1/jellyfin/genres/songs?genre=${encodeURIComponent(g)}&limit=${limit}&offset=${offset}`;
+		}
 	},
 	navidromeLibrary: {
 		albums: () => '/api/v1/navidrome/albums',
@@ -281,7 +340,96 @@ export const API = {
 		favorites: () => '/api/v1/navidrome/favorites',
 		genres: () => '/api/v1/navidrome/genres',
 		stats: () => '/api/v1/navidrome/stats',
-		albumMatch: (albumId: string) => `/api/v1/navidrome/album-match/${albumId}`
+		albumMatch: (albumId: string) => `/api/v1/navidrome/album-match/${albumId}`,
+		hub: () => '/api/v1/navidrome/hub',
+		favoritesExpanded: () => '/api/v1/navidrome/favorites/expanded',
+		playlists: (limit = 50) => `/api/v1/navidrome/playlists?limit=${limit}`,
+		playlistDetail: (id: string) => `/api/v1/navidrome/playlists/${id}`,
+		playlistImport: (id: string) => `/api/v1/navidrome/playlists/${id}/import`,
+		random: (size = 20, genre?: string) => {
+			let url = `/api/v1/navidrome/random?size=${size}`;
+			if (genre) url += `&genre=${encodeURIComponent(genre)}`;
+			return url;
+		},
+		nowPlaying: () => '/api/v1/navidrome/now-playing',
+		topSongs: (artistName: string, count = 20) =>
+			`/api/v1/navidrome/top-songs/${encodeURIComponent(artistName)}?count=${count}`,
+		similarSongs: (songId: string, count = 20) =>
+			`/api/v1/navidrome/similar-songs/${songId}?count=${count}`,
+		artistInfo: (artistId: string) => `/api/v1/navidrome/artist-info/${artistId}`,
+		albumInfo: (albumId: string) => `/api/v1/navidrome/album-info/${albumId}`,
+		lyrics: (songId: string, artist = '', title = '') => {
+			let url = `/api/v1/navidrome/lyrics/${songId}`;
+			const params: string[] = [];
+			if (artist) params.push(`artist=${encodeURIComponent(artist)}`);
+			if (title) params.push(`title=${encodeURIComponent(title)}`);
+			if (params.length) url += `?${params.join('&')}`;
+			return url;
+		},
+		artistsIndex: () => '/api/v1/navidrome/artists/index',
+		genreSongs: (genre: string, count = 50, offset = 0) =>
+			`/api/v1/navidrome/genres/${encodeURIComponent(genre)}/songs?count=${count}&offset=${offset}`,
+		multiGenreSongs: (genres: string[], count = 50, offset = 0) =>
+			`/api/v1/navidrome/genres/songs?genres=${encodeURIComponent(genres.join(','))}&count=${count}&offset=${offset}`,
+		musicFolders: () => '/api/v1/navidrome/music-folders',
+		artistsBrowse: (limit = 48, offset = 0, search = '') => {
+			let url = `/api/v1/navidrome/artists/browse?limit=${limit}&offset=${offset}`;
+			if (search) url += `&search=${encodeURIComponent(search)}`;
+			return url;
+		},
+		tracks: (limit = 48, offset = 0, search = '') => {
+			let url = `/api/v1/navidrome/tracks?limit=${limit}&offset=${offset}`;
+			if (search) url += `&search=${encodeURIComponent(search)}`;
+			return url;
+		}
+	},
+	plexLibrary: {
+		albums: (
+			limit = 48,
+			offset = 0,
+			sortBy = 'name',
+			genre?: string,
+			sortOrder?: string,
+			mood?: string,
+			decade?: string
+		) => {
+			let url = `/api/v1/plex/albums?limit=${limit}&offset=${offset}&sort_by=${sortBy}`;
+			if (sortOrder) url += `&sort_order=${sortOrder}`;
+			if (genre) url += `&genre=${encodeURIComponent(genre)}`;
+			if (mood) url += `&mood=${encodeURIComponent(mood)}`;
+			if (decade) url += `&decade=${encodeURIComponent(decade)}`;
+			return url;
+		},
+		albumDetail: (id: string) => `/api/v1/plex/albums/${id}`,
+		search: (q: string) => `/api/v1/plex/search?q=${encodeURIComponent(q)}`,
+		recent: (limit = 20) => `/api/v1/plex/recent?limit=${limit}`,
+		genres: () => '/api/v1/plex/genres',
+		moods: () => '/api/v1/plex/moods',
+		stats: () => '/api/v1/plex/stats',
+		thumb: (ratingKey: string, size = 500) => `/api/v1/plex/thumb/${ratingKey}?size=${size}`,
+		albumMatch: (albumId: string) => `/api/v1/plex/album-match/${albumId}`,
+		hub: () => '/api/v1/plex/hub',
+		recentlyAdded: (limit = 20) => `/api/v1/plex/recently-added?limit=${limit}`,
+		playlists: (limit = 50) => `/api/v1/plex/playlists?limit=${limit}`,
+		playlistDetail: (id: string) => `/api/v1/plex/playlists/${id}`,
+		playlistImport: (id: string) => `/api/v1/plex/playlists/${id}/import`,
+		discovery: (count = 10) => `/api/v1/plex/discovery?count=${count}`,
+		sessions: () => '/api/v1/plex/sessions',
+		history: (limit = 50, offset = 0) => `/api/v1/plex/history?limit=${limit}&offset=${offset}`,
+		analytics: () => '/api/v1/plex/analytics',
+		artistsBrowse: (limit = 48, offset = 0, sort = 'titleSort:asc', search = '') => {
+			let url = `/api/v1/plex/artists/browse?limit=${limit}&offset=${offset}&sort=${encodeURIComponent(sort)}`;
+			if (search) url += `&search=${encodeURIComponent(search)}`;
+			return url;
+		},
+		tracks: (limit = 48, offset = 0, sort = 'titleSort:asc', search = '') => {
+			let url = `/api/v1/plex/tracks?limit=${limit}&offset=${offset}&sort=${encodeURIComponent(sort)}`;
+			if (search) url += `&search=${encodeURIComponent(search)}`;
+			return url;
+		},
+		artistsIndex: () => '/api/v1/plex/artists/index',
+		genreSongs: (genre: string, limit = 50, offset = 0) =>
+			`/api/v1/plex/genres/songs?genre=${encodeURIComponent(genre)}&limit=${limit}&offset=${offset}`
 	},
 	local: {
 		albumMatch: (mbid: string) => `/api/v1/local/albums/match/${mbid}`,
