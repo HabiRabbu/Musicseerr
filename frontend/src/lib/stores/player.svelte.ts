@@ -18,7 +18,11 @@ import {
 	reportNavidromeNowPlaying,
 	reportNavidromeStopped
 } from '$lib/player/navidromePlaybackApi';
-import { reportPlexScrobble, reportPlexNowPlaying, reportPlexStopped } from '$lib/player/plexPlaybackApi';
+import {
+	reportPlexScrobble,
+	reportPlexNowPlaying,
+	reportPlexStopped
+} from '$lib/player/plexPlaybackApi';
 import { playbackToast } from '$lib/stores/playbackToast.svelte';
 import {
 	getStoredVolume,
@@ -525,6 +529,27 @@ function createPlayerStore() {
 			showQueueMutationToast('queue', items.length);
 		},
 
+		appendQueueSilent(items: QueueItem[]): void {
+			if (items.length === 0) return;
+			const r = addMultipleItems(queue, items, shuffleEnabled, shuffleOrder);
+			queue = r.newQueue;
+			shuffleOrder = r.newShuffleOrder;
+			persist();
+		},
+
+		regenerateShuffleOrder(): void {
+			if (!shuffleEnabled || queue.length === 0) return;
+			const allIndices = Array.from({ length: queue.length }, (_, i) => i);
+			const upcoming = allIndices.filter((i) => i !== currentIndex && i > currentIndex);
+			const played = allIndices.filter((i) => i < currentIndex);
+			for (let i = upcoming.length - 1; i > 0; i--) {
+				const j = Math.floor(Math.random() * (i + 1));
+				[upcoming[i], upcoming[j]] = [upcoming[j], upcoming[i]];
+			}
+			shuffleOrder = [...played, currentIndex, ...upcoming];
+			persist();
+		},
+
 		playNext(item: QueueItem): void {
 			if (queue.length === 0) {
 				this.playQueue([stampSingleOrigin(item, 'manual')], 0, false);
@@ -643,8 +668,7 @@ function createPlayerStore() {
 			const item = getCurrentItem();
 			if (item?.sourceType === 'plex' && item.plexRatingKey)
 				void reportPlexStopped(item.plexRatingKey);
-			if (item?.sourceType === 'navidrome')
-				void reportNavidromeStopped(item.trackSourceId);
+			if (item?.sourceType === 'navidrome') void reportNavidromeStopped(item.trackSourceId);
 			persist();
 		},
 
@@ -657,8 +681,7 @@ function createPlayerStore() {
 				const item = getCurrentItem();
 				if (item?.sourceType === 'plex' && item.plexRatingKey)
 					void reportPlexStopped(item.plexRatingKey);
-				if (item?.sourceType === 'navidrome')
-					void reportNavidromeStopped(item.trackSourceId);
+				if (item?.sourceType === 'navidrome') void reportNavidromeStopped(item.trackSourceId);
 				persist();
 			} else {
 				currentSource?.play();

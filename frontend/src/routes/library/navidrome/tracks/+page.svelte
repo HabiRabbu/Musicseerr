@@ -4,6 +4,7 @@
 	import { buildDiscoveryQueueFromNavidrome } from '$lib/player/queueHelpers';
 	import { playerStore } from '$lib/stores/player.svelte';
 	import { toastStore } from '$lib/stores/toast';
+	import { createLibraryTrackLoader } from '$lib/utils/libraryTrackLoader.svelte';
 	import NavidromeIcon from '$lib/components/NavidromeIcon.svelte';
 	import NowPlayingIndicator from '$lib/components/NowPlayingIndicator.svelte';
 	import ContextMenu from '$lib/components/ContextMenu.svelte';
@@ -17,7 +18,8 @@
 		Play,
 		Shuffle,
 		ListPlus,
-		ListStart
+		ListStart,
+		Loader2
 	} from 'lucide-svelte';
 	import type { NavidromeTrackInfo, NavidromeTrackPage } from '$lib/types';
 
@@ -31,7 +33,20 @@
 
 	const totalPages = $derived(Math.ceil(data.total / PAGE_SIZE));
 
+	const loader = createLibraryTrackLoader<NavidromeTrackInfo>(
+		{
+			fetchPageUrl: (limit, offset) => API.navidromeLibrary.tracks(limit, offset, searchQuery),
+			buildQueue: (tracks) => buildDiscoveryQueueFromNavidrome(tracks),
+			pageSize: PAGE_SIZE
+		},
+		(items) => playerStore.appendQueueSilent(items),
+		(items, startIndex, shuffle) => playerStore.playQueue(items, startIndex, shuffle),
+		() => playerStore.regenerateShuffleOrder(),
+		(message, type) => toastStore.show({ message, type })
+	);
+
 	async function fetchTracks() {
+		loader.abort();
 		loading = true;
 		try {
 			data = await api.get<NavidromeTrackPage>(
@@ -59,35 +74,32 @@
 	}
 
 	function playTrack(index: number) {
+		loader.abort();
 		const queue = buildDiscoveryQueueFromNavidrome(data.items);
 		if (queue.length === 0) return;
 		playerStore.playQueue(queue, index, false);
 	}
 
 	function playAll() {
-		const queue = buildDiscoveryQueueFromNavidrome(data.items);
-		if (queue.length === 0) return;
-		playerStore.playQueue(queue, 0, false);
+		loader.playAll(data.items, data.total);
 	}
 
 	function shuffleAll() {
-		const queue = buildDiscoveryQueueFromNavidrome(data.items);
-		if (queue.length === 0) return;
-		playerStore.playQueue(queue, 0, true);
+		loader.shuffleAll(data.items, data.total);
 	}
 
 	function addTrackToQueue(track: NavidromeTrackInfo) {
 		const items = buildDiscoveryQueueFromNavidrome([track]);
 		if (items.length === 0) return;
 		playerStore.addMultipleToQueue(items);
-		toastStore.show({ message: `Added "${track.title}" to queue`, type: 'info' });
+		toastStore.show({ message: `"${track.title}" was added to the queue`, type: 'info' });
 	}
 
 	function playTrackNext(track: NavidromeTrackInfo) {
 		const items = buildDiscoveryQueueFromNavidrome([track]);
 		if (items.length === 0) return;
 		playerStore.playMultipleNext(items);
-		toastStore.show({ message: `"${track.title}" plays next`, type: 'info' });
+		toastStore.show({ message: `"${track.title}" will play next`, type: 'info' });
 	}
 
 	function getTrackMenuItems(track: NavidromeTrackInfo): MenuItem[] {
@@ -115,13 +127,18 @@
 
 	$effect(() => {
 		fetchTracks();
+		return () => loader.abort();
 	});
 </script>
 
 <div class="container mx-auto max-w-7xl px-4 py-6">
-	<div class="h-[2px] rounded-full bg-gradient-to-r from-transparent via-[rgb(var(--brand-navidrome))] to-transparent opacity-40 mb-6"></div>
+	<div
+		class="h-[2px] rounded-full bg-gradient-to-r from-transparent via-[rgb(var(--brand-navidrome))] to-transparent opacity-40 mb-6"
+	></div>
 
-	<div class="mb-6 rounded-xl bg-base-200/30 backdrop-blur-sm border border-base-content/5 px-5 py-4 shadow-sm flex items-center gap-3">
+	<div
+		class="mb-6 rounded-xl bg-base-200/30 backdrop-blur-sm border border-base-content/5 px-5 py-4 shadow-sm flex items-center gap-3"
+	>
 		<a
 			href="/library/navidrome"
 			class="btn btn-ghost btn-sm gap-1"
@@ -138,12 +155,12 @@
 	</div>
 
 	<LibraryFilterBar
-		bind:searchQuery={searchQuery}
+		bind:searchQuery
 		onSearchInput={handleSearchInput}
-		placeholder="Search tracks..."
+		placeholder="Search tracks"
 		ariaLabel="Search tracks"
 		resultCount={loading ? null : data.total}
-		loading={loading}
+		{loading}
 	/>
 
 	{#if loading}
@@ -163,99 +180,131 @@
 	{:else if data.items.length === 0}
 		<div class="flex flex-col items-center justify-center py-20 text-base-content/50">
 			<NavidromeIcon class="mb-4 h-12 w-12 opacity-20" />
-			<p class="text-lg font-medium">{searchQuery ? 'No results found' : 'No tracks found'}</p>
-			<p class="mt-1 text-sm">{searchQuery ? 'Try a different search term' : 'Make sure Navidrome has music in its library'}</p>
+			<p class="text-lg font-medium">{searchQuery ? 'No matches' : 'No tracks yet'}</p>
+			<p class="mt-1 text-sm">
+				{searchQuery ? 'Try another search term.' : 'Add music to Navidrome to see tracks here.'}
+			</p>
 		</div>
 	{:else}
 		{#if data.items.length > 0}
 			<div class="flex items-center gap-2 mb-4">
-				<button
-					class="btn btn-sm btn-primary gap-1.5"
-					onclick={playAll}
-					aria-label="Play all tracks"
-				>
-					<Play class="h-3.5 w-3.5 fill-current" />
-					Play All
-				</button>
-				<button
-					class="btn btn-sm btn-ghost gap-1.5"
-					onclick={shuffleAll}
-					aria-label="Shuffle all tracks"
-				>
-					<Shuffle class="h-3.5 w-3.5" />
-					Shuffle
-				</button>
+				{#if loader.loading}
+					<button
+						class="btn btn-sm btn-primary gap-1.5"
+						onclick={() => loader.abort()}
+						aria-busy="true"
+						aria-label="Stop loading tracks"
+					>
+						<Loader2 class="h-3.5 w-3.5 animate-spin" />
+						{loader.progressText ?? 'Loading tracks'}
+					</button>
+				{:else}
+					<button
+						class="btn btn-sm btn-primary gap-1.5"
+						onclick={playAll}
+						aria-label="Play all tracks"
+					>
+						<Play class="h-3.5 w-3.5 fill-current" />
+						Play All
+					</button>
+					<button
+						class="btn btn-sm btn-ghost gap-1.5"
+						onclick={shuffleAll}
+						aria-label="Shuffle all tracks"
+					>
+						<Shuffle class="h-3.5 w-3.5" />
+						Shuffle
+					</button>
+				{/if}
 			</div>
 		{/if}
 
 		<div class="rounded-xl bg-base-100/40 shadow-sm overflow-hidden" use:reveal>
-				<table class="table table-sm w-full table-fixed">
-					<thead>
-						<tr class="text-base-content/50 border-b border-base-content/5">
-							<th scope="col" class="w-12 text-center">#</th>
-							<th scope="col">Title</th>
-							<th scope="col" class="hidden md:table-cell">Artist</th>
-							<th scope="col" class="hidden lg:table-cell">Album</th>
-							<th scope="col" class="w-16 text-right hidden sm:table-cell"></th>
-							<th scope="col" class="w-12 text-right hidden sm:table-cell"></th>
+			<table class="table table-sm w-full table-fixed">
+				<thead>
+					<tr class="text-base-content/50 border-b border-base-content/5">
+						<th scope="col" class="w-12 text-center">#</th>
+						<th scope="col">Title</th>
+						<th scope="col" class="hidden md:table-cell">Artist</th>
+						<th scope="col" class="hidden lg:table-cell">Album</th>
+						<th scope="col" class="w-16 text-right hidden sm:table-cell"></th>
+						<th scope="col" class="w-12 text-right hidden sm:table-cell"></th>
+					</tr>
+				</thead>
+				<tbody>
+					{#each data.items as track, i (track.navidrome_id)}
+						{@const playing = isTrackPlaying(track)}
+						<tr
+							class="group cursor-pointer transition-colors {playing
+								? 'bg-accent/10'
+								: 'hover:bg-base-200/50'}"
+							onclick={() => playTrack(i)}
+							onkeydown={(e) =>
+								(e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), playTrack(i))}
+							tabindex="0"
+							role="button"
+							aria-label="Play {track.title}"
+						>
+							<td class="text-center">
+								<div class="flex items-center justify-center w-8 h-8">
+									{#if playing}
+										<NowPlayingIndicator />
+									{:else}
+										<span class="text-base-content/40 text-sm tabular-nums group-hover:hidden"
+											>{i + 1}</span
+										>
+										<Play class="h-3.5 w-3.5 fill-current text-primary hidden group-hover:block" />
+									{/if}
+								</div>
+							</td>
+							<td class="overflow-hidden">
+								<div class="font-medium truncate text-sm {playing ? 'text-accent' : ''}">
+									{track.title}
+								</div>
+								<div class="text-xs text-base-content/50 md:hidden truncate">
+									{track.artist_name}
+								</div>
+							</td>
+							<td class="hidden md:table-cell overflow-hidden">
+								<span
+									class="text-sm text-base-content/60 truncate block {playing
+										? 'text-accent/70'
+										: ''}">{track.artist_name}</span
+								>
+							</td>
+							<td class="hidden lg:table-cell overflow-hidden">
+								<span class="text-sm text-base-content/50 truncate block">{track.album_name}</span>
+							</td>
+							<td class="text-right hidden sm:table-cell">
+								<span
+									class="text-sm text-base-content/40 tabular-nums {playing
+										? 'text-accent/60'
+										: ''}"
+								>
+									{formatDurationSec(track.duration_seconds)}
+								</span>
+							</td>
+							<td class="text-right hidden sm:table-cell">
+								<div
+									class="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
+								>
+									{#if track.codec}
+										<span
+											class="text-[10px] font-medium text-base-content/30 tracking-wide uppercase"
+										>
+											{track.codec}
+											{#if track.bitrate}
+												<span class="ml-0.5 opacity-70">{Math.round(track.bitrate / 1000)}</span>
+											{/if}
+										</span>
+									{/if}
+									<ContextMenu items={getTrackMenuItems(track)} position="end" size="xs" />
+								</div>
+							</td>
 						</tr>
-					</thead>
-					<tbody>
-						{#each data.items as track, i (track.navidrome_id)}
-							{@const playing = isTrackPlaying(track)}
-							<tr
-								class="group cursor-pointer transition-colors {playing
-									? 'bg-accent/10'
-									: 'hover:bg-base-200/50'}"
-								onclick={() => playTrack(i)}
-								onkeydown={(e) =>
-									(e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), playTrack(i))}
-								tabindex="0"
-								role="button"
-								aria-label="Play {track.title}"
-							>
-								<td class="text-center">
-									<div class="flex items-center justify-center w-8 h-8">
-										{#if playing}
-											<NowPlayingIndicator />
-										{:else}
-											<span class="text-base-content/40 text-sm tabular-nums group-hover:hidden">{i + 1}</span>
-											<Play class="h-3.5 w-3.5 fill-current text-primary hidden group-hover:block" />
-										{/if}
-									</div>
-								</td>
-								<td class="overflow-hidden">
-									<div class="font-medium truncate text-sm {playing ? 'text-accent' : ''}">{track.title}</div>
-									<div class="text-xs text-base-content/50 md:hidden truncate">{track.artist_name}</div>
-								</td>
-								<td class="hidden md:table-cell overflow-hidden">
-									<span class="text-sm text-base-content/60 truncate block {playing ? 'text-accent/70' : ''}">{track.artist_name}</span>
-								</td>
-								<td class="hidden lg:table-cell overflow-hidden">
-									<span class="text-sm text-base-content/50 truncate block">{track.album_name}</span>
-								</td>
-								<td class="text-right hidden sm:table-cell">
-									<span class="text-sm text-base-content/40 tabular-nums {playing ? 'text-accent/60' : ''}">
-										{formatDurationSec(track.duration_seconds)}
-									</span>
-								</td>
-								<td class="text-right hidden sm:table-cell">
-									<div class="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-										{#if track.codec}
-											<span class="text-[10px] font-medium text-base-content/30 tracking-wide uppercase">
-												{track.codec}
-												{#if track.bitrate}
-													<span class="ml-0.5 opacity-70">{Math.round(track.bitrate / 1000)}</span>
-												{/if}
-											</span>
-										{/if}
-										<ContextMenu items={getTrackMenuItems(track)} position="end" size="xs" />
-									</div>
-								</td>
-							</tr>
-						{/each}
-					</tbody>
-				</table>
+					{/each}
+				</tbody>
+			</table>
 		</div>
 
 		{#if totalPages > 1}
