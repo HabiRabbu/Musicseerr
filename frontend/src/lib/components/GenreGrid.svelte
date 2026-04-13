@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { getApiUrl } from '$lib/utils/api';
+	import { getApiUrl } from '$lib/api/api-utils';
 	import { imageSettingsStore } from '$lib/stores/imageSettings';
 	import { appendAudioDBSizeSuffix } from '$lib/utils/imageSuffix';
 

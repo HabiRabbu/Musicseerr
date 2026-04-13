@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { getApiUrl } from '$lib/utils/api';
+	import { getApiUrl } from '$lib/api/api-utils';
 	interface CacheStats {
 		memory_entries: number;
 		memory_size_bytes: number;

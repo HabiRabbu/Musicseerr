@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { getApiUrl } from '$lib/utils/api';
+	import { getApiUrl } from '$lib/api/api-utils';
 	import { page } from '$app/state';
 	import { onMount, onDestroy } from 'svelte';
 	import { beforeNavigate } from '$app/navigation';

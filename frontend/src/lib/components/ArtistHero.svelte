@@ -11,7 +11,7 @@
 	import ArtistMonitoringToggle from './ArtistMonitoringToggle.svelte';
 	import BackButton from './BackButton.svelte';
 	import HeroBackdrop from './HeroBackdrop.svelte';
-	import { getApiUrl } from '$lib/utils/api';
+	import { getApiUrl } from '$lib/api/api-utils';
 
 	interface Props {
 		artist: ArtistInfo;

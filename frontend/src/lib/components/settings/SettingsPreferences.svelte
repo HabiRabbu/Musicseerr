@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { getApiUrl } from '$lib/utils/api';
+	import { getApiUrl } from '$lib/api/api-utils';
 	import { browser } from '$app/environment';
 	import { preferencesStore } from '$lib/stores/preferences';
 	import { integrationStore } from '$lib/stores/integration';

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { AlbumBasicInfo, AlbumTracksInfo } from '$lib/types';
-	import { getApiUrl } from '$lib/utils/api';
+	import { getApiUrl } from '$lib/api/api-utils';
 	import { colors } from '$lib/colors';
 	import AlbumImage from '$lib/components/AlbumImage.svelte';
 	import HeroBackdrop from '$lib/components/HeroBackdrop.svelte';

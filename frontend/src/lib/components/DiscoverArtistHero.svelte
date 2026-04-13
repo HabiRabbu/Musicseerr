@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { getApiUrl } from '$lib/utils/api';
+	import { getApiUrl } from '$lib/api/api-utils';
 	import type { BecauseYouListenTo } from '$lib/types';
 	import HomeSection from './HomeSection.svelte';
 	import HeroBackdrop from './HeroBackdrop.svelte';

@@ -1,7 +1,7 @@
 import { browser } from '$app/environment';
 import { api } from '$lib/api/client';
 import { libraryStore } from '$lib/stores/library';
-import { getApiUrl } from '$lib/utils/api';
+import { getApiUrl } from '$lib/api/api-utils';
 
 export type SyncStatus = {
 	is_syncing: boolean;

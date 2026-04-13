@@ -8,7 +8,7 @@
     <Support>https://github.com/HabiRabbu/Musicseerr/issues</Support>
     <Project>https://github.com/HabiRabbu/Musicseerr</Project>
     <Overview>MusicSeerr is a self-hosted music request and discovery app built around Lidarr. Search the full MusicBrainz catalogue, request albums, stream music from Jellyfin or Navidrome, discover new music based on your listening history, and scrobble to ListenBrainz and Last.fm. Requires a running Lidarr instance.</Overview>
-    <Category>MediaApp:Music</Category>
+    <Category>MediaApp:Music MediaServer:Music</Category>
     <WebUI>http://[IP]:[PORT:8688]</WebUI>
     <TemplateURL>https://raw.githubusercontent.com/HabiRabbu/Musicseerr/main/templates/musicseerr.xml</TemplateURL>
     <Icon>https://raw.githubusercontent.com/HabiRabbu/Musicseerr/main/Images/logo_icon.png</Icon>
@@ -24,4 +24,5 @@
     <Config Name="PUID" Target="PUID" Default="99" Mode="" Description="User ID for file permissions inside the container. Run 'id' on your Unraid terminal to find your value." Type="Variable" Display="advanced" Required="false" Mask="false">99</Config>
     <Config Name="PGID" Target="PGID" Default="100" Mode="" Description="Group ID for file permissions inside the container. Run 'id' on your Unraid terminal to find your value." Type="Variable" Display="advanced" Required="false" Mask="false">100</Config>
     <Config Name="Timezone" Target="TZ" Default="Europe/London" Mode="" Description="Your timezone. Examples: America/New_York, Europe/Berlin, Asia/Tokyo." Type="Variable" Display="always" Required="false" Mask="false">Europe/London</Config>
+    <Config Name="UMASK" Target="UMASK" Default="002" Mode="" Description="Umask for file creation permissions inside the container." Type="Variable" Display="advanced" Required="false" Mask="false">002</Config>
 </Container>

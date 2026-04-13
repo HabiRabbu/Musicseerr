@@ -1,5 +1,5 @@
 import { isValidMbid } from '$lib/utils/formatting';
-import { getApiUrl } from '$lib/utils/api';
+import { getApiUrl } from '$lib/api/api-utils';
 
 export function isAbortError(error: unknown): boolean {
 	return (

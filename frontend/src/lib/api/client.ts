@@ -1,5 +1,5 @@
 import { pageFetch } from '$lib/utils/navigationAbort';
-import { getApiUrl } from '$lib/utils/api';
+import { getApiUrl } from '$lib/api/api-utils';
 
 export class ApiError extends Error {
 	readonly status: number;

@@ -12,7 +12,7 @@
 	import { toastStore } from '$lib/stores/toast';
 	import { getCacheTTL } from '$lib/stores/cacheTtl';
 	import { extractDominantColor, DEFAULT_GRADIENT } from '$lib/utils/colors';
-	import { getApiUrl } from '$lib/utils/api';
+	import { getApiUrl } from '$lib/api/api-utils';
 	import { Music } from 'lucide-svelte';
 	import BackButton from '$lib/components/BackButton.svelte';
 	import HeroBackdrop from '$lib/components/HeroBackdrop.svelte';

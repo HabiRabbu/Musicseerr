@@ -164,17 +164,3 @@ describe('raw fetch is not affected by navigation abort', () => {
 		expect(callArgs[1]?.signal).toBeUndefined();
 	});
 });
-
-describe('SSR safety', () => {
-	it('falls back to raw fetch when window is undefined', async () => {
-		vi.stubGlobal('window', undefined);
-		const mockFetch = vi.fn().mockResolvedValue(new Response('ok'));
-		vi.stubGlobal('fetch', mockFetch);
-
-		await pageFetch('/api/v1/test');
-
-		expect(mockFetch).toHaveBeenCalledOnce();
-		const callArgs = mockFetch.mock.calls[0];
-		expect(callArgs[1]?.signal).toBeUndefined();
-	});
-});

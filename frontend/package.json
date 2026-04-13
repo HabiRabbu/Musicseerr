@@ -4,11 +4,12 @@
 	"version": "1.0.0",
 	"type": "module",
 	"scripts": {
-		"dev": "vite dev",
+		"dev": "vite dev --open",
 		"build": "vite build",
 		"preview": "vite preview",
 		"tailwind": "tailwindcss -i ./src/app.css -o ./static/tailwind.css --watch",
 		"prepare": "svelte-kit sync || echo ''",
+		"check:ci": "pnpm check && pnpm format:check && pnpm lint",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"format": "prettier --write .",
@@ -47,6 +48,11 @@
 		"vitest-browser-svelte": "^1.1.0"
 	},
 	"dependencies": {
-		"lucide-svelte": "^0.575.0"
+		"@tanstack/svelte-query": "^6.1.13",
+		"@tanstack/svelte-query-devtools": "^6.1.13",
+		"@tanstack/svelte-query-persist-client": "^6.1.13",
+		"idb-keyval": "^6.2.2",
+		"lucide-svelte": "^0.575.0",
+		"runed": "^0.37.1"
 	}
 }

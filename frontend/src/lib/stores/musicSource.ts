@@ -7,14 +7,14 @@ export type MusicSource = 'listenbrainz' | 'lastfm';
 export type MusicSourcePage = keyof typeof PAGE_SOURCE_KEYS;
 
 const CACHED_SOURCE_KEY = 'musicseerr_primary_source';
-const DEFAULT_SOURCE: MusicSource = 'listenbrainz';
+export const DEFAULT_SOURCE: MusicSource = 'listenbrainz';
 
 interface MusicSourceState {
 	source: MusicSource;
 	loaded: boolean;
 }
 
-function isMusicSource(value: unknown): value is MusicSource {
+export function isMusicSource(value: unknown): value is MusicSource {
 	return value === 'listenbrainz' || value === 'lastfm';
 }
 

@@ -330,7 +330,7 @@
 							{/if}
 
 							<div class="grid-cards-overview lg:col-span-2">
-								{#each items.slice(0, 8) as item, idx (item.mbid)}
+								{#each items.slice(0, 8) as item, idx (idx)}
 									{@const rank = idx + 2}
 									{@const itemHref = getItemHref(item)}
 									<TimeRangeCard
@@ -351,7 +351,7 @@
 						</div>
 					{:else if expandedData}
 						<div class="grid-cards">
-							{#each expandedData.items as item, idx (item.mbid)}
+							{#each expandedData.items as item, idx (idx)}
 								{@const rank = idx + 1}
 								{@const itemHref = getItemHref(item)}
 								<TimeRangeCard
