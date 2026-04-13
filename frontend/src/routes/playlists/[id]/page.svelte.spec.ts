@@ -131,7 +131,9 @@ describe('Playlist detail page', () => {
 		mockGoto.mockReset();
 		try {
 			localStorage.clear();
-		} catch {}
+		} catch {
+			// migh throw in environments without localStorage
+		}
 	});
 
 	it('renders header with playlist name, track count, and duration', async () => {
