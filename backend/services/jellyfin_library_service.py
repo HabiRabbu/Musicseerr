@@ -1,4 +1,5 @@
 import asyncio
+import logging
 
 from api.v1.schemas.jellyfin import (
     JellyfinAlbumDetail,
@@ -27,6 +28,8 @@ from core.exceptions import ExternalServiceError
 from repositories.protocols import JellyfinRepositoryProtocol
 from repositories.jellyfin_models import JellyfinItem
 from services.preferences_service import PreferencesService
+
+logger = logging.getLogger(__name__)
 
 
 class JellyfinLibraryService:

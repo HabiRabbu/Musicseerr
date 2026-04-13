@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock, MagicMock, PropertyMock
 
 import pytest
 
+from core.exceptions import ExternalServiceError
 from repositories.plex_models import PlexPlaylist, PlexTrack
 from repositories.navidrome_models import SubsonicPlaylist, SubsonicSong
 from repositories.jellyfin_models import JellyfinItem
@@ -325,6 +326,6 @@ class TestJellyfinImportPlaylist:
         svc = _jellyfin_service(playlists=[pl], items=tracks)
         ps = _mock_playlist_service()
         ps.add_tracks = AsyncMock(side_effect=Exception("fail"))
-        with pytest.raises(Exception):
+        with pytest.raises(ExternalServiceError):
             await svc.import_playlist("jf-1", ps)
         ps.delete_playlist.assert_awaited_once_with("new-pl-1")
