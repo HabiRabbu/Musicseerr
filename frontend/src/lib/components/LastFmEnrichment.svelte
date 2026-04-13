@@ -3,7 +3,7 @@
 	import LastFmInfoCard from './LastFmInfoCard.svelte';
 
 	interface Props {
-		enrichment: LastFmArtistEnrichment | null;
+		enrichment: LastFmArtistEnrichment | null | undefined;
 		loading?: boolean;
 		enabled?: boolean;
 	}

@@ -387,13 +387,14 @@ class ArtistService:
         artist_id: str,
         library_artist_mbids: set[str] = None,
         library_album_mbids: dict[str, Any] = None,
-        include_extended: bool = True
+        include_extended: bool = True,
+        include_releases: bool = True,
     ) -> ArtistInfo:
         mb_artist, library_mbids, album_mbids, requested_mbids = await self._fetch_artist_data(
             artist_id, library_artist_mbids, library_album_mbids
         )
         in_library = artist_id.lower() in library_mbids
-        albums, singles, eps = await self._get_categorized_releases(mb_artist, album_mbids, requested_mbids)
+        albums, singles, eps = (await self._get_categorized_releases(mb_artist, album_mbids, requested_mbids)) if include_releases else ([], [], [])
         description, image = (await self._fetch_wikidata_info(mb_artist)) if include_extended else (None, None)
         info = build_base_artist_info(
             mb_artist, artist_id, in_library,
@@ -419,7 +420,7 @@ class ArtistService:
         future: asyncio.Future[ArtistInfo] = loop.create_future()
         self._artist_basic_in_flight[artist_id] = future
         try:
-            artist_info = await self._build_artist_from_musicbrainz(artist_id, include_extended=False)
+            artist_info = await self._build_artist_from_musicbrainz(artist_id, include_extended=False, include_releases=False)
             artist_info = await self._apply_audiodb_artist_images(
                 artist_info, artist_id, artist_info.name, allow_fetch=False,
             )

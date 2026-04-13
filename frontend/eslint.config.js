@@ -62,6 +62,12 @@ export default defineConfig(
 						"CallExpression[callee.object.name='queryClient'][callee.property.name='setQueryData']",
 					message:
 						"Direct use of 'queryClient.setQueryData' is forbidden. Please use the 'setQueryDataWithPersister' function instead."
+				},
+				{
+					selector:
+						"CallExpression[callee.object.name='queryClient'][callee.property.name='invalidateQueries']",
+					message:
+						"Direct use of 'queryClient.invalidateQueries' is forbidden. Please use the custom 'invalidateQueriesWithPersister' hook instead."
 				}
 			]
 		}

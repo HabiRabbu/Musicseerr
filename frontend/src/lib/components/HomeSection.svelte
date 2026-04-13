@@ -167,6 +167,7 @@
 						<svelte:element
 							this={artistHref ? 'a' : 'div'}
 							href={artistHref ?? undefined}
+							data-sveltekit-preload-data={artistHref ? 'hover' : undefined}
 							class="card bg-base-100 w-full shadow-sm transition-all {artistHref
 								? 'cursor-pointer hover:scale-105 active:scale-95 hover:shadow-[0_0_20px_rgba(174,213,242,0.15)]'
 								: 'cursor-default opacity-80'}"
