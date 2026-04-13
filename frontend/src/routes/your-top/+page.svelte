@@ -1,11 +1,11 @@
 <script lang="ts">
 	import TimeRangeView from '$lib/components/TimeRangeView.svelte';
-	import SourceSwitcher from '$lib/components/SourceSwitcher.svelte';
 	import { type MusicSource } from '$lib/stores/musicSource';
 	import { Disc3 } from 'lucide-svelte';
 	import { PersistedState } from 'runed';
 	import { PAGE_SOURCE_KEYS } from '$lib/constants';
 	import type { PageProps } from './$types';
+	import SimpleSourceSwitcher from '$lib/components/SimpleSourceSwitcher.svelte';
 
 	const { data }: PageProps = $props();
 
@@ -28,7 +28,10 @@
 
 <div class="space-y-4 px-4 sm:px-6 lg:px-8">
 	<div class="flex justify-end">
-		<SourceSwitcher pageKey="yourTop" onSourceChange={handleSourceChange} />
+		<SimpleSourceSwitcher
+			currentSource={activeSource.current}
+			onSourceChange={handleSourceChange}
+		/>
 	</div>
 	<TimeRangeView
 		itemType="album"
