@@ -46,9 +46,7 @@
 					</td>
 					<td>
 						<div class="flex items-center gap-3">
-							<div
-								class="hidden h-8 w-8 shrink-0 overflow-hidden rounded sm:block"
-							>
+							<div class="hidden h-8 w-8 shrink-0 overflow-hidden rounded sm:block">
 								<AlbumImage
 									mbid={track.album_id ?? track.id}
 									customUrl={track.image_url}

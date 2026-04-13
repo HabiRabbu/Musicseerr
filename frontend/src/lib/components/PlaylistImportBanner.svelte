@@ -57,16 +57,13 @@
 						<div
 							class="absolute h-20 w-20 overflow-hidden rounded-xl border-2 border-base-100 shadow-md transition-all duration-500"
 							style="
-								transform: rotate({isHovered ? angle * 1.4 : angle}deg) translateX({isHovered ? offset * 1.3 : offset}px);
+								transform: rotate({isHovered ? angle * 1.4 : angle}deg) translateX({isHovered
+								? offset * 1.3
+								: offset}px);
 								z-index: {i};
 							"
 						>
-							<img
-								src={url}
-								alt=""
-								class="h-full w-full object-cover"
-								loading="lazy"
-							/>
+							<img src={url} alt="" class="h-full w-full object-cover" loading="lazy" />
 						</div>
 					{/each}
 				{:else}
@@ -117,11 +114,7 @@
 				</div>
 
 				<div class="relative shrink-0">
-					<svg
-						class="h-16 w-16 -rotate-90 sm:h-[72px] sm:w-[72px]"
-						viewBox="0 0 64 64"
-						fill="none"
-					>
+					<svg class="h-16 w-16 -rotate-90 sm:h-[72px] sm:w-[72px]" viewBox="0 0 64 64" fill="none">
 						<circle
 							cx="32"
 							cy="32"
@@ -153,16 +146,18 @@
 					</div>
 				</div>
 
-				<div
-					class="hidden shrink-0 sm:flex"
-				>
+				<div class="hidden shrink-0 sm:flex">
 					<div
 						class="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 transition-all duration-300 group-hover:bg-primary/20 group-hover:scale-110"
 					>
 						{#if allImported}
-							<ArrowRight class="h-5 w-5 text-primary transition-transform duration-300 group-hover:translate-x-0.5" />
+							<ArrowRight
+								class="h-5 w-5 text-primary transition-transform duration-300 group-hover:translate-x-0.5"
+							/>
 						{:else}
-							<ChevronRight class="h-5 w-5 text-primary transition-transform duration-300 group-hover:translate-x-0.5" />
+							<ChevronRight
+								class="h-5 w-5 text-primary transition-transform duration-300 group-hover:translate-x-0.5"
+							/>
 						{/if}
 					</div>
 				</div>

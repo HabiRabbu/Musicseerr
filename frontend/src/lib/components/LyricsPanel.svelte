@@ -34,9 +34,7 @@
 	let scrollTimeout: ReturnType<typeof setTimeout> | undefined;
 
 	const timedLines = $derived(
-		isSynced && lines.length > 0
-			? lines.filter((l) => l.start_seconds !== null)
-			: []
+		isSynced && lines.length > 0 ? lines.filter((l) => l.start_seconds !== null) : []
 	);
 
 	const activeLineIndex = $derived.by(() => {
@@ -119,18 +117,18 @@
 				onscroll={onUserScroll}
 			>
 				{#if isLoading}
-				<div class="flex flex-col items-center justify-center py-12 gap-3">
-					<Loader2 class="h-6 w-6 animate-spin text-primary" />
-					<p class="text-sm text-base-content/50">Loading lyrics...</p>
-				</div>
-			{:else if hasError}
-				<div class="flex flex-col items-center justify-center py-8 gap-2">
-					<AlertCircle class="h-5 w-5 text-warning" />
-					<p class="text-center text-base-content/50 text-sm">
-						Couldn't load the lyrics. Try again in a bit.
-					</p>
-				</div>
-			{:else if timedLines.length > 0}
+					<div class="flex flex-col items-center justify-center py-12 gap-3">
+						<Loader2 class="h-6 w-6 animate-spin text-primary" />
+						<p class="text-sm text-base-content/50">Loading lyrics...</p>
+					</div>
+				{:else if hasError}
+					<div class="flex flex-col items-center justify-center py-8 gap-2">
+						<AlertCircle class="h-5 w-5 text-warning" />
+						<p class="text-center text-base-content/50 text-sm">
+							Couldn't load the lyrics. Try again in a bit.
+						</p>
+					</div>
+				{:else if timedLines.length > 0}
 					<div class="space-y-2">
 						{#each timedLines as line, i (i)}
 							<p
@@ -148,7 +146,9 @@
 					<pre
 						class="whitespace-pre-wrap font-sans text-sm leading-relaxed text-base-content/80">{lyricsText}</pre>
 				{:else}
-					<p class="text-center text-base-content/40 py-8">Lyrics aren't available for this track.</p>
+					<p class="text-center text-base-content/40 py-8">
+						Lyrics aren't available for this track.
+					</p>
 				{/if}
 			</div>
 

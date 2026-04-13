@@ -23,9 +23,7 @@
 				<div class="flex items-center justify-center rounded-lg bg-primary/10 p-1.5">
 					<Sparkles class="h-4.5 w-4.5 text-primary" />
 				</div>
-				<h2 class="text-lg font-semibold tracking-tight text-base-content sm:text-xl">
-					Discover
-				</h2>
+				<h2 class="text-lg font-semibold tracking-tight text-base-content sm:text-xl">Discover</h2>
 			</div>
 
 			{@render children()}

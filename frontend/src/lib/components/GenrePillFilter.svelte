@@ -37,9 +37,7 @@
 		return !selected;
 	}
 
-	let visibleGenres = $derived(
-		maxVisible > 0 && !expanded ? genres.slice(0, maxVisible) : genres
-	);
+	let visibleGenres = $derived(maxVisible > 0 && !expanded ? genres.slice(0, maxVisible) : genres);
 	let hasOverflow = $derived(maxVisible > 0 && genres.length > maxVisible);
 </script>
 

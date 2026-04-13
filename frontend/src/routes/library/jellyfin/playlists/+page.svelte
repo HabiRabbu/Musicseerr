@@ -41,9 +41,7 @@
 	{:else if error}
 		<div class="alert alert-error">{error}</div>
 	{:else if playlists.length === 0}
-		<p class="text-base-content/50 text-center py-12">
-			No playlists were found in Jellyfin.
-		</p>
+		<p class="text-base-content/50 text-center py-12">No playlists were found in Jellyfin.</p>
 	{:else}
 		<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
 			{#each playlists as playlist (playlist.id)}

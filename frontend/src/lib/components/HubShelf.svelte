@@ -16,8 +16,15 @@
 <section class="space-y-3">
 	<div class="flex items-center justify-between px-1">
 		{#if seeAllHref}
-			<a href={seeAllHref} class="group/title flex items-center gap-1 transition-colors hover:text-primary">
-				<h2 class="text-lg font-semibold text-base-content group-hover/title:text-primary sm:text-xl">{title}</h2>
+			<a
+				href={seeAllHref}
+				class="group/title flex items-center gap-1 transition-colors hover:text-primary"
+			>
+				<h2
+					class="text-lg font-semibold text-base-content group-hover/title:text-primary sm:text-xl"
+				>
+					{title}
+				</h2>
 			</a>
 		{:else}
 			<h2 class="text-lg font-semibold text-base-content sm:text-xl">{title}</h2>

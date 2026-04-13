@@ -32,7 +32,12 @@
 		loading = true;
 		try {
 			artists = await api.get<PlexArtistPage>(
-				API.plexLibrary.artistsBrowse(PAGE_SIZE, currentPage * PAGE_SIZE, `${sortBy}:${sortOrder}`, searchQuery)
+				API.plexLibrary.artistsBrowse(
+					PAGE_SIZE,
+					currentPage * PAGE_SIZE,
+					`${sortBy}:${sortOrder}`,
+					searchQuery
+				)
 			);
 		} catch {
 			artists = { items: [], total: 0, offset: 0, limit: PAGE_SIZE };
@@ -76,14 +81,14 @@
 </script>
 
 <div class="container mx-auto max-w-7xl px-4 py-6">
-	<div class="h-[2px] rounded-full bg-gradient-to-r from-transparent via-[rgb(var(--brand-plex))] to-transparent opacity-40 mb-6"></div>
+	<div
+		class="h-[2px] rounded-full bg-gradient-to-r from-transparent via-[rgb(var(--brand-plex))] to-transparent opacity-40 mb-6"
+	></div>
 
-	<div class="mb-6 rounded-xl bg-base-200/30 backdrop-blur-sm border border-base-content/5 px-5 py-4 shadow-sm flex items-center gap-3">
-		<a
-			href="/library/plex"
-			class="btn btn-ghost btn-sm gap-1"
-			aria-label="Back to Plex library"
-		>
+	<div
+		class="mb-6 rounded-xl bg-base-200/30 backdrop-blur-sm border border-base-content/5 px-5 py-4 shadow-sm flex items-center gap-3"
+	>
+		<a href="/library/plex" class="btn btn-ghost btn-sm gap-1" aria-label="Back to Plex library">
 			<ChevronLeft class="h-4 w-4" />
 			Back
 		</a>
@@ -97,18 +102,18 @@
 	</div>
 
 	<LibraryFilterBar
-		bind:searchQuery={searchQuery}
+		bind:searchQuery
 		onSearchInput={handleSearchInput}
 		placeholder="Search artists..."
 		ariaLabel="Search artists"
 		sortOptions={ARTIST_SORT_OPTIONS}
-		sortBy={sortBy}
+		{sortBy}
 		onSortChange={handleSortChange}
-		sortOrder={sortOrder}
+		{sortOrder}
 		onToggleSortOrder={toggleSortOrder}
 		ascValue="asc"
 		resultCount={loading ? null : artists.total}
-		loading={loading}
+		{loading}
 	/>
 
 	{#if loading}
@@ -123,7 +128,9 @@
 		<div class="flex flex-col items-center justify-center py-20 text-base-content/50">
 			<PlexIcon class="mb-4 h-12 w-12 opacity-20" />
 			<p class="text-lg font-medium">{searchQuery ? 'No results found' : 'No artists found'}</p>
-			<p class="mt-1 text-sm">{searchQuery ? `Try a different search term` : 'Make sure Plex has music in its library'}</p>
+			<p class="mt-1 text-sm">
+				{searchQuery ? `Try a different search term` : 'Make sure Plex has music in its library'}
+			</p>
 		</div>
 	{:else}
 		<div class="rounded-xl bg-base-100/40 p-5 shadow-sm" use:reveal>

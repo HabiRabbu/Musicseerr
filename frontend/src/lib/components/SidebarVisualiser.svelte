@@ -19,7 +19,9 @@
 			data-tip="{session.track_name} - {session.artist_name}"
 			aria-label="Now playing: {session.track_name} by {session.artist_name}"
 		>
-			<div class="now-playing-bars now-playing-bars--sm {isPaused ? 'now-playing-bars--paused' : ''}">
+			<div
+				class="now-playing-bars now-playing-bars--sm {isPaused ? 'now-playing-bars--paused' : ''}"
+			>
 				<span></span><span></span><span></span>
 			</div>
 			<span class="is-drawer-close:hidden truncate text-xs opacity-70">

@@ -72,7 +72,7 @@ export interface LibraryAdapter<TAlbum> {
 
 export function createLibraryController<TAlbum>(
 	adapter: LibraryAdapter<TAlbum>,
-	options?: { initialSortBy?: string; initialSortOrder?: string },
+	options?: { initialSortBy?: string; initialSortOrder?: string }
 ) {
 	let albums = $state<TAlbum[]>([]);
 	let recentAlbums = $state<TAlbum[]>([]);
@@ -88,7 +88,10 @@ export function createLibraryController<TAlbum>(
 
 	let sortBy = $state(options?.initialSortBy ?? adapter.defaultSortBy);
 	let sortOrder = $state(
-		options?.initialSortOrder ?? (options?.initialSortBy ? adapter.getDefaultSortOrder(options.initialSortBy) : adapter.ascValue),
+		options?.initialSortOrder ??
+			(options?.initialSortBy
+				? adapter.getDefaultSortOrder(options.initialSortBy)
+				: adapter.ascValue)
 	);
 	let selectedGenre = $state('');
 	let selectedMood = $state('');

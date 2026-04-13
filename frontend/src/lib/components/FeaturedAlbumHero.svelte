@@ -53,7 +53,9 @@
 {#if hero}
 	<canvas bind:this={canvasEl} class="hidden" width="1" height="1"></canvas>
 	<section class="animate-fade-in-up space-y-0 overflow-hidden rounded-2xl">
-		<div class="relative flex min-h-[220px] items-center gap-6 overflow-hidden px-6 py-6 sm:min-h-[260px] sm:px-8 sm:py-8">
+		<div
+			class="relative flex min-h-[220px] items-center gap-6 overflow-hidden px-6 py-6 sm:min-h-[260px] sm:px-8 sm:py-8"
+		>
 			{#if hero.image_url}
 				<img
 					src={hero.image_url}
@@ -72,7 +74,9 @@
 				></div>
 			{/if}
 
-			<div class="pointer-events-none absolute inset-0 bg-gradient-to-r from-base-100/70 via-base-100/40 to-transparent"></div>
+			<div
+				class="pointer-events-none absolute inset-0 bg-gradient-to-r from-base-100/70 via-base-100/40 to-transparent"
+			></div>
 
 			<div class="relative z-10 flex items-center gap-6">
 				<button
@@ -109,7 +113,10 @@
 		</div>
 
 		{#if thumbnails.length > 0}
-			<div class="-mt-5 flex gap-3 overflow-x-auto px-6 pb-4 pt-5 scrollbar-hide" style="-webkit-mask-image: linear-gradient(to bottom, transparent, black 30%); mask-image: linear-gradient(to bottom, transparent, black 30%);">
+			<div
+				class="-mt-5 flex gap-3 overflow-x-auto px-6 pb-4 pt-5 scrollbar-hide"
+				style="-webkit-mask-image: linear-gradient(to bottom, transparent, black 30%); mask-image: linear-gradient(to bottom, transparent, black 30%);"
+			>
 				{#each thumbnails as album (getId(album))}
 					<button
 						class="shrink-0 overflow-hidden rounded-lg ring-2 ring-base-100/30 transition-all duration-300 hover:scale-105 hover:ring-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"

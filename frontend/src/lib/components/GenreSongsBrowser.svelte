@@ -81,8 +81,6 @@
 		const items = buildQueue(songs);
 		playerStore.playQueue(items, 0, true);
 	}
-
-
 </script>
 
 <div class="space-y-3">

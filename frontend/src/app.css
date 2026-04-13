@@ -368,12 +368,7 @@
 
 @utility section-divider-glow {
 	height: 2px;
-	background: linear-gradient(
-		to right,
-		transparent,
-		oklch(var(--p) / 0.15),
-		transparent
-	);
+	background: linear-gradient(to right, transparent, oklch(var(--p) / 0.15), transparent);
 	box-shadow: 0 0 8px oklch(var(--p) / 0.06);
 }
 

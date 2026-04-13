@@ -397,7 +397,9 @@
 									</div>
 									<span class="is-drawer-close:hidden">Jellyfin</span>
 									{#if nowPlayingMerged.isSourcePlaying('jellyfin')}
-										<div class="now-playing-bars now-playing-bars--sm ml-auto is-drawer-close:hidden">
+										<div
+											class="now-playing-bars now-playing-bars--sm ml-auto is-drawer-close:hidden"
+										>
 											<span></span><span></span><span></span>
 										</div>
 									{/if}
@@ -426,7 +428,9 @@
 									</div>
 									<span class="is-drawer-close:hidden">Navidrome</span>
 									{#if nowPlayingMerged.isSourcePlaying('navidrome')}
-										<div class="now-playing-bars now-playing-bars--sm ml-auto is-drawer-close:hidden">
+										<div
+											class="now-playing-bars now-playing-bars--sm ml-auto is-drawer-close:hidden"
+										>
 											<span></span><span></span><span></span>
 										</div>
 									{/if}
@@ -455,7 +459,9 @@
 									</div>
 									<span class="is-drawer-close:hidden">Plex</span>
 									{#if nowPlayingMerged.isSourcePlaying('plex')}
-										<div class="now-playing-bars now-playing-bars--sm ml-auto is-drawer-close:hidden">
+										<div
+											class="now-playing-bars now-playing-bars--sm ml-auto is-drawer-close:hidden"
+										>
 											<span></span><span></span><span></span>
 										</div>
 									{/if}

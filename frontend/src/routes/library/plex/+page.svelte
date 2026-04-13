@@ -84,7 +84,7 @@
 			loadHistory();
 			loadArtistIndex();
 		} catch (err) {
-			console.warn("[Hub] secondary load failed:", err);
+			console.warn('[Hub] secondary load failed:', err);
 			return;
 		} finally {
 			refreshing = false;
@@ -97,7 +97,7 @@
 			const resp = await api.get<PlexDiscoveryResponse>(API.plexLibrary.discovery());
 			discoveryHubs = resp.hubs;
 		} catch (err) {
-			console.warn("[Hub] secondary load failed:", err);
+			console.warn('[Hub] secondary load failed:', err);
 			discoveryHubs = [];
 		} finally {
 			discoveryLoading = false;
@@ -111,7 +111,7 @@
 			historyEntries = resp.entries;
 			historyTotal = resp.total;
 		} catch (err) {
-			console.warn("[Hub] secondary load failed:", err);
+			console.warn('[Hub] secondary load failed:', err);
 			historyEntries = [];
 		} finally {
 			historyLoading = false;
@@ -133,9 +133,7 @@
 	): Promise<BrowseTrack[]> {
 		const genre = genres[0];
 		if (!genre) return [];
-		const res = await api.get<PlexTrackPage>(
-			API.plexLibrary.genreSongs(genre, limit, offset)
-		);
+		const res = await api.get<PlexTrackPage>(API.plexLibrary.genreSongs(genre, limit, offset));
 		if (!res) return [];
 		if (plexGenreTrackMap.size > GENRE_MAP_MAX) plexGenreTrackMap.clear();
 		for (const t of res.items) plexGenreTrackMap.set(t.plex_id, t);
@@ -168,9 +166,30 @@
 	}
 
 	let browseCards = $derived<BrowseHeroCard[]>([
-		{ label: 'Albums', value: hub?.stats?.total_albums ?? null, href: '/library/plex/albums', subtitle: 'in your library', colorScheme: 'primary', icon: 'disc' },
-		{ label: 'Artists', value: hub?.stats?.total_artists ?? null, href: '/library/plex/artists', subtitle: 'in your library', colorScheme: 'secondary', icon: 'users' },
-		{ label: 'Tracks', value: hub?.stats?.total_tracks ?? null, href: '/library/plex/tracks', subtitle: 'in your library', colorScheme: 'accent', icon: 'music' }
+		{
+			label: 'Albums',
+			value: hub?.stats?.total_albums ?? null,
+			href: '/library/plex/albums',
+			subtitle: 'in your library',
+			colorScheme: 'primary',
+			icon: 'disc'
+		},
+		{
+			label: 'Artists',
+			value: hub?.stats?.total_artists ?? null,
+			href: '/library/plex/artists',
+			subtitle: 'in your library',
+			colorScheme: 'secondary',
+			icon: 'users'
+		},
+		{
+			label: 'Tracks',
+			value: hub?.stats?.total_tracks ?? null,
+			href: '/library/plex/tracks',
+			subtitle: 'in your library',
+			colorScheme: 'accent',
+			icon: 'music'
+		}
 	]);
 
 	function formatViewedAt(ts: string): string {
@@ -183,7 +202,7 @@
 				minute: '2-digit'
 			});
 		} catch (err) {
-			console.warn("[Hub] secondary load failed:", err);
+			console.warn('[Hub] secondary load failed:', err);
 			return '';
 		}
 	}
@@ -223,7 +242,7 @@
 			scrobbleEnabled = settings.scrobble_to_plex;
 			resetPlexScrobblePreference();
 		} catch (err) {
-			console.warn("[Hub] secondary load failed:", err);
+			console.warn('[Hub] secondary load failed:', err);
 			toastStore.show({
 				message: "Couldn't update the Plex scrobble setting.",
 				type: 'error'
@@ -235,11 +254,9 @@
 	async function loadArtistIndex() {
 		artistIndexLoading = true;
 		try {
-			artistIndex = await api.get<PlexArtistIndexResponse>(
-				API.plexLibrary.artistsIndex()
-			);
+			artistIndex = await api.get<PlexArtistIndexResponse>(API.plexLibrary.artistsIndex());
 		} catch (err) {
-			console.warn("[Hub] secondary load failed:", err);
+			console.warn('[Hub] secondary load failed:', err);
 			artistIndex = null;
 		} finally {
 			artistIndexLoading = false;
@@ -248,9 +265,16 @@
 </script>
 
 <div class="container mx-auto space-y-6 p-6">
-	<div class="h-[2px] rounded-full bg-gradient-to-r from-transparent via-[rgb(var(--brand-plex))] to-transparent opacity-40"></div>
+	<div
+		class="h-[2px] rounded-full bg-gradient-to-r from-transparent via-[rgb(var(--brand-plex))] to-transparent opacity-40"
+	></div>
 
-	<SourceHubHeader title="Plex Library" albumCount={hub?.stats?.total_albums ?? null} onrefresh={refreshHub} {refreshing}>
+	<SourceHubHeader
+		title="Plex Library"
+		albumCount={hub?.stats?.total_albums ?? null}
+		onrefresh={refreshHub}
+		{refreshing}
+	>
 		{#snippet icon()}
 			<PlexIcon class="h-8 w-8" style="color: rgb(var(--brand-plex));" />
 		{/snippet}
@@ -297,155 +321,155 @@
 	{#if loading && !hub}
 		<HubPageSkeleton />
 	{:else}
+		<FeaturedAlbumHero
+			albums={hub?.recently_played ?? []}
+			idKey="plex_id"
+			onAlbumClick={(a) => openAlbumDetail(a as PlexAlbumSummary)}
+		/>
 
-	<FeaturedAlbumHero
-		albums={hub?.recently_played ?? []}
-		idKey="plex_id"
-		onAlbumClick={(a) => openAlbumDetail(a as PlexAlbumSummary)}
-	/>
+		<DiscoveryZone>
+			<DiscoveryShelf
+				title="Recommended for you"
+				loading={discoveryLoading}
+				empty={!discoveryLoading && discoveryHubs.length === 0 && !loading}
+				emptyMessage="No recommendations available right now."
+				onrefresh={loadDiscovery}
+			>
+				{#each discoveryHubs as dHub (dHub.title)}
+					<div class="mb-4">
+						<h3 class="text-sm font-medium text-base-content/70 mb-2">{dHub.title}</h3>
+						<HorizontalCarousel>
+							{#each dHub.albums as album (album.plex_id)}
+								<SourceAlbumCardCompact
+									imageId={album.plex_id}
+									imageUrl={album.image_url}
+									name={album.name}
+									artistName={album.artist_name}
+									onclick={() =>
+										openAlbumDetail({
+											plex_id: album.plex_id,
+											name: album.name,
+											artist_name: album.artist_name,
+											year: album.year,
+											image_url: album.image_url,
+											track_count: 0
+										})}
+								/>
+							{/each}
+						</HorizontalCarousel>
+					</div>
+				{/each}
+			</DiscoveryShelf>
 
-	<DiscoveryZone>
-		<DiscoveryShelf
-			title="Recommended for you"
-			loading={discoveryLoading}
-			empty={!discoveryLoading && discoveryHubs.length === 0 && !loading}
-			emptyMessage="No recommendations available right now."
-			onrefresh={loadDiscovery}
-		>
-			{#each discoveryHubs as dHub (dHub.title)}
-				<div class="mb-4">
-					<h3 class="text-sm font-medium text-base-content/70 mb-2">{dHub.title}</h3>
+			{#if hub && hub.genres.length > 0}
+				<DiscoveryShelf title="Browse by Genre" emptyMessage="Pick a genre to browse tracks.">
+					<GenreSongsBrowser
+						genres={hub.genres}
+						fetchSongs={fetchPlexGenreSongs}
+						buildQueue={buildPlexGenreQueue}
+					/>
+				</DiscoveryShelf>
+			{/if}
+		</DiscoveryZone>
+
+		<div use:reveal>
+			<HubShelf title="Recently Added" {loading} seeAllHref="/library/plex/albums?sort=date_added">
+				{#if hub && hub.recently_added.length > 0}
+					<AlbumGrid
+						albums={hub.recently_added}
+						idKey="plex_id"
+						seeAllHref="/library/plex/albums?sort=date_added"
+						onAlbumClick={(a) => openAlbumDetail(a as PlexAlbumSummary)}
+					/>
+				{:else if hub}
+					<p class="text-sm text-base-content/50">Nothing new yet.</p>
+				{/if}
+			</HubShelf>
+		</div>
+
+		<div class="section-divider-glow"></div>
+
+		<div use:reveal>
+			<HubShelf title="Listening History" loading={historyLoading}>
+				{#if historyEntries.length > 0}
+					<div class="overflow-x-auto rounded-lg">
+						<table class="table table-sm">
+							<thead>
+								<tr>
+									<th>Track</th>
+									<th>Artist</th>
+									<th>Album</th>
+									<th>When</th>
+									<th>Device</th>
+								</tr>
+							</thead>
+							<tbody>
+								{#each historyEntries as entry (entry.rating_key + entry.viewed_at)}
+									<tr
+										class="hover transition-all duration-200 hover:border-l-2 hover:border-l-primary hover:pl-1"
+									>
+										<td class="font-medium">{entry.track_title}</td>
+										<td class="text-base-content/60">{entry.artist_name}</td>
+										<td class="text-base-content/60">{entry.album_name}</td>
+										<td class="text-base-content/50 text-xs">{formatViewedAt(entry.viewed_at)}</td>
+										<td class="text-base-content/50 text-xs">{entry.device_name}</td>
+									</tr>
+								{/each}
+							</tbody>
+						</table>
+					</div>
+					{#if historyTotal > 10}
+						<div class="mt-2 flex gap-2">
+							<a href="/library/plex/activity" class="btn btn-sm btn-outline">
+								View full history and analytics ({historyTotal.toLocaleString()} plays)
+							</a>
+						</div>
+					{/if}
+				{:else if !historyLoading}
+					<p class="text-sm text-base-content/50">No listening history is available yet.</p>
+				{/if}
+			</HubShelf>
+		</div>
+
+		<div class="section-divider-glow"></div>
+
+		<div class="mt-10 mb-6 rounded-2xl bg-base-200/20 p-6 space-y-6">
+			<HubShelf title="Artists A-Z" loading={artistIndexLoading}>
+				{#if genericArtistIndex.length > 0}
+					<ArtistIndexSidebar
+						index={genericArtistIndex}
+						onselect={(artist) => {
+							if (artist.musicbrainz_id) {
+								goto(`/artist/${artist.musicbrainz_id}`);
+							} else {
+								goto(`/library/plex/artists?search=${encodeURIComponent(artist.name)}`);
+							}
+						}}
+					/>
+				{:else if !artistIndexLoading}
+					<p class="text-sm text-base-content/50">No artists found.</p>
+				{/if}
+			</HubShelf>
+
+			<HubShelf title="Browse Albums" seeAllHref="/library/plex/albums" {loading}>
+				{#if hub && hub.all_albums_preview.length > 0}
 					<HorizontalCarousel>
-						{#each dHub.albums as album (album.plex_id)}
+						{#each hub?.all_albums_preview ?? [] as album (album.plex_id)}
 							<SourceAlbumCardCompact
-								imageId={album.plex_id}
+								imageId={album.musicbrainz_id ?? album.plex_id}
 								imageUrl={album.image_url}
 								name={album.name}
 								artistName={album.artist_name}
-								onclick={() =>
-									openAlbumDetail({
-										plex_id: album.plex_id,
-										name: album.name,
-										artist_name: album.artist_name,
-										year: album.year,
-										image_url: album.image_url,
-										track_count: 0
-									})}
+								onclick={() => openAlbumDetail(album)}
 							/>
 						{/each}
 					</HorizontalCarousel>
-				</div>
-			{/each}
-		</DiscoveryShelf>
-
-		{#if hub && hub.genres.length > 0}
-			<DiscoveryShelf title="Browse by Genre" emptyMessage="Pick a genre to browse tracks.">
-				<GenreSongsBrowser
-					genres={hub.genres}
-					fetchSongs={fetchPlexGenreSongs}
-					buildQueue={buildPlexGenreQueue}
-				/>
-			</DiscoveryShelf>
-		{/if}
-	</DiscoveryZone>
-
-	<div use:reveal>
-		<HubShelf title="Recently Added" {loading} seeAllHref="/library/plex/albums?sort=date_added">
-			{#if hub && hub.recently_added.length > 0}
-				<AlbumGrid
-					albums={hub.recently_added}
-					idKey="plex_id"
-					seeAllHref="/library/plex/albums?sort=date_added"
-					onAlbumClick={(a) => openAlbumDetail(a as PlexAlbumSummary)}
-				/>
-			{:else if hub}
-				<p class="text-sm text-base-content/50">Nothing new yet.</p>
-			{/if}
-		</HubShelf>
-	</div>
-
-	<div class="section-divider-glow"></div>
-
-	<div use:reveal>
-		<HubShelf title="Listening History" loading={historyLoading}>
-			{#if historyEntries.length > 0}
-				<div class="overflow-x-auto rounded-lg">
-					<table class="table table-sm">
-						<thead>
-							<tr>
-								<th>Track</th>
-								<th>Artist</th>
-								<th>Album</th>
-								<th>When</th>
-								<th>Device</th>
-							</tr>
-						</thead>
-						<tbody>
-							{#each historyEntries as entry (entry.rating_key + entry.viewed_at)}
-								<tr class="hover transition-all duration-200 hover:border-l-2 hover:border-l-primary hover:pl-1">
-									<td class="font-medium">{entry.track_title}</td>
-									<td class="text-base-content/60">{entry.artist_name}</td>
-									<td class="text-base-content/60">{entry.album_name}</td>
-									<td class="text-base-content/50 text-xs">{formatViewedAt(entry.viewed_at)}</td>
-									<td class="text-base-content/50 text-xs">{entry.device_name}</td>
-								</tr>
-							{/each}
-						</tbody>
-					</table>
-				</div>
-				{#if historyTotal > 10}
-					<div class="mt-2 flex gap-2">
-						<a href="/library/plex/activity" class="btn btn-sm btn-outline">
-							View full history and analytics ({historyTotal.toLocaleString()} plays)
-						</a>
-					</div>
+				{:else if hub}
+					<p class="text-sm text-base-content/50">No albums found.</p>
 				{/if}
-			{:else if !historyLoading}
-				<p class="text-sm text-base-content/50">No listening history is available yet.</p>
-			{/if}
-		</HubShelf>
-	</div>
-
-	<div class="section-divider-glow"></div>
-
-	<div class="mt-10 mb-6 rounded-2xl bg-base-200/20 p-6 space-y-6">
-		<HubShelf title="Artists A-Z" loading={artistIndexLoading}>
-			{#if genericArtistIndex.length > 0}
-				<ArtistIndexSidebar
-					index={genericArtistIndex}
-					onselect={(artist) => {
-						if (artist.musicbrainz_id) {
-							goto(`/artist/${artist.musicbrainz_id}`);
-						} else {
-							goto(`/library/plex/artists?search=${encodeURIComponent(artist.name)}`);
-						}
-					}}
-				/>
-			{:else if !artistIndexLoading}
-				<p class="text-sm text-base-content/50">No artists found.</p>
-			{/if}
-		</HubShelf>
-
-		<HubShelf title="Browse Albums" seeAllHref="/library/plex/albums" {loading}>
-			{#if hub && hub.all_albums_preview.length > 0}
-				<HorizontalCarousel>
-					{#each hub?.all_albums_preview ?? [] as album (album.plex_id)}
-						<SourceAlbumCardCompact
-							imageId={album.musicbrainz_id ?? album.plex_id}
-							imageUrl={album.image_url}
-							name={album.name}
-							artistName={album.artist_name}
-							onclick={() => openAlbumDetail(album)}
-						/>
-					{/each}
-				</HorizontalCarousel>
-			{:else if hub}
-				<p class="text-sm text-base-content/50">No albums found.</p>
-			{/if}
-		</HubShelf>
-	</div>
-
-{/if}
+			</HubShelf>
+		</div>
+	{/if}
 </div>
 
 <SourceAlbumModal

@@ -45,13 +45,25 @@
 			{@const isSibling = hoveredIdx !== null && hoveredIdx !== i}
 			<button
 				class="group cursor-pointer text-left transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 focus-visible:ring-offset-base-100"
-				style="transition: transform 0.25s var(--ease-overshoot), opacity 0.2s ease, box-shadow 0.3s var(--ease-spring); will-change: transform; transform: {hoveredIdx === i ? 'scale(1.04)' : isSibling ? 'scale(0.98)' : 'scale(1)'}; {hoveredIdx === i ? 'z-index: 1;' : ''} {isSibling ? 'opacity: 0.8;' : ''}"
+				style="transition: transform 0.25s var(--ease-overshoot), opacity 0.2s ease, box-shadow 0.3s var(--ease-spring); will-change: transform; transform: {hoveredIdx ===
+				i
+					? 'scale(1.04)'
+					: isSibling
+						? 'scale(0.98)'
+						: 'scale(1)'}; {hoveredIdx === i ? 'z-index: 1;' : ''} {isSibling
+					? 'opacity: 0.8;'
+					: ''}"
 				aria-label="Open {album.name} by {album.artist_name}"
 				onpointerenter={() => (hoveredIdx = i)}
 				onpointerleave={() => (hoveredIdx = null)}
 				onclick={() => onAlbumClick?.(album)}
 			>
-				<div class="aspect-square overflow-hidden rounded-xl shadow-sm transition-shadow duration-300 {hoveredIdx === i ? 'shadow-2xl' : ''}">
+				<div
+					class="aspect-square overflow-hidden rounded-xl shadow-sm transition-shadow duration-300 {hoveredIdx ===
+					i
+						? 'shadow-2xl'
+						: ''}"
+				>
 					<AlbumImage
 						mbid={album.musicbrainz_id ?? getId(album)}
 						customUrl={album.image_url}

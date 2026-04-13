@@ -51,7 +51,18 @@
 		getAlbumImageUrl: (a) => a.image_url ?? null,
 		getAlbumYear: (a) => a.year,
 
-		async fetchAlbums({ limit, offset, sortBy, sortOrder, genre, mood, decade, tag, search, signal }) {
+		async fetchAlbums({
+			limit,
+			offset,
+			sortBy,
+			sortOrder,
+			genre,
+			mood,
+			decade,
+			tag,
+			search,
+			signal
+		}) {
 			if (search) {
 				const data = await api.get<{ albums?: JellyfinAlbumSummary[] }>(
 					API.jellyfinLibrary.search(search),
@@ -64,16 +75,7 @@
 			const studios = mood || undefined;
 			const tags = tag || undefined;
 			const data: JellyfinPaginatedResponse = await api.get(
-				API.jellyfinLibrary.albums(
-					limit,
-					offset,
-					sortBy,
-					genre,
-					sortOrder,
-					year,
-					tags,
-					studios
-				),
+				API.jellyfinLibrary.albums(limit, offset, sortBy, genre, sortOrder, year, tags, studios),
 				{ signal }
 			);
 			return { items: data.items, total: data.total };

@@ -86,7 +86,7 @@
 			loadFavoritesExpanded();
 			loadArtistIndex();
 		} catch (err) {
-			console.warn("[Hub] secondary load failed:", err);
+			console.warn('[Hub] secondary load failed:', err);
 			return;
 		} finally {
 			refreshing = false;
@@ -118,7 +118,7 @@
 				API.jellyfinLibrary.instantMixByGenre(genre, 30)
 			);
 		} catch (err) {
-			console.warn("[Hub] secondary load failed:", err);
+			console.warn('[Hub] secondary load failed:', err);
 			mixTracks = [];
 		} finally {
 			mixLoading = false;
@@ -175,19 +175,38 @@
 				API.jellyfinLibrary.similar(seed.jellyfin_id)
 			);
 		} catch (err) {
-			console.warn("[Hub] secondary load failed:", err);
+			console.warn('[Hub] secondary load failed:', err);
 			similarAlbums = [];
 		} finally {
 			similarLoading = false;
 		}
 	}
 
-
-
 	let browseCards = $derived<BrowseHeroCard[]>([
-		{ label: 'Albums', value: hub?.stats?.total_albums ?? null, href: '/library/jellyfin/albums', subtitle: 'in your library', colorScheme: 'primary', icon: 'disc' },
-		{ label: 'Artists', value: hub?.stats?.total_artists ?? null, href: '/library/jellyfin/artists', subtitle: 'in your library', colorScheme: 'secondary', icon: 'users' },
-		{ label: 'Tracks', value: hub?.stats?.total_tracks ?? null, href: '/library/jellyfin/tracks', subtitle: 'in your library', colorScheme: 'accent', icon: 'music' }
+		{
+			label: 'Albums',
+			value: hub?.stats?.total_albums ?? null,
+			href: '/library/jellyfin/albums',
+			subtitle: 'in your library',
+			colorScheme: 'primary',
+			icon: 'disc'
+		},
+		{
+			label: 'Artists',
+			value: hub?.stats?.total_artists ?? null,
+			href: '/library/jellyfin/artists',
+			subtitle: 'in your library',
+			colorScheme: 'secondary',
+			icon: 'users'
+		},
+		{
+			label: 'Tracks',
+			value: hub?.stats?.total_tracks ?? null,
+			href: '/library/jellyfin/tracks',
+			subtitle: 'in your library',
+			colorScheme: 'accent',
+			icon: 'music'
+		}
 	]);
 
 	onMount(() => {
@@ -211,7 +230,7 @@
 				API.jellyfinLibrary.favoritesExpanded()
 			);
 		} catch (err) {
-			console.warn("[Hub] secondary load failed:", err);
+			console.warn('[Hub] secondary load failed:', err);
 			favExpanded = null;
 		}
 	}
@@ -219,11 +238,9 @@
 	async function loadArtistIndex() {
 		artistIndexLoading = true;
 		try {
-			artistIndex = await api.get<JellyfinArtistIndexResponse>(
-				API.jellyfinLibrary.artistsIndex()
-			);
+			artistIndex = await api.get<JellyfinArtistIndexResponse>(API.jellyfinLibrary.artistsIndex());
 		} catch (err) {
-			console.warn("[Hub] secondary load failed:", err);
+			console.warn('[Hub] secondary load failed:', err);
 			artistIndex = null;
 		} finally {
 			artistIndexLoading = false;
@@ -232,9 +249,16 @@
 </script>
 
 <div class="container mx-auto space-y-6 p-6">
-	<div class="h-[2px] rounded-full bg-gradient-to-r from-transparent via-[rgb(var(--brand-jellyfin))] to-transparent opacity-40"></div>
+	<div
+		class="h-[2px] rounded-full bg-gradient-to-r from-transparent via-[rgb(var(--brand-jellyfin))] to-transparent opacity-40"
+	></div>
 
-	<SourceHubHeader title="Jellyfin Library" albumCount={hub?.stats?.total_albums ?? null} onrefresh={refreshHub} {refreshing}>
+	<SourceHubHeader
+		title="Jellyfin Library"
+		albumCount={hub?.stats?.total_albums ?? null}
+		onrefresh={refreshHub}
+		{refreshing}
+	>
 		{#snippet icon()}
 			<Tv class="h-8 w-8 text-info" />
 		{/snippet}
@@ -266,60 +290,21 @@
 	{#if loading && !hub}
 		<HubPageSkeleton />
 	{:else}
+		<FeaturedAlbumHero
+			albums={hub?.recently_played ?? []}
+			idKey="jellyfin_id"
+			onAlbumClick={(a) => openAlbumDetail(a as JellyfinAlbumSummary)}
+		/>
 
-	<FeaturedAlbumHero
-		albums={hub?.recently_played ?? []}
-		idKey="jellyfin_id"
-		onAlbumClick={(a) => openAlbumDetail(a as JellyfinAlbumSummary)}
-	/>
-
-	{#if similarSeedName || similarLoading || similarAlbums.length > 0}
-		<div use:reveal>
-			<HubShelf title={similarSeedName ? `More Like "${similarSeedName}"` : 'More Like This'} loading={similarLoading}>
-				{#if similarAlbums.length > 0}
-					<HorizontalCarousel>
-						{#each similarAlbums as album (album.jellyfin_id)}
-							<SourceAlbumCardCompact
-								imageId={album.musicbrainz_id ?? album.jellyfin_id}
-								imageUrl={album.image_url}
-								name={album.name}
-								artistName={album.artist_name}
-								onclick={() => openAlbumDetail(album)}
-							/>
-						{/each}
-					</HorizontalCarousel>
-				{:else if !similarLoading}
-					<p class="text-sm text-base-content/50">No similar albums found.</p>
-				{/if}
-			</HubShelf>
-		</div>
-	{/if}
-
-	{#if loading || (favExpanded && (favExpanded.albums.length > 0 || favExpanded.artists.length > 0))}
-		<div use:reveal>
-			<HubShelf title="Favorites" {loading}>
-				<div class="flex gap-2 mb-3">
-					{#if !favExpanded || favExpanded.albums.length > 0}
-						<button
-							class="badge cursor-pointer"
-							class:badge-primary={favTab === 'albums'}
-							class:badge-outline={favTab !== 'albums'}
-							onclick={() => (favTab = 'albums')}>Albums</button
-						>
-					{/if}
-					{#if !favExpanded || favExpanded.artists.length > 0}
-						<button
-							class="badge cursor-pointer"
-							class:badge-primary={favTab === 'artists'}
-							class:badge-outline={favTab !== 'artists'}
-							onclick={() => (favTab = 'artists')}>Artists</button
-						>
-					{/if}
-				</div>
-				{#if favTab === 'albums'}
-					{#if favExpanded && favExpanded.albums.length > 0}
+		{#if similarSeedName || similarLoading || similarAlbums.length > 0}
+			<div use:reveal>
+				<HubShelf
+					title={similarSeedName ? `More Like "${similarSeedName}"` : 'More Like This'}
+					loading={similarLoading}
+				>
+					{#if similarAlbums.length > 0}
 						<HorizontalCarousel>
-							{#each favExpanded.albums as album (album.jellyfin_id)}
+							{#each similarAlbums as album (album.jellyfin_id)}
 								<SourceAlbumCardCompact
 									imageId={album.musicbrainz_id ?? album.jellyfin_id}
 									imageUrl={album.image_url}
@@ -329,153 +314,211 @@
 								/>
 							{/each}
 						</HorizontalCarousel>
+					{:else if !similarLoading}
+						<p class="text-sm text-base-content/50">No similar albums found.</p>
 					{/if}
-				{:else if favExpanded && favExpanded.artists.length > 0}
-					<HorizontalCarousel>
-						{#each favExpanded.artists as artist (artist.jellyfin_id)}
-							<div class="shrink-0 w-28 text-center">
-								<div class="w-24 h-24 mx-auto rounded-full overflow-hidden shadow-sm">
-									<ArtistImage
-										mbid={artist.musicbrainz_id ?? artist.jellyfin_id}
-										remoteUrl={artist.image_url}
-										alt={artist.name}
-										size="full"
+				</HubShelf>
+			</div>
+		{/if}
+
+		{#if loading || (favExpanded && (favExpanded.albums.length > 0 || favExpanded.artists.length > 0))}
+			<div use:reveal>
+				<HubShelf title="Favorites" {loading}>
+					<div class="flex gap-2 mb-3">
+						{#if !favExpanded || favExpanded.albums.length > 0}
+							<button
+								class="badge cursor-pointer"
+								class:badge-primary={favTab === 'albums'}
+								class:badge-outline={favTab !== 'albums'}
+								onclick={() => (favTab = 'albums')}>Albums</button
+							>
+						{/if}
+						{#if !favExpanded || favExpanded.artists.length > 0}
+							<button
+								class="badge cursor-pointer"
+								class:badge-primary={favTab === 'artists'}
+								class:badge-outline={favTab !== 'artists'}
+								onclick={() => (favTab = 'artists')}>Artists</button
+							>
+						{/if}
+					</div>
+					{#if favTab === 'albums'}
+						{#if favExpanded && favExpanded.albums.length > 0}
+							<HorizontalCarousel>
+								{#each favExpanded.albums as album (album.jellyfin_id)}
+									<SourceAlbumCardCompact
+										imageId={album.musicbrainz_id ?? album.jellyfin_id}
+										imageUrl={album.image_url}
+										name={album.name}
+										artistName={album.artist_name}
+										onclick={() => openAlbumDetail(album)}
 									/>
+								{/each}
+							</HorizontalCarousel>
+						{/if}
+					{:else if favExpanded && favExpanded.artists.length > 0}
+						<HorizontalCarousel>
+							{#each favExpanded.artists as artist (artist.jellyfin_id)}
+								<div class="shrink-0 w-28 text-center">
+									<div class="w-24 h-24 mx-auto rounded-full overflow-hidden shadow-sm">
+										<ArtistImage
+											mbid={artist.musicbrainz_id ?? artist.jellyfin_id}
+											remoteUrl={artist.image_url}
+											alt={artist.name}
+											size="full"
+										/>
+									</div>
+									<p class="text-sm font-medium mt-1 line-clamp-1">{artist.name}</p>
+									<p class="text-xs opacity-60">
+										{artist.album_count} album{artist.album_count !== 1 ? 's' : ''}
+									</p>
 								</div>
-								<p class="text-sm font-medium mt-1 line-clamp-1">{artist.name}</p>
-								<p class="text-xs opacity-60">
-									{artist.album_count} album{artist.album_count !== 1 ? 's' : ''}
-								</p>
-							</div>
+							{/each}
+						</HorizontalCarousel>
+					{/if}
+				</HubShelf>
+			</div>
+		{/if}
+
+		{#if (hub && hub.genres.length > 0) || mixTracks.length > 0}
+			<DiscoveryZone>
+				<DiscoveryShelf
+					title="Instant Mix"
+					loading={mixLoading}
+					empty={!mixLoading && mixTracks.length === 0}
+					emptyMessage="Pick a genre to build a mix."
+					onrefresh={mixLabel ? () => loadInstantMixByGenre(mixLabel) : undefined}
+				>
+					{#snippet actions()}
+						{#if hub && hub.genres.length > 0}
+							<GenrePillFilter
+								genres={hub.genres.slice(0, 12)}
+								selected={mixLabel || undefined}
+								loading={mixLoading}
+								onselect={(g) => {
+									if (g) loadInstantMixByGenre(g);
+								}}
+							/>
+						{/if}
+					{/snippet}
+					{#if mixTracks.length > 0}
+						<div class="flex items-center gap-2 mb-3 mt-3">
+							<button class="btn btn-primary btn-sm" onclick={() => playMixTracks()}
+								>Play all</button
+							>
+							<button
+								class="btn btn-ghost btn-sm"
+								onclick={() => {
+									const items = buildDiscoveryQueueFromJellyfin(mixTracks);
+									playerStore.playQueue(items, 0, true);
+								}}
+							>
+								Shuffle
+							</button>
+						</div>
+						<DiscoveryTrackTable
+							tracks={toDiscoveryTracks(mixTracks)}
+							onplay={(i) => playMixTracks(i)}
+							{formatDuration}
+						/>
+					{/if}
+				</DiscoveryShelf>
+
+				{#if hub && hub.genres.length > 0}
+					<DiscoveryShelf title="Browse by Genre" emptyMessage="Pick a genre to browse tracks.">
+						<GenreSongsBrowser
+							genres={hub.genres}
+							fetchSongs={fetchJellyfinGenreSongs}
+							buildQueue={buildJellyfinGenreQueue}
+							multiSelect
+						/>
+					</DiscoveryShelf>
+				{/if}
+			</DiscoveryZone>
+		{/if}
+
+		<div use:reveal>
+			<HubShelf title="Recently Added" {loading}>
+				{#if hub && hub.recently_added.length > 0}
+					<AlbumGrid
+						albums={hub.recently_added}
+						idKey="jellyfin_id"
+						onAlbumClick={(a) => openAlbumDetail(a as JellyfinAlbumSummary)}
+					/>
+				{:else if hub}
+					<p class="text-sm text-base-content/50">Nothing new yet.</p>
+				{/if}
+			</HubShelf>
+		</div>
+
+		{#if hub && (hub.most_played_artists.length > 0 || hub.most_played_albums.length > 0)}
+			<div use:reveal>
+				<HubShelf title="Most Played" {loading}>
+					<MostPlayedSection
+						artists={hub.most_played_artists.map((a) => ({
+							id: a.jellyfin_id,
+							name: a.name,
+							image_url: a.image_url,
+							musicbrainz_id: a.musicbrainz_id,
+							play_count: a.play_count,
+							album_count: a.album_count
+						}))}
+						albums={hub.most_played_albums.map((a) => ({
+							id: a.jellyfin_id,
+							name: a.name,
+							artist_name: a.artist_name,
+							image_url: a.image_url,
+							musicbrainz_id: a.musicbrainz_id,
+							play_count: a.play_count
+						}))}
+						onAlbumClick={(album) => {
+							const orig = hub?.most_played_albums.find((a) => a.jellyfin_id === album.id);
+							if (orig) openAlbumDetail(orig);
+						}}
+					/>
+				</HubShelf>
+			</div>
+		{/if}
+
+		<div class="section-divider-glow"></div>
+
+		<div class="mt-10 mb-6 rounded-2xl bg-base-200/20 p-6 space-y-6">
+			<HubShelf title="Artists A-Z" loading={artistIndexLoading}>
+				{#if genericArtistIndex.length > 0}
+					<ArtistIndexSidebar
+						index={genericArtistIndex}
+						onselect={(artist) => {
+							if (artist.musicbrainz_id) {
+								goto(`/artist/${artist.musicbrainz_id}`);
+							} else {
+								goto(`/library/jellyfin/artists?search=${encodeURIComponent(artist.name)}`);
+							}
+						}}
+					/>
+				{:else if !artistIndexLoading}
+					<p class="text-sm text-base-content/50">No artists found.</p>
+				{/if}
+			</HubShelf>
+
+			<HubShelf title="Browse Albums" seeAllHref="/library/jellyfin/albums" {loading}>
+				{#if hub && hub.all_albums_preview.length > 0}
+					<HorizontalCarousel>
+						{#each hub?.all_albums_preview ?? [] as album (album.jellyfin_id)}
+							<SourceAlbumCardCompact
+								imageId={album.musicbrainz_id ?? album.jellyfin_id}
+								imageUrl={album.image_url}
+								name={album.name}
+								artistName={album.artist_name}
+								onclick={() => openAlbumDetail(album)}
+							/>
 						{/each}
 					</HorizontalCarousel>
+				{:else if hub}
+					<p class="text-sm text-base-content/50">No albums found.</p>
 				{/if}
 			</HubShelf>
 		</div>
 	{/if}
-
-	{#if (hub && hub.genres.length > 0) || mixTracks.length > 0}
-		<DiscoveryZone>
-			<DiscoveryShelf
-				title="Instant Mix"
-				loading={mixLoading}
-				empty={!mixLoading && mixTracks.length === 0}
-				emptyMessage="Pick a genre to build a mix."
-				onrefresh={mixLabel ? () => loadInstantMixByGenre(mixLabel) : undefined}
-			>
-				{#snippet actions()}
-					{#if hub && hub.genres.length > 0}
-						<GenrePillFilter
-							genres={hub.genres.slice(0, 12)}
-							selected={mixLabel || undefined}
-							loading={mixLoading}
-							onselect={(g) => { if (g) loadInstantMixByGenre(g); }}
-						/>
-					{/if}
-				{/snippet}
-				{#if mixTracks.length > 0}
-					<div class="flex items-center gap-2 mb-3 mt-3">
-						<button class="btn btn-primary btn-sm" onclick={() => playMixTracks()}>Play all</button>
-						<button
-							class="btn btn-ghost btn-sm"
-							onclick={() => {
-								const items = buildDiscoveryQueueFromJellyfin(mixTracks);
-								playerStore.playQueue(items, 0, true);
-							}}
-						>
-							Shuffle
-						</button>
-					</div>
-					<DiscoveryTrackTable
-						tracks={toDiscoveryTracks(mixTracks)}
-						onplay={(i) => playMixTracks(i)}
-						{formatDuration}
-					/>
-				{/if}
-			</DiscoveryShelf>
-
-			{#if hub && hub.genres.length > 0}
-				<DiscoveryShelf title="Browse by Genre" emptyMessage="Pick a genre to browse tracks.">
-					<GenreSongsBrowser
-						genres={hub.genres}
-						fetchSongs={fetchJellyfinGenreSongs}
-						buildQueue={buildJellyfinGenreQueue}
-						multiSelect
-					/>
-				</DiscoveryShelf>
-			{/if}
-		</DiscoveryZone>
-	{/if}
-
-	<div use:reveal>
-		<HubShelf title="Recently Added" {loading}>
-			{#if hub && hub.recently_added.length > 0}
-				<AlbumGrid
-					albums={hub.recently_added}
-					idKey="jellyfin_id"
-					onAlbumClick={(a) => openAlbumDetail(a as JellyfinAlbumSummary)}
-				/>
-			{:else if hub}
-				<p class="text-sm text-base-content/50">Nothing new yet.</p>
-			{/if}
-		</HubShelf>
-	</div>
-
-	{#if hub && (hub.most_played_artists.length > 0 || hub.most_played_albums.length > 0)}
-		<div use:reveal>
-			<HubShelf title="Most Played" {loading}>
-				<MostPlayedSection
-					artists={hub.most_played_artists.map(a => ({ id: a.jellyfin_id, name: a.name, image_url: a.image_url, musicbrainz_id: a.musicbrainz_id, play_count: a.play_count, album_count: a.album_count }))}
-					albums={hub.most_played_albums.map(a => ({ id: a.jellyfin_id, name: a.name, artist_name: a.artist_name, image_url: a.image_url, musicbrainz_id: a.musicbrainz_id, play_count: a.play_count }))}
-					onAlbumClick={(album) => {
-						const orig = hub?.most_played_albums.find(a => a.jellyfin_id === album.id);
-						if (orig) openAlbumDetail(orig);
-					}}
-				/>
-			</HubShelf>
-		</div>
-	{/if}
-
-	<div class="section-divider-glow"></div>
-
-	<div class="mt-10 mb-6 rounded-2xl bg-base-200/20 p-6 space-y-6">
-		<HubShelf title="Artists A-Z" loading={artistIndexLoading}>
-			{#if genericArtistIndex.length > 0}
-				<ArtistIndexSidebar
-					index={genericArtistIndex}
-					onselect={(artist) => {
-						if (artist.musicbrainz_id) {
-							goto(`/artist/${artist.musicbrainz_id}`);
-						} else {
-							goto(`/library/jellyfin/artists?search=${encodeURIComponent(artist.name)}`);
-						}
-					}}
-				/>
-			{:else if !artistIndexLoading}
-				<p class="text-sm text-base-content/50">No artists found.</p>
-			{/if}
-		</HubShelf>
-
-		<HubShelf title="Browse Albums" seeAllHref="/library/jellyfin/albums" {loading}>
-			{#if hub && hub.all_albums_preview.length > 0}
-				<HorizontalCarousel>
-					{#each hub?.all_albums_preview ?? [] as album (album.jellyfin_id)}
-						<SourceAlbumCardCompact
-							imageId={album.musicbrainz_id ?? album.jellyfin_id}
-							imageUrl={album.image_url}
-							name={album.name}
-							artistName={album.artist_name}
-							onclick={() => openAlbumDetail(album)}
-						/>
-					{/each}
-				</HorizontalCarousel>
-			{:else if hub}
-				<p class="text-sm text-base-content/50">No albums found.</p>
-			{/if}
-		</HubShelf>
-	</div>
-
-{/if}
 </div>
 
 <SourceAlbumModal

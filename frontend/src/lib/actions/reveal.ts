@@ -40,7 +40,9 @@ export function reveal(node: HTMLElement, options?: { threshold?: number; stagge
 		destroy() {
 			observer.disconnect();
 			const children = Array.from(node.children) as HTMLElement[];
-			children.forEach((child) => { child.style.transitionDelay = ''; });
+			children.forEach((child) => {
+				child.style.transitionDelay = '';
+			});
 		}
 	};
 }

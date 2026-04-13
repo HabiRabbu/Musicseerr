@@ -21,7 +21,9 @@
 		<svelte:element
 			this={Tag}
 			href={stat.href || undefined}
-			class="group relative rounded-xl border border-base-content/5 bg-base-200/30 px-4 py-3 text-center shadow-lg backdrop-blur-md transition-all duration-200 {stat.href ? 'cursor-pointer hover:-translate-y-0.5 hover:shadow-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 focus-visible:ring-offset-base-100' : ''}"
+			class="group relative rounded-xl border border-base-content/5 bg-base-200/30 px-4 py-3 text-center shadow-lg backdrop-blur-md transition-all duration-200 {stat.href
+				? 'cursor-pointer hover:-translate-y-0.5 hover:shadow-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 focus-visible:ring-offset-base-100'
+				: ''}"
 		>
 			{#if stat.value !== null}
 				<div class="text-xl font-bold tabular-nums text-base-content sm:text-2xl">

@@ -114,7 +114,10 @@ function createNowPlayingStore() {
 		if (typeof document !== 'undefined' && document.hidden) return;
 
 		const integrations = get(integrationStore);
-		const fetches: Promise<{ source: SourceKey; result: NowPlayingSession[] | typeof FETCH_FAILED }>[] = [];
+		const fetches: Promise<{
+			source: SourceKey;
+			result: NowPlayingSession[] | typeof FETCH_FAILED;
+		}>[] = [];
 
 		if (integrations.jellyfin) {
 			fetches.push(
