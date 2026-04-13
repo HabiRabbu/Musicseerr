@@ -1,6 +1,5 @@
 import asyncio
 import httpx
-import logging
 from typing import Any
 
 import msgspec
@@ -21,8 +20,6 @@ from repositories.listenbrainz_models import (
 )
 from infrastructure.degradation import try_get_degradation_context
 from infrastructure.integration_result import IntegrationResult
-
-logger = logging.getLogger(__name__)
 
 _SOURCE = "listenbrainz"
 
@@ -590,11 +587,6 @@ class ListenBrainzRepository:
 
         result = await self._get(f"/1/popularity/top-release-groups-for-artist/{artist_mbid}")
         if not result or not isinstance(result, list):
-            logger.info(
-                "LB top-release-groups returned empty/non-list for %s (type=%s)",
-                artist_mbid[:8],
-                type(result).__name__,
-            )
             return []
 
         release_groups = []
@@ -663,10 +655,6 @@ class ListenBrainzRepository:
             "payload": [{"track_metadata": track_metadata}],
         }
         await self._post("/1/submit-listens", payload, require_auth=True)
-        logger.info(
-            "Now playing reported to ListenBrainz",
-            extra={"artist": artist_name, "track": track_name},
-        )
         return True
 
     async def submit_single_listen(
@@ -696,14 +684,6 @@ class ListenBrainzRepository:
             ],
         }
         await self._post("/1/submit-listens", payload, require_auth=True)
-        logger.info(
-            "Scrobble submitted to ListenBrainz",
-            extra={
-                "artist": artist_name,
-                "track": track_name,
-                "listened_at": listened_at,
-            },
-        )
         return True
 
     async def get_recommendation_playlists(
@@ -790,9 +770,4 @@ class ListenBrainzRepository:
         if tracks:
             await self._cache.set(cache_key, playlist, ttl_seconds=21600)
 
-        logger.info(
-            "Fetched recommendation playlist: %s (%d tracks)",
-            playlist.title,
-            len(tracks),
-        )
         return playlist

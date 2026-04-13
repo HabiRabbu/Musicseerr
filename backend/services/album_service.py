@@ -125,14 +125,10 @@ class AlbumService:
     async def _get_cached_album_info(self, release_group_id: str, cache_key: str) -> Optional[AlbumInfo]:
         cached_info = await self._cache.get(cache_key)
         if cached_info:
-            logger.info(f"Cache HIT (RAM): Album {release_group_id[:8]}... - instant load")
             return await self._revalidate_library_status(release_group_id, cached_info)
-        
-        logger.debug(f"Cache MISS (RAM): Album {release_group_id[:8]}...")
         
         disk_data = await self._disk_cache.get_album(release_group_id)
         if disk_data:
-            logger.info(f"Cache HIT (Disk): Album {release_group_id[:8]}... - loading from persistent cache")
             album_info = msgspec.convert(disk_data, AlbumInfo, strict=False)
             album_info = await self._revalidate_library_status(release_group_id, album_info)
             advanced_settings = self._preferences_service.get_advanced_settings()
@@ -140,7 +136,6 @@ class AlbumService:
             await self._cache.set(cache_key, album_info, ttl_seconds=ttl)
             return album_info
         
-        logger.debug(f"Cache MISS (Disk): Album {release_group_id[:8]}...")
         return None
 
     async def _revalidate_library_status(self, release_group_id: str, album_info: AlbumInfo) -> AlbumInfo:
@@ -159,10 +154,6 @@ class AlbumService:
         self._revalidation_timestamps[release_group_id] = time.monotonic()
         current_in_library = self._check_lidarr_in_library(lidarr_album)
         if current_in_library != album_info.in_library:
-            logger.info(
-                f"Library status changed for album {release_group_id[:8]}...: "
-                f"{album_info.in_library} -> {current_in_library}, updating caches"
-            )
             album_info.in_library = current_in_library
             await self._save_album_to_cache(release_group_id, album_info)
         return album_info
@@ -173,7 +164,6 @@ class AlbumService:
         ttl = advanced_settings.cache_ttl_album_library if album_info.in_library else advanced_settings.cache_ttl_album_non_library
         await self._cache.set(cache_key, album_info, ttl_seconds=ttl)
         await self._disk_cache.set_album(release_group_id, album_info, is_monitored=album_info.in_library, ttl_seconds=ttl if not album_info.in_library else None)
-        logger.info(f"Cached {'library' if album_info.in_library else 'non-library'} album {release_group_id[:8]}... for {ttl // 3600}h")
 
     def _check_lidarr_in_library(self, lidarr_album: dict | None) -> bool:
         if lidarr_album and lidarr_album.get("monitored", False):
@@ -189,7 +179,7 @@ class AlbumService:
                 return
             await self.get_album_info(release_group_id)
         except Exception:  # noqa: BLE001
-            logger.debug(f"Background album cache warm failed for {release_group_id[:8]}")
+            pass
 
     async def refresh_album(self, release_group_id: str) -> AlbumInfo:
         release_group_id = validate_mbid(release_group_id, "album")
@@ -200,7 +190,6 @@ class AlbumService:
         self._revalidation_timestamps.pop(release_group_id, None)
         self._album_in_flight.pop(release_group_id, None)
 
-        logger.info("Cleared all caches for album %s", release_group_id[:8])
         return await self.get_album_info(release_group_id)
 
     async def get_album_info(self, release_group_id: str, monitored_mbids: set[str] = None) -> AlbumInfo:
@@ -248,10 +237,8 @@ class AlbumService:
         lidarr_album = await self._lidarr_repo.get_album_details(release_group_id) if self._lidarr_repo.is_configured() else None
         in_library = self._check_lidarr_in_library(lidarr_album)
         if in_library and lidarr_album:
-            logger.info(f"Using Lidarr as primary source for album {release_group_id[:8]}")
             album_info = await self._build_album_from_lidarr(release_group_id, lidarr_album)
         else:
-            logger.info(f"Using MusicBrainz as primary source for album {release_group_id[:8]}")
             album_info = await self._build_album_from_musicbrainz(release_group_id, monitored_mbids)
         album_info = await self._apply_audiodb_album_images(
             album_info, release_group_id, album_info.artist_name, album_info.title,
@@ -306,7 +293,6 @@ class AlbumService:
             lidarr_album = await self._lidarr_repo.get_album_details(release_group_id) if self._lidarr_repo.is_configured() else None
             in_library = self._check_lidarr_in_library(lidarr_album)
             if lidarr_album and lidarr_album.get("monitored", False):
-                logger.info(f"[BASIC] Using Lidarr for album {release_group_id[:8]}")
                 basic = AlbumBasicInfo(**lidarr_to_basic_info(lidarr_album, release_group_id, in_library, is_requested=is_requested))
                 if not basic.album_thumb_url:
                     basic.album_thumb_url = await self._get_audiodb_album_thumb(
@@ -314,7 +300,6 @@ class AlbumService:
                         allow_fetch=False,
                     )
                 return basic
-            logger.info(f"[BASIC] Using MusicBrainz for album {release_group_id[:8]}")
             release_group = await self._fetch_release_group(release_group_id)
             if lidarr_album is None:
                 cached_album = await self._library_db.get_album_by_mbid(release_group_id)
@@ -356,7 +341,6 @@ class AlbumService:
             in_library = lidarr_album is not None and lidarr_album.get("monitored", False)
             
             if in_library and lidarr_album:
-                logger.info(f"[TRACKS] Using Lidarr for album {release_group_id[:8]}")
                 album_id = lidarr_album.get("id")
                 tracks = []
                 total_length = 0
@@ -384,7 +368,6 @@ class AlbumService:
                     country=None,
                 )
             
-            logger.info(f"[TRACKS] Using MusicBrainz for album {release_group_id[:8]}")
             release_group = await self._fetch_release_group(release_group_id)
             ranked_releases = get_ranked_releases(release_group)
             
@@ -519,7 +502,6 @@ class AlbumService:
         country = None
         
         if not tracks:
-            logger.debug(f"No tracks from Lidarr for album {release_group_id[:8]}, falling back to MusicBrainz")
             try:
                 release_group = await self._fetch_release_group(release_group_id)
                 ranked_releases = get_ranked_releases(release_group)
@@ -586,12 +568,6 @@ class AlbumService:
         cached_album = await self._library_db.get_album_by_mbid(release_group_id)
         in_library = cached_album is not None
         
-        if in_library:
-            logger.info(f"Cache HIT (library DB): Album {release_group_id[:8]}... is in library")
-        else:
-            logger.debug(f"Cache MISS (library DB): Album {release_group_id[:8]}... not in library")
-        
-        logger.info(f"API CALL (MusicBrainz): Fetching album {release_group_id[:8]}...")
         release_group = await self._fetch_release_group(release_group_id)
         primary_release = find_primary_release(release_group)
         artist_name, artist_id = extract_artist_info(release_group)

@@ -1,6 +1,5 @@
 """Domain 5: Sync lifecycle persistence."""
 
-import logging
 import sqlite3
 import time
 from typing import Any
@@ -12,8 +11,6 @@ from infrastructure.persistence._database import (
     _normalize,
 )
 from infrastructure.serialization import to_jsonable
-
-logger = logging.getLogger(__name__)
 
 
 class SyncStateStore(PersistenceBase):

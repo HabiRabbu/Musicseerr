@@ -139,7 +139,6 @@ class CacheStatusService:
                 total_albums=total_albums,
                 processed_albums=0
             )
-            logger.info(f"Cache sync started: {phase} ({total_items} items)")
 
             if self._sync_state_store:
                 try:
@@ -220,7 +219,6 @@ class CacheStatusService:
             self._progress.processed_items = 0
             self._progress.current_item = None
         await self.broadcast_progress()
-        logger.info(f"Phase skipped (already cached): {phase}")
         await asyncio.sleep(0.5)
 
     def get_last_progress_at(self) -> float:
@@ -270,7 +268,6 @@ class CacheStatusService:
                 return
             is_success = error_message is None
             status = 'completed' if is_success else 'failed'
-            logger.info(f"Cache sync {status}: {self._progress.phase}")
 
             if self._sync_state_store:
                 try:
@@ -375,9 +372,6 @@ class CacheStatusService:
         try:
             state = await self._sync_state_store.get_sync_state()
             if state and state.get('status') == 'running':
-                logger.info(f"Found interrupted sync: phase={state.get('phase')}, "
-                           f"artists={state.get('processed_artists')}/{state.get('total_artists')}, "
-                           f"albums={state.get('processed_albums')}/{state.get('total_albums')}")
 
                 phase = state.get('phase')
                 if phase == 'albums':

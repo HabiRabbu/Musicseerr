@@ -39,10 +39,6 @@ async def request_auth_token(
             )
 
         token, auth_url = await auth_service.request_token(settings.api_key)
-        logger.info(
-            "Last.fm auth token requested",
-            extra={"step": "token_requested", "status": "success"},
-        )
         return LastFmAuthTokenResponse(token=token, auth_url=auth_url)
     except HTTPException:
         raise
@@ -83,11 +79,6 @@ async def exchange_auth_session(
         get_lastfm_repository.cache_clear()
         get_lastfm_auth_service.cache_clear()
         clear_lastfm_dependent_caches()
-        logger.info(
-            "Last.fm session exchanged for user %s",
-            username,
-            extra={"step": "session_exchanged", "status": "success"},
-        )
 
         return LastFmAuthSessionResponse(
             username=username,

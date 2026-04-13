@@ -1,15 +1,12 @@
 import asyncio
 import hashlib
 import json
-import logging
 import shutil
 import time
 from pathlib import Path
 from typing import Any
 
 from infrastructure.serialization import to_jsonable
-
-logger = logging.getLogger(__name__)
 
 
 def _encode_json(value: Any) -> str:
@@ -204,8 +201,8 @@ class DiskMetadataCache:
             meta["last_accessed"] = time.time()
             try:
                 meta_path.write_text(_encode_json(meta))
-            except OSError as exc:
-                logger.debug("Failed to update disk cache access time for %s: %s", meta_path, exc)
+            except OSError:
+                pass
 
         return payload
 

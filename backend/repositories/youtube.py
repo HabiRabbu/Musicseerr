@@ -71,16 +71,16 @@ class YouTubeRepository:
                     self._daily_count = 0
                     self._quota_date = today
                     self._save_quota()
-        except Exception as e:  # noqa: BLE001
-            logger.warning(f"Failed to load YouTube quota state: {e}")
+        except Exception:  # noqa: BLE001
+            pass
 
     def _save_quota(self) -> None:
         quota_file = get_quota_file_path()
         try:
             quota_file.parent.mkdir(parents=True, exist_ok=True)
             quota_file.write_bytes(msgspec.json.encode(YouTubeQuotaState(date=self._quota_date, count=self._daily_count)))
-        except Exception as e:  # noqa: BLE001
-            logger.warning(f"Failed to save YouTube quota state: {e}")
+        except Exception:  # noqa: BLE001
+            pass
 
     def configure(self, api_key: str) -> None:
         self._api_key = api_key

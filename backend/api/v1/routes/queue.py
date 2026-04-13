@@ -1,11 +1,8 @@
-import logging
 from fastapi import APIRouter, Depends, HTTPException
 from api.v1.schemas.request import QueueItem
 from core.dependencies import get_lidarr_repository
 from infrastructure.msgspec_fastapi import MsgSpecRoute
 from repositories.lidarr import LidarrRepository
-
-logger = logging.getLogger(__name__)
 
 router = APIRouter(route_class=MsgSpecRoute, prefix="/queue", tags=["queue"])
 

@@ -120,17 +120,6 @@ class ScrobbleService:
                 services[service_name] = ServiceResult(success=True)
                 any_success = True
 
-        logger.info(
-            "Now playing reported",
-            extra={
-                "artist": request.artist_name,
-                "track": request.track_name,
-                "services": {
-                    k: {"success": v.success, "error": v.error}
-                    for k, v in services.items()
-                },
-            },
-        )
         return ScrobbleResponse(accepted=any_success, services=services)
 
     async def submit_scrobble(
@@ -205,16 +194,4 @@ class ScrobbleService:
         if any_success:
             self._record_dedup(dedup)
 
-        logger.info(
-            "Scrobble submitted",
-            extra={
-                "artist": request.artist_name,
-                "track": request.track_name,
-                "timestamp": request.timestamp,
-                "services": {
-                    k: {"success": v.success, "error": v.error}
-                    for k, v in services.items()
-                },
-            },
-        )
         return ScrobbleResponse(accepted=any_success, services=services)

@@ -42,9 +42,7 @@ export async function reportProgress(
 			is_paused: isPaused
 		});
 		return true;
-	} catch (e) {
-		const detail = e instanceof ApiError ? String(e.status) : 'network error';
-		console.warn(`[Jellyfin] progress report failed: ${detail}`);
+	} catch {
 		return false;
 	}
 }
@@ -60,9 +58,7 @@ export async function reportStop(
 			position_seconds: positionSeconds
 		});
 		return true;
-	} catch (e) {
-		const detail = e instanceof ApiError ? String(e.status) : 'network error';
-		console.warn(`[Jellyfin] stop report failed: ${detail}`);
+	} catch {
 		return false;
 	}
 }

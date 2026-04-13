@@ -44,7 +44,7 @@ def _clean_album_name(name: str) -> str:
     """Strip common suffixes like '(Remastered 2009)', '[Deluxe Edition]', year prefixes, etc."""
     cleaned = name.strip()
     cleaned = re.sub(r'\s*[\(\[][^)\]]*(?:remaster|deluxe|edition|bonus|expanded|mono|stereo|anniversary)[^)\]]*[\)\]]', '', cleaned, flags=re.IGNORECASE)
-    cleaned = re.sub(r'^\d{4}\s*[-–—]\s*', '', cleaned)
+    cleaned = re.sub(r'^\d{4}\s*[-\u2013\u2014]\s*', '', cleaned)
     cleaned = re.sub(r'\s*-\s*EP$', '', cleaned, flags=re.IGNORECASE)
     cleaned = re.sub(r'\s*\[[^\]]*\]\s*$', '', cleaned)
     return cleaned.strip()
@@ -80,7 +80,7 @@ class NavidromeLibraryService:
         self._dirty = False
 
     def lookup_navidrome_id(self, mbid: str) -> str | None:
-        """Public accessor for MBID → Navidrome album ID reverse index."""
+        """Public accessor for the MBID -> Navidrome album ID reverse index."""
         return self._mbid_to_navidrome_id.get(mbid)
 
     def invalidate_album_cache(self, album_mbid: str) -> None:
@@ -91,7 +91,6 @@ class NavidromeLibraryService:
             del self._album_mbid_cache[key]
         if stale_keys:
             self._dirty = True
-            logger.debug("navidrome.cache action=invalidate mbid=%s cleared_keys=%d", album_mbid[:8], len(stale_keys))
 
     async def _resolve_album_mbid(self, name: str, artist: str) -> str | None:
         """Resolve a release-group MBID for an album via Lidarr library matching."""
@@ -167,7 +166,6 @@ class NavidromeLibraryService:
             await self._mbid_store.save_navidrome_album_mbid_index(serializable_albums)
             await self._mbid_store.save_navidrome_artist_mbid_index(serializable_artists)
             self._dirty = False
-            logger.debug("Persisted dirty Navidrome MBID cache to disk")
         except Exception:  # noqa: BLE001
             logger.warning("Failed to persist dirty Navidrome MBID cache", exc_info=True)
 
@@ -199,7 +197,7 @@ class NavidromeLibraryService:
         )
 
     async def _album_to_summary(self, album: SubsonicAlbum) -> NavidromeAlbumSummary:
-        # Only expose Lidarr-resolved MBIDs (Navidrome may have release IDs, not release-group IDs)
+        # Only expose Lidarr-resolved MBIDs. Navidrome may return release IDs instead.
         mbid = await self._resolve_album_mbid(album.name, album.artist) if album.name and album.artist else None
         if mbid:
             self._mbid_to_navidrome_id[mbid] = album.id
@@ -401,7 +399,7 @@ class NavidromeLibraryService:
             async with sem:
                 return await self.get_album_detail(aid)
 
-        # Fast path: direct MBID→navidrome_id lookup from reverse index
+        # Fast path: direct MBID -> navidrome_id lookup from the reverse index.
         if album_id and album_id in self._mbid_to_navidrome_id:
             nav_id = self._mbid_to_navidrome_id[album_id]
             detail = await _fetch_detail(nav_id)
@@ -467,10 +465,6 @@ class NavidromeLibraryService:
                     norm_artist = _normalize(artist_name)
                     if norm_artist and artist_mbid:
                         self._lidarr_artist_index[norm_artist] = artist_mbid
-                logger.info(
-                    "Built Lidarr matching indices: %d album entries, %d artist entries",
-                    len(self._lidarr_album_index), len(self._lidarr_artist_index),
-                )
             except Exception:  # noqa: BLE001
                 logger.warning("Failed to build Lidarr matching indices", exc_info=True)
 
@@ -484,10 +478,6 @@ class NavidromeLibraryService:
                     self._album_mbid_cache.update(disk_albums)
                     self._artist_mbid_cache.update(disk_artists)
                     loaded_from_disk = True
-                    logger.info(
-                        "Loaded Navidrome MBID cache from disk: %d albums, %d artists",
-                        len(disk_albums), len(disk_artists),
-                    )
             except Exception:  # noqa: BLE001
                 logger.warning("Failed to load Navidrome MBID cache from disk", exc_info=True)
 
@@ -528,11 +518,6 @@ class NavidromeLibraryService:
             del self._album_mbid_cache[key]
         for key in stale_artist_keys:
             del self._artist_mbid_cache[key]
-        if stale_album_keys or stale_artist_keys:
-            logger.info(
-                "Removed %d stale album and %d stale artist MBID entries",
-                len(stale_album_keys), len(stale_artist_keys),
-            )
 
         # Phase 4: Enrich all entries from Lidarr library matching (skipped when Lidarr unavailable)
         resolved_albums = 0
@@ -591,11 +576,6 @@ class NavidromeLibraryService:
                 if mbid:
                     resolved_artists += 1
 
-        logger.info(
-            "Navidrome MBID enrichment complete: %d new albums resolved, %d new artists resolved (loaded_from_disk=%s, lidarr_available=%s)",
-            resolved_albums, resolved_artists, loaded_from_disk, bool(self._lidarr_album_index),
-        )
-
         # Phase 5: Persist to SQLite
         if self._mbid_store and (self._dirty or stale_album_keys or stale_artist_keys):
             try:
@@ -604,14 +584,10 @@ class NavidromeLibraryService:
                 await self._mbid_store.save_navidrome_album_mbid_index(serializable_albums)
                 await self._mbid_store.save_navidrome_artist_mbid_index(serializable_artists)
                 self._dirty = False
-                logger.info(
-                    "Persisted Navidrome MBID cache to disk: %d albums, %d artists",
-                    len(self._album_mbid_cache), len(self._artist_mbid_cache),
-                )
             except Exception:  # noqa: BLE001
                 logger.warning("Failed to persist Navidrome MBID cache to disk", exc_info=True)
 
-        # Phase 6: Rebuild MBID→navidrome_id reverse index from scratch
+        # Phase 6: Rebuild the MBID -> navidrome_id reverse index from scratch.
         self._mbid_to_navidrome_id.clear()
         for album in all_albums:
             if not album.name or album.name == "Unknown":

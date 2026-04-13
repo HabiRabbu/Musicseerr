@@ -88,7 +88,6 @@ class PreferencesService:
     def save_preferences(self, preferences: UserPreferences) -> None:
         try:
             self._save_section("user_preferences", preferences)
-            logger.info(f"Saved preferences to {self._config_path}")
         except Exception as e:  # noqa: BLE001
             logger.error(f"Failed to save preferences: {e}")
             raise ConfigurationError(f"Failed to save preferences: {e}")
@@ -99,7 +98,6 @@ class PreferencesService:
     def save_lidarr_settings(self, lidarr_settings: LidarrSettings) -> None:
         try:
             self._save_section("lidarr_settings", lidarr_settings)
-            logger.info(f"Saved Lidarr settings to {self._config_path}")
         except Exception as e:  # noqa: BLE001
             logger.error(f"Failed to save Lidarr settings: {e}")
             raise ConfigurationError(f"Failed to save Lidarr settings: {e}")
@@ -110,7 +108,6 @@ class PreferencesService:
     def save_advanced_settings(self, advanced_settings: AdvancedSettings) -> None:
         try:
             self._save_section("advanced_settings", advanced_settings)
-            logger.info(f"Saved advanced settings to {self._config_path}")
         except Exception as e:  # noqa: BLE001
             logger.error(f"Failed to save advanced settings: {e}")
             raise ConfigurationError(f"Failed to save advanced settings: {e}")
@@ -142,8 +139,6 @@ class PreferencesService:
             self._settings.quality_profile_id = settings.quality_profile_id
             self._settings.metadata_profile_id = settings.metadata_profile_id
             self._settings.root_folder_path = settings.root_folder_path
-
-            logger.info(f"Saved Lidarr connection settings to {self._config_path}")
         except Exception as e:  # noqa: BLE001
             logger.error(f"Failed to save Lidarr connection settings: {e}")
             raise ConfigurationError(f"Failed to save Lidarr connection settings: {e}")
@@ -171,8 +166,6 @@ class PreferencesService:
             self._save_config(config)
 
             self._settings.jellyfin_url = settings.jellyfin_url
-
-            logger.info(f"Saved Jellyfin connection settings to {self._config_path}")
         except Exception as e:  # noqa: BLE001
             logger.error(f"Failed to save Jellyfin connection settings: {e}")
             raise ConfigurationError(f"Failed to save Jellyfin connection settings: {e}")
@@ -214,7 +207,6 @@ class PreferencesService:
                 "enabled": settings.enabled,
             }
             self._save_config(config)
-            logger.info("Saved Navidrome connection settings to %s", self._config_path)
         except Exception as e:  # noqa: BLE001
             logger.error("Failed to save Navidrome connection settings: %s", e)
             raise ConfigurationError(f"Failed to save Navidrome connection settings: {e}")
@@ -237,8 +229,6 @@ class PreferencesService:
                 "enabled": settings.enabled,
             }
             self._save_config(config)
-
-            logger.info(f"Saved ListenBrainz connection settings to {self._config_path}")
         except Exception as e:  # noqa: BLE001
             logger.error(f"Failed to save ListenBrainz connection settings: {e}")
             raise ConfigurationError(f"Failed to save ListenBrainz connection settings: {e}")
@@ -270,7 +260,6 @@ class PreferencesService:
                 "daily_quota_limit": settings.daily_quota_limit,
             }
             self._save_config(config)
-            logger.info(f"Saved YouTube connection settings to {self._config_path}")
         except Exception as e:  # noqa: BLE001
             logger.error(f"Failed to save YouTube connection settings: {e}")
             raise ConfigurationError(f"Failed to save YouTube connection settings: {e}")
@@ -281,7 +270,6 @@ class PreferencesService:
     def save_home_settings(self, settings: HomeSettings) -> None:
         try:
             self._save_section("home_settings", settings)
-            logger.info(f"Saved home settings to {self._config_path}")
         except Exception as e:  # noqa: BLE001
             logger.error(f"Failed to save home settings: {e}")
             raise ConfigurationError(f"Failed to save home settings: {e}")
@@ -292,7 +280,6 @@ class PreferencesService:
     def save_local_files_connection(self, settings: LocalFilesConnectionSettings) -> None:
         try:
             self._save_section("local_files_settings", settings)
-            logger.info("Saved local files settings to %s", self._config_path)
         except Exception as e:  # noqa: BLE001
             logger.error("Failed to save local files settings: %s", e)
             raise ConfigurationError(f"Failed to save local files settings: {e}")
@@ -332,7 +319,6 @@ class PreferencesService:
                 enabled=enabled,
             )
             self._save_section("lastfm_settings", resolved)
-            logger.info("Saved Last.fm connection settings to %s", self._config_path)
         except Exception as e:  # noqa: BLE001
             logger.error("Failed to save Last.fm connection settings: %s", e)
             raise ConfigurationError(f"Failed to save Last.fm connection settings: {e}")
@@ -347,7 +333,6 @@ class PreferencesService:
     def save_scrobble_settings(self, settings: ScrobbleSettings) -> None:
         try:
             self._save_section("scrobble_settings", settings)
-            logger.info("Saved scrobble settings to %s", self._config_path)
         except Exception as e:  # noqa: BLE001
             logger.error("Failed to save scrobble settings: %s", e)
             raise ConfigurationError(f"Failed to save scrobble settings: {e}")
@@ -358,7 +343,6 @@ class PreferencesService:
     def save_primary_music_source(self, settings: PrimaryMusicSourceSettings) -> None:
         try:
             self._save_section("primary_music_source", settings)
-            logger.info("Saved primary music source to %s", self._config_path)
         except Exception as e:  # noqa: BLE001
             logger.error("Failed to save primary music source: %s", e)
             raise ConfigurationError(f"Failed to save primary music source: {e}")
@@ -369,7 +353,6 @@ class PreferencesService:
     def save_profile_settings(self, settings: ProfileSettings) -> None:
         try:
             self._save_section("profile_settings", settings)
-            logger.info("Saved profile settings to %s", self._config_path)
         except Exception as e:  # noqa: BLE001
             logger.error("Failed to save profile settings: %s", e)
             raise ConfigurationError(f"Failed to save profile settings: {e}")

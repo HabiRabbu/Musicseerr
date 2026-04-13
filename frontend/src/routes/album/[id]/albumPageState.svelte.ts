@@ -292,7 +292,6 @@ export function createAlbumPageState(albumIdGetter: () => string) {
 			albumSourceMatchCache.set({ ...existing, [cacheField]: result }, albumId);
 		} catch (e) {
 			if (isAbortError(e)) return;
-			console.error(`Failed to fetch ${label} album data:`, e);
 		} finally {
 			if (!signal.aborted) loadingSetter(false);
 		}
@@ -321,7 +320,6 @@ export function createAlbumPageState(albumIdGetter: () => string) {
 			}
 		} catch (e) {
 			if (isAbortError(e)) return;
-			console.error('Failed to fetch Last.fm album data:', e);
 		} finally {
 			if (!signal.aborted) loadingLastfm = false;
 		}
@@ -339,9 +337,7 @@ export function createAlbumPageState(albumIdGetter: () => string) {
 			if (signal.aborted) return;
 			artistInLidarr = info.in_lidarr ?? false;
 			artistMonitored = info.monitored ?? false;
-		} catch (e) {
-			console.debug('Artist monitoring fetch failed:', e);
-		}
+		} catch {}
 	}
 
 	async function loadAlbum(albumId: string) {
@@ -381,9 +377,7 @@ export function createAlbumPageState(albumIdGetter: () => string) {
 							albumId,
 							'local'
 						);
-				} catch {
-					/* ignore integration loading errors */
-				}
+				} catch {}
 			})();
 		}
 
@@ -422,9 +416,7 @@ export function createAlbumPageState(albumIdGetter: () => string) {
 							albumId,
 							'navidrome'
 						);
-				} catch {
-					/* ignore integration loading errors */
-				}
+				} catch {}
 			})();
 		}
 	}
@@ -457,9 +449,7 @@ export function createAlbumPageState(albumIdGetter: () => string) {
 				extractServiceStatus(album);
 				albumBasicCache.set(album, albumId);
 			}
-		} catch {
-			/* refresh endpoint failure is non-fatal, loadAlbum will re-fetch */
-		}
+		} catch {}
 
 		if (signal.aborted) return;
 		await loadAlbum(albumId);

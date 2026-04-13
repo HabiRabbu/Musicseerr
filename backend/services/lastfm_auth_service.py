@@ -1,12 +1,9 @@
-import logging
 import time
 
 import msgspec
 
 from core.exceptions import ConfigurationError
 from repositories.protocols import LastFmRepositoryProtocol
-
-logger = logging.getLogger(__name__)
 
 MAX_PENDING_TOKENS = 5
 TOKEN_TTL_SECONDS = 600

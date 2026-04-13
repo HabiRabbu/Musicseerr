@@ -102,8 +102,7 @@ function createLibraryStore() {
 			}));
 
 			cache.set({ mbids, requested });
-		} catch (e) {
-			console.error('Failed to fetch library MBIDs:', e);
+		} catch {
 			if (!background) {
 				update((s) => ({ ...s, loading: false, initialized: true }));
 			}

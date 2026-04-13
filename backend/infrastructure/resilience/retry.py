@@ -63,10 +63,6 @@ class CircuitBreaker:
     def is_open(self) -> bool:
         if self.state == CircuitState.OPEN:
             if time.time() - self.last_failure_time > self.timeout:
-                logger.info(
-                    "Circuit breaker '%s' transitioning to HALF_OPEN",
-                    self.name,
-                )
                 previous_state = self.state
                 self.state = CircuitState.HALF_OPEN
                 self.success_count = 0
@@ -79,11 +75,6 @@ class CircuitBreaker:
         if self.state == CircuitState.HALF_OPEN:
             self.success_count += 1
             if self.success_count >= self.success_threshold:
-                logger.info(
-                    "Circuit breaker '%s' closing after %d successes",
-                    self.name,
-                    self.success_count,
-                )
                 previous_state = self.state
                 self.state = CircuitState.CLOSED
                 self.failure_count = 0
@@ -127,7 +118,6 @@ class CircuitBreaker:
         }
     
     def reset(self):
-        logger.info("Circuit breaker '%s' manually reset", self.name)
         previous_state = self.state
         self.state = CircuitState.CLOSED
         self.failure_count = 0
@@ -144,15 +134,11 @@ class CircuitBreaker:
             self.record_failure()
 
     async def atry_transition(self):
-        """Acquire lock and attempt OPEN→HALF_OPEN transition if timeout elapsed."""
+        """Acquire the lock and attempt an OPEN -> HALF_OPEN transition if the timeout has elapsed."""
         if self.state != CircuitState.OPEN:
             return
         async with self._lock:
             if self.state == CircuitState.OPEN and time.time() - self.last_failure_time > self.timeout:
-                logger.info(
-                    "Circuit breaker '%s' transitioning to HALF_OPEN (locked)",
-                    self.name,
-                )
                 previous_state = self.state
                 self.state = CircuitState.HALF_OPEN
                 self.success_count = 0
@@ -196,7 +182,6 @@ def with_retry(
         async def wrapper(*args: P.args, **kwargs: P.kwargs) -> T:
             service_name = circuit_breaker.name if circuit_breaker else "unknown"
             func_name = func.__name__
-            start_time = time.time()
             
             if circuit_breaker:
                 await circuit_breaker.atry_transition()
@@ -215,54 +200,23 @@ def with_retry(
             last_exception = None
             
             for attempt in range(1, max_attempts + 1):
-                attempt_start = time.time()
                 try:
                     result = await func(*args, **kwargs)
                     
-                    elapsed_ms = int((time.time() - attempt_start) * 1000)
-                    
                     if circuit_breaker:
                         await circuit_breaker.arecord_success()
-                    
-                    if attempt > 1:
-                        total_elapsed_ms = int((time.time() - start_time) * 1000)
-                        logger.info(
-                            "%s succeeded on attempt %d/%d",
-                            func_name,
-                            attempt,
-                            max_attempts,
-                            extra={
-                                "service_name": service_name,
-                                "function": func_name,
-                                "attempt": attempt,
-                                "max_attempts": max_attempts,
-                                "elapsed_ms": elapsed_ms,
-                                "total_elapsed_ms": total_elapsed_ms,
-                            }
-                        )
                     
                     return result
                 
                 except retriable_exceptions as e:
                     last_exception = e
-                    elapsed_ms = int((time.time() - attempt_start) * 1000)
                     
                     if attempt >= max_attempts:
-                        total_elapsed_ms = int((time.time() - start_time) * 1000)
                         logger.error(
                             "%s failed after %d attempts: %s",
                             func_name,
                             max_attempts,
                             e,
-                            extra={
-                                "service_name": service_name,
-                                "function": func_name,
-                                "attempt": attempt,
-                                "max_attempts": max_attempts,
-                                "elapsed_ms": elapsed_ms,
-                                "total_elapsed_ms": total_elapsed_ms,
-                                "error": str(e),
-                            }
                         )
                         break
 
@@ -273,24 +227,6 @@ def with_retry(
                         delay = min(base_delay * (exponential_base ** (attempt - 1)), max_delay)
                         if jitter:
                             delay *= (0.5 + random.random())
-                    
-                    logger.warning(
-                        "%s attempt %d/%d failed: %s. Retrying in %.2fs...",
-                        func_name,
-                        attempt,
-                        max_attempts,
-                        e,
-                        delay,
-                        extra={
-                            "service_name": service_name,
-                            "function": func_name,
-                            "attempt": attempt,
-                            "max_attempts": max_attempts,
-                            "elapsed_ms": elapsed_ms,
-                            "retry_delay_s": f"{delay:.2f}",
-                            "error": str(e),
-                        }
-                    )
                     
                     await asyncio.sleep(delay)
             

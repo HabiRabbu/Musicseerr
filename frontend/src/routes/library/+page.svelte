@@ -109,15 +109,15 @@
 
 	const FREQ_LABELS: Record<string, string> = {
 		manual: 'Manual sync only',
-		'5min': 'Auto-syncs every 5 minutes',
-		'10min': 'Auto-syncs every 10 minutes',
-		'30min': 'Auto-syncs every 30 minutes',
-		'1hr': 'Auto-syncs every hour',
-		'6hr': 'Auto-syncs every 6 hours',
-		'12hr': 'Auto-syncs every 12 hours',
-		'24hr': 'Auto-syncs every 24 hours',
-		'3d': 'Auto-syncs every 3 days',
-		'7d': 'Auto-syncs every 7 days'
+		'5min': 'Syncs automatically every 5 minutes',
+		'10min': 'Syncs automatically every 10 minutes',
+		'30min': 'Syncs automatically every 30 minutes',
+		'1hr': 'Syncs automatically every hour',
+		'6hr': 'Syncs automatically every 6 hours',
+		'12hr': 'Syncs automatically every 12 hours',
+		'24hr': 'Syncs automatically every 24 hours',
+		'3d': 'Syncs automatically every 3 days',
+		'7d': 'Syncs automatically every 7 days'
 	};
 
 	onMount(() => {
@@ -132,9 +132,7 @@
 		try {
 			const data = await api.global.get<{ sync_frequency: string }>('/api/v1/settings/lidarr');
 			syncFrequencyLabel = FREQ_LABELS[data.sync_frequency] ?? null;
-		} catch {
-			// Silently omit frequency hint if settings can't be loaded
-		}
+		} catch {}
 	}
 
 	async function loadArtists() {
@@ -144,7 +142,6 @@
 			artists = data.artists;
 		} catch (e) {
 			if (isAbortError(e)) return;
-			console.error("Couldn't load artists:", e);
 		} finally {
 			loadingArtists = false;
 		}
@@ -166,7 +163,6 @@
 		} catch (e) {
 			if (isAbortError(e)) return;
 			if (id !== albumsFetchId) return;
-			console.error("Couldn't load albums:", e);
 			if (e instanceof ApiError) {
 				error = e.message;
 				errorCode = e.code;
@@ -183,7 +179,6 @@
 			stats = await api.get<LibraryStats>('/api/v1/library/stats');
 		} catch (e) {
 			if (isAbortError(e)) return;
-			console.error('Failed to load stats:', e);
 		} finally {
 			loadingStats = false;
 		}
@@ -211,7 +206,6 @@
 			syncStatus.checkStatus();
 			await loadLibrary();
 		} catch (e) {
-			console.error('Sync failed:', e);
 			if (e instanceof ApiError) {
 				error = e.message;
 				errorCode = e.code;
@@ -275,7 +269,7 @@
 			<div class="flex flex-col gap-1">
 				<span>{error}</span>
 				{#if isConnectionError}
-					<a href="/settings" class="link link-primary text-sm">Check Lidarr settings →</a>
+					<a href="/settings" class="link link-primary text-sm">Check Lidarr settings</a>
 				{/if}
 			</div>
 			<div class="flex gap-2">
@@ -308,7 +302,7 @@
 				{#if loadingStats}
 					<span class="skeleton h-4 w-64 inline-block"></span>
 				{:else}
-					{stats.artist_count} artists • {stats.album_count} albums • Last sync: {lastSyncText}
+					{stats.artist_count} artists, {stats.album_count} albums. Last synced {lastSyncText}
 				{/if}
 			</p>
 			{#if syncFrequencyLabel}
@@ -373,7 +367,7 @@
 			<div class="flex items-center gap-2 text-sm text-base-content/70 mb-1">
 				<span>{syncStatus.phaseLabel}</span>
 				{#if syncStatus.totalItems > 0}
-					<span>— {syncStatus.processedItems}/{syncStatus.totalItems}</span>
+					<span>({syncStatus.processedItems}/{syncStatus.totalItems})</span>
 				{/if}
 			</div>
 			<progress class="progress progress-primary w-full" value={syncStatus.progress} max="100"
@@ -451,10 +445,10 @@
 		>
 			<option value="date_added:desc">Newest First</option>
 			<option value="date_added:asc">Oldest First</option>
-			<option value="title:asc">Title A–Z</option>
-			<option value="title:desc">Title Z–A</option>
-			<option value="artist:asc">Artist A–Z</option>
-			<option value="artist:desc">Artist Z–A</option>
+			<option value="title:asc">Title A-Z</option>
+			<option value="title:desc">Title Z-A</option>
+			<option value="artist:asc">Artist A-Z</option>
+			<option value="artist:desc">Artist Z-A</option>
 			<option value="year:desc">Year (Newest)</option>
 			<option value="year:asc">Year (Oldest)</option>
 		</select>
@@ -555,7 +549,6 @@
 
 	{#if !isSearching && !loadingArtists && !loadingAlbums && artists.length === 0 && albums.length === 0}
 		<div class="flex flex-col items-center justify-center min-h-50 text-center mt-8">
-			<div class="text-6xl mb-4">📚</div>
 			<h2 class="text-2xl font-semibold mb-2">No items in library</h2>
 			<p class="text-base-content/70 mb-4">
 				Your Lidarr library is empty or hasn't been synced yet.
@@ -591,7 +584,7 @@
 						<div class="flex items-center justify-center gap-2 text-sm text-base-content/70 mb-1">
 							<span>{syncStatus.phaseLabel}</span>
 							{#if syncStatus.totalItems > 0}
-								<span>— {syncStatus.processedItems}/{syncStatus.totalItems}</span>
+								<span>({syncStatus.processedItems}/{syncStatus.totalItems})</span>
 							{/if}
 						</div>
 						<progress class="progress progress-primary w-full" value={syncStatus.progress} max="100"

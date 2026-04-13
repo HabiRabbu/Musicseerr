@@ -36,7 +36,6 @@ class AlbumPhase:
         generation: int = 0,
     ) -> None:
         from core.dependencies import get_album_service
-        logger.info(f"Pre-caching {len(release_group_ids)} new/missing release-groups")
         album_service = get_album_service()
 
         async def cache_rg(rgid: str, index: int) -> tuple[str, bool, bool]:
@@ -77,7 +76,6 @@ class AlbumPhase:
         i = 0
         while i < len(release_group_ids):
             if status_service.is_cancelled():
-                logger.info("Album pre-caching cancelled by user")
                 break
             batch_start = time.time()
             batch = release_group_ids[i:i + batch_size]
@@ -117,10 +115,6 @@ class AlbumPhase:
                     batch_size = min(batch_size + 1, max_batch)
                     logger.debug(f"Increasing batch size to {batch_size} (fast: {avg_time_per_item:.2f}s/item)")
             next_i = i + len(batch)
-            if next_i % 30 == 0 or next_i >= len(release_group_ids):
-                percent = int((min(next_i, len(release_group_ids)) / len(release_group_ids)) * 100)
-                logger.info(f"Album progress: {min(next_i, len(release_group_ids))}/{len(release_group_ids)} ({percent}%) - metadata: {metadata_fetched}, covers: {covers_fetched} [batch: {batch_size}]")
             i = next_i
             await asyncio.sleep(advanced_settings.delay_albums)
         await status_service.persist_progress(force=True, generation=generation)
-        logger.info(f"Album pre-caching complete: metadata fetched={metadata_fetched}, covers fetched={covers_fetched}, total processed={len(release_group_ids)}")

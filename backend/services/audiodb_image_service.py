@@ -63,7 +63,6 @@ class AudioDBImageService:
 
         raw = await self._disk_cache.get_audiodb_artist(mbid)
         if raw is None:
-            logger.debug("audiodb.cache action=miss entity_type=artist mbid=%s lookup_source=mbid", mbid)
             return None
 
         try:
@@ -73,10 +72,6 @@ class AudioDBImageService:
             await self._disk_cache.delete_entity("audiodb_artist", mbid)
             return None
 
-        logger.debug(
-            "audiodb.cache action=hit entity_type=artist mbid=%s lookup_source=%s is_negative=%s",
-            mbid, images.lookup_source, images.is_negative,
-        )
         await self._mem_set("artist", mbid, images)
         return images
 
@@ -92,7 +87,6 @@ class AudioDBImageService:
 
         raw = await self._disk_cache.get_audiodb_album(mbid)
         if raw is None:
-            logger.debug("audiodb.cache action=miss entity_type=album mbid=%s lookup_source=mbid", mbid)
             return None
 
         try:
@@ -102,10 +96,6 @@ class AudioDBImageService:
             await self._disk_cache.delete_entity("audiodb_album", mbid)
             return None
 
-        logger.debug(
-            "audiodb.cache action=hit entity_type=album mbid=%s lookup_source=%s is_negative=%s",
-            mbid, images.lookup_source, images.is_negative,
-        )
         await self._mem_set("album", mbid, images)
         return images
 
@@ -151,10 +141,6 @@ class AudioDBImageService:
                     mbid, images, is_monitored=is_monitored, ttl_seconds=ttl,
                 )
                 await self._mem_set("artist", mbid, images)
-                logger.debug(
-                    "audiodb.cache action=write entity_type=artist mbid=%s lookup_source=mbid is_negative=false ttl=%d",
-                    mbid, ttl,
-                )
                 return images
 
             negative = AudioDBArtistImages.negative(lookup_source="mbid")
@@ -162,10 +148,6 @@ class AudioDBImageService:
                 mbid, negative, is_monitored=False, ttl_seconds=ttl_not_found,
             )
             await self._mem_set("artist", mbid, negative)
-            logger.debug(
-                "audiodb.cache action=write entity_type=artist mbid=%s lookup_source=mbid is_negative=true ttl=%d",
-                mbid, ttl_not_found,
-            )
         else:
             negative = cached
 
@@ -183,10 +165,6 @@ class AudioDBImageService:
                     mbid, images, is_monitored=is_monitored, ttl_seconds=ttl,
                 )
                 await self._mem_set("artist", mbid, images)
-                logger.debug(
-                    "audiodb.cache action=write entity_type=artist mbid=%s is_negative=false lookup_source=name ttl=%d",
-                    mbid, ttl,
-                )
                 return images
 
             negative_name = AudioDBArtistImages.negative(lookup_source="name")
@@ -194,10 +172,6 @@ class AudioDBImageService:
                 mbid, negative_name, is_monitored=False, ttl_seconds=ttl_not_found,
             )
             await self._mem_set("artist", mbid, negative_name)
-            logger.debug(
-                "audiodb.cache action=write entity_type=artist mbid=%s is_negative=true lookup_source=name ttl=%d",
-                mbid, ttl_not_found,
-            )
             return negative_name
 
         return negative
@@ -249,10 +223,6 @@ class AudioDBImageService:
                     mbid, images, is_monitored=is_monitored, ttl_seconds=ttl,
                 )
                 await self._mem_set("album", mbid, images)
-                logger.debug(
-                    "audiodb.cache action=write entity_type=album mbid=%s lookup_source=mbid is_negative=false ttl=%d",
-                    mbid, ttl,
-                )
                 return images
 
             negative = AudioDBAlbumImages.negative(lookup_source="mbid")
@@ -260,10 +230,6 @@ class AudioDBImageService:
                 mbid, negative, is_monitored=False, ttl_seconds=ttl_not_found,
             )
             await self._mem_set("album", mbid, negative)
-            logger.debug(
-                "audiodb.cache action=write entity_type=album mbid=%s lookup_source=mbid is_negative=true ttl=%d",
-                mbid, ttl_not_found,
-            )
         else:
             negative = cached
 
@@ -292,10 +258,6 @@ class AudioDBImageService:
                     mbid, images, is_monitored=is_monitored, ttl_seconds=ttl,
                 )
                 await self._mem_set("album", mbid, images)
-                logger.debug(
-                    "audiodb.cache action=write entity_type=album mbid=%s is_negative=false lookup_source=name ttl=%d",
-                    mbid, ttl,
-                )
                 return images
 
             negative_name = AudioDBAlbumImages.negative(lookup_source="name")
@@ -303,10 +265,6 @@ class AudioDBImageService:
                 mbid, negative_name, is_monitored=False, ttl_seconds=ttl_not_found,
             )
             await self._mem_set("album", mbid, negative_name)
-            logger.debug(
-                "audiodb.cache action=write entity_type=album mbid=%s is_negative=true lookup_source=name ttl=%d",
-                mbid, ttl_not_found,
-            )
             return negative_name
 
         return negative

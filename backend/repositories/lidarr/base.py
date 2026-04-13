@@ -1,6 +1,5 @@
 import asyncio
 import httpx
-import logging
 import msgspec
 import time
 from typing import Any, Optional
@@ -10,8 +9,6 @@ from infrastructure.cache.cache_keys import lidarr_raw_albums_key, lidarr_reques
 from infrastructure.cache.memory_cache import CacheInterface
 from infrastructure.http.deduplication import get_deduplicator
 from infrastructure.resilience.retry import with_retry, CircuitBreaker
-
-logger = logging.getLogger(__name__)
 
 _lidarr_circuit_breaker = CircuitBreaker(
     failure_threshold=5,
@@ -157,8 +154,7 @@ class LidarrBase:
     async def _post_command(self, body: dict[str, Any]) -> Any:
         try:
             return await self._post("/api/v1/command", body)
-        except ExternalServiceError as exc:
-            logger.warning("Failed to post Lidarr command %s: %s", body.get("name"), exc)
+        except ExternalServiceError:
             return None
 
     async def _get_command(self, cmd_id: int) -> Any:
@@ -180,8 +176,7 @@ class LidarrBase:
                 try:
                     status = await self._get_command(cmd_id)
                     last_status = status
-                except ExternalServiceError as exc:
-                    logger.debug("Lidarr command %s status poll failed: %s", cmd_id, exc)
+                except ExternalServiceError:
                     continue
 
                 state = (status or {}).get("status") or (status or {}).get("state")
@@ -189,8 +184,7 @@ class LidarrBase:
                     return status
 
             return last_status
-        except ExternalServiceError as exc:
-            logger.warning("Failed to await Lidarr command %s: %s", body.get("name"), exc)
+        except ExternalServiceError:
             return None
 
     async def _wait_for(
@@ -207,8 +201,8 @@ class LidarrBase:
                 last = await fetch_coro_factory()
                 if stop(last):
                     return last
-            except ExternalServiceError as exc:
-                logger.debug("Lidarr wait_for poll failed: %s", exc)
+            except ExternalServiceError:
+                pass
             await asyncio.sleep(poll)
         return last
 

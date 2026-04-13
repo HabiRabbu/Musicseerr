@@ -1,13 +1,10 @@
-"""Domain 3 — YouTube link persistence."""
+"""Domain 3 - YouTube link persistence."""
 
-import logging
 import sqlite3
 from typing import Any
 
 from infrastructure.persistence._database import PersistenceBase
 from infrastructure.serialization import to_jsonable
-
-logger = logging.getLogger(__name__)
 
 
 class YouTubeStore(PersistenceBase):

@@ -102,7 +102,6 @@ class LidarrAlbumRepository(LidarrHistoryRepository):
                     cover_url = constructed_url
 
             if cover_url:
-                logger.debug(f"[Lidarr:Album] Found cover for {album_mbid[:8]}: {cover_url[:60]}...")
                 await self._cache.set(cache_key, cover_url, ttl_seconds=3600)
                 return cover_url
 
@@ -110,7 +109,6 @@ class LidarrAlbumRepository(LidarrHistoryRepository):
             return None
 
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"Failed to get album image from Lidarr for {album_mbid}: {e}")
             return None
 
     async def get_album_details(self, album_mbid: str) -> Optional[dict[str, Any]]:
@@ -193,11 +191,9 @@ class LidarrAlbumRepository(LidarrHistoryRepository):
             }
 
             await self._cache.set(cache_key, result, ttl_seconds=300)
-            logger.debug(f"[Lidarr] Fetched album details for {album_mbid[:8]}")
             return result
 
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"Failed to get album details from Lidarr for {album_mbid}: {e}")
             return None
 
     async def get_album_tracks(self, album_id: int) -> list[dict[str, Any]]:
@@ -231,11 +227,9 @@ class LidarrAlbumRepository(LidarrHistoryRepository):
             tracks.sort(key=lambda t: (t["disc_number"], t["track_number"]))
 
             await self._cache.set(cache_key, tracks, ttl_seconds=300)
-            logger.debug(f"[Lidarr] Fetched {len(tracks)} tracks for album ID {album_id}")
             return tracks
 
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"Failed to get tracks from Lidarr for album ID {album_id}: {e}")
             return []
 
     async def get_track_file(self, track_file_id: int) -> dict[str, Any] | None:
@@ -277,7 +271,6 @@ class LidarrAlbumRepository(LidarrHistoryRepository):
             items = await self._get("/api/v1/album", params={"foreignAlbumId": album_mbid})
             return items[0] if items else None
         except Exception as e:  # noqa: BLE001
-            logger.warning(f"Error getting album by foreign ID {album_mbid}: {e}")
             return None
 
     _ALBUM_MUTABLE_FIELDS = frozenset({"monitored"})
@@ -298,7 +291,6 @@ class LidarrAlbumRepository(LidarrHistoryRepository):
             params = {"deleteFiles": str(delete_files).lower(), "addImportListExclusion": "false"}
             await self._delete(f"/api/v1/album/{album_id}", params=params)
             await self._invalidate_album_list_caches()
-            logger.info(f"Deleted album ID {album_id} (deleteFiles={delete_files})")
             return True
         except Exception as e:
             logger.error(f"Failed to delete album {album_id}: {e}")
@@ -380,11 +372,6 @@ class LidarrAlbumRepository(LidarrHistoryRepository):
             is_monitored = album_obj.get("monitored", False)
 
             if has_files and is_monitored:
-                total_ms = int((time.monotonic() - t0) * 1000)
-                logger.info(
-                    "add_album timing: album=%s artist_ensure=%dms total=%dms (already downloaded)",
-                    musicbrainz_id[:8], artist_ensure_ms, total_ms,
-                )
                 await self._invalidate_album_list_caches()
                 return {
                     "message": f"Album already downloaded: {album_title}",
@@ -396,8 +383,8 @@ class LidarrAlbumRepository(LidarrHistoryRepository):
 
             try:
                 await self._post_command({"name": "AlbumSearch", "albumIds": [album_id]})
-            except ExternalServiceError as exc:
-                logger.warning("Failed to queue AlbumSearch for %s: %s", musicbrainz_id, exc)
+            except ExternalServiceError:
+                pass
 
             await self._unmonitor_auto_monitored_albums(
                 artist_id, musicbrainz_id, album_id, pre_add_monitored_ids
@@ -405,19 +392,13 @@ class LidarrAlbumRepository(LidarrHistoryRepository):
             await self._invalidate_album_list_caches()
             await self._cache.clear_prefix(f"{LIDARR_PREFIX}artists:mbids")
 
-            total_ms = int((time.monotonic() - t0) * 1000)
-            logger.info(
-                "add_album timing: album=%s artist_ensure=%dms total=%dms (existing album, monitor+search)",
-                musicbrainz_id[:8], artist_ensure_ms, total_ms,
-            )
-
             return {
                 "message": f"Album monitored & search triggered: {album_title}",
                 "monitored": True,
                 "payload": album_obj,
             }
 
-        # Album doesn't exist yet — wait for indexing after artist add/refresh
+        # The album does not exist yet, so wait for indexing after the artist add or refresh.
         if artist_created:
             await self._wait_for_artist_commands_to_complete(artist_id, timeout=120.0)
 
@@ -469,7 +450,6 @@ class LidarrAlbumRepository(LidarrHistoryRepository):
             except ExternalServiceError as e:
                 err_str = str(e).lower()
                 if "already exists" in err_str:
-                    logger.info("Album %s already exists per Lidarr, fetching", musicbrainz_id)
                     album_obj = await self._get_album_by_foreign_id(musicbrainz_id)
                     if album_obj:
                         if not album_obj.get("monitored"):
@@ -483,7 +463,7 @@ class LidarrAlbumRepository(LidarrHistoryRepository):
                 elif "post failed" in err_str or "405" in err_str or "metadata" in err_str:
                     raise ExternalServiceError(
                         f"Lidarr rejected '{album_title}' ({album_type}"
-                        f"{' — ' + ', '.join(secondary_types) if secondary_types else ''}). "
+                        f"{': ' + ', '.join(secondary_types) if secondary_types else ''}). "
                         f"Your Metadata Profile probably excludes {album_type}s. "
                         f"Go to Lidarr > Settings > Profiles > Metadata Profiles and enable '{album_type}'."
                     )
@@ -508,8 +488,8 @@ class LidarrAlbumRepository(LidarrHistoryRepository):
 
         try:
             await self._post_command({"name": "AlbumSearch", "albumIds": [album_id]})
-        except ExternalServiceError as exc:
-            logger.warning("Failed to queue AlbumSearch for %s: %s", musicbrainz_id, exc)
+        except ExternalServiceError:
+            pass
 
         # Unmonitor albums that Lidarr auto-monitored during the add
         await self._unmonitor_auto_monitored_albums(
@@ -520,12 +500,6 @@ class LidarrAlbumRepository(LidarrHistoryRepository):
 
         await self._invalidate_album_list_caches()
         await self._cache.clear_prefix(f"{LIDARR_PREFIX}artists:mbids")
-
-        total_ms = int((time.monotonic() - t0) * 1000)
-        logger.info(
-            "add_album timing: album=%s artist_ensure=%dms total=%dms (new album, created=%s)",
-            musicbrainz_id[:8], artist_ensure_ms, total_ms, artist_created,
-        )
 
         return {
             "message": f"Album added & monitored: {album_title}",
@@ -560,8 +534,8 @@ class LidarrAlbumRepository(LidarrHistoryRepository):
                 if not has_running_commands:
                     break
 
-            except Exception as e:  # noqa: BLE001
-                logger.warning(f"Error checking command status: {e}")
+            except Exception:  # noqa: BLE001
+                pass
 
             await asyncio.sleep(5.0)
 
@@ -627,9 +601,5 @@ class LidarrAlbumRepository(LidarrHistoryRepository):
                     "/api/v1/album/monitor",
                     {"albumIds": to_unmonitor, "monitored": False},
                 )
-                logger.info(
-                    "Unmonitored %d auto-monitored albums for artist %d (kept requested %s)",
-                    len(to_unmonitor), artist_id, requested_mbid[:8],
-                )
-        except ExternalServiceError as exc:
-            logger.warning("Failed to unmonitor auto-monitored albums: %s", exc)
+        except ExternalServiceError:
+            pass

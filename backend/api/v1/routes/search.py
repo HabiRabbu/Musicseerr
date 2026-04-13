@@ -1,5 +1,3 @@
-import logging
-import time
 from fastapi import APIRouter, Query, Path, BackgroundTasks, Depends, Request
 from core.exceptions import ClientDisconnectedError
 from api.v1.schemas.search import (
@@ -17,8 +15,6 @@ import msgspec.structs
 from services.search_service import SearchService
 from services.search_enrichment_service import SearchEnrichmentService
 from repositories.coverart_repository import CoverArtRepository
-
-logger = logging.getLogger(__name__)
 
 router = APIRouter(route_class=MsgSpecRoute, prefix="/search", tags=["search"])
 
@@ -79,11 +75,7 @@ async def suggest(
     stripped = q.strip()
     if len(stripped) < 2:
         return SuggestResponse()
-    start = time.monotonic()
-    result = await search_service.suggest(query=stripped, limit=limit)
-    elapsed_ms = (time.monotonic() - start) * 1000
-    logger.debug("Suggest query_len=%d results=%d time_ms=%.1f", len(stripped), len(result.results), elapsed_ms)
-    return result
+    return await search_service.suggest(query=stripped, limit=limit)
 
 
 @router.get("/{bucket}", response_model=SearchBucketResponse)

@@ -1,8 +1,7 @@
-"""Tier 2 — Cache layer, persistence stores, and foundation providers."""
+"""Tier 2 - Cache layer, persistence stores, and foundation providers."""
 
 from __future__ import annotations
 
-import logging
 import threading
 
 from core.config import get_settings
@@ -18,15 +17,11 @@ from infrastructure.persistence import (
 
 from ._registry import singleton
 
-logger = logging.getLogger(__name__)
-
-
 @singleton
 def get_cache() -> CacheInterface:
     preferences_service = get_preferences_service()
     advanced = preferences_service.get_advanced_settings()
     max_entries = advanced.memory_cache_max_entries
-    logger.info(f"Initialized RAM cache with max {max_entries} entries")
     return InMemoryCache(max_entries=max_entries)
 
 
@@ -36,7 +31,6 @@ def get_disk_cache() -> DiskMetadataCache:
     preferences_service = get_preferences_service()
     advanced = preferences_service.get_advanced_settings()
     cache_dir = settings.cache_dir / "metadata"
-    logger.info(f"Initialized disk metadata cache at {cache_dir}")
     return DiskMetadataCache(
         base_path=cache_dir,
         recent_metadata_max_size_mb=advanced.recent_metadata_max_size_mb,

@@ -97,5 +97,4 @@ async def request_validation_error_handler(request: Request, exc: RequestValidat
 
 
 async def client_disconnected_handler(request: Request, exc: ClientDisconnectedError) -> Response:
-    logger.debug("Client disconnected: %s %s", request.method, request.url.path)
     return Response(status_code=status.HTTP_204_NO_CONTENT)

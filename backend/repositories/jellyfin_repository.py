@@ -482,7 +482,6 @@ class JellyfinRepository:
                 ):
                     return item
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"MBID search fallback failed for {musicbrainz_id}: {e}")
             _record_degradation(f"Album MBID search fallback failed: {e}")
 
         return None
@@ -496,7 +495,6 @@ class JellyfinRepository:
                 if item.provider_ids.get("MusicBrainzArtist") == musicbrainz_id:
                     return item
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"Artist MBID search fallback failed for {musicbrainz_id}: {e}")
             _record_degradation(f"Artist MBID search fallback failed: {e}")
 
         return None
@@ -529,9 +527,6 @@ class JellyfinRepository:
             )
             if sqlite_index:
                 await self._cache.set(cache_key, sqlite_index, ttl_seconds=3600)
-                logger.info(
-                    f"Loaded MBID index from SQLite with {len(sqlite_index)} entries"
-                )
                 return sqlite_index
 
         index: dict[str, str] = {}
@@ -578,7 +573,6 @@ class JellyfinRepository:
                 await self._cache.set(cache_key, index, ttl_seconds=3600)
                 if self._mbid_store:
                     await self._mbid_store.save_jellyfin_mbid_index(index)
-            logger.info(f"Built Jellyfin MBID index with {len(index)} entries")
         except Exception as e:  # noqa: BLE001
             logger.error(f"Failed to build MBID index: {e}")
             _record_degradation(f"Failed to build MBID index: {e}")
@@ -670,11 +664,9 @@ class JellyfinRepository:
 
         raw_play_session_id = result.get("PlaySessionId")
         if not raw_play_session_id:
-            logger.warning(
-                "PlaybackInfo returned null PlaySessionId",
-                extra={"item_id": item_id},
-            )
-        play_session_id = raw_play_session_id or ""
+            play_session_id = ""
+        else:
+            play_session_id = raw_play_session_id
         media_sources = result.get("MediaSources") or []
         if not media_sources:
             raise ExternalServiceError(f"Playback info missing media sources for {item_id}")

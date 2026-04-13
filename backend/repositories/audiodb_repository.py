@@ -126,7 +126,6 @@ class AudioDBRepository:
                 raise RateLimitedError("AudioDB rate limit exceeded", retry_after_seconds=60)
 
             if response.status_code == 404:
-                logger.debug("audiodb.request endpoint=%s status=404 elapsed_ms=%.1f", endpoint, elapsed_ms)
                 return None
 
             if response.status_code != 200:
@@ -139,7 +138,6 @@ class AudioDBRepository:
             except (msgspec.DecodeError, ValueError, TypeError):
                 raise ExternalServiceError("AudioDB returned invalid JSON")
 
-            logger.debug("audiodb.request endpoint=%s status=200 elapsed_ms=%.1f", endpoint, elapsed_ms)
             return data
 
         except (ExternalServiceError, RateLimitedError):
@@ -164,12 +162,10 @@ class AudioDBRepository:
         elapsed_ms = (time.monotonic() - t0) * 1000
 
         if data is None:
-            logger.debug("audiodb.lookup entity=artist lookup_type=mbid mbid=%s found=false elapsed_ms=%.1f", mbid, elapsed_ms)
             return None
 
         item = _extract_first(data, "artists")
         if item is None:
-            logger.debug("audiodb.lookup entity=artist lookup_type=mbid mbid=%s found=false elapsed_ms=%.1f", mbid, elapsed_ms)
             return None
 
         try:
@@ -178,7 +174,6 @@ class AudioDBRepository:
             logger.warning("audiodb.schema_error entity=artist lookup_type=mbid mbid=%s error=%s", mbid, exc)
             _record_degradation(f"Schema error for artist mbid {mbid}: {exc}")
             return None
-        logger.debug("audiodb.lookup entity=artist lookup_type=mbid mbid=%s found=true elapsed_ms=%.1f", mbid, elapsed_ms)
         return result
 
     async def get_album_by_mbid(self, mbid: str) -> AudioDBAlbumResponse | None:
@@ -198,12 +193,10 @@ class AudioDBRepository:
         elapsed_ms = (time.monotonic() - t0) * 1000
 
         if data is None:
-            logger.debug("audiodb.lookup entity=album lookup_type=mbid mbid=%s found=false elapsed_ms=%.1f", mbid, elapsed_ms)
             return None
 
         item = _extract_first(data, "album")
         if item is None:
-            logger.debug("audiodb.lookup entity=album lookup_type=mbid mbid=%s found=false elapsed_ms=%.1f", mbid, elapsed_ms)
             return None
 
         try:
@@ -212,7 +205,6 @@ class AudioDBRepository:
             logger.warning("audiodb.schema_error entity=album lookup_type=mbid mbid=%s error=%s", mbid, exc)
             _record_degradation(f"Schema error for album mbid {mbid}: {exc}")
             return None
-        logger.debug("audiodb.lookup entity=album lookup_type=mbid mbid=%s found=true elapsed_ms=%.1f", mbid, elapsed_ms)
         return result
 
     async def search_artist_by_name(self, name: str) -> AudioDBArtistResponse | None:
@@ -232,12 +224,10 @@ class AudioDBRepository:
         elapsed_ms = (time.monotonic() - t0) * 1000
 
         if data is None:
-            logger.debug("audiodb.lookup entity=artist lookup_type=name name=%s found=false elapsed_ms=%.1f", name, elapsed_ms)
             return None
 
         item = _extract_first(data, "artists")
         if item is None:
-            logger.debug("audiodb.lookup entity=artist lookup_type=name name=%s found=false elapsed_ms=%.1f", name, elapsed_ms)
             return None
 
         try:
@@ -246,7 +236,6 @@ class AudioDBRepository:
             logger.warning("audiodb.schema_error entity=artist lookup_type=name name=%s error=%s", name, exc)
             _record_degradation(f"Schema error for artist name search: {exc}")
             return None
-        logger.debug("audiodb.lookup entity=artist lookup_type=name name=%s found=true elapsed_ms=%.1f", name, elapsed_ms)
         return result
 
     async def search_album_by_name(self, artist: str, album: str) -> AudioDBAlbumResponse | None:
@@ -266,18 +255,10 @@ class AudioDBRepository:
         elapsed_ms = (time.monotonic() - t0) * 1000
 
         if data is None:
-            logger.debug(
-                "audiodb.lookup entity=album lookup_type=name artist=%s album=%s found=false elapsed_ms=%.1f",
-                artist, album, elapsed_ms,
-            )
             return None
 
         item = _extract_first(data, "album")
         if item is None:
-            logger.debug(
-                "audiodb.lookup entity=album lookup_type=name artist=%s album=%s found=false elapsed_ms=%.1f",
-                artist, album, elapsed_ms,
-            )
             return None
 
         try:
@@ -291,8 +272,4 @@ class AudioDBRepository:
             )
             _record_degradation(f"Schema error for album name search: {exc}")
             return None
-        logger.debug(
-            "audiodb.lookup entity=album lookup_type=name artist=%s album=%s found=true elapsed_ms=%.1f",
-            artist, album, elapsed_ms,
-        )
         return result

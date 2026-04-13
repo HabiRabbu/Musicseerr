@@ -252,7 +252,6 @@ class NavidromeRepository:
             await self._request("/rest/ping")
             return True
         except Exception:  # noqa: BLE001
-            logger.debug("Navidrome ping failed", exc_info=True)
             _record_degradation("Navidrome ping failed")
             return False
 
@@ -451,7 +450,6 @@ class NavidromeRepository:
             await self._request("/rest/scrobble", params)
             return True
         except Exception:  # noqa: BLE001
-            logger.warning("Navidrome scrobble failed", exc_info=True)
             _record_degradation("Navidrome scrobble failed")
             return False
 
@@ -461,7 +459,6 @@ class NavidromeRepository:
             await self._request("/rest/scrobble", params)
             return True
         except Exception:  # noqa: BLE001
-            logger.warning("Navidrome now-playing report failed", exc_info=True)
             _record_degradation("Navidrome now-playing report failed")
             return False
 

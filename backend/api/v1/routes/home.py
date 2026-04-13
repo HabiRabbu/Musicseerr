@@ -1,4 +1,3 @@
-import logging
 from typing import Literal
 from fastapi import APIRouter, Depends, Query, HTTPException
 from api.v1.schemas.home import (
@@ -19,8 +18,6 @@ from infrastructure.msgspec_fastapi import MsgSpecRoute
 import msgspec.structs
 from services.home_service import HomeService
 from services.home_charts_service import HomeChartsService
-
-logger = logging.getLogger(__name__)
 
 router = APIRouter(route_class=MsgSpecRoute, prefix="/home", tags=["home"])
 

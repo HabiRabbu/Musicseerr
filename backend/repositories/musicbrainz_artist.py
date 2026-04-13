@@ -255,7 +255,7 @@ class MusicBrainzArtistMixin:
             try:
                 await self.get_release_group_by_id(rg_id, priority=RequestPriority.BACKGROUND_SYNC)
             except (CircuitOpenError, ExternalServiceError, httpx.HTTPError) as exc:
-                logger.debug("Failed to warm release group cache for %s: %s", rg_id, exc)
+                pass
 
     async def get_artist_release_groups(
         self,

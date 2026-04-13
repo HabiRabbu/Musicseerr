@@ -288,7 +288,6 @@ class MusicBrainzAlbumMixin:
         cache_key = f"{MB_RELEASE_TO_RG_PREFIX}{release_id}"
         cached = await self._cache.get(cache_key)
         if cached is not None:
-            logger.debug(f"[MB] Cache hit for release {release_id[:8]}: '{cached[:8] if cached else 'empty'}'")
             return cached if cached != "" else None
 
         dedupe_key = f"{MB_RELEASE_TO_RG_PREFIX}{release_id}"
@@ -303,7 +302,6 @@ class MusicBrainzAlbumMixin:
         cache_key: str,
     ) -> str | None:
         try:
-            logger.debug(f"[MB] Fetching release group for release {release_id[:8]}")
             result = await mb_api_get(
                 f"/release/{release_id}",
                 params={"inc": "release-groups+recordings"},
@@ -312,7 +310,6 @@ class MusicBrainzAlbumMixin:
             )
             rg = result.release_group
             rg_id = rg.get("id")
-            logger.debug(f"[MB] Resolved release {release_id[:8]} -> release_group {rg_id}")
             await self._cache.set(cache_key, rg_id or "", ttl_seconds=86400)
 
             positions: dict[str, list[int]] = {}
@@ -330,7 +327,6 @@ class MusicBrainzAlbumMixin:
 
             return rg_id
         except Exception as e:  # noqa: BLE001
-            logger.warning(f"[MB] Failed to get release group for release {release_id[:8]}: {e}")
             _record_mb_degradation(f"release-to-rg lookup failed: {e}")
             await self._cache.set(cache_key, "", ttl_seconds=3600)
             return None

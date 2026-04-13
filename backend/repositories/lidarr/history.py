@@ -12,7 +12,6 @@ class LidarrHistoryRepository(LidarrBase):
     async def get_recently_imported(self, limit: int = 20) -> list[LibraryAlbum]:
         try:
             album_dates: dict[str, tuple[int, dict]] = {}
-
             try:
                 params = {
                     "page": 1,
@@ -52,16 +51,13 @@ class LidarrHistoryRepository(LidarrBase):
                                 'album_data': album_data,
                                 'artist_data': record.get("artist", {})
                             })
-
-                    logger.info(f"Found {len(album_dates)} unique albums from {len(history_data.get('records', []))} history records")
-            except Exception as e:  # noqa: BLE001
-                logger.warning(f"Failed to get history data: {e}")
+            except Exception:  # noqa: BLE001
+                pass
 
             if len(album_dates) < limit * 2:
                 album_dates = await self._supplement_with_album_dates(album_dates, limit)
 
             if not album_dates:
-                logger.warning("No albums found with dates from either history or track files")
                 return []
 
             sorted_albums = sorted(album_dates.items(), key=lambda x: x[1][0], reverse=True)
@@ -111,10 +107,8 @@ class LidarrHistoryRepository(LidarrBase):
                     'album_data': album,
                     'artist_data': album.get("artist", {})
                 })
-
-            logger.info(f"Total {len(album_dates)} unique albums after supplementing with album dates")
-        except Exception as e:  # noqa: BLE001
-            logger.warning(f"Failed to supplement with album data: {e}")
+        except Exception:  # noqa: BLE001
+            pass
 
         return album_dates
 
@@ -153,7 +147,6 @@ class LidarrHistoryRepository(LidarrBase):
                     artist_mbid=artist_mbid,
                     date_added=date_added,
                 )
-            )
+                )
 
-        logger.info(f"Retrieved {len(out)} recently added albums (merged from history and track files)")
-        return out
+            return out

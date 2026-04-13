@@ -134,7 +134,6 @@ class DiscoverHomepageService:
             if self._memory_cache and self._has_meaningful_content(response):
                 cache_key = self._integration.get_discover_cache_key(resolved)
                 await self._memory_cache.set(cache_key, response, DISCOVER_CACHE_TTL)
-                logger.info("Discover data built and cached for source=%s", resolved)
             elif not self._has_meaningful_content(response):
                 logger.warning("Discover build produced no meaningful content, keeping existing cache")
         except Exception as e:  # noqa: BLE001
@@ -220,11 +219,6 @@ class DiscoverHomepageService:
 
         results = await self._execute_tasks(tasks)
 
-        logger.info(
-            "Discover data fetch results: %s",
-            {k: "ok" if v is not None else "empty" for k, v in results.items()},
-        )
-
         response = DiscoverResponse(
             integration_status=self._integration.get_integration_status(),
         )
@@ -236,7 +230,6 @@ class DiscoverHomepageService:
             resolved_source=resolved_source,
         )
         await self._enrich_because_sections_audiodb(response.because_you_listen_to)
-        logger.info("because_you_listen_to: %d sections", len(response.because_you_listen_to))
 
         response.fresh_releases = self._build_fresh_releases(results, library_mbids)
 
@@ -312,22 +305,6 @@ class DiscoverHomepageService:
         response.lastfm_recent_scrobbles = post_results.get("lastfm_recent_scrobbles")
 
         response.service_prompts = self._build_service_prompts()
-
-        sections_status = {
-            "because": len(response.because_you_listen_to),
-            "fresh_releases": response.fresh_releases is not None,
-            "missing_essentials": response.missing_essentials is not None,
-            "rediscover": response.rediscover is not None,
-            "artists_you_might_like": response.artists_you_might_like is not None,
-            "popular_in_genres": response.popular_in_your_genres is not None,
-            "genre_list": response.genre_list is not None,
-            "globally_trending": response.globally_trending is not None,
-            "weekly_exploration": response.weekly_exploration is not None,
-            "lastfm_weekly_artist_chart": getattr(response, "lastfm_weekly_artist_chart", None) is not None,
-            "lastfm_weekly_album_chart": getattr(response, "lastfm_weekly_album_chart", None) is not None,
-            "lastfm_recent_scrobbles": getattr(response, "lastfm_recent_scrobbles", None) is not None,
-        }
-        logger.info("Discover build complete (source=%s): %s", resolved_source, sections_status)
 
         return response
 
@@ -406,11 +383,6 @@ class DiscoverHomepageService:
                     logger.warning(f"Failed to get Jellyfin seed artists: {e}")
                     continue
 
-        logger.info(
-            "Seed artists found: %d — %s",
-            len(seeds),
-            [(s.artist_name, s.artist_mbids[0][:8] if s.artist_mbids else "?") for s in seeds],
-        )
         return seeds
 
     async def _enrich_because_sections_audiodb(
@@ -1053,7 +1025,7 @@ class DiscoverHomepageService:
                 service="listenbrainz",
                 title="Connect ListenBrainz",
                 description="Get recommendations from your listening history, find similar artists, and keep an eye on your top genres. Connect Last.fm too if you want global listener stats.",
-                icon="🎵",
+                icon="LB",
                 color="primary",
                 features=["Personalized recommendations", "Similar artists", "Listening stats", "Genre insights"],
             ))
@@ -1062,7 +1034,7 @@ class DiscoverHomepageService:
                 service="jellyfin",
                 title="Connect Jellyfin",
                 description="Use your play history to surface favorites and sharpen recommendations.",
-                icon="📺",
+                icon="JF",
                 color="secondary",
                 features=["Rediscover favorites", "Play statistics", "Listening history", "Better recommendations"],
             ))
@@ -1071,7 +1043,7 @@ class DiscoverHomepageService:
                 service="lidarr-connection",
                 title="Connect Lidarr",
                 description="Spot gaps in your collection and keep your library in sync.",
-                icon="🎶",
+                icon="LD",
                 color="accent",
                 features=["Missing essentials", "Library management", "Album requests", "Collection tracking"],
             ))
@@ -1080,7 +1052,7 @@ class DiscoverHomepageService:
                 service="lastfm",
                 title="Connect Last.fm",
                 description="Track your listening, compare stats, and discover music that matches your taste.",
-                icon="🎸",
+                icon="FM",
                 color="primary",
                 features=["Scrobbling", "Global listener stats", "Artist recommendations", "Play history"],
             ))

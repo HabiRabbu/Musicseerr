@@ -100,19 +100,18 @@ class LocalFilesService:
         try:
             data = await self._lidarr.get_all_albums()
         except (ExternalServiceError, CircuitOpenError, ConnectionError, OSError):
-            # Stale-while-error: serve last-known data if Lidarr is down
+            # Serve the last cached data if Lidarr is unavailable.
             try:
                 stale = await self._cache.get(f"{cache_key}:stale")
             except Exception:  # noqa: BLE001
                 stale = None
             if stale is not None:
-                logger.warning("Lidarr unavailable — serving stale local album data")
                 return stale
             raise
         result = data or []
         if result:
             await self._cache.set(cache_key, result, ttl_seconds=self._ALBUM_LIST_TTL)
-            # Keep a long-lived stale copy for fallback (24h)
+            # Keep a longer-lived fallback copy for 24 hours.
             await self._cache.set(f"{cache_key}:stale", result, ttl_seconds=86400)
         return result
 
@@ -636,6 +635,6 @@ class LocalFilesService:
 
         return LocalFilesVerifyResponse(
             success=True,
-            message=f"Connected — {track_count:,} audio files found",
+            message=f"Connected, found {track_count:,} audio files",
             track_count=track_count,
         )

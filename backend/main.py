@@ -60,7 +60,6 @@ async def lifespan(app: FastAPI):
     settings = get_settings()
     configured_level = getattr(logging, settings.log_level, logging.INFO)
     logging.getLogger().setLevel(configured_level)
-    logger.info("Log level set to %s", settings.log_level)
 
     await init_app_state(app)
     
@@ -92,14 +91,13 @@ async def lifespan(app: FastAPI):
     def handle_cache_warming_error(task: asyncio.Task):
         try:
             if task.cancelled():
-                logger.info("Cache warming was cancelled")
                 return
             
             exc = task.exception()
             if exc:
                 logger.error("Cache warming failed: %s", exc, exc_info=exc)
         except asyncio.CancelledError:
-            logger.info("Cache warming was cancelled")
+            pass
         except Exception as e:  # noqa: BLE001
             logger.error("Error checking cache warming task: %s", e)
     
@@ -116,7 +114,6 @@ async def lifespan(app: FastAPI):
 
     interrupted_state = await status_service.restore_from_persistence()
     if interrupted_state:
-        logger.info("Found interrupted library sync, scheduling resume...")
 
         async def resume_sync():
             try:
@@ -136,7 +133,7 @@ async def lifespan(app: FastAPI):
                 await status_service.complete_sync(str(e))
 
         resume_task = asyncio.create_task(resume_sync())
-        resume_task.add_done_callback(lambda t: logger.info("Resume sync task completed") if not t.exception() else logger.error("Resume sync failed: %s", t.exception()))
+        resume_task.add_done_callback(lambda t: logger.error("Resume sync failed: %s", t.exception()) if t.exception() else None)
         TaskRegistry.get_instance().register("library-sync-resume", resume_task)
 
     from core.dependencies import get_home_service

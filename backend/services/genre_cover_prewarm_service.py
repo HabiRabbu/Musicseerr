@@ -59,7 +59,6 @@ class GenreCoverPrewarmService:
             t.cancel()
         await asyncio.gather(*tasks, return_exceptions=True)
         self._active_genres.clear()
-        logger.info("GenreCoverPrewarmService shutdown complete (%d tasks cancelled)", len(tasks))
 
     async def _prewarm(
         self,
@@ -96,6 +95,5 @@ class GenreCoverPrewarmService:
                     if i < len(all_album) - 1:
                         await asyncio.sleep(_PREWARM_INTER_ITEM_DELAY)
 
-                logger.info("Pre-warmed %d/%d genre covers for '%s'", warmed, total, genre_name)
             except Exception as exc:  # noqa: BLE001
                 logger.error("Genre cover pre-warm failed for '%s': %s", genre_name, exc)

@@ -2,13 +2,10 @@
 
 import asyncio
 import json
-import logging
 import sqlite3
 import threading
 from pathlib import Path
 from typing import Any, TypeVar
-
-logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
 

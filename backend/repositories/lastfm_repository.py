@@ -274,10 +274,6 @@ class LastFmRepository:
             signed=True,
             http_method="POST",
         )
-        logger.info(
-            "Now playing reported to Last.fm",
-            extra={"artist": artist, "track": track},
-        )
         return True
 
     async def scrobble(
@@ -305,10 +301,6 @@ class LastFmRepository:
             params=params,
             signed=True,
             http_method="POST",
-        )
-        logger.info(
-            "Scrobble submitted to Last.fm",
-            extra={"artist": artist, "track": track, "timestamp": timestamp},
         )
         return True
 

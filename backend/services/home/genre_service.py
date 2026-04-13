@@ -73,7 +73,7 @@ class GenreService:
                             await self._memory_cache.set(cache_key, result, remaining)
                         return result
             except Exception:  # noqa: BLE001
-                logger.debug("Failed to read genre section from disk for %s", source_key)
+                pass
 
         return None
 
@@ -109,19 +109,12 @@ class GenreService:
             self._genre_build_locks[source_key] = asyncio.Lock()
         lock = self._genre_build_locks[source_key]
         if lock.locked():
-            logger.debug("Genre section build already in progress for source=%s, skipping", source_key)
             return
         async with lock:
             try:
-                logger.debug(
-                    "Building genre section for source=%s (%d genres)",
-                    source_key,
-                    len(genre_names),
-                )
                 genre_artists = await self.get_genre_artists_batch(genre_names)
                 genre_artist_images = await self.resolve_genre_artist_images(genre_artists)
                 await self.save_genre_section(source_key, genre_artists, genre_artist_images)
-                logger.debug("Genre section build complete for source=%s", source_key)
             except Exception as exc:  # noqa: BLE001
                 logger.error("Genre section build failed for source=%s: %s", source_key, exc)
 
@@ -185,8 +178,6 @@ class GenreService:
         for f in self._genre_section_dir.glob("*.json"):
             f.unlink(missing_ok=True)
             count += 1
-        if count:
-            logger.info("Cleared %d genre section files from disk", count)
         return count
 
     async def resolve_genre_artist_images(

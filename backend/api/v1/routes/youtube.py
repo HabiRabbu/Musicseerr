@@ -1,5 +1,3 @@
-import logging
-
 from fastapi import APIRouter, Response
 
 from api.v1.schemas.discover import YouTubeQuotaResponse
@@ -17,8 +15,6 @@ from api.v1.schemas.youtube import (
 )
 from core.dependencies import YouTubeServiceDep
 from infrastructure.msgspec_fastapi import MsgSpecBody, MsgSpecRoute
-
-logger = logging.getLogger(__name__)
 
 router = APIRouter(route_class=MsgSpecRoute, prefix="/youtube", tags=["YouTube"])
 

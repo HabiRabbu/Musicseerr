@@ -1,11 +1,8 @@
-import logging
 from fastapi import APIRouter, Depends
 from api.v1.schemas.request import AlbumRequest, RequestAcceptedResponse, QueueStatusResponse
 from core.dependencies import get_request_service
 from infrastructure.msgspec_fastapi import MsgSpecBody, MsgSpecRoute
 from services.request_service import RequestService
-
-logger = logging.getLogger(__name__)
 
 router = APIRouter(route_class=MsgSpecRoute, prefix="/requests", tags=["requests"])
 

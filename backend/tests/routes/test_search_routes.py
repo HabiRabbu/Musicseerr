@@ -1,5 +1,4 @@
 import pytest
-import logging
 from unittest.mock import AsyncMock, MagicMock
 
 from fastapi import FastAPI
@@ -94,30 +93,6 @@ def test_suggest_whitespace_padded_valid_input_strips(client, mock_search_servic
 
     assert response.status_code == 200
     mock_search_service.suggest.assert_called_once_with(query="ab", limit=5)
-
-
-def test_suggest_debug_log_contains_fields_without_query_text(client, mock_search_service, caplog):
-    """Debug log includes query_len, results, time_ms but not the raw query text."""
-    mock_search_service.suggest = AsyncMock(
-        return_value=SuggestResponse(results=[
-            SuggestResult(
-                type="artist", title="Muse", musicbrainz_id="mb-1",
-                in_library=False, requested=False, score=90,
-            )
-        ])
-    )
-
-    with caplog.at_level(logging.DEBUG, logger="api.v1.routes.search"):
-        response = client.get("/search/suggest?q=muse")
-
-    assert response.status_code == 200
-    log_messages = [r.message for r in caplog.records if "Suggest" in r.message]
-    assert len(log_messages) >= 1
-    log_msg = log_messages[0]
-    assert "query_len=4" in log_msg
-    assert "results=1" in log_msg
-    assert "time_ms=" in log_msg
-    assert "muse" not in log_msg
 
 
 def test_search_response_tolerates_additive_score_field():

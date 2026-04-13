@@ -224,7 +224,7 @@ class CoverArtRepository:
             task = asyncio.create_task(self._disk_cache.enforce_size_limit(force=True))
             task.add_done_callback(_log_task_error)
         except RuntimeError:
-            logger.debug("No running event loop to enforce cover cache size at initialization")
+            pass
 
     @property
     def disk_cache(self) -> CoverDiskCache:
@@ -497,11 +497,9 @@ class CoverArtRepository:
         file_path = self._disk_cache.get_file_path(identifier, "img")
 
         if cached_memory := await self._memory_get(identifier, "img"):
-            logger.debug(f"Cache HIT (memory): Artist image {artist_id[:8]}...")
             return cached_memory
 
         if cached := await self._disk_cache.read(file_path, ["source", "wikidata_id"]):
-            logger.debug(f"Cache HIT (disk): Artist image {artist_id[:8]}...")
             source = "wikidata"
             if cached[2] and isinstance(cached[2], dict):
                 source = cached[2].get("source") or source
@@ -512,12 +510,10 @@ class CoverArtRepository:
         if size and size != 250:
             fallback_identifier = f"artist_{artist_id}_250"
             if cached_memory := await self._memory_get(fallback_identifier, "img"):
-                logger.debug(f"Cache HIT (memory - fallback 250px): Artist image {artist_id[:8]}...")
                 return cached_memory
 
             fallback_path = self._disk_cache.get_file_path(fallback_identifier, "img")
             if cached := await self._disk_cache.read(fallback_path, ["source", "wikidata_id"]):
-                logger.debug(f"Cache HIT (disk - fallback 250px): Artist image {artist_id[:8]}...")
                 source = "wikidata"
                 if cached[2] and isinstance(cached[2], dict):
                     source = cached[2].get("source") or source
@@ -526,10 +522,7 @@ class CoverArtRepository:
                 return result
 
         if await self._disk_cache.is_negative(file_path):
-            logger.debug(f"Cache HIT (disk-negative): Artist image {artist_id[:8]}...")
             return None
-
-        logger.debug(f"Cache MISS (disk): Artist image {artist_id[:8]}... - fetching from Wikidata")
 
         dedupe_key = f"artist:img:{artist_id}:{size}"
         try:
@@ -540,11 +533,6 @@ class CoverArtRepository:
         except ClientDisconnectedError:
             raise
         except (TransientImageFetchError, CircuitOpenError, httpx.HTTPError, ExternalServiceError, RateLimitedError) as e:
-            logger.warning(
-                "Transient artist image fetch failure for %s: %s",
-                artist_id[:8],
-                e,
-            )
             _record_degradation(f"Artist image fetch failed for {artist_id[:8]}: {e}")
             return None
 
@@ -572,11 +560,9 @@ class CoverArtRepository:
         file_path = self._disk_cache.get_file_path(identifier, suffix)
 
         if cached_memory := await self._memory_get(identifier, suffix):
-            logger.debug(f"Cache HIT (memory): Album cover {release_group_id[:8]}...")
             return cached_memory
 
         if cached := await self._disk_cache.read(file_path, ["source"]):
-            logger.debug(f"Cache HIT (disk): Album cover {release_group_id[:8]}...")
             source = "cover-art-archive"
             if cached[2] and isinstance(cached[2], dict):
                 source = cached[2].get("source") or source
@@ -585,10 +571,7 @@ class CoverArtRepository:
             return result
 
         if await self._disk_cache.is_negative(file_path):
-            logger.debug(f"Cache HIT (disk-negative): Album cover {release_group_id[:8]}...")
             return None
-
-        logger.debug(f"Cache MISS (disk): Album cover {release_group_id[:8]}... - fetching from CoverArtArchive")
 
         dedupe_key = f"cover:rg:{release_group_id}:{size}"
         result = await _deduplicator.dedupe(
@@ -619,7 +602,6 @@ class CoverArtRepository:
         file_path = self._disk_cache.get_file_path(identifier, suffix)
 
         if cached_memory := await self._memory_get(identifier, suffix):
-            logger.debug(f"Cache HIT (memory): Release cover {release_id[:8]}...")
             return cached_memory
 
         if cached := await self._disk_cache.read(file_path, ["source"]):
@@ -631,7 +613,6 @@ class CoverArtRepository:
             return result
 
         if await self._disk_cache.is_negative(file_path):
-            logger.debug(f"Cache HIT (disk-negative): Release cover {release_id[:8]}...")
             return None
 
         dedupe_key = f"cover:rel:{release_id}:{size}"
@@ -678,16 +659,10 @@ class CoverArtRepository:
             async with semaphore:
                 try:
                     await self.get_release_group_cover(album_id, size)
-                except Exception as e:  # noqa: BLE001
-                    error_msg = str(e)
-                    if "Invalid" in error_msg or "MBID" in error_msg:
-                        logger.warning(f"Invalid MBID in batch prefetch: {album_id} - {e}")
-                    else:
-                        logger.debug(f"Failed to prefetch cover for {album_id}: {e}")
+                except Exception:  # noqa: BLE001
+                    pass
         
-        logger.info(f"Batch prefetching {len(valid_album_ids)} covers with max {max_concurrent} concurrent requests")
         await asyncio.gather(*[fetch_with_limit(aid) for aid in valid_album_ids], return_exceptions=True)
-        logger.debug(f"Completed batch prefetch of {len(valid_album_ids)} covers")
     
     async def promote_cover_to_persistent(self, identifier: str, identifier_type: str = "album") -> bool:
         return await self._disk_cache.promote_to_persistent(identifier, identifier_type)

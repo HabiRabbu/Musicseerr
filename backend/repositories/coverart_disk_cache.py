@@ -101,8 +101,8 @@ class CoverDiskCache:
 
             await asyncio.gather(write_content(), write_meta(), write_wikidata())
             await self.enforce_size_limit()
-        except Exception as e:  # noqa: BLE001
-            logger.warning(f"Failed to write disk cache: {e}")
+        except Exception:  # noqa: BLE001
+            pass
 
     async def write_negative(
         self,
@@ -121,8 +121,8 @@ class CoverDiskCache:
             meta_path = file_path.with_suffix(".meta.json")
             async with aiofiles.open(meta_path, "w") as f:
                 await f.write(_encode_json(meta))
-        except Exception as e:  # noqa: BLE001
-            logger.warning(f"Failed to write negative disk cache: {e}")
+        except Exception:  # noqa: BLE001
+            pass
 
     async def is_negative(self, file_path: Path) -> bool:
         meta_path = file_path.with_suffix(".meta.json")
@@ -147,8 +147,7 @@ class CoverDiskCache:
             task = asyncio.create_task(self._update_meta_access(meta_path, meta))
             task.add_done_callback(_log_task_error)
             return True
-        except Exception as e:  # noqa: BLE001
-            logger.warning(f"Failed to read negative disk cache: {e}")
+        except Exception:  # noqa: BLE001
             return False
 
     async def read(
@@ -199,8 +198,7 @@ class CoverDiskCache:
             task = asyncio.create_task(self._update_meta_access(file_path.with_suffix('.meta.json'), meta))
             task.add_done_callback(_log_task_error)
             return content, content_type, extra_data if extra_data else None
-        except Exception as e:  # noqa: BLE001
-            logger.warning(f"Failed to read disk cache: {e}")
+        except Exception:  # noqa: BLE001
             return None
 
     async def _update_meta_access(self, meta_file: Path, meta: dict) -> None:
@@ -210,8 +208,8 @@ class CoverDiskCache:
             meta['last_accessed'] = datetime.now().timestamp()
             async with aiofiles.open(meta_file, 'w') as f:
                 await f.write(_encode_json(meta))
-        except OSError as exc:
-            logger.debug("Failed to update coverart disk cache meta %s: %s", meta_file, exc)
+        except OSError:
+            pass
 
     async def get_content_hash(self, file_path: Path) -> Optional[str]:
         meta_path = file_path.with_suffix('.meta.json')
@@ -249,8 +247,7 @@ class CoverDiskCache:
             meta['content_sha1'] = content_hash
             await self._update_meta_access(meta_path, meta)
             return content_hash
-        except Exception as e:  # noqa: BLE001
-            logger.warning(f"Failed to get disk cache content hash: {e}")
+        except Exception:  # noqa: BLE001
             return None
 
     async def enforce_size_limit(self, force: bool = False) -> int:
@@ -311,13 +308,6 @@ class CoverDiskCache:
                 if bytes_freed >= bytes_to_free:
                     break
 
-            if bytes_freed > 0:
-                logger.info(
-                    "Evicted %d bytes from cover cache (target max=%d bytes)",
-                    bytes_freed,
-                    self.max_size_bytes,
-                )
-
             return bytes_freed
 
     async def delete_by_identifiers(self, identifiers: list[tuple[str, str]]) -> int:
@@ -334,7 +324,7 @@ class CoverDiskCache:
         return count
 
     def cleanup_expired(self) -> int:
-        """Sync — call via asyncio.to_thread() from background tasks."""
+        """Synchronous helper for background tasks via asyncio.to_thread()."""
         count = 0
         now = datetime.now().timestamp()
         if not self.cache_dir.exists():
@@ -350,12 +340,10 @@ class CoverDiskCache:
                 meta_path.unlink(missing_ok=True)
                 (self.cache_dir / f"{stem}.wikidata").unlink(missing_ok=True)
                 count += 1
-        if count:
-            logger.info("Expired cover cache cleanup: removed %d entries", count)
         return count
 
     def demote_orphaned(self, valid_hashes: set[str]) -> int:
-        """Sync — call via asyncio.to_thread() from background tasks."""
+        """Synchronous helper for background tasks via asyncio.to_thread()."""
         count = 0
         now = datetime.now().timestamp()
         if not self.cache_dir.exists():
@@ -377,8 +365,6 @@ class CoverDiskCache:
             except Exception:  # noqa: BLE001
                 continue
             count += 1
-        if count:
-            logger.info("Demoted %d orphaned monitored covers to expiring", count)
         return count
 
     def get_file_path(self, identifier: str, suffix: str) -> Path:
@@ -412,8 +398,6 @@ class CoverDiskCache:
                             meta.pop('expires_at', None)
                             async with aiofiles.open(meta_path, 'w') as f:
                                 await f.write(_encode_json(meta))
-                            logger.debug(f"Promoted cover cache to persistent: {identifier_type}={identifier}, size={size}")
             return True
-        except Exception as e:  # noqa: BLE001
-            logger.warning(f"Failed to promote cover cache to persistent: {e}")
+        except Exception:  # noqa: BLE001
             return False

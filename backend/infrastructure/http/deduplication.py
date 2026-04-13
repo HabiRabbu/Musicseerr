@@ -1,11 +1,8 @@
 import asyncio
-import logging
 from typing import TypeVar, Awaitable, Callable, Any
 from functools import wraps
 
 from core.exceptions import ClientDisconnectedError
-
-logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
 

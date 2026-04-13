@@ -1,12 +1,9 @@
-import logging
 from fastapi import APIRouter, Depends, HTTPException
 
 from api.v1.schemas.cache import CacheStats, CacheClearResponse
 from core.dependencies import get_cache_service
 from infrastructure.msgspec_fastapi import MsgSpecRoute
 from services.cache_service import CacheService
-
-logger = logging.getLogger(__name__)
 
 router = APIRouter(route_class=MsgSpecRoute, prefix="/cache", tags=["cache"])
 

@@ -1,11 +1,8 @@
-import logging
 from typing import Any
 from models.common import ServiceStatus
 from models.request import QueueItem
 from infrastructure.cache.cache_keys import LIDARR_PREFIX
 from .base import LidarrBase
-
-logger = logging.getLogger(__name__)
 
 LIDARR_QUEUE_KEY = f"{LIDARR_PREFIX}queue"
 LIDARR_QUEUE_TTL = 30

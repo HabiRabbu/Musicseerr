@@ -71,7 +71,6 @@
 		} catch (e) {
 			if (isAbortError(e)) return;
 			if (id !== fetchId) return;
-			console.error("Couldn't load albums:", e);
 			error = "Couldn't load albums";
 		} finally {
 			if (id === fetchId) {
@@ -170,10 +169,10 @@
 			onchange={handleSortChange}
 			aria-label="Sort albums"
 		>
-			<option value="artist:asc">Artist A–Z</option>
-			<option value="artist:desc">Artist Z–A</option>
-			<option value="title:asc">Title A–Z</option>
-			<option value="title:desc">Title Z–A</option>
+			<option value="artist:asc">Artist A-Z</option>
+			<option value="artist:desc">Artist Z-A</option>
+			<option value="title:asc">Title A-Z</option>
+			<option value="title:desc">Title Z-A</option>
 			<option value="date_added:desc">Newest First</option>
 			<option value="date_added:asc">Oldest First</option>
 			<option value="year:desc">Year (Newest)</option>

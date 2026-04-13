@@ -75,7 +75,7 @@ class RequestQueue(QueueInterface):
         self._on_import_callback = on_import_callback
     
     async def add(self, album_mbid: str) -> dict:
-        """Blocking enqueue — waits for the result."""
+        """Blocking enqueue that waits for the result."""
         await self.start()
         
         request = QueuedRequest(album_mbid)
@@ -90,7 +90,6 @@ class RequestQueue(QueueInterface):
         """Fire-and-forget enqueue. Returns True if enqueued, False if duplicate."""
         async with self._enqueue_lock:
             if self._store and self._store.has_active_mbid(album_mbid):
-                logger.info("Duplicate request rejected for %s — already active", album_mbid[:8])
                 return False
 
             # Clear any prior cancellation so re-requests aren't silently dropped
@@ -101,7 +100,6 @@ class RequestQueue(QueueInterface):
             if self._store:
                 self._store.enqueue(request.job_id, album_mbid)
             await self._queue.put(request)
-            logger.info("Enqueued request for album %s (job %s)", album_mbid[:8], request.job_id[:8])
             return True
 
     async def cancel(self, album_mbid: str) -> bool:
@@ -112,8 +110,6 @@ class RequestQueue(QueueInterface):
         # Mark for skip - items already in the asyncio.Queue can't be removed,
         # so workers check this set before processing.
         self._cancelled_mbids.add(album_mbid.lower())
-        if removed:
-            logger.info("Cancelled pending queue job for %s", album_mbid[:8])
         return removed
 
     async def start(self) -> None:
@@ -122,7 +118,6 @@ class RequestQueue(QueueInterface):
             for _ in range(self._concurrency - len(alive)):
                 task = asyncio.create_task(self._process_queue())
                 self._worker_tasks.append(task)
-            logger.info("Queue processor started (%d workers)", self._concurrency)
             if not self._recovered:
                 self._recovered = True
                 self._recover_pending()
@@ -135,12 +130,10 @@ class RequestQueue(QueueInterface):
                 t.cancel()
             await asyncio.gather(*alive, return_exceptions=True)
             self._worker_tasks.clear()
-            logger.info("Queue processor stopped")
     
     async def drain(self, timeout: float = 30.0) -> None:
         try:
             await asyncio.wait_for(self._queue.join(), timeout=timeout)
-            logger.info("Queue drained successfully")
         except asyncio.TimeoutError:
             remaining = self._queue.qsize()
             logger.warning("Queue drain timeout: %d items remaining", remaining)
@@ -183,9 +176,6 @@ class RequestQueue(QueueInterface):
                 logger.warning("Queue full during recovery, %d items deferred to next restart",
                                len(pending) - recovered)
                 break
-        if recovered:
-            logger.info("Recovered %d pending jobs from store", recovered)
-
         self._retry_dead_letters()
 
     async def _backfill_history(self, album_mbid: str) -> None:
@@ -200,7 +190,6 @@ class RequestQueue(QueueInterface):
                     artist_name="Unknown",
                     album_title="Unknown",
                 )
-                logger.info("Backfilled history record for recovered job %s", album_mbid[:8])
         except Exception as e:  # noqa: BLE001
             logger.warning("Failed to backfill history for %s: %s", album_mbid[:8], e)
 
@@ -213,7 +202,6 @@ class RequestQueue(QueueInterface):
             # Don't overwrite a user-initiated cancellation
             existing = await self._request_history.async_get_record(album_mbid)
             if existing and existing.status == "cancelled":
-                logger.info("Skipping history update for %s — already cancelled", album_mbid[:8])
                 return
 
             payload = result.get("payload", {})
@@ -294,8 +282,6 @@ class RequestQueue(QueueInterface):
             self._store.remove_dead_letter(row["id"])
             self._store.enqueue(row["id"], row["album_mbid"])
             enqueued += 1
-        if enqueued:
-            logger.info("Re-enqueued %d dead-letter jobs for retry", enqueued)
 
     async def _process_queue(self) -> None:
         while True:
@@ -305,7 +291,6 @@ class RequestQueue(QueueInterface):
                 # Skip items cancelled while sitting in the asyncio.Queue
                 if request.album_mbid.lower() in self._cancelled_mbids:
                     self._cancelled_mbids.discard(request.album_mbid.lower())
-                    logger.info("Skipping cancelled request %s", request.album_mbid[:8])
                     if not request.future.done():
                         request.future.cancel()
                     self._queue.task_done()
@@ -319,14 +304,7 @@ class RequestQueue(QueueInterface):
                 if self._store:
                     self._store.mark_processing(request.job_id)
 
-                queue_wait_ms = int((time.monotonic() - request.enqueued_at) * 1000)
-                logger.info(
-                    "Processing request %s (queue_wait=%dms)", request.album_mbid[:8], queue_wait_ms
-                )
-
                 try:
-                    if request.recovered:
-                        logger.info("Processing recovered job %s for album %s", request.job_id[:8], request.album_mbid[:8])
                     result = await self._processor(request.album_mbid)
                     if not request.future.done():
                         request.future.set_result(result)
@@ -353,7 +331,6 @@ class RequestQueue(QueueInterface):
                     self._queue.task_done()
             
             except asyncio.CancelledError:
-                logger.info("Queue worker cancelled")
                 break
             except Exception as e:  # noqa: BLE001
                 logger.error("Queue worker error: %s", e)

@@ -1,4 +1,3 @@
-import logging
 import re
 import uuid
 from datetime import datetime, timezone
@@ -11,8 +10,6 @@ from core.exceptions import ConfigurationError, ExternalServiceError, ResourceNo
 from infrastructure.persistence import YouTubeStore
 from infrastructure.serialization import to_jsonable
 from repositories.protocols import YouTubeRepositoryProtocol
-
-logger = logging.getLogger(__name__)
 
 _VIDEO_ID_RE = re.compile(
     r'(?:youtube\.com/watch\?.*v=|youtu\.be/|youtube\.com/embed/)([a-zA-Z0-9_-]{11})'
@@ -256,7 +253,7 @@ class YouTubeService:
     ) -> YouTubeLink:
         video_id = extract_video_id(youtube_url)
         if not video_id:
-            raise ValidationError("Invalid YouTube URL — could not extract video ID")
+            raise ValidationError("Invalid YouTube URL: could not extract a video ID")
 
         if not album_id:
             album_id = f"manual-{uuid.uuid4().hex[:12]}"
@@ -289,7 +286,7 @@ class YouTubeService:
         if youtube_url:
             new_vid = extract_video_id(youtube_url)
             if not new_vid:
-                raise ValidationError("Invalid YouTube URL — could not extract video ID")
+                raise ValidationError("Invalid YouTube URL: could not extract a video ID")
             video_id = new_vid
             embed_url = f"https://www.youtube.com/embed/{new_vid}"
 

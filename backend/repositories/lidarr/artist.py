@@ -16,17 +16,11 @@ class LidarrArtistRepository(LidarrBase):
         cache_key = f"{LIDARR_ARTIST_IMAGE_PREFIX}{artist_mbid}:{size or 'orig'}"
         cached_url = await self._cache.get(cache_key)
         if cached_url is not None:
-            if cached_url:
-                logger.debug(f"[Lidarr:Image] Cache HIT for {artist_mbid[:8]}")
-            else:
-                logger.debug(f"[Lidarr:Image] Cache HIT (negative) for {artist_mbid[:8]}")
             return cached_url if cached_url else None
 
-        logger.info(f"[Lidarr:Image] Cache MISS - querying Lidarr for {artist_mbid[:8]}")
         try:
             data = await self._get("/api/v1/artist", params={"mbId": artist_mbid})
             if not data or not isinstance(data, list) or len(data) == 0:
-                logger.info(f"[Lidarr:Image] Artist not found in Lidarr for {artist_mbid[:8]}")
                 await self._cache.set(cache_key, "", ttl_seconds=300)
                 return None
 
@@ -34,10 +28,8 @@ class LidarrArtistRepository(LidarrBase):
             artist_id = artist.get("id")
             artist_name = artist.get("artistName", "Unknown")
             images = artist.get("images", [])
-            logger.debug(f"[Lidarr:Image] Found artist '{artist_name}' (id={artist_id}) with {len(images)} images")
 
             if not artist_id or not images:
-                logger.info(f"[Lidarr:Image] No images for {artist_mbid[:8]} ({artist_name})")
                 await self._cache.set(cache_key, "", ttl_seconds=300)
                 return None
 
@@ -63,7 +55,6 @@ class LidarrArtistRepository(LidarrBase):
 
             image_url = poster_url or fanart_url
             if image_url:
-                logger.info(f"[Lidarr:Image] Found image for {artist_mbid[:8]} ({artist_name}): {image_url[:60]}...")
                 await self._cache.set(cache_key, image_url, ttl_seconds=3600)
                 return image_url
 
@@ -72,7 +63,6 @@ class LidarrArtistRepository(LidarrBase):
             return None
 
         except Exception as e:  # noqa: BLE001
-            logger.warning(f"[Lidarr:Image] Exception for {artist_mbid[:8]}: {e}")
             return None
 
     async def get_artist_details(self, artist_mbid: str) -> Optional[dict[str, Any]]:
@@ -119,11 +109,9 @@ class LidarrArtistRepository(LidarrBase):
             }
 
             await self._cache.set(cache_key, result, ttl_seconds=300)
-            logger.debug(f"[Lidarr] Fetched artist details for {artist_mbid[:8]}")
             return result
 
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"Failed to get artist details from Lidarr for {artist_mbid}: {e}")
             return None
 
     async def get_artist_albums(self, artist_mbid: str) -> list[dict[str, Any]]:
@@ -193,25 +181,21 @@ class LidarrArtistRepository(LidarrBase):
             albums.sort(key=lambda a: a.get("release_date") or "", reverse=True)
 
             await self._cache.set(cache_key, albums, ttl_seconds=300)
-            logger.debug(f"[Lidarr] Fetched {len(albums)} albums for artist {artist_mbid[:8]}")
             return albums
 
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"Failed to get artist albums from Lidarr for {artist_mbid}: {e}")
             return []
 
     async def _get_artist_by_id(self, artist_id: int) -> Optional[dict[str, Any]]:
         try:
             return await self._get(f"/api/v1/artist/{artist_id}")
         except Exception as e:  # noqa: BLE001
-            logger.warning(f"Error getting artist {artist_id}: {e}")
             return None
 
     async def delete_artist(self, artist_id: int, delete_files: bool = False) -> bool:
         try:
             params = {"deleteFiles": str(delete_files).lower(), "addImportListExclusion": "false"}
             await self._delete(f"/api/v1/artist/{artist_id}", params=params)
-            logger.info(f"Deleted artist ID {artist_id} (deleteFiles={delete_files})")
             return True
         except Exception as e:
             logger.error(f"Failed to delete artist {artist_id}: {e}")
@@ -243,10 +227,6 @@ class LidarrArtistRepository(LidarrBase):
         cache_key = f"{LIDARR_ARTIST_DETAILS_PREFIX}{artist_mbid}"
         await self._cache.delete(cache_key)
 
-        logger.info(
-            "Updated artist %s monitoring: monitored=%s, monitorNewItems=%s",
-            artist_mbid[:8], monitored, monitor_new_items,
-        )
         return {"monitored": monitored, "auto_download": monitor_new_items == "all"}
 
     async def _ensure_artist_exists(
@@ -256,10 +236,9 @@ class LidarrArtistRepository(LidarrBase):
         try:
             items = await self._get("/api/v1/artist", params={"mbId": artist_mbid})
             if items:
-                logger.info("Artist already exists: %s", items[0].get("artistName"))
                 return items[0], False
         except ExternalServiceError as exc:
-            logger.debug("Failed to query existing Lidarr artist %s: %s", artist_mbid, exc)
+            pass
 
         try:
             roots = await self._get("/api/v1/rootfolder")
@@ -300,19 +279,16 @@ class LidarrArtistRepository(LidarrBase):
         try:
             created = await self._post("/api/v1/artist", payload)
             artist_id = created["id"]
-            logger.info("Created artist %s (ID: %s), triggering refresh", artist_name, artist_id)
 
             await self._await_command(
                 {"name": "RefreshArtist", "artistId": artist_id},
                 timeout=180.0,
             )
 
-            logger.info("Artist %s refresh complete", artist_name)
             return created, True
         except ExternalServiceError as exc:
             err_str = str(exc).lower()
             if "already exists" in err_str or "409" in err_str:
-                logger.info("Artist %s was added concurrently, retrying GET", artist_mbid)
                 items = await self._get("/api/v1/artist", params={"mbId": artist_mbid})
                 if items:
                     return items[0], False

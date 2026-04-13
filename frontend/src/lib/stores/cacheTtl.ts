@@ -76,9 +76,7 @@ export async function initCacheTTLs(): Promise<void> {
 				(data.discover_queue_auto_generate as boolean) ?? DEFAULTS.discoverQueueAutoGenerate
 		};
 		applyTTLs(resolved);
-	} catch (e) {
-		console.warn('[cacheTtl] Failed to load cache TTL settings, using defaults', e);
-	}
+	} catch {}
 }
 
 export function getCacheTTLs(): CacheTTLs {

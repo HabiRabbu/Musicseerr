@@ -475,10 +475,6 @@ class RequestsPageService:
                         await self._notify_import(record)
                         return True
                     if event_type == "albumImportIncomplete":
-                        logger.info(
-                            "Partial import detected for %s",
-                            record.musicbrainz_id,
-                        )
                         await self._request_history.async_update_status(
                             record.musicbrainz_id,
                             "incomplete",

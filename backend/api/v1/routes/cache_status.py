@@ -1,5 +1,4 @@
 import asyncio
-import logging
 from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 import msgspec
@@ -8,8 +7,6 @@ from api.v1.schemas.cache_status import CacheSyncStatus
 from core.dependencies import get_cache_status_service
 from infrastructure.msgspec_fastapi import MsgSpecRoute
 from services.cache_status_service import CacheStatusService
-
-logger = logging.getLogger(__name__)
 
 router = APIRouter(route_class=MsgSpecRoute, prefix="/cache/sync", tags=["cache"])
 

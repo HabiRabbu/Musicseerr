@@ -1,8 +1,5 @@
-import logging
 from repositories.protocols import LidarrRepositoryProtocol
 from api.v1.schemas.common import StatusReport, ServiceStatus
-
-logger = logging.getLogger(__name__)
 
 
 class StatusService:

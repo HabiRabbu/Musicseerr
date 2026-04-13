@@ -42,9 +42,7 @@ def _safe_delete(conn: sqlite3.Connection, table: str) -> None:
     try:
         conn.execute(f'DELETE FROM "{table}"')
     except sqlite3.OperationalError as exc:
-        if "no such table" in str(exc):
-            logger.debug("Cross-domain table %s not yet created, skipping clear", table)
-        else:
+        if "no such table" not in str(exc):
             logger.warning("Unexpected error clearing cross-domain table %s: %s", table, exc)
 
 

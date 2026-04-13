@@ -138,7 +138,7 @@ class Settings(BaseSettings):
             validated_values: dict[str, object] = {}
             for key, value in config_data.items():
                 if key not in model_fields:
-                    logger.warning("Unknown config key '%s' — ignoring", key)
+                    logger.warning("Unknown config key '%s', ignoring", key)
                     continue
                 try:
                     field_info = model_fields[key]
@@ -173,11 +173,10 @@ class Settings(BaseSettings):
             # Dry-run cross-field validation on merged candidate state
             self._validate_merged(validated_values)
 
-            # All validation passed — apply atomically
+            # All validation passed; apply atomically.
             for key, value in validated_values.items():
                 setattr(self, key, value)
 
-            logger.info(f"Loaded configuration from {self.config_file_path}")
         except (ConfigurationError, ValueError):
             raise
         except msgspec.DecodeError as e:
@@ -225,7 +224,6 @@ class Settings(BaseSettings):
             },
         }
         atomic_write_json(self.config_file_path, config_data)
-        logger.info(f"Created default config at {self.config_file_path}")
     
     def save_to_file(self) -> None:
         try:
@@ -252,7 +250,6 @@ class Settings(BaseSettings):
             
             atomic_write_json(self.config_file_path, config_data)
             
-            logger.info(f"Saved config to {self.config_file_path}")
         except Exception as e:
             logger.error(f"Failed to save config: {e}")
             raise

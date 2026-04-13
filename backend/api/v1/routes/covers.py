@@ -1,4 +1,3 @@
-import logging
 import hashlib
 from typing import Optional
 from fastapi import APIRouter, HTTPException, Path, Query, Depends, Request
@@ -8,7 +7,6 @@ from infrastructure.msgspec_fastapi import MsgSpecRoute
 from repositories.coverart_repository import CoverArtRepository
 
 router = APIRouter(route_class=MsgSpecRoute, prefix="/covers", tags=["covers"])
-log = logging.getLogger(__name__)
 
 _ALLOWED_SIZES = {"250", "500", "1200"}
 _SIZE_ALIAS_NONE = {"", "original", "full", "max", "largest"}

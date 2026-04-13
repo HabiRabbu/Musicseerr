@@ -1,9 +1,6 @@
 import httpx
-import logging
 from typing import Optional
 from core.config import Settings, get_settings
-
-logger = logging.getLogger(__name__)
 
 
 def _get_user_agent(settings: Optional[Settings] = None) -> str:

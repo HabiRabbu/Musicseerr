@@ -102,15 +102,6 @@ class AudioDBBrowseQueue:
                         )
 
                     processed += 1
-                    logger.debug(
-                        "audiodb.browse_queue action=processed entity_type=%s mbid=%s",
-                        item.entity_type, item.mbid[:8],
-                    )
-                    if processed % _BROWSE_QUEUE_LOG_INTERVAL == 0:
-                        logger.info(
-                            "audiodb.browse_queue processed=%d queue_depth=%d",
-                            processed, self._queue.qsize(),
-                        )
                 except Exception as e:
                     logger.error(
                         "audiodb.browse_queue action=item_error entity_type=%s mbid=%s error=%s",
@@ -124,4 +115,4 @@ class AudioDBBrowseQueue:
 
                 await asyncio.sleep(_BROWSE_QUEUE_INTER_ITEM_DELAY)
         except asyncio.CancelledError:
-            logger.info("AudioDB browse queue consumer cancelled (processed=%d)", processed)
+            pass

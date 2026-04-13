@@ -174,17 +174,10 @@ class DiscoverQueueManager:
     async def _do_build(self, source: str) -> None:
         state = self._get_state(source)
         try:
-            logger.info("Background queue build started (source=%s)", source)
             queue = await self.build_hydrated_queue(source)
             state.queue = queue
             state.built_at = time.time()
             state.status = QueueBuildStatus.READY
-            logger.info(
-                "Background queue build complete (source=%s, items=%d, queue_id=%s)",
-                source,
-                len(queue.items),
-                queue.queue_id,
-            )
             task = asyncio.create_task(self._prewarm_covers(queue, source))
             from core.task_registry import TaskRegistry
             try:
@@ -192,7 +185,6 @@ class DiscoverQueueManager:
             except RuntimeError:
                 pass
         except asyncio.CancelledError:
-            logger.info("Background queue build cancelled (source=%s)", source)
             if state.status == QueueBuildStatus.BUILDING:
                 state.status = QueueBuildStatus.IDLE
             raise
@@ -229,20 +221,12 @@ class DiscoverQueueManager:
                     return False
 
         results = await asyncio.gather(*(warm_one(m) for m in mbids), return_exceptions=True)
-        warmed = sum(1 for r in results if r is True)
-        logger.info(
-            "Pre-warmed %d/%d discover queue covers (source=%s)",
-            warmed,
-            len(mbids),
-            source,
-        )
 
     async def consume_queue(self, source: str) -> DiscoverQueueResponse | None:
         state = self._get_state(source)
         if state.status != QueueBuildStatus.READY or state.queue is None:
             return None
         if self._is_stale(state):
-            logger.info("Discarding stale pre-built queue (source=%s)", source)
             state.queue = None
             state.status = QueueBuildStatus.IDLE
             state.built_at = 0.0

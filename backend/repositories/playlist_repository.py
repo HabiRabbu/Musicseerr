@@ -1,13 +1,10 @@
 import json
-import logging
 import sqlite3
 import threading
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 from uuid import uuid4
-
-logger = logging.getLogger(__name__)
 
 
 _UNSET = object()
@@ -646,8 +643,8 @@ class PlaylistRepository:
         if conn is not None:
             try:
                 conn.close()
-            except sqlite3.Error as exc:
-                logger.warning("Failed to close playlist repository connection: %s", exc)
+            except sqlite3.Error:
+                pass
             self._local.conn = None
 
 

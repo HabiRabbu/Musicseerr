@@ -75,23 +75,17 @@ describe('jellyfinPlaybackApi', () => {
 			});
 		});
 
-		it('warns on network errors without throwing', async () => {
-			const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+		it('returns false on network errors without throwing', async () => {
 			mockPost.mockRejectedValueOnce(new Error('Network down'));
 
 			await expect(api.reportProgress('item-1', 'sess-1', 10, false)).resolves.toBe(false);
-			expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('network error'));
-			warnSpy.mockRestore();
 		});
 
-		it('warns on non-ok response without throwing', async () => {
-			const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+		it('returns false on non-ok responses without throwing', async () => {
 			const { ApiError } = await import('$lib/api/client');
 			mockPost.mockRejectedValueOnce(new ApiError(500, 'server_error', 'Internal error'));
 
 			await expect(api.reportProgress('item-1', 'sess-1', 10, false)).resolves.toBe(false);
-			expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('500'));
-			warnSpy.mockRestore();
 		});
 	});
 
@@ -108,20 +102,17 @@ describe('jellyfinPlaybackApi', () => {
 			});
 		});
 
-		it('swallows errors silently', async () => {
+		it('returns false on errors', async () => {
 			mockPost.mockRejectedValueOnce(new Error('Network down'));
 
 			await expect(api.reportStop('item-1', 'sess-1', 60)).resolves.toBe(false);
 		});
 
-		it('warns on non-ok response without throwing', async () => {
-			const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+		it('returns false on non-ok responses without throwing', async () => {
 			const { ApiError } = await import('$lib/api/client');
 			mockPost.mockRejectedValueOnce(new ApiError(502, 'bad_gateway', 'Bad gateway'));
 
 			await expect(api.reportStop('item-1', 'sess-1', 60)).resolves.toBe(false);
-			expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('502'));
-			warnSpy.mockRestore();
 		});
 	});
 });

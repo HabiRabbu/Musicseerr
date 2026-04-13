@@ -153,7 +153,6 @@
 			}
 		} catch (e) {
 			if (isAbortError(e)) return;
-			console.error('Failed to fetch discover queue:', e);
 		} finally {
 			loading = false;
 		}
@@ -176,9 +175,7 @@
 			if (queue.length === 0) {
 				await fetchNewQueue();
 			}
-		} catch {
-			/* ignore validation errors */
-		}
+		} catch {}
 	}
 
 	async function enrichCurrentAndNext() {
@@ -224,7 +221,6 @@
 				return data;
 			} catch (e) {
 				if (isAbortError(e)) return null;
-				console.error('Failed to enrich item:', e);
 				if (queue[index]?.release_group_mbid === mbid && !queue[index]?.enrichment) {
 					queue[index] = { ...queue[index], enrichment: emptyEnrichment() };
 				}
@@ -268,9 +264,7 @@
 				},
 				{ signal: abortController?.signal }
 			);
-		} catch {
-			/* continue regardless */
-		}
+		} catch {}
 
 		queue = queue.filter((_, i) => i !== currentIndex);
 		if (currentIndex >= queue.length) currentIndex = Math.max(0, queue.length - 1);
@@ -313,7 +307,7 @@
 
 	function truncateText(text: string, maxLen: number): string {
 		if (text.length <= maxLen) return text;
-		return text.slice(0, maxLen).trimEnd() + '…';
+		return text.slice(0, maxLen).trimEnd() + '...';
 	}
 
 	function resetYtSearch() {
@@ -326,9 +320,7 @@
 			ytQuota = await api.get<YouTubeQuotaStatus>(API.discoverQueueYoutubeQuota(), {
 				signal: abortController?.signal
 			});
-		} catch {
-			// YouTube not configured or network error — leave null
-		}
+		} catch {}
 	}
 
 	async function handleYtSearch() {
@@ -369,7 +361,7 @@
 		{#if loading}
 			<div class="flex flex-col items-center justify-center py-16 px-8">
 				<span class="loading loading-spinner loading-lg text-primary"></span>
-				<p class="mt-4 text-base-content/60">Building your discovery queue…</p>
+				<p class="mt-4 text-base-content/60">Building your discovery queue...</p>
 			</div>
 		{:else if queue.length === 0}
 			<div class="flex flex-col items-center justify-center py-16 px-8">
@@ -395,7 +387,7 @@
 									{currentItem.album_name}
 								</button>
 								{#if currentItem.is_wildcard}
-									<span class="badge badge-sm badge-warning">✨</span>
+									<span class="badge badge-sm badge-warning">Wildcard</span>
 								{/if}
 							</div>
 							{#if artistNavigationMbid}

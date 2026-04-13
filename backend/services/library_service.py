@@ -105,7 +105,6 @@ class LibraryService:
             albums_data = await self._library_db.get_albums()
             
             if not albums_data:
-                logger.info("Library cache is empty, syncing from Lidarr")
                 await self.sync_library()
                 albums_data = await self._library_db.get_albums()
             
@@ -174,7 +173,6 @@ class LibraryService:
             artists_data = await self._library_db.get_artists(limit=limit)
             
             if not artists_data:
-                logger.info("Artists cache is empty, syncing from Lidarr")
                 await self.sync_library()
                 artists_data = await self._library_db.get_artists(limit=limit)
             
@@ -207,7 +205,6 @@ class LibraryService:
             )
 
             if not albums_data and offset == 0 and not search:
-                logger.info("Library cache is empty, syncing from Lidarr")
                 await self.sync_library()
                 albums_data, total = await self._library_db.get_albums_paginated(
                     limit=limit, offset=offset, sort_by=sort_by, sort_order=sort_order, search=search,
@@ -248,7 +245,6 @@ class LibraryService:
             )
 
             if not artists_data and offset == 0 and not search:
-                logger.info("Artists cache is empty, syncing from Lidarr")
                 await self.sync_library()
                 artists_data, total = await self._library_db.get_artists_paginated(
                     limit=limit, offset=offset, sort_by=sort_by, sort_order=sort_order, search=search,
@@ -279,7 +275,6 @@ class LibraryService:
                 albums = []
             
             if not albums:
-                logger.info("No recent imports from history, falling back to cache")
                 albums_data = await self._library_db.get_recently_added(limit=limit)
                 
                 albums = [
@@ -320,7 +315,6 @@ class LibraryService:
                 time_since_last_sync = current_time - self._last_sync_time
                 if time_since_last_sync < self._global_sync_cooldown:
                     remaining = int(self._global_sync_cooldown - time_since_last_sync)
-                    logger.info(f"Global sync cooldown active ({remaining}s remaining). Skipping sync.")
                     raise ExternalServiceError(
                         f"Sync cooldown active. Please wait {remaining} seconds before syncing again."
                     )
@@ -339,7 +333,6 @@ class LibraryService:
                         await status_service.cancel_current_sync()
                         await status_service.wait_for_completion()
                     else:
-                        logger.info("Library sync already in progress - skipping auto-sync")
                         return SyncLibraryResponse(status="skipped", artists=0, albums=0)
 
                 if self._sync_future is not None and not self._sync_future.done():
@@ -355,8 +348,6 @@ class LibraryService:
             
             sync_succeeded = False
             try:
-                logger.info("Starting library sync from Lidarr")
-
                 albums = await self._lidarr_repo.get_library()
                 artists = await self._lidarr_repo.get_artists_from_library()
                 
@@ -378,7 +369,6 @@ class LibraryService:
                 ]
                 
                 await self._library_db.save_library(artists, albums_data)
-                logger.info("Library cache updated - unmonitored items removed")
 
                 now = time.time()
                 self._last_sync_time = now
@@ -398,7 +388,6 @@ class LibraryService:
                         last_state = await self._sync_state_store.get_sync_state()
                         if last_state and last_state.get('status') == 'failed':
                             resume = True
-                            logger.info("Previous sync failed, resuming from checkpoint")
                     except Exception as e:  # noqa: BLE001
                         logger.warning("Failed to check sync state for resume: %s", e)
 
@@ -406,7 +395,6 @@ class LibraryService:
                     try:
                         await self._sync_state_store.clear_processed_items()
                         await self._sync_state_store.clear_sync_state()
-                        logger.info("Force full sync: cleared previous progress")
                     except Exception as e:  # noqa: BLE001
                         logger.warning("Failed to clear sync state for force_full: %s", e)
 
@@ -421,7 +409,6 @@ class LibraryService:
                         else:
                             task_success = not t.cancelled()
                     except asyncio.CancelledError:
-                        logger.info("Precache task was cancelled")
                         task_success = False
                     finally:
                         status_service.set_current_task(None)
@@ -437,8 +424,6 @@ class LibraryService:
 
                 task.add_done_callback(on_task_done)
                 status_service.set_current_task(task)
-
-                logger.info(f"Library sync complete: {len(artists)} artists, {len(albums)} albums")
 
                 self._update_last_sync_timestamp()
                 sync_started_at = self._preferences_service.get_lidarr_settings().last_sync or 0
@@ -489,7 +474,6 @@ class LibraryService:
     async def clear_cache(self) -> None:
         try:
             await self._library_db.clear()
-            logger.info("Library cache cleared")
         except Exception as e:  # noqa: BLE001
             logger.error(f"Failed to clear library cache: {e}")
             raise ExternalServiceError(f"Failed to clear library cache: {e}")
@@ -557,7 +541,6 @@ class LibraryService:
                                 artist_details["id"], delete_files=delete_files
                             )
                             artist_removed = True
-                            logger.info(f"Auto-removed artist '{artist_name}' (no remaining albums)")
                 except Exception as e:  # noqa: BLE001
                     logger.warning(
                         f"Album '{album_mbid}' removed but artist cleanup failed for '{artist_mbid}': {e}"
@@ -628,7 +611,7 @@ class LibraryService:
     ) -> dict[str, tuple[str, str, str | None, float | None]]:
         """Resolve album MBID to {disc:track: (source, source_id, format, duration)}.
 
-        Priority: local → navidrome → jellyfin.
+        Priority: local -> navidrome -> jellyfin.
         Uses source_resolution cache (1h TTL).
         """
         if self._memory_cache is None:

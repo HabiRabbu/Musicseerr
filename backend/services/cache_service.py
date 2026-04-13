@@ -78,7 +78,6 @@ class CacheService:
                             if result.returncode == 0:
                                 lines = result.stdout.strip()
                                 disk_count = len(lines.split('\n')) if lines else 0
-                                logger.debug(f"Disk cache stats calculated via subprocess: {disk_count} files, {disk_bytes} bytes")
                         else:
                             du_available = False
                     except (subprocess.TimeoutExpired, subprocess.SubprocessError, ValueError) as e:
@@ -138,8 +137,6 @@ class CacheService:
             
             self._cached_stats = None
             
-            logger.info(f"Cleared {entries_before} memory cache entries")
-            
             return CacheClearResponse(
                 success=True,
                 message=f"Successfully cleared {entries_before} memory cache entries",
@@ -168,8 +165,6 @@ class CacheService:
                     if file_path.is_file():
                         file_path.unlink()
                         files_cleared += 1
-                
-                logger.info(f"Cleared {metadata_count} metadata files and {files_cleared} cover image files from disk")
             
             files_cleared += self._clear_genre_disk_cache()
             self._cached_stats = None
@@ -209,8 +204,6 @@ class CacheService:
             disk_files += self._clear_genre_disk_cache()
             self._cached_stats = None
             
-            logger.info(f"Cleared all cache: {memory_entries} memory entries, {metadata_count} metadata files, {disk_files} cover files (library DB preserved)")
-            
             return CacheClearResponse(
                 success=True,
                 message=f"Successfully cleared {memory_entries} memory entries, {metadata_count} metadata files, and {disk_files} cover files (library database preserved)",
@@ -238,8 +231,6 @@ class CacheService:
             
             self._cached_stats = None
             
-            logger.info(f"Cleared {files_cleared} cover image files from disk")
-            
             return CacheClearResponse(
                 success=True,
                 message=f"Successfully cleared {files_cleared} cover images",
@@ -264,8 +255,6 @@ class CacheService:
             await self._library_db.clear()
             
             self._cached_stats = None
-            
-            logger.info(f"Cleared library cache: {artists_before} artists, {albums_before} albums")
             
             return CacheClearResponse(
                 success=True,
@@ -293,8 +282,6 @@ class CacheService:
             memory_cleared = await self._cache.clear_prefix(AUDIODB_PREFIX)
 
             self._cached_stats = None
-
-            logger.info(f"Cleared AudioDB cache: {count_before} disk entries, {memory_cleared} memory entries")
 
             return CacheClearResponse(
                 success=True,

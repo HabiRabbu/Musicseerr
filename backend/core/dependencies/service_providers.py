@@ -123,7 +123,6 @@ def make_on_queue_import(memory_cache, disk_cache, library_db):
             })
         except Exception as ex:  # noqa: BLE001
             logger.warning("Queue import: failed to upsert album %s: %s", record.musicbrainz_id[:8], ex)
-        logger.info("Queue import: invalidated caches for album=%s", record.musicbrainz_id[:8])
 
     return on_queue_import
 
@@ -143,8 +142,6 @@ def make_processor(lidarr_repo, memory_cache, disk_cache, cover_repo, request_hi
                 is_monitored = bool(result.get("monitored"))
 
             if is_monitored:
-                logger.info(f"Album {album_mbid[:8]}... successfully monitored - promoting cache entries to persistent")
-
                 try:
                     await disk_cache.promote_album_to_persistent(album_mbid)
                     await cover_repo.promote_cover_to_persistent(album_mbid, identifier_type="album")
@@ -156,7 +153,6 @@ def make_processor(lidarr_repo, memory_cache, disk_cache, cover_repo, request_hi
                             await disk_cache.promote_artist_to_persistent(artist_mbid)
                             await cover_repo.promote_cover_to_persistent(artist_mbid, identifier_type="artist")
 
-                    logger.info(f"Cache promotion complete for album {album_mbid[:8]}...")
                 except Exception as e:  # noqa: BLE001
                     logger.error(f"Failed to promote cache entries for album {album_mbid[:8]}...: {e}")
             else:
@@ -173,7 +169,6 @@ def make_processor(lidarr_repo, memory_cache, disk_cache, cover_repo, request_hi
                         )
                         await memory_cache.delete(f"{ARTIST_INFO_PREFIX}{record.artist_mbid}")
                         await disk_cache.delete_artist(record.artist_mbid)
-                        logger.info("Applied deferred artist monitoring for %s", record.artist_mbid[:8])
                         break
                     except Exception:  # noqa: BLE001
                         if attempt == 0:
@@ -284,11 +279,6 @@ def get_requests_page_service() -> "RequestsPageService":
             })
         except Exception as ex:  # noqa: BLE001
             logger.warning("Failed to upsert album into library cache: %s", ex)
-        logger.info(
-            "Invalidated caches after import: album=%s artist=%s",
-            record.musicbrainz_id[:8],
-            (record.artist_mbid or "?")[:8],
-        )
 
     request_queue = get_request_queue()
     library_service = get_library_service()

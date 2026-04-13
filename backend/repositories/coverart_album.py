@@ -91,7 +91,7 @@ class AlbumCoverFetcher:
                 timeout=LOCAL_SOURCE_TIMEOUT_SECONDS,
             )
         except TimeoutError:
-            logger.debug(f"Timed out local source lookup for release group {release_group_id[:8]}...")
+            pass
         if result:
             return result
         size_suffix = f"-{size}" if size else ""
@@ -146,7 +146,6 @@ class AlbumCoverFetcher:
     ) -> tuple[bytes, str, str] | None:
         if self._audiodb_service is None:
             return None
-        logger.debug(f"[IMG:AudioDB] Fetching album image for {release_group_id[:8]}...")
         try:
             cached_images = await self._audiodb_service.fetch_and_cache_album_images(release_group_id)
             if cached_images is None or cached_images.is_negative or not cached_images.album_thumb_url:
@@ -174,8 +173,8 @@ class AlbumCoverFetcher:
         except ClientDisconnectedError:
             raise
         except Exception as e:  # noqa: BLE001
-            logger.warning(f"[IMG:AudioDB] Exception for {release_group_id[:8]}: {e}")
             return None
+
     async def _get_cover_from_best_release(
         self,
         release_group_id: str,
@@ -231,7 +230,7 @@ class AlbumCoverFetcher:
         except ClientDisconnectedError:
             raise
         except Exception as e:  # noqa: BLE001
-            logger.warning(f"Failed to fetch cover from best release: {e}")
+            return None
         return None
 
     async def _fetch_from_lidarr(
@@ -249,7 +248,6 @@ class AlbumCoverFetcher:
             image_url = await self._lidarr_repo.get_album_image_url(release_group_id, size=size)
             if not image_url:
                 return None
-            logger.debug(f"Fetching album cover from Lidarr: {release_group_id[:8]}...")
             response = await self._http_get(
                 image_url,
                 priority,
@@ -266,7 +264,6 @@ class AlbumCoverFetcher:
             task.add_done_callback(_log_task_error)
             return (content, content_type, "lidarr")
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"Failed to fetch album cover from Lidarr for {release_group_id}: {e}")
             return None
 
     async def _fetch_from_jellyfin(
@@ -303,7 +300,6 @@ class AlbumCoverFetcher:
             task.add_done_callback(_log_task_error)
             return (content, content_type, "jellyfin")
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"Failed to fetch album cover from Jellyfin for {musicbrainz_id}: {e}")
             return None
 
     async def fetch_release_cover(
@@ -322,9 +318,7 @@ class AlbumCoverFetcher:
             except ClientDisconnectedError:
                 raise
             except Exception as e:  # noqa: BLE001
-                logger.debug(
-                    f"[IMG:AudioDB] Failed resolving release group for release {release_id[:8]}: {e}"
-                )
+                pass
         result = None
         try:
             await check_disconnected(is_disconnected)
@@ -333,7 +327,7 @@ class AlbumCoverFetcher:
                 timeout=LOCAL_SOURCE_TIMEOUT_SECONDS,
             )
         except TimeoutError:
-            logger.debug(f"Timed out local source lookup for release {release_id[:8]}...")
+            pass
         if result:
             return result
         if release_group_id:
@@ -366,7 +360,7 @@ class AlbumCoverFetcher:
         except ClientDisconnectedError:
             raise
         except Exception as e:  # noqa: BLE001
-            logger.warning(f"Failed to fetch release cover for {release_id}: {e}")
+            pass
         return None
 
     async def _fetch_release_local_sources(

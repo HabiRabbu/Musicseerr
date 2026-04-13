@@ -110,7 +110,6 @@
 		} catch (e) {
 			if (id === fetchId) {
 				trackError = true;
-				console.warn('Failed to fetch YouTube track links', e);
 			}
 		} finally {
 			if (id === fetchId) loadingTracks = false;

@@ -1,14 +1,11 @@
 from __future__ import annotations
 
-import logging
 from collections.abc import AsyncIterator
 from typing import Any
 
 import msgspec
 
 from core.exceptions import NavidromeApiError, NavidromeAuthError, NavidromeSubsonicError
-
-logger = logging.getLogger(__name__)
 
 
 class SubsonicArtist(msgspec.Struct):

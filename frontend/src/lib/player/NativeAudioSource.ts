@@ -147,7 +147,6 @@ export class NativeAudioSource implements PlaybackSource {
 
 	seekTo(seconds: number): void {
 		if (!this.seekable) {
-			console.warn('[NativeAudio] seekTo ignored: stream is not seekable');
 			return;
 		}
 		const clamped = Math.max(0, seconds);

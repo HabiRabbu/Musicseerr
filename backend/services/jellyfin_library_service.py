@@ -1,5 +1,4 @@
 import asyncio
-import logging
 
 from api.v1.schemas.jellyfin import (
     JellyfinAlbumDetail,
@@ -14,8 +13,6 @@ from infrastructure.cover_urls import prefer_artist_cover_url, prefer_release_gr
 from repositories.protocols import JellyfinRepositoryProtocol
 from repositories.jellyfin_models import JellyfinItem
 from services.preferences_service import PreferencesService
-
-logger = logging.getLogger(__name__)
 
 
 class JellyfinLibraryService:

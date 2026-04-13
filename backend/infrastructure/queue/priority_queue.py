@@ -1,10 +1,7 @@
 import asyncio
-import logging
 from enum import IntEnum
 from typing import Optional
 from datetime import datetime
-
-logger = logging.getLogger(__name__)
 
 
 class RequestPriority(IntEnum):
@@ -37,8 +34,6 @@ class PriorityQueueManager:
         self._user_activity_event = asyncio.Event()
         self._background_waiters = 0
         self._initialized = True
-        
-        logger.info("PriorityQueueManager initialized: user=20, image=10, background=5")
     
     async def acquire_slot(self, priority: RequestPriority) -> asyncio.Semaphore:
         if priority == RequestPriority.USER_INITIATED:

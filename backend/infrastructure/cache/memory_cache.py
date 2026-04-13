@@ -1,12 +1,9 @@
 import asyncio
-import logging
 import sys
 import time
 from typing import Any, Optional
 from abc import ABC, abstractmethod
 from collections import OrderedDict
-
-logger = logging.getLogger(__name__)
 
 
 class CacheInterface(ABC):
@@ -84,8 +81,6 @@ class InMemoryCache(CacheInterface):
             if key not in self._cache and len(self._cache) >= self._max_entries:
                 oldest_key, _ = self._cache.popitem(last=False)
                 self._evictions += 1
-                if self._evictions % 100 == 0:
-                    logger.info(f"Cache LRU evictions: {self._evictions}, current size: {len(self._cache)}")
             
             self._cache[key] = CacheEntry(value, ttl_seconds)
             self._cache.move_to_end(key)
@@ -104,9 +99,6 @@ class InMemoryCache(CacheInterface):
             for key in keys_to_remove:
                 self._cache.pop(key, None)
         
-        if keys_to_remove:
-            logger.info(f"Cleared {len(keys_to_remove)} cache entries with prefix '{prefix}'")
-        
         return len(keys_to_remove)
 
     async def cleanup_expired(self) -> int:
@@ -119,9 +111,6 @@ class InMemoryCache(CacheInterface):
             ]
             for key in expired_keys:
                 self._cache.pop(key, None)
-        
-        if expired_keys:
-            logger.debug(f"Cleaned up {len(expired_keys)} expired cache entries")
         
         return len(expired_keys)
     

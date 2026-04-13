@@ -1,13 +1,10 @@
-"""Domain 4 — MBID resolution and external-service index persistence."""
+"""Domain 4 - MBID resolution and external-service index persistence."""
 
-import logging
 import sqlite3
 import time
 from typing import Any
 
 from infrastructure.persistence._database import PersistenceBase, _normalize
-
-logger = logging.getLogger(__name__)
 
 
 class MBIDStore(PersistenceBase):

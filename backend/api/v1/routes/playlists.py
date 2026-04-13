@@ -1,4 +1,3 @@
-import logging
 from fastapi import APIRouter, File, UploadFile
 from fastapi.responses import FileResponse
 
@@ -24,8 +23,6 @@ from api.v1.schemas.playlists import (
 from core.dependencies import JellyfinLibraryServiceDep, LocalFilesServiceDep, NavidromeLibraryServiceDep, PlaylistServiceDep
 from core.exceptions import PlaylistNotFoundError
 from infrastructure.msgspec_fastapi import MsgSpecBody, MsgSpecRoute
-
-logger = logging.getLogger(__name__)
 
 router = APIRouter(
     route_class=MsgSpecRoute,

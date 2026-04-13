@@ -165,10 +165,8 @@ class ArtistDiscoveryService:
                 recordings = await self._lb_repo.get_artist_top_recordings(artist_mbid, count=count)
 
                 release_ids = [r.release_mbid for r in recordings if r.release_mbid]
-                logger.info(f"Top songs for {artist_mbid}: {len(recordings)} recordings, {len(release_ids)} with release_mbid")
 
                 rg_map = await self._resolve_release_groups(release_ids)
-                logger.info(f"Resolved {len(rg_map)} release groups from {len(release_ids)} releases")
 
                 songs = []
                 for r in recordings[:count]:
@@ -235,7 +233,6 @@ class ArtistDiscoveryService:
             try:
                 release_groups = await self._lb_repo.get_artist_top_release_groups(artist_mbid, count=count)
                 if not release_groups:
-                    logger.info("ListenBrainz returned no release groups for %s", artist_mbid[:8])
                     fallback_albums = await self._get_top_albums_from_recordings_fallback(
                         artist_mbid, count
                     )
@@ -414,7 +411,6 @@ class ArtistDiscoveryService:
     ) -> int:
         global _discovery_precache_running
         if _discovery_precache_running:
-            logger.info("Discovery precache already running, skipping duplicate invocation")
             return 0
 
         _discovery_precache_running = True
@@ -511,9 +507,6 @@ class ArtistDiscoveryService:
                     artist_name = (mbid_to_name or {}).get(mbid, mbid[:8])
                     await status_service.update_progress(local_progress, current_item=artist_name, generation=generation)
 
-                if local_progress % 10 == 0:
-                    logger.info("Discovery precache progress: %d/%d artists", local_progress, len(artist_mbids))
-
                 return True
             except Exception as e:  # noqa: BLE001
                 logger.warning("Failed to precache discovery for %s: %s", mbid[:8], e)
@@ -550,19 +543,12 @@ class ArtistDiscoveryService:
         chunk = max(discovery_concurrency * 4, 20)
         for i in range(0, len(artist_mbids), chunk):
             if status_service and status_service.is_cancelled():
-                logger.info("Discovery precache cancelled by user")
                 break
             batch = artist_mbids[i:i + chunk]
             batch_tasks = [asyncio.create_task(process_artist_with_timeout(i + j, mbid)) for j, mbid in enumerate(batch)]
             if batch_tasks:
                 await asyncio.gather(*batch_tasks, return_exceptions=True)
 
-        logger.info(
-            "Discovery precache complete: %d/%d artists refreshed (%d source fetches)",
-            cached_count,
-            len(artist_mbids),
-            source_fetches,
-        )
         return cached_count
 
     async def _resolve_release_groups(self, release_ids: list[str]) -> dict[str, str]:
@@ -570,7 +556,6 @@ class ArtistDiscoveryService:
             return {}
 
         unique_ids = list(dict.fromkeys(release_ids))
-        logger.info(f"Resolving {len(unique_ids)} unique release IDs to release groups (from {len(release_ids)} total)")
         tasks = [self._mb_repo.get_release_group_id_from_release(rid) for rid in unique_ids]
         results = await asyncio.gather(*tasks, return_exceptions=True)
         
@@ -586,7 +571,6 @@ class ArtistDiscoveryService:
                 errors += 1
                 logger.warning(f"Resolution returned None/empty for {rid}")
         
-        logger.info(f"Release group resolution: {len(rg_map)} succeeded, {errors} failed")
         return rg_map
 
     async def _get_similar_artists_lastfm(

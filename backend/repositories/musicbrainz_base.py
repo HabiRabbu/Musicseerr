@@ -1,4 +1,3 @@
-import logging
 from typing import Any, TypeVar
 
 import httpx
@@ -9,8 +8,6 @@ from infrastructure.resilience.retry import with_retry, CircuitBreaker
 from infrastructure.resilience.rate_limiter import TokenBucketRateLimiter
 from infrastructure.queue.priority_queue import RequestPriority, get_priority_queue
 from infrastructure.http.deduplication import RequestDeduplicator
-
-logger = logging.getLogger(__name__)
 
 MB_API_BASE = "https://musicbrainz.org/ws/2"
 

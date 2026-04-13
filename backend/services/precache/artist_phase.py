@@ -38,7 +38,6 @@ class ArtistPhase:
         offset: int = 0,
         generation: int = 0,
     ) -> None:
-        logger.info(f"Pre-caching metadata+images for {len(artists)} artists")
         from core.dependencies import get_artist_service
         from infrastructure.validators import is_unknown_mbid
         artist_service = get_artist_service()
@@ -52,8 +51,6 @@ class ArtistPhase:
             elif mbid.lower() not in seen_mbids:
                 seen_mbids.add(mbid.lower())
                 unique_artists.append(a)
-        if len(unique_artists) < len(artists):
-            logger.info("Deduplicated %d artists to %d unique", len(artists), len(unique_artists))
         artists = unique_artists
 
         async def cache_artist(artist: dict, index: int) -> str:
@@ -96,7 +93,6 @@ class ArtistPhase:
         batch_size = advanced_settings.batch_artist_images
         for i in range(0, len(artists), batch_size):
             if status_service.is_cancelled():
-                logger.info("Artist pre-caching cancelled by user")
                 break
             batch = artists[i:i + batch_size]
             tasks = [cache_artist(artist, i + idx) for idx, artist in enumerate(batch)]
@@ -114,14 +110,12 @@ class ArtistPhase:
             await status_service.persist_progress(generation=generation)
             await asyncio.sleep(advanced_settings.delay_artist)
         await status_service.persist_progress(force=True, generation=generation)
-        logger.info("Artist metadata+image pre-caching complete")
         await self._cache_artist_genres(artists)
 
     async def _cache_artist_genres(self, artists: list[dict]) -> None:
         from core.dependencies import get_artist_service
         artist_service = get_artist_service()
         artist_genres: dict[str, list[str]] = {}
-        logger.info(f"Extracting genre tags for {len(artists)} library artists")
         for artist in artists:
             mbid = artist.get('mbid')
             if not mbid:
@@ -132,6 +126,3 @@ class ArtistPhase:
                 artist_genres[mbid] = cached_info.tags[:10]
         if artist_genres:
             await self._genre_index.save_artist_genres(artist_genres)
-            logger.info(f"Cached genres for {len(artist_genres)} artists")
-        else:
-            logger.info("No artist genres found to cache")

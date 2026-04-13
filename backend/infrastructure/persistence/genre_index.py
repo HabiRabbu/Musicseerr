@@ -1,6 +1,5 @@
-"""Domain 2 — Genre indexing persistence."""
+"""Domain 2 - Genre indexing persistence."""
 
-import logging
 import sqlite3
 from typing import Any
 
@@ -11,8 +10,6 @@ from infrastructure.persistence._database import (
     _encode_json,
     _normalize,
 )
-
-logger = logging.getLogger(__name__)
 
 LIBRARY_ARTISTS_TABLE = "library_artists"
 LIBRARY_ALBUMS_TABLE = "library_albums"

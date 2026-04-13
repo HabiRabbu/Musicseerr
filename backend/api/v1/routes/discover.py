@@ -1,4 +1,3 @@
-import logging
 from typing import Literal
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from api.v1.schemas.discover import (
@@ -27,8 +26,6 @@ import msgspec.structs
 from repositories.youtube import YouTubeRepository
 from services.discover_service import DiscoverService
 from services.discover_queue_manager import DiscoverQueueManager
-
-logger = logging.getLogger(__name__)
 
 router = APIRouter(route_class=MsgSpecRoute, prefix="/discover", tags=["discover"])
 
@@ -63,7 +60,6 @@ async def get_discover_queue(
     resolved = source or discover_service.resolve_source(None)
     cached = await queue_manager.consume_queue(resolved)
     if cached:
-        logger.info("Serving pre-built discover queue (source=%s, items=%d)", resolved, len(cached.items))
         return cached
     effective_count = min(count, 20) if count is not None else None
     return await queue_manager.build_hydrated_queue(resolved, effective_count)

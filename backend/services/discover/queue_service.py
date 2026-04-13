@@ -52,7 +52,6 @@ class DiscoverQueueService:
         if count is None:
             count = qs.queue_size
         resolved_source = self._integration.resolve_source(source)
-        logger.info("Building discover queue: requested_source=%s, resolved_source=%s", source, resolved_source)
         lb_enabled = self._integration.is_listenbrainz_enabled()
         jf_enabled = self._integration.is_jellyfin_enabled()
         lidarr_configured = self._integration.is_lidarr_configured()
@@ -168,11 +167,6 @@ class DiscoverQueueService:
                     logger.warning(f"Failed to get Jellyfin seed artists: {e}")
                     continue
 
-        logger.info(
-            "Seed artists found: %d — %s",
-            len(seeds),
-            [(s.artist_name, s.artist_mbids[0][:8] if s.artist_mbids else "?") for s in seeds],
-        )
         return seeds
 
     async def validate_queue_mbids(self, mbids: list[str]) -> list[str]:
@@ -608,8 +602,6 @@ class DiscoverQueueService:
             similar_seed_pools = strategy_results[0]
             if isinstance(similar_seed_pools, list):
                 candidate_pools.extend(similar_seed_pools)
-                pool_counts = [len(p) for p in similar_seed_pools]
-                logger.info("Strategy similar_seeds: %d pools, items per pool: %s", len(similar_seed_pools), pool_counts)
             elif isinstance(similar_seed_pools, Exception):
                 logger.warning("Strategy similar_seeds FAILED: %s", similar_seed_pools)
 
@@ -620,15 +612,8 @@ class DiscoverQueueService:
                     continue
                 if strategy_result:
                     candidate_pools.append(strategy_result)
-                    logger.info("Strategy %s: %d items", name, len(strategy_result))
-                else:
-                    logger.info("Strategy %s: 0 items", name)
 
         personalized = self._round_robin_select(candidate_pools, personalized_target)
-        logger.info(
-            "Personalized queue: %d items from %d pools (target=%d, wildcard_slots=%d)",
-            len(personalized), len(candidate_pools), personalized_target, wildcard_slots,
-        )
         seen_mbids = {item.release_group_mbid.lower() for item in personalized}
 
         wildcard_count = max(wildcard_slots, count - len(personalized))

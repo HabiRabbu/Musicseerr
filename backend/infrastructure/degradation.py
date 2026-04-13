@@ -9,12 +9,9 @@ call signatures.
 from __future__ import annotations
 
 import contextvars
-import logging
 from typing import Literal
 
 from infrastructure.integration_result import IntegrationResult, IntegrationStatus
-
-logger = logging.getLogger(__name__)
 
 _degradation_ctx_var: contextvars.ContextVar[DegradationContext | None] = (
     contextvars.ContextVar("degradation_ctx", default=None)
@@ -34,13 +31,6 @@ class DegradationContext:
         prev = self._services.get(result.source)
         if prev is None or _severity(result.status) > _severity(prev):
             self._services[result.source] = result.status
-            if result.status != "ok":
-                logger.debug(
-                    "Degradation recorded: source=%s status=%s msg=%s",
-                    result.source,
-                    result.status,
-                    result.error_message,
-                )
 
     def summary(self) -> dict[str, str]:
         """Return ``{source: status}`` for all recorded integrations."""

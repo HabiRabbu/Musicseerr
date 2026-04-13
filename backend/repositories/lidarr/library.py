@@ -1,4 +1,3 @@
-import logging
 from datetime import datetime
 from typing import Any, TYPE_CHECKING
 from models.library import LibraryAlbum, LibraryGroupedAlbum, LibraryGroupedArtist
@@ -15,8 +14,6 @@ from .base import LidarrBase
 
 if TYPE_CHECKING:
     from infrastructure.persistence.request_history import RequestHistoryStore
-
-logger = logging.getLogger(__name__)
 
 
 class LidarrLibraryRepository(LidarrBase):
@@ -63,8 +60,8 @@ class LidarrLibraryRepository(LidarrBase):
                 try:
                     dt = datetime.fromisoformat(added_str.replace('Z', '+00:00'))
                     date_added = int(dt.timestamp())
-                except Exception as e:  # noqa: BLE001
-                    logger.warning(f"Failed to parse date_added '{added_str}' for album '{item.get('title')}': {e}")
+                except Exception:  # noqa: BLE001
+                    pass
 
             out.append(
                 LibraryAlbum(
@@ -79,9 +76,6 @@ class LidarrLibraryRepository(LidarrBase):
                     date_added=date_added,
                 )
             )
-
-        if filtered_count > 0:
-            logger.info(f"Filtered out {filtered_count} unmonitored albums from library")
 
         await self._cache.set(cache_key, out, ttl_seconds=300)
         return out
@@ -115,8 +109,8 @@ class LidarrLibraryRepository(LidarrBase):
                 try:
                     dt = datetime.fromisoformat(added_str.replace('Z', '+00:00'))
                     date_added = int(dt.timestamp())
-                except Exception as e:  # noqa: BLE001
-                    logger.warning(f"Failed to parse date_added '{added_str}' for artist '{artist_name}': {e}")
+                except Exception:  # noqa: BLE001
+                    pass
 
             if artist_mbid not in artists_dict:
                 artists_dict[artist_mbid] = {
@@ -130,9 +124,6 @@ class LidarrLibraryRepository(LidarrBase):
             if date_added and (not artists_dict[artist_mbid]['date_added'] or
                               date_added < artists_dict[artist_mbid]['date_added']):
                 artists_dict[artist_mbid]['date_added'] = date_added
-
-        if filtered_count > 0:
-            logger.info(f"Filtered out {filtered_count} unmonitored albums from artist extraction")
 
         result = list(artists_dict.values())
         await self._cache.set(cache_key, result, ttl_seconds=300)
@@ -235,8 +226,7 @@ class LidarrLibraryRepository(LidarrBase):
         if self._request_history_store is not None:
             try:
                 return await self._request_history_store.async_get_active_mbids()
-            except Exception as e:  # noqa: BLE001
-                logger.warning("RequestHistoryStore unavailable, falling back to empty set: %s", e)
+            except Exception:  # noqa: BLE001
                 return set()
         return set()
 

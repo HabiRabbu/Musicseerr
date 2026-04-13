@@ -1,8 +1,6 @@
-"""Tier 3 — Repository providers and infrastructure services."""
+"""Tier 3 - Repository providers and infrastructure services."""
 
 from __future__ import annotations
-
-import logging
 
 import httpx
 
@@ -16,9 +14,6 @@ from .cache_providers import (
     get_mbid_store,
     get_preferences_service,
 )
-
-logger = logging.getLogger(__name__)
-
 
 def _get_configured_http_client() -> httpx.AsyncClient:
     settings = get_settings()

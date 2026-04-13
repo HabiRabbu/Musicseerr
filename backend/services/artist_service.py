@@ -106,10 +106,7 @@ class ArtistService:
         new_artist_in_library = result.musicbrainz_id and result.musicbrainz_id.lower() in artist_mbids
         if new_artist_in_library != result.in_library:
             result.in_library = new_artist_in_library
-            changed = True
 
-        if changed:
-            logger.info("Revalidated library status for cached artist %s", (result.musicbrainz_id or "")[:8])
         return result
 
     async def _get_library_artist_mbids(self) -> set[str]:
@@ -223,10 +220,8 @@ class ArtistService:
         lidarr_artist = await self._lidarr_repo.get_artist_details(artist_id) if self._lidarr_repo.is_configured() else None
         in_library = lidarr_artist is not None and lidarr_artist.get("monitored", False)
         if in_library and lidarr_artist:
-            logger.info(f"Using Lidarr as primary source for artist {artist_id[:8]}")
             artist_info = await self._build_artist_from_lidarr(artist_id, lidarr_artist, library_album_mbids)
         else:
-            logger.info(f"Using MusicBrainz as primary source for artist {artist_id[:8]}")
             artist_info = await self._build_artist_from_musicbrainz(artist_id, library_artist_mbids, library_album_mbids)
         if lidarr_artist is not None:
             artist_info.in_lidarr = True
@@ -327,7 +322,6 @@ class ArtistService:
         release_group_count = len(lidarr_albums)
         
         if need_musicbrainz:
-            logger.debug(f"Fetching supplementary data from MusicBrainz for artist {artist_id[:8]}")
             try:
                 mb_artist = result_map.get("mb_artist")
                 if isinstance(mb_artist, Exception):
@@ -425,7 +419,6 @@ class ArtistService:
         future: asyncio.Future[ArtistInfo] = loop.create_future()
         self._artist_basic_in_flight[artist_id] = future
         try:
-            logger.debug(f"Cache MISS (Disk): Artist {artist_id[:8]}... - fetching from API")
             artist_info = await self._build_artist_from_musicbrainz(artist_id, include_extended=False)
             artist_info = await self._apply_audiodb_artist_images(
                 artist_info, artist_id, artist_info.name, allow_fetch=False,
@@ -480,9 +473,7 @@ class ArtistService:
         cache_key = f"{ARTIST_INFO_PREFIX}{artist_id}"
         cached_info = await self._cache.get(cache_key)
         if cached_info:
-            logger.debug(f"Cache HIT (RAM): Artist {artist_id[:8]}...")
             return cached_info
-        logger.debug(f"Cache MISS (RAM): Artist {artist_id[:8]}...")
         disk_data = await self._disk_cache.get_artist(artist_id)
         if disk_data:
             try:
@@ -491,7 +482,6 @@ class ArtistService:
                 logger.warning(f"Corrupt disk cache for artist {artist_id[:8]}, clearing: {e}")
                 await self._disk_cache.delete_artist(artist_id)
                 return None
-            logger.debug(f"Cache HIT (Disk): Artist {artist_id[:8]}...")
             ttl = self._get_artist_ttl(artist_info.in_library)
             await self._cache.set(cache_key, artist_info, ttl_seconds=ttl)
             return artist_info
@@ -517,7 +507,6 @@ class ArtistService:
             cache_key = f"{ARTIST_INFO_PREFIX}{artist_id}"
             cached_info = await self._cache.get(cache_key)
             if cached_info and cached_info.description is not None:
-                logger.debug(f"Extended info cache HIT: Artist {artist_id[:8]}...")
                 return ArtistExtendedInfo(description=cached_info.description, image=cached_info.image)
             mb_artist = await self._mb_repo.get_artist_by_id(artist_id)
             if not mb_artist:
@@ -554,7 +543,6 @@ class ArtistService:
             included_secondary_types = set(t.lower() for t in prefs.secondary_types)
 
             if in_library and offset == 0:
-                logger.debug(f"Using Lidarr for artist releases {artist_id[:8]}")
                 lidarr_albums = await self._lidarr_repo.get_artist_albums(artist_id)
                 albums, singles, eps = self._categorize_lidarr_albums(lidarr_albums, album_mbids, requested_mbids=requested_mbids)
 
@@ -568,7 +556,6 @@ class ArtistService:
                     has_more=False
                 )
 
-            logger.debug(f"Using MusicBrainz for artist releases {artist_id[:8]}")
             release_groups, total_count = await self._mb_repo.get_artist_release_groups(
                 artist_id, offset, limit
             )

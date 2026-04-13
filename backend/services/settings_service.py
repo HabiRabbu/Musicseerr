@@ -135,11 +135,11 @@ class SettingsService:
             detail = str(e)
             logger.warning(f"Lidarr connection test failed: {detail}")
             if "No address associated with hostname" in detail or "Name or service not known" in detail:
-                hint = "DNS resolution failed — check the hostname is reachable from inside the container"
+                hint = "We could not resolve that hostname. Make sure the container can reach it."
             elif "Connection refused" in detail:
-                hint = "Connection refused — check the port and that Lidarr is running"
+                hint = "Connection refused. Check the port and make sure Lidarr is running."
             elif "timed out" in detail.lower() or "timeout" in detail.lower():
-                hint = "Connection timed out — check network/firewall settings"
+                hint = "Connection timed out. Check your network or firewall settings."
             else:
                 hint = detail
             return LidarrVerifyResponse(
@@ -229,7 +229,6 @@ class SettingsService:
         total += await self._cache.clear_prefix(ALBUM_INFO_PREFIX)
         for prefix in musicbrainz_prefixes():
             total += await self._cache.clear_prefix(prefix)
-        logger.info(f"Cleared {total} cache entries for preference change")
         return total
 
     async def clear_home_cache(self) -> int:
@@ -241,20 +240,17 @@ class SettingsService:
             total += await self._cache.clear_prefix(prefix)
         for prefix in lastfm_prefixes():
             total += await self._cache.clear_prefix(prefix)
-        logger.info(f"Cleared {total} home/discover/integration cache entries")
         return total
 
     async def clear_local_files_cache(self) -> int:
         cleared = await self._cache.clear_prefix(LOCAL_FILES_PREFIX)
-        logger.info(f"Cleared {cleared} local files cache entries")
         return cleared
 
     async def clear_source_resolution_cache(self) -> int:
         cleared = await self._cache.clear_prefix(SOURCE_RESOLUTION_PREFIX)
-        logger.info(f"Cleared {cleared} source-resolution cache entries")
         return cleared
 
-    # Lifecycle methods — one per integration settings change
+    # Lifecycle methods, one for each integration settings change.
 
     async def on_jellyfin_settings_changed(self) -> None:
         """Full cache/state reset when Jellyfin settings change."""
@@ -274,7 +270,6 @@ class SettingsService:
         await mbid_store.clear_jellyfin_mbid_index()
         await self.clear_home_cache()
         await self.clear_source_resolution_cache()
-        logger.info("Jellyfin settings change: all caches/singletons reset")
 
     async def on_navidrome_settings_changed(self, enabled: bool = False) -> None:
         """Full cache/state reset when Navidrome settings change."""
@@ -307,7 +302,6 @@ class SettingsService:
                     registry.register("navidrome-mbid-warmup", _nav_task)
                 except RuntimeError:
                     pass
-        logger.info("Navidrome settings change: all caches/singletons reset")
 
     async def on_lastfm_settings_changed(self) -> None:
         """Full cache/state reset when Last.fm settings change."""
@@ -321,7 +315,6 @@ class SettingsService:
         get_lastfm_auth_service.cache_clear()
         clear_lastfm_dependent_caches()
         await self.clear_home_cache()
-        logger.info("Last.fm settings change: all caches/singletons reset")
 
     async def on_listenbrainz_settings_changed(self) -> None:
         """Full cache/state reset when ListenBrainz settings change."""
@@ -330,26 +323,22 @@ class SettingsService:
         ListenBrainzRepository.reset_circuit_breaker()
         clear_listenbrainz_dependent_caches()
         await self.clear_home_cache()
-        logger.info("ListenBrainz settings change: all caches/singletons reset")
 
     async def on_youtube_settings_changed(self) -> None:
         """Reset YouTube singleton and clear home caches when settings change."""
         from core.dependencies import get_youtube_repo
         get_youtube_repo.cache_clear()
         await self.clear_home_cache()
-        logger.info("YouTube settings change: singleton reset, home caches cleared")
 
     async def on_coverart_settings_changed(self) -> None:
         """Reset coverart singleton when settings change."""
         from core.dependencies import get_coverart_repository
         get_coverart_repository.cache_clear()
-        logger.info("Coverart settings change: singleton reset")
 
     async def on_local_files_settings_changed(self) -> None:
         """Full cache reset when local files settings change."""
         await self.clear_local_files_cache()
         await self.clear_source_resolution_cache()
-        logger.info("Local files settings change: caches reset")
 
     async def on_lidarr_settings_changed(self) -> None:
         """Full cache reset when Lidarr settings change."""
@@ -367,8 +356,6 @@ class SettingsService:
             home_service.clear_genre_disk_cache()
         except Exception:  # noqa: BLE001
             logger.debug("Genre disk cache cleanup skipped (home service unavailable)")
-
-        logger.info("Lidarr settings change: home, lidarr, library and genre caches reset")
 
     def _create_lidarr_repo(self) -> "LidarrRepository":
         from repositories.lidarr import LidarrRepository
@@ -511,10 +498,9 @@ class SettingsService:
                 f"Failed to update Lidarr metadata profile: {e}"
             )
 
-        logger.info(f"Updated Lidarr metadata profile '{result.get('name')}' (ID: {resolved_id})")
         return self._lidarr_profile_to_preferences(result)
 
-    # Verify methods — Navidrome, YouTube, Last.fm
+    # Verification methods for Navidrome, YouTube, and Last.fm.
 
     async def verify_navidrome(
         self, settings: NavidromeConnectionSettings

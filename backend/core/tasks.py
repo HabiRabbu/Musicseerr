@@ -53,17 +53,13 @@ async def cleanup_disk_cache_periodically(
     while True:
         try:
             await asyncio.sleep(interval)
-            logger.debug("Running disk cache cleanup...")
             await disk_cache.cleanup_expired_recent()
             await disk_cache.enforce_recent_size_limits()
             await disk_cache.cleanup_expired_covers()
             await disk_cache.enforce_cover_size_limits()
             if cover_disk_cache:
                 await cover_disk_cache.enforce_size_limit(force=True)
-                expired = await asyncio.to_thread(cover_disk_cache.cleanup_expired)
-                if expired:
-                    logger.info("Cover expiry sweep removed %d expired covers", expired)
-            logger.debug("Disk cache cleanup complete")
+                await asyncio.to_thread(cover_disk_cache.cleanup_expired)
         except asyncio.CancelledError:
             break
         except Exception as e:
@@ -114,17 +110,14 @@ async def sync_library_periodically(
             
             await asyncio.sleep(interval)
             
-            logger.info(f"Auto-syncing library (frequency: {sync_freq})")
             sync_success = False
             should_update_status = True
             try:
                 result = await library_service.sync_library()
                 if result.status == "skipped":
-                    logger.info("Auto-sync skipped - sync already in progress")
                     should_update_status = False
                     continue
                 sync_success = True
-                logger.info("Auto-sync completed successfully")
                 
             except Exception as e:
                 logger.error("Auto-sync library call failed: %s", e, exc_info=True)
@@ -140,7 +133,6 @@ async def sync_library_periodically(
                     preferences_service.save_lidarr_settings(updated_settings)
         
         except asyncio.CancelledError:
-            logger.info("Library sync task cancelled")
             break
         except Exception as e:
             logger.error("Library sync task failed: %s", e, exc_info=True)
@@ -162,20 +154,15 @@ async def warm_library_cache(
     library_db: 'LibraryDB'
 ) -> None:
     try:
-        logger.info("Warming cache with recently-added library albums...")
-        
         await asyncio.sleep(5)
         
         albums_data = await library_db.get_albums()
         
         if not albums_data:
-            logger.info("No library albums to warm cache with")
             return
 
         max_warm = 30
         albums_to_warm = albums_data[:max_warm]
-        
-        logger.info(f"Warming cache with {len(albums_to_warm)} of {len(albums_data)} library albums (first {max_warm})")
         
         warmed = 0
         for i, album_data in enumerate(albums_to_warm):
@@ -199,8 +186,6 @@ async def warm_library_cache(
                     )
                     continue
         
-        logger.info(f"Cache warming complete: {warmed} albums fetched, {len(albums_to_warm) - warmed} already cached")
-    
     except Exception as e:
         logger.error("Library cache warming failed: %s", e, exc_info=True)
 
@@ -215,9 +200,7 @@ async def warm_home_cache_periodically(
         try:
             for src in ("listenbrainz", "lastfm"):
                 try:
-                    logger.debug("Warming home page cache (source=%s)...", src)
                     await home_service.get_home_data(source=src)
-                    logger.debug("Home cache warming complete (source=%s)", src)
                 except Exception as e:
                     logger.error(
                         "Home cache warming failed (source=%s): %s",
@@ -226,7 +209,6 @@ async def warm_home_cache_periodically(
                         exc_info=True,
                     )
         except asyncio.CancelledError:
-            logger.info("Home cache warming task cancelled")
             break
 
         await asyncio.sleep(interval)
@@ -255,16 +237,13 @@ async def warm_genre_cache_periodically(
                 try:
                     cached_home = await home_service.get_cached_home_data(source=src)
                     if not cached_home or not cached_home.genre_list or not cached_home.genre_list.items:
-                        logger.debug("No cached home data for genre warming (source=%s), skipping", src)
                         continue
                     genre_names = [
                         g.name for g in cached_home.genre_list.items[:20]
                         if isinstance(g, HomeGenre)
                     ]
                     if genre_names:
-                        logger.debug("Warming genre cache (source=%s, %d genres)...", src, len(genre_names))
                         await home_service._genre.build_and_cache_genre_section(src, genre_names)
-                        logger.debug("Genre cache warming complete (source=%s)", src)
                         warmed += 1
                 except Exception as e:
                     logger.error(
@@ -274,7 +253,6 @@ async def warm_genre_cache_periodically(
                         exc_info=True,
                     )
         except asyncio.CancelledError:
-            logger.info("Genre cache warming task cancelled")
             break
 
         if warmed == 0:
@@ -305,9 +283,7 @@ async def warm_discover_cache_periodically(
         try:
             for src in ("listenbrainz", "lastfm"):
                 try:
-                    logger.info("Warming discover cache (source=%s)...", src)
                     await discover_service.warm_cache(source=src)
-                    logger.info("Discover cache warming complete (source=%s)", src)
                 except Exception as e:
                     logger.error(
                         "Discover cache warming failed (source=%s): %s",
@@ -321,13 +297,11 @@ async def warm_discover_cache_periodically(
                     adv = preferences_service.get_advanced_settings()
                     if adv.discover_queue_auto_generate and adv.discover_queue_warm_cycle_build:
                         resolved = discover_service.resolve_source(None)
-                        logger.info("Pre-building discover queue (source=%s)...", resolved)
                         await queue_manager.start_build(resolved)
                 except Exception as e:
                     logger.error("Discover queue pre-build failed: %s", e, exc_info=True)
 
         except asyncio.CancelledError:
-            logger.info("Discover cache warming task cancelled")
             break
 
         await asyncio.sleep(interval)
@@ -355,7 +329,6 @@ async def warm_jellyfin_mbid_index(jellyfin_repo: 'JellyfinRepository') -> None:
     await asyncio.sleep(8)
     try:
         index = await jellyfin_repo.build_mbid_index()
-        logger.info("Jellyfin MBID index warmed with %d entries", len(index))
     except Exception as e:
         logger.error("Jellyfin MBID index warming failed: %s", e, exc_info=True)
 
@@ -385,7 +358,6 @@ async def warm_artist_discovery_cache_periodically(
         try:
             artists = await library_db.get_artists()
             if not artists:
-                logger.debug("No library artists for discovery cache warming")
                 await asyncio.sleep(interval)
                 continue
 
@@ -397,18 +369,10 @@ async def warm_artist_discovery_cache_periodically(
                 await asyncio.sleep(interval)
                 continue
 
-            logger.info(
-                "Warming artist discovery cache for %d library artists...", len(mbids)
-            )
             cached = await artist_discovery_service.precache_artist_discovery(
                 mbids, delay=delay
             )
-            logger.info(
-                "Artist discovery cache warming complete: %d/%d artists refreshed",
-                cached, len(mbids),
-            )
         except asyncio.CancelledError:
-            logger.info("Artist discovery cache warming task cancelled")
             break
         except Exception as e:
             logger.error("Artist discovery cache warming failed: %s", e, exc_info=True)
@@ -458,13 +422,11 @@ async def warm_audiodb_cache_periodically(
 
             settings = preferences_service.get_advanced_settings()
             if not settings.audiodb_enabled:
-                logger.debug("AudioDB sweep skipped (audiodb_enabled=false)")
                 continue
 
             artists = await library_db.get_artists()
             albums = await library_db.get_albums()
             if not artists and not albums:
-                logger.debug("AudioDB sweep: no library items")
                 continue
 
             cursor = preferences_service.get_setting('audiodb_sweep_cursor')
@@ -506,20 +468,13 @@ async def warm_audiodb_cache_periodically(
             if not items_needing_refresh:
                 preferences_service.save_setting('audiodb_sweep_cursor', None)
                 preferences_service.save_setting('audiodb_sweep_last_completed', time())
-                logger.info("AudioDB sweep complete: all items up to date")
                 continue
-
-            logger.info(
-                "audiodb.sweep action=start items=%d cursor=%s",
-                len(items_needing_refresh), cursor[:8] if cursor else 'start',
-            )
 
             processed = 0
             bytes_ok = 0
             bytes_fail = 0
             for entity_type, mbid, data in items_needing_refresh:
                 if not preferences_service.get_advanced_settings().audiodb_enabled:
-                    logger.info("AudioDB disabled during sweep, stopping")
                     break
 
                 try:
@@ -558,31 +513,15 @@ async def warm_audiodb_cache_periodically(
                 if processed % _AUDIODB_SWEEP_CURSOR_PERSIST_INTERVAL == 0:
                     preferences_service.save_setting('audiodb_sweep_cursor', mbid)
 
-                if processed % _AUDIODB_SWEEP_LOG_INTERVAL == 0:
-                    logger.info(
-                        "audiodb.sweep processed=%d total=%d cursor=%s bytes_ok=%d bytes_fail=%d remaining=%d",
-                        processed, len(items_needing_refresh), mbid[:8],
-                        bytes_ok, bytes_fail, len(items_needing_refresh) - processed,
-                    )
-
                 await asyncio.sleep(_AUDIODB_SWEEP_INTER_ITEM_DELAY)
 
             if processed >= len(items_needing_refresh):
                 preferences_service.save_setting('audiodb_sweep_cursor', None)
                 preferences_service.save_setting('audiodb_sweep_last_completed', time())
-                logger.info(
-                    "audiodb.sweep action=complete refreshed=%d bytes_ok=%d bytes_fail=%d",
-                    processed, bytes_ok, bytes_fail,
-                )
             else:
                 preferences_service.save_setting('audiodb_sweep_cursor', mbid)
-                logger.info(
-                    "audiodb.sweep action=interrupted processed=%d total=%d bytes_ok=%d bytes_fail=%d",
-                    processed, len(items_needing_refresh), bytes_ok, bytes_fail,
-                )
 
         except asyncio.CancelledError:
-            logger.info("AudioDB sweep task cancelled")
             break
         except Exception as e:
             logger.error("AudioDB sweep cycle failed: %s", e, exc_info=True)
@@ -618,7 +557,6 @@ async def sync_request_statuses_periodically(
         try:
             await requests_page_service.sync_request_statuses()
         except asyncio.CancelledError:
-            logger.info("Request status sync task cancelled")
             break
         except Exception as e:
             logger.error("Periodic request status sync failed: %s", e, exc_info=True)
@@ -661,10 +599,7 @@ async def demote_orphaned_covers_periodically(
                 valid_hashes.add(get_cache_filename(f"artist_{mbid}", "img"))
 
             demoted = await asyncio.to_thread(cover_disk_cache.demote_orphaned, valid_hashes)
-            if demoted:
-                logger.info("Orphan cover demotion: %d covers demoted to expiring", demoted)
         except asyncio.CancelledError:
-            logger.info("Orphan cover demotion task cancelled")
             break
         except Exception as e:
             logger.error("Orphan cover demotion failed: %s", e, exc_info=True)
@@ -700,13 +635,7 @@ async def prune_stores_periodically(
             pruned_requests = await request_history.prune_old_terminal_requests(request_retention_days)
             pruned_ignored = await mbid_store.prune_old_ignored_releases(ignored_retention_days)
             orphaned_yt = await youtube_store.delete_orphaned_track_links()
-            if pruned_requests or pruned_ignored or orphaned_yt:
-                logger.info(
-                    "Store prune: requests=%d ignored_releases=%d youtube_orphans=%d",
-                    pruned_requests, pruned_ignored, orphaned_yt,
-                )
         except asyncio.CancelledError:
-            logger.info("Store prune task cancelled")
             break
         except Exception as e:
             logger.error("Store prune task failed: %s", e, exc_info=True)

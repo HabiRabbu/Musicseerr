@@ -1,9 +1,6 @@
-import logging
 import sqlite3
 import threading
 from pathlib import Path
-
-logger = logging.getLogger(__name__)
 
 
 class QueueStore:

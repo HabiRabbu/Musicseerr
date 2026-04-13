@@ -54,7 +54,7 @@ def clear_listenbrainz_dependent_caches() -> None:
 
 
 async def init_app_state(app) -> None:
-    logger.info("Application state initialized")
+    pass
 
 
 async def cleanup_app_state() -> None:
@@ -74,7 +74,5 @@ async def cleanup_app_state() -> None:
     except (AttributeError, RuntimeError, OSError) as exc:
         logger.error("Failed to shut down genre prewarm service during cleanup: %s", exc)
 
-    # Automatic cleanup via registry — no manual list needed
+    # Automatic cleanup via registry; no manual list needed.
     clear_all_singletons()
-
-    logger.info("Application state cleaned up")

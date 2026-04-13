@@ -3,7 +3,6 @@ import { API } from '$lib/constants';
 import { DEFAULT_SOURCE, isMusicSource } from '$lib/stores/musicSource';
 import type { LayoutLoad } from './$types';
 
-// Disable SSR, because we currently use only CSR
 export const ssr = false;
 export const prerender = false;
 
@@ -15,8 +14,7 @@ export const load: LayoutLoad = async () => {
 		return {
 			primarySource
 		};
-	} catch (error) {
-		console.error('Error fetching primary music source:', error);
+	} catch {
 		return {
 			primarySource: DEFAULT_SOURCE
 		};

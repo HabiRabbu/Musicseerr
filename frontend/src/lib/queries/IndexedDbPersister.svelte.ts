@@ -6,11 +6,6 @@ import type {
 } from '@tanstack/svelte-query-persist-client';
 import { del, entries, get, set } from 'idb-keyval';
 
-/**
- * Creates an Indexed DB persister
- * @see https://developer.mozilla.org/en-US/docs/Web/API/IndexedDB_API
- * @see https://tanstack.com/query/latest/docs/framework/react/plugins/persistQueryClient#building-a-persister
- */
 export function createIDBPersister(idbValidKey: string = 'tanstackQuery') {
 	return {
 		persistClient: async (client: PersistedClient) => {
@@ -32,15 +27,8 @@ export function createIDBStorage(): AsyncStorage<PersistedQuery> {
 			return val;
 		},
 		setItem: async (key: string, value: PersistedQuery) => {
-			// In some cases, a svelte state proxy value appears in the query state, which cannot be stored in IndexedDB.
-			// To work around this, we can snapshot the value before storing it.
-			console.debug('Setting item in IndexedDB', key, value);
-			try {
-				await set(key, $state.snapshot(value));
-			} catch (e) {
-				console.error('Failed to set item in IndexedDB', key, value, e);
-				throw e;
-			}
+			// Snapshot Svelte state proxies before storing them in IndexedDB.
+			await set(key, $state.snapshot(value));
 		},
 		removeItem: async (key: string) => {
 			await del(key);
