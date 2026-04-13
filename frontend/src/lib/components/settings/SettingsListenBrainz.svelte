@@ -53,7 +53,9 @@
 <div class="card bg-base-200">
 	<div class="card-body">
 		<h2 class="card-title text-2xl">ListenBrainz</h2>
-		<p class="text-base-content/70 mb-4">Connect ListenBrainz for tailored recommendations and listening stats.</p>
+		<p class="text-base-content/70 mb-4">
+			Connect ListenBrainz for tailored recommendations and listening stats.
+		</p>
 
 		{#if form.loading}
 			<div class="flex justify-center items-center py-12">
@@ -242,7 +244,9 @@
 						<div class="alert alert-info">
 							<span>
 								To scrobble your listening to ListenBrainz,
-								<a href="/settings?tab=scrobbling" class="link font-medium">turn it on in the Scrobbling tab</a>
+								<a href="/settings?tab=scrobbling" class="link font-medium"
+									>turn it on in the Scrobbling tab</a
+								>
 							</span>
 						</div>
 					{/if}

@@ -61,7 +61,7 @@ NPM    ?= pnpm
 	frontend-test-playlist-detail \
 	frontend-test-queuehelpers \
 	rebuild \
-	test tests check lint ci
+	test tests check lint format ci
 
 # Help
 
@@ -272,5 +272,9 @@ tests: test ## Alias for 'test'
 check: backend-test frontend-check ## Run backend tests and frontend type checks
 
 lint: backend-lint frontend-lint ## Run linting targets
+
+format: ## Auto-format backend (ruff --fix) and frontend (prettier)
+	cd "$(ROOT_DIR)" && $(BACKEND_VENV_DIR)/bin/ruff check --fix backend
+	cd "$(FRONTEND_DIR)" && $(NPM) run format
 
 ci: backend-test backend-lint frontend-check frontend-lint frontend-format-check frontend-test-server ## Run the local CI checks

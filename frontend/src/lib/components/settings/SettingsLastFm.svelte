@@ -129,7 +129,9 @@
 <div class="card bg-base-200">
 	<div class="card-body">
 		<h2 class="card-title text-2xl">Last.fm</h2>
-		<p class="text-base-content/70 mb-4">Connect Last.fm to scrobble listens and improve recommendations.</p>
+		<p class="text-base-content/70 mb-4">
+			Connect Last.fm to scrobble listens and improve recommendations.
+		</p>
 
 		{#if form.loading}
 			<div class="flex justify-center items-center py-12">
@@ -221,7 +223,7 @@
 									type={showSecret ? 'text' : 'password'}
 									bind:value={form.data.shared_secret}
 									class="input input-bordered join-item flex-1"
-								placeholder="Last.fm shared secret"
+									placeholder="Last.fm shared secret"
 								/>
 								<button
 									type="button"
@@ -294,7 +296,9 @@
 									Re-authorize
 								</button>
 							{:else if !pendingToken}
-								<p class="text-sm text-base-content/70">Open Last.fm in a new tab, approve access, then return here.</p>
+								<p class="text-sm text-base-content/70">
+									Open Last.fm in a new tab, approve access, then return here.
+								</p>
 								<button
 									type="button"
 									class="btn btn-primary"
@@ -312,7 +316,9 @@
 							{#if pendingToken}
 								<div class="card bg-base-300">
 									<div class="card-body p-4 space-y-3">
-										<p class="text-sm">Once you've approved access in Last.fm, finish connecting it here.</p>
+										<p class="text-sm">
+											Once you've approved access in Last.fm, finish connecting it here.
+										</p>
 										<div class="flex gap-2">
 											<button
 												type="button"
