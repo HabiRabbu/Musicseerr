@@ -543,46 +543,126 @@ class ArtistService:
             included_primary_types = set(t.lower() for t in prefs.primary_types)
             included_secondary_types = set(t.lower() for t in prefs.secondary_types)
 
-            if in_library and offset == 0:
-                lidarr_albums = await self._lidarr_repo.get_artist_albums(artist_id)
-                albums, singles, eps = self._categorize_lidarr_albums(lidarr_albums, album_mbids, requested_mbids=requested_mbids)
-
-                total_count = len(albums) + len(singles) + len(eps)
-
+            if in_library:
+                if offset == 0:
+                    lidarr_albums = await self._lidarr_repo.get_artist_albums(artist_id)
+                    albums, singles, eps = self._categorize_lidarr_albums(lidarr_albums, album_mbids, requested_mbids=requested_mbids)
+                    total_count = len(albums) + len(singles) + len(eps)
+                    return ArtistReleases(
+                        albums=albums,
+                        singles=singles,
+                        eps=eps,
+                        offset=0,
+                        limit=limit,
+                        returned_count=total_count,
+                        next_offset=None,
+                        has_more=False,
+                        source_total_count=None,
+                    )
                 return ArtistReleases(
-                    albums=albums,
-                    singles=singles,
-                    eps=eps,
-                    total_count=total_count,
-                    has_more=False
+                    albums=[], singles=[], eps=[],
+                    offset=offset, limit=limit, returned_count=0,
+                    next_offset=None, has_more=False, source_total_count=None,
                 )
 
-            release_groups, total_count = await self._mb_repo.get_artist_release_groups(
-                artist_id, offset, limit
-            )
-
-            temp_artist = {"release-group-list": release_groups}
-
-            albums, singles, eps = categorize_release_groups(
-                temp_artist,
-                album_mbids,
-                included_primary_types,
-                included_secondary_types,
-                requested_mbids
-            )
-            
-            has_more = (offset + len(release_groups)) < total_count
-            
-            return ArtistReleases(
-                albums=albums,
-                singles=singles,
-                eps=eps,
-                total_count=total_count,
-                has_more=has_more
+            return await self._filter_aware_release_page(
+                artist_id, offset, limit, album_mbids, requested_mbids,
+                included_primary_types, included_secondary_types,
             )
         except Exception as e:  # noqa: BLE001
             logger.error(f"Error fetching releases for artist {artist_id} at offset {offset}: {e}")
-            return ArtistReleases(albums=[], singles=[], eps=[], total_count=0, has_more=False)
+            return ArtistReleases(
+                albums=[], singles=[], eps=[],
+                offset=offset, limit=limit, returned_count=0,
+                next_offset=None, has_more=False, source_total_count=None,
+            )
+
+    async def _filter_aware_release_page(
+        self,
+        artist_id: str,
+        offset: int,
+        limit: int,
+        album_mbids: set[str],
+        requested_mbids: set[str],
+        included_primary_types: set[str],
+        included_secondary_types: set[str],
+    ) -> ArtistReleases:
+        if not included_primary_types:
+            return ArtistReleases(
+                albums=[], singles=[], eps=[],
+                offset=offset, limit=limit, returned_count=0,
+                next_offset=None, has_more=False, source_total_count=None,
+            )
+
+        _SCAN_BATCH = 100
+        _MAX_SCAN_BATCHES = 20
+        seen_mbids: set[str] = set()
+        all_albums: list[ReleaseItem] = []
+        all_singles: list[ReleaseItem] = []
+        all_eps: list[ReleaseItem] = []
+
+        raw_offset = offset
+        source_total: int | None = None
+        batches_scanned = 0
+
+        while batches_scanned < _MAX_SCAN_BATCHES:
+            release_groups, mb_total = await self._mb_repo.get_artist_release_groups(
+                artist_id, raw_offset, _SCAN_BATCH
+            )
+            if source_total is None:
+                source_total = mb_total
+
+            if not release_groups:
+                break
+
+            temp_artist = {"release-group-list": release_groups}
+            page_albums, page_singles, page_eps = categorize_release_groups(
+                temp_artist, album_mbids, included_primary_types,
+                included_secondary_types, requested_mbids,
+            )
+
+            for item in page_albums:
+                if item.id and item.id not in seen_mbids:
+                    seen_mbids.add(item.id)
+                    all_albums.append(item)
+            for item in page_singles:
+                if item.id and item.id not in seen_mbids:
+                    seen_mbids.add(item.id)
+                    all_singles.append(item)
+            for item in page_eps:
+                if item.id and item.id not in seen_mbids:
+                    seen_mbids.add(item.id)
+                    all_eps.append(item)
+
+            raw_offset += len(release_groups)
+            batches_scanned += 1
+
+            total_collected = len(all_albums) + len(all_singles) + len(all_eps)
+            if total_collected >= limit:
+                break
+            if raw_offset >= mb_total:
+                break
+
+        for lst in (all_albums, all_singles, all_eps):
+            lst.sort(key=lambda x: (x.year is None, -(x.year or 0)))
+
+        returned_count = len(all_albums) + len(all_singles) + len(all_eps)
+
+        has_more = raw_offset < (source_total or 0)
+
+        next_offset = raw_offset if has_more else None
+
+        return ArtistReleases(
+            albums=all_albums,
+            singles=all_singles,
+            eps=all_eps,
+            offset=offset,
+            limit=limit,
+            returned_count=returned_count,
+            next_offset=next_offset,
+            has_more=has_more,
+            source_total_count=source_total,
+        )
     
     async def _fetch_artist_data(
         self,

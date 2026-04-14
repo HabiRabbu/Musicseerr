@@ -128,8 +128,6 @@
 		releasesQuery.data?.pages.flatMap((page) => [...page.albums, ...page.singles, ...page.eps])
 			.length || 0
 	);
-	// Total count is not reliable, since it contains items that are filtered out
-	const totalReleaseCount = $derived(releasesQuery.data?.pages[0].total_count || 0);
 
 	$effect(() => {
 		if (hasMoreReleases && !releasesQuery.isFetchingNextPage) {
@@ -341,7 +339,7 @@
 								>Loading releases...</span
 							>
 							<span class="text-sm text-base-content/70"
-								>Loaded {loadedReleaseCount} of {totalReleaseCount} potential releases</span
+								>Loading {loadedReleaseCount} releases</span
 							>
 						</div>
 					</div>

@@ -15,8 +15,15 @@ class ArtistReleases(AppStruct):
     albums: list[ReleaseItem] = []
     singles: list[ReleaseItem] = []
     eps: list[ReleaseItem] = []
-    total_count: int = 0
+
+    offset: int = 0
+    limit: int = 50
+    returned_count: int = 0
+
+    next_offset: int | None = None
     has_more: bool = False
+
+    source_total_count: int | None = None
 
 
 class LastFmSimilarArtistSchema(AppStruct):

@@ -26,8 +26,12 @@ def mock_artist_service():
             albums=[ReleaseItem(id="rg-2", title="Album Two", type="Album", year=2023)],
             singles=[],
             eps=[],
-            total_count=120,
+            offset=0,
+            limit=50,
+            returned_count=1,
+            next_offset=100,
             has_more=True,
+            source_total_count=120,
         )
     )
     mock.get_artist_info_basic = AsyncMock()
@@ -61,13 +65,17 @@ class TestGetArtistReleasesRoute:
         assert response.status_code == 200
         mock_artist_service.get_artist_releases.assert_awaited_once_with(VALID_MBID, 50, 50)
 
-    def test_has_more_flag_propagated(self, client):
+    def test_new_pagination_fields_propagated(self, client):
         response = client.get(f"/api/v1/artists/{VALID_MBID}/releases?offset=0&limit=50")
         body = response.json()
 
         assert response.status_code == 200
         assert body["has_more"] is True
-        assert body["total_count"] == 120
+        assert body["offset"] == 0
+        assert body["limit"] == 50
+        assert body["returned_count"] == 1
+        assert body["next_offset"] == 100
+        assert body["source_total_count"] == 120
 
     def test_default_params(self, client, mock_artist_service):
         response = client.get(f"/api/v1/artists/{VALID_MBID}/releases")

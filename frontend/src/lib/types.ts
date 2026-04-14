@@ -162,8 +162,12 @@ export type ArtistReleases = {
 	albums: ReleaseGroup[];
 	singles: ReleaseGroup[];
 	eps: ReleaseGroup[];
-	total_count: number;
+	offset: number;
+	limit: number;
+	returned_count: number;
+	next_offset: number | null;
 	has_more: boolean;
+	source_total_count: number | null;
 };
 
 export type UserPreferences = {

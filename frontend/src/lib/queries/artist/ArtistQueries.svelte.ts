@@ -115,13 +115,14 @@ export const getArtistReleasesInfiniteQuery = (getArtistId: Getter<string>) =>
 			);
 			return response;
 		},
-		getNextPageParam: (lastPage, allPages) => {
-			const wasLastPageEmpty =
-				lastPage.albums.length === 0 && lastPage.singles.length === 0 && lastPage.eps.length === 0;
-			if (!lastPage.has_more || wasLastPageEmpty) {
+		getNextPageParam: (lastPage) => {
+			if (!lastPage.has_more) {
 				return undefined;
 			}
-			return allPages.length * BATCH_SIZE;
+			if (lastPage.next_offset != null) {
+				return lastPage.next_offset;
+			}
+			return undefined;
 		}
 	}));
 
