@@ -338,8 +338,7 @@
 							<span class="font-semibold text-base" style="color: {colors.accent};"
 								>Loading releases...</span
 							>
-							<span class="text-sm text-base-content/70"
-								>Loading {loadedReleaseCount} releases</span
+							<span class="text-sm text-base-content/70">Loading {loadedReleaseCount} releases</span
 							>
 						</div>
 					</div>
