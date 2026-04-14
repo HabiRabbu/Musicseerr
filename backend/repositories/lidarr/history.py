@@ -147,6 +147,6 @@ class LidarrHistoryRepository(LidarrBase):
                     artist_mbid=artist_mbid,
                     date_added=date_added,
                 )
-                )
+            )
 
-            return out
+        return out

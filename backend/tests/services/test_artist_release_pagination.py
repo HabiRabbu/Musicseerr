@@ -310,4 +310,4 @@ class TestFilterAwarePagination:
 
         assert result.has_more is True
         assert result.next_offset is not None
-        assert result.next_offset == 20
+        assert result.next_offset == 2

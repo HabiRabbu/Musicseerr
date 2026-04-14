@@ -106,6 +106,7 @@ const BATCH_SIZE = 50;
 
 export const getArtistReleasesInfiniteQuery = (getArtistId: Getter<string>) =>
 	createInfiniteQuery(() => ({
+		staleTime: CACHE_TTL.ARTIST_DETAIL_BASIC,
 		queryKey: ArtistQueryKeyFactory.releases(getArtistId()),
 		initialPageParam: 0,
 		queryFn: async ({ pageParam = 0, signal }) => {

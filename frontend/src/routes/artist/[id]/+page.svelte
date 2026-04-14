@@ -128,6 +128,8 @@
 		releasesQuery.data?.pages.flatMap((page) => [...page.albums, ...page.singles, ...page.eps])
 			.length || 0
 	);
+	const initialReleasesLoading = $derived(releasesQuery.isLoading);
+	const sourceTotalCount = $derived(releasesQuery.data?.pages[0]?.source_total_count ?? null);
 
 	$effect(() => {
 		if (hasMoreReleases && !releasesQuery.isFetchingNextPage) {
@@ -328,7 +330,9 @@
 					/>
 				</section>
 
-				{#if hasMoreReleases || loadingMoreReleases}
+				{#if initialReleasesLoading}
+					<AlbumGridSkeleton title="Discography" count={12} />
+				{:else if hasMoreReleases || loadingMoreReleases}
 					<div
 						class="flex items-center justify-center gap-3 p-4 bg-base-300 rounded-box mb-6"
 						style="border: 2px solid {colors.accent};"
@@ -338,7 +342,8 @@
 							<span class="font-semibold text-base" style="color: {colors.accent};"
 								>Loading releases...</span
 							>
-							<span class="text-sm text-base-content/70">Loading {loadedReleaseCount} releases</span
+							<span class="text-sm text-base-content/70"
+								>{#if sourceTotalCount}Loaded {loadedReleaseCount} of {sourceTotalCount} releases{:else}Loading {loadedReleaseCount} releases{/if}</span
 							>
 						</div>
 					</div>

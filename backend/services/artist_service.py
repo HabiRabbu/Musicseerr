@@ -595,7 +595,7 @@ class ArtistService:
             )
 
         _SCAN_BATCH = 100
-        _MAX_SCAN_BATCHES = 20
+        _MAX_SCAN_BATCHES = 2
         seen_mbids: set[str] = set()
         all_albums: list[ReleaseItem] = []
         all_singles: list[ReleaseItem] = []

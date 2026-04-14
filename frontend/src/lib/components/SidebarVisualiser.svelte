@@ -8,7 +8,7 @@
 	};
 </script>
 
-{#if nowPlayingMerged.primarySession}
+{#if nowPlayingMerged.primarySession && !nowPlayingMerged.primarySession._isLocal}
 	{@const session = nowPlayingMerged.primarySession}
 	{@const isPaused = session.is_paused}
 	{@const href = sourceHub[session.source ?? ''] ?? '#'}
