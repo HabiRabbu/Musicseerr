@@ -118,6 +118,8 @@ from .type_aliases import (  # noqa: F401
     CacheStatusServiceDep,
 )
 
+from .auth_providers import get_auth_service  # noqa: F401
+
 from .cleanup import (  # noqa: F401
     init_app_state,
     cleanup_app_state,

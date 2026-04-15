@@ -1,9 +1,11 @@
 aiofiles==24.1.0
+bcrypt==4.2.1
 fastapi==0.118.3
 h2>=4.1,<5
 httpx[h2]==0.28.1
 msgspec==0.20.0
 python-multipart==0.0.20
+PyJWT==2.10.1
 pydantic==2.12.0
 pydantic-settings==2.3.0
 uvicorn[standard]==0.37.0

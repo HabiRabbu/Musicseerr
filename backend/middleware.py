@@ -122,3 +122,51 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
         response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
         return response
+
+
+# Paths that are always accessible regardless of auth state
+_AUTH_EXEMPT = {
+    "/health",
+    "/api/v1/auth/status",
+    "/api/v1/auth/login",
+    "/api/v1/auth/setup",
+}
+
+
+class AuthMiddleware(BaseHTTPMiddleware):
+    """When auth is enabled, require a valid Bearer JWT for all API routes."""
+
+    async def dispatch(self, request: Request, call_next):
+        path = request.url.path
+
+        # Non-API paths (frontend assets, static files) — always pass through
+        if not path.startswith("/api/"):
+            return await call_next(request)
+
+        # Exempt endpoints
+        if path in _AUTH_EXEMPT:
+            return await call_next(request)
+
+        from core.dependencies import get_auth_service
+        auth = get_auth_service()
+
+        if not auth.is_auth_enabled():
+            return await call_next(request)
+
+        token = request.headers.get("Authorization", "")
+        if token.startswith("Bearer "):
+            token = token[7:]
+
+        if not token or not auth.validate_token(token):
+            return MsgSpecJSONResponse(
+                status_code=401,
+                content={
+                    "error": {
+                        "code": "UNAUTHORIZED",
+                        "message": "Authentication required",
+                        "details": None,
+                    }
+                },
+            )
+
+        return await call_next(request)

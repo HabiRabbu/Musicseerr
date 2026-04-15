@@ -33,11 +33,12 @@ from core.exception_handlers import (
 )
 from infrastructure.resilience.retry import CircuitOpenError
 from infrastructure.msgspec_fastapi import MsgSpecJSONResponse
-from middleware import DegradationMiddleware, PerformanceMiddleware, RateLimitMiddleware, SecurityHeadersMiddleware
+from middleware import AuthMiddleware, DegradationMiddleware, PerformanceMiddleware, RateLimitMiddleware, SecurityHeadersMiddleware
 from static_server import mount_frontend
 from api.v1.routes import (
     search, requests, library, status, queue, covers, artists, albums, settings, home, discover, profile, playlists
 )
+from api.v1.routes import auth as auth_routes
 from api.v1.routes import cache as cache_routes
 from api.v1.routes import cache_status as cache_status_routes
 from api.v1.routes import youtube as youtube_routes
@@ -281,6 +282,7 @@ app.add_exception_handler(RequestValidationError, request_validation_error_handl
 app.add_exception_handler(Exception, general_exception_handler)
 
 app.add_middleware(SecurityHeadersMiddleware)
+app.add_middleware(AuthMiddleware)
 app.add_middleware(DegradationMiddleware)
 app.add_middleware(PerformanceMiddleware)
 app.add_middleware(
@@ -329,6 +331,7 @@ def health_check():
 
 
 v1_router = APIRouter(prefix="/api/v1")
+v1_router.include_router(auth_routes.router)
 v1_router.include_router(search.router)
 v1_router.include_router(requests.router)
 v1_router.include_router(library.router)

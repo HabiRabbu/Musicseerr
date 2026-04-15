@@ -31,6 +31,7 @@
 	import SearchSuggestions from '$lib/components/SearchSuggestions.svelte';
 	import type { SuggestResult } from '$lib/types';
 	import { onMount, onDestroy } from 'svelte';
+	import { authStore } from '$lib/stores/auth.svelte';
 	import { cancelPendingImages } from '$lib/utils/lazyImage';
 	import { abortAllPageRequests } from '$lib/utils/navigationAbort';
 	import { requestCountStore } from '$lib/stores/requestCountStore.svelte';
@@ -64,7 +65,9 @@
 	let playlistModalRef: AddToPlaylistModal | undefined = $state(undefined);
 	let modalQuery = $state('');
 	let showNavigationProgress = $state(false);
-	let currentPath = $state('/');
+	let currentPath = $state(browser ? window.location.pathname : '/');
+	const AUTH_PAGES = new Set(['/login', '/setup']);
+	const isAuthPage = $derived(AUTH_PAGES.has(currentPath));
 
 	const NAV_PROGRESS_DELAY_MS = 120;
 	const NAV_PROGRESS_MIN_VISIBLE_MS = 220;
@@ -87,12 +90,22 @@
 		cancelPendingImages();
 	});
 
+	function enforceAuthGuard(path: string) {
+		if (!authStore.checked || !authStore.authEnabled) return;
+		if (authStore.setupRequired && path !== '/setup') {
+			goto('/setup');
+		} else if (!authStore.isLoggedIn() && !AUTH_PAGES.has(path)) {
+			goto('/login');
+		}
+	}
+
 	afterNavigate(() => {
 		if (browser) {
 			currentPath = window.location.pathname;
 		}
 		navigationProgress.finish();
 		libraryStore.refreshIfStale(10_000);
+		enforceAuthGuard(currentPath);
 	});
 
 	let cleanupResumeListeners: (() => void) | null = null;
@@ -120,6 +133,11 @@
 		}
 		initCacheTTLs();
 		document.addEventListener('keydown', handleGlobalKeydown);
+
+		// Auth guard — check status then redirect if needed
+		authStore.checkStatus().then(() => {
+			enforceAuthGuard(window.location.pathname);
+		});
 		if (playlistModalRef) registerPlaylistModal(playlistModalRef);
 
 		const deferInit = (fn: () => void) => {
@@ -243,6 +261,9 @@
 
 <QueryProvider>
 	<div data-theme="musicseerr">
+		{#if isAuthPage}
+			{@render children()}
+		{:else}
 		{#if showNavigationProgress}
 			<div class="fixed top-0 left-0 right-0 z-120 pointer-events-none">
 				<progress class="progress progress-primary w-full h-1"></progress>
@@ -272,9 +293,28 @@
 						</div>
 					</div>
 					<div class="navbar-end w-auto pr-2">
-						<a href="/profile" class="btn btn-ghost btn-circle btn-md" aria-label="Profile">
-							<UserRound class="h-6 w-6" />
-						</a>
+						{#if authStore.authEnabled && authStore.isLoggedIn()}
+							<div class="dropdown dropdown-end">
+								<button tabindex="0" class="btn btn-ghost btn-circle btn-md" aria-label="Profile">
+									<UserRound class="h-6 w-6" />
+								</button>
+								<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+								<ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-box z-50 w-48 p-2 shadow-lg border border-base-300 mt-1">
+									{#if authStore.username}
+										<li class="menu-title text-xs opacity-60 px-3 py-1">{authStore.username}</li>
+									{/if}
+									<li>
+										<button onclick={() => { authStore.clearToken(); goto('/login'); }} class="text-error">
+											Sign out
+										</button>
+									</li>
+								</ul>
+							</div>
+						{:else}
+							<a href="/profile" class="btn btn-ghost btn-circle btn-md" aria-label="Profile">
+								<UserRound class="h-6 w-6" />
+							</a>
+						{/if}
 					</div>
 				</div>
 
@@ -646,5 +686,6 @@
 		<Player />
 		<CacheSyncIndicator />
 		<AddToPlaylistModal bind:this={playlistModalRef} />
+		{/if}
 	</div>
 </QueryProvider>

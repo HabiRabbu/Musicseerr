@@ -1,5 +1,12 @@
+import { browser } from '$app/environment';
 import { pageFetch } from '$lib/utils/navigationAbort';
 import { getApiUrl } from '$lib/api/api-utils';
+
+function getAuthHeader(): Record<string, string> {
+	if (!browser) return {};
+	const token = localStorage.getItem('musicseerr_token');
+	return token ? { Authorization: `Bearer ${token}` } : {};
+}
 
 export class ApiError extends Error {
 	readonly status: number;
@@ -79,6 +86,16 @@ function createClient(fetchFn: FetchFn): ApiClient {
 	): Promise<T> {
 		const { raw, ...fetchOpts } = opts ?? {};
 		const init: RequestInit = { method, ...fetchOpts };
+
+		// Attach auth token to every API request
+		const authHeaders = getAuthHeader();
+		if (Object.keys(authHeaders).length > 0) {
+			const headers = new Headers(init.headers as HeadersInit | undefined);
+			for (const [k, v] of Object.entries(authHeaders)) {
+				if (!headers.has(k)) headers.set(k, v);
+			}
+			init.headers = headers;
+		}
 
 		if (body !== undefined && body !== null) {
 			if (body instanceof FormData) {

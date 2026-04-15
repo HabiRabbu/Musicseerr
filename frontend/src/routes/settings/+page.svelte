@@ -27,8 +27,27 @@
 		Settings,
 		Radio,
 		Activity,
-		BarChart3
+		BarChart3,
+		Lock
 	} from 'lucide-svelte';
+	import { authStore } from '$lib/stores/auth.svelte';
+	import { api } from '$lib/api/client';
+
+	let authToggling = $state(false);
+	let authToggleError = $state('');
+
+	async function toggleAuth(enabled: boolean) {
+		authToggling = true;
+		authToggleError = '';
+		try {
+			await api.put('/api/v1/auth/settings', { enabled });
+			await authStore.checkStatus();
+		} catch (e: unknown) {
+			authToggleError = e instanceof Error ? e.message : 'Failed to update auth setting';
+		} finally {
+			authToggling = false;
+		}
+	}
 	import JellyfinIcon from '$lib/components/JellyfinIcon.svelte';
 	import NavidromeIcon from '$lib/components/NavidromeIcon.svelte';
 	import PlexIcon from '$lib/components/PlexIcon.svelte';
@@ -77,7 +96,8 @@
 		{ id: 'youtube', label: 'YouTube', group: 'Library & Sources', icon: Youtube },
 		{ id: 'local-files', label: 'Local Files', group: 'Library & Sources', icon: Headphones },
 		{ id: 'cache', label: 'Cache', group: 'System', icon: Database },
-		{ id: 'advanced', label: 'Advanced', group: 'System', icon: Settings }
+		{ id: 'advanced', label: 'Advanced', group: 'System', icon: Settings },
+		{ id: 'users', label: 'Users & Access', group: 'System', icon: Lock }
 	];
 
 	const groups = [...new Set(tabs.map((t) => t.group))];
@@ -175,6 +195,44 @@
 					<SettingsScrobbling />
 				{:else if activeTab === 'advanced'}
 					<SettingsAdvanced />
+				{:else if activeTab === 'users'}
+					<div class="card bg-base-200">
+						<div class="card-body gap-6">
+							<div>
+								<h2 class="card-title text-xl">Users & Access</h2>
+								<p class="text-base-content/60 text-sm mt-1">
+									Control whether a login is required to access Musicseerr.
+								</p>
+							</div>
+
+							{#if authToggleError}
+								<div class="alert alert-error text-sm py-2">{authToggleError}</div>
+							{/if}
+
+							<div class="flex items-center justify-between gap-4 bg-base-100 rounded-box p-4">
+								<div>
+									<p class="font-medium">Require Login</p>
+									<p class="text-sm text-base-content/60">
+										When enabled, users must sign in with a username and password.
+									</p>
+								</div>
+								<input
+									type="checkbox"
+									class="toggle toggle-primary"
+									checked={authStore.authEnabled}
+									disabled={authToggling}
+									onchange={(e) => toggleAuth((e.target as HTMLInputElement).checked)}
+								/>
+							</div>
+
+							{#if authStore.authEnabled}
+								<div class="alert alert-info text-sm gap-2 py-2">
+									<Lock class="h-4 w-4 shrink-0" />
+									Auth is active. To add more users, use the backend CLI or API (user management UI coming soon).
+								</div>
+							{/if}
+						</div>
+					</div>
 				{/if}
 			</main>
 		</div>
