@@ -17,6 +17,8 @@
 	import SettingsScrobbling from '$lib/components/settings/SettingsScrobbling.svelte';
 	import SettingsMusicSource from '$lib/components/settings/SettingsMusicSource.svelte';
 	import SettingsAdvanced from '$lib/components/settings/SettingsAdvanced.svelte';
+	import SettingsAbout from '$lib/components/settings/SettingsAbout.svelte';
+	import { getUpdateCheckQuery } from '$lib/queries/VersionQuery.svelte';
 	import {
 		Settings2,
 		Music,
@@ -27,13 +29,18 @@
 		Settings,
 		Radio,
 		Activity,
-		BarChart3
+		BarChart3,
+		Info,
+		ArrowUpCircle
 	} from 'lucide-svelte';
 	import JellyfinIcon from '$lib/components/JellyfinIcon.svelte';
 	import NavidromeIcon from '$lib/components/NavidromeIcon.svelte';
 	import PlexIcon from '$lib/components/PlexIcon.svelte';
 
 	const integration = fromStore(integrationStore);
+
+	const updateCheckQuery = getUpdateCheckQuery();
+	const updateAvailable = $derived(updateCheckQuery.data?.update_available ?? false);
 
 	const connectionMap: Record<
 		string,
@@ -77,7 +84,8 @@
 		{ id: 'youtube', label: 'YouTube', group: 'Library & Sources', icon: Youtube },
 		{ id: 'local-files', label: 'Local Files', group: 'Library & Sources', icon: Headphones },
 		{ id: 'cache', label: 'Cache', group: 'System', icon: Database },
-		{ id: 'advanced', label: 'Advanced', group: 'System', icon: Settings }
+		{ id: 'advanced', label: 'Advanced', group: 'System', icon: Settings },
+		{ id: 'about', label: 'About', group: 'System', icon: Info }
 	];
 
 	const groups = [...new Set(tabs.map((t) => t.group))];
@@ -138,6 +146,14 @@
 												<span class="sr-only">{connected ? 'Connected' : 'Not connected'}</span>
 											</span>
 										{/if}
+										{#if tab.id === 'about' && updateAvailable}
+											<span
+												class="ml-auto flex items-center gap-1 rounded-full bg-accent/15 px-2 py-0.5 text-xs font-semibold text-accent"
+											>
+												<ArrowUpCircle class="h-3 w-3" />
+												Update
+											</span>
+										{/if}
 									</button>
 								</li>
 							{/each}
@@ -175,6 +191,8 @@
 					<SettingsScrobbling />
 				{:else if activeTab === 'advanced'}
 					<SettingsAdvanced />
+				{:else if activeTab === 'about'}
+					<SettingsAbout />
 				{/if}
 			</main>
 		</div>

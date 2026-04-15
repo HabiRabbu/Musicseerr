@@ -88,6 +88,11 @@ export const CACHE_TTL_GROUPS = {
 	charts: {
 		TIME_RANGE_OVERVIEW: 2 * 60 * 1000,
 		GENRE_DETAIL: 5 * 60 * 1000
+	},
+	version: {
+		VERSION_INFO: 60 * 60 * 1000,
+		UPDATE_CHECK: 30 * 60 * 1000,
+		RELEASE_HISTORY: 60 * 60 * 1000
 	}
 } as const;
 
@@ -95,7 +100,8 @@ export const CACHE_TTL = {
 	...CACHE_TTL_GROUPS.core,
 	...CACHE_TTL_GROUPS.library,
 	...CACHE_TTL_GROUPS.detail,
-	...CACHE_TTL_GROUPS.charts
+	...CACHE_TTL_GROUPS.charts,
+	...CACHE_TTL_GROUPS.version
 } as const;
 
 export const API_SIZES = {
@@ -430,6 +436,11 @@ export const API = {
 		artistsIndex: () => '/api/v1/plex/artists/index',
 		genreSongs: (genre: string, limit = 50, offset = 0) =>
 			`/api/v1/plex/genres/songs?genre=${encodeURIComponent(genre)}&limit=${limit}&offset=${offset}`
+	},
+	version: {
+		info: () => '/api/v1/version',
+		checkUpdate: () => '/api/v1/version/check-update',
+		releases: () => '/api/v1/version/releases'
 	},
 	local: {
 		albumMatch: (mbid: string) => `/api/v1/local/albums/match/${mbid}`,

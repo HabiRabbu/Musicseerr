@@ -35,6 +35,7 @@ from .repo_providers import (  # noqa: F401
     get_lastfm_repository,
     get_playlist_repository,
     get_request_history_store,
+    get_github_repository,
 )
 
 from .service_providers import (  # noqa: F401
@@ -68,6 +69,7 @@ from .service_providers import (  # noqa: F401
     get_navidrome_playback_service,
     get_plex_library_service,
     get_plex_playback_service,
+    get_version_service,
 )
 
 from .type_aliases import (  # noqa: F401
@@ -116,6 +118,8 @@ from .type_aliases import (  # noqa: F401
     PlexLibraryServiceDep,
     PlexPlaybackServiceDep,
     CacheStatusServiceDep,
+    GitHubRepositoryDep,
+    VersionServiceDep,
 )
 
 from .cleanup import (  # noqa: F401

@@ -57,6 +57,8 @@ WIKIPEDIA_PREFIX = "wikipedia:extract:"
 
 PREFERENCES_PREFIX = "preferences:"
 
+GITHUB_RELEASES_PREFIX = "github:releases:"
+
 AUDIODB_PREFIX = "audiodb_"
 
 

@@ -43,6 +43,7 @@ from .repo_providers import (
     get_lastfm_repository,
     get_playlist_repository,
     get_request_history_store,
+    get_github_repository,
 )
 
 logger = logging.getLogger(__name__)
@@ -619,3 +620,11 @@ def get_plex_playback_service() -> "PlexPlaybackService":
     plex_repo = get_plex_repository()
     cache = get_cache()
     return PlexPlaybackService(plex_repo, cache)
+
+
+@singleton
+def get_version_service() -> "VersionService":
+    from services.version_service import VersionService
+
+    github_repo = get_github_repository()
+    return VersionService(github_repo)

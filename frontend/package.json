@@ -27,6 +27,7 @@
 		"@sveltejs/vite-plugin-svelte": "^6.2.0",
 		"@tailwindcss/cli": "^4.1.14",
 		"@tailwindcss/postcss": "^4.1.14",
+		"@tailwindcss/typography": "^0.5.19",
 		"@types/node": "^22",
 		"@vitest/browser": "^3.2.4",
 		"daisyui": "^5.3.1",
@@ -51,8 +52,10 @@
 		"@tanstack/svelte-query": "^6.1.13",
 		"@tanstack/svelte-query-devtools": "^6.1.13",
 		"@tanstack/svelte-query-persist-client": "^6.1.13",
+		"dompurify": "^3.4.0",
 		"idb-keyval": "^6.2.2",
 		"lucide-svelte": "^0.575.0",
+		"marked": "^18.0.0",
 		"runed": "^0.37.1"
 	}
 }

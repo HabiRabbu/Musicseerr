@@ -22,6 +22,7 @@ from repositories.lastfm_repository import LastFmRepository
 from repositories.playlist_repository import PlaylistRepository
 from repositories.navidrome_repository import NavidromeRepository
 from repositories.plex_repository import PlexRepository
+from repositories.github_repository import GitHubRepository
 from services.preferences_service import PreferencesService
 from services.search_service import SearchService
 from services.search_enrichment_service import SearchEnrichmentService
@@ -51,6 +52,7 @@ from services.playlist_service import PlaylistService
 from services.lastfm_auth_service import LastFmAuthService
 from services.scrobble_service import ScrobbleService
 from services.cache_status_service import CacheStatusService
+from services.version_service import VersionService
 
 from .cache_providers import (
     get_cache,
@@ -72,6 +74,7 @@ from .repo_providers import (
     get_request_history_store,
     get_navidrome_repository,
     get_plex_repository,
+    get_github_repository,
 )
 from .service_providers import (
     get_search_service,
@@ -101,6 +104,7 @@ from .service_providers import (
     get_navidrome_playback_service,
     get_plex_library_service,
     get_plex_playback_service,
+    get_version_service,
 )
 
 
@@ -149,3 +153,5 @@ PlexRepositoryDep = Annotated[PlexRepository, Depends(get_plex_repository)]
 PlexLibraryServiceDep = Annotated[PlexLibraryService, Depends(get_plex_library_service)]
 PlexPlaybackServiceDep = Annotated[PlexPlaybackService, Depends(get_plex_playback_service)]
 CacheStatusServiceDep = Annotated[CacheStatusService, Depends(get_cache_status_service)]
+GitHubRepositoryDep = Annotated[GitHubRepository, Depends(get_github_repository)]
+VersionServiceDep = Annotated[VersionService, Depends(get_version_service)]

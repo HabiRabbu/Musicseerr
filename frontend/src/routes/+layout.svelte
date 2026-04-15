@@ -28,6 +28,7 @@
 	import PlexIcon from '$lib/components/PlexIcon.svelte';
 	import SidebarServiceHint from '$lib/components/SidebarServiceHint.svelte';
 	import DegradedBanner from '$lib/components/DegradedBanner.svelte';
+	import VersionOverlays from '$lib/components/VersionOverlays.svelte';
 	import SearchSuggestions from '$lib/components/SearchSuggestions.svelte';
 	import type { SuggestResult } from '$lib/types';
 	import { onMount, onDestroy } from 'svelte';
@@ -52,7 +53,8 @@
 		Info,
 		X,
 		UserRound,
-		ListMusic
+		ListMusic,
+		ArrowUpCircle
 	} from 'lucide-svelte';
 	import type { Snippet } from 'svelte';
 	import QueryProvider from '$lib/queries/QueryProvider.svelte';
@@ -65,6 +67,7 @@
 	let modalQuery = $state('');
 	let showNavigationProgress = $state(false);
 	let currentPath = $state('/');
+	let versionUpdateAvailable = $state(false);
 
 	const NAV_PROGRESS_DELAY_MS = 120;
 	const NAV_PROGRESS_MIN_VISIBLE_MS = 220;
@@ -250,6 +253,7 @@
 		{/if}
 
 		<DegradedBanner />
+		<VersionOverlays bind:updateAvailable={versionUpdateAvailable} />
 
 		<div class="drawer drawer-open">
 			<input id="main-drawer" type="checkbox" class="drawer-toggle" />
@@ -518,9 +522,23 @@
 						{/if}
 					</ul>
 					<div class="w-full p-2 flex flex-col gap-1" class:pb-24={playerStore.isPlayerVisible}>
-						<div class="is-drawer-close:tooltip is-drawer-close:tooltip-right" data-tip="Settings">
-							<a href="/settings" class="btn btn-ghost btn-circle" aria-label="Settings">
+						<div
+							class="is-drawer-close:tooltip is-drawer-close:tooltip-right"
+							data-tip={versionUpdateAvailable ? 'Settings - update available' : 'Settings'}
+						>
+							<a
+								href={versionUpdateAvailable ? '/settings?tab=about' : '/settings'}
+								class="btn btn-ghost btn-circle relative"
+								aria-label={versionUpdateAvailable ? 'Settings - update available' : 'Settings'}
+							>
 								<Settings class="h-6 w-6" />
+								{#if versionUpdateAvailable}
+									<span
+										class="absolute -top-0.5 -right-0.5 flex h-4.5 w-4.5 items-center justify-center rounded-full bg-accent text-accent-content shadow-sm shadow-accent/30"
+									>
+										<ArrowUpCircle class="h-3 w-3" />
+									</span>
+								{/if}
 							</a>
 						</div>
 						<div class="is-drawer-close:tooltip is-drawer-close:tooltip-right" data-tip="Open">

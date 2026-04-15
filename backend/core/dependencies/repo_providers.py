@@ -265,3 +265,12 @@ def get_coverart_repository() -> "CoverArtRepository":
         cover_memory_cache_max_bytes=advanced.cover_memory_cache_max_size_mb * 1024 * 1024,
         cover_non_monitored_ttl_seconds=advanced.cache_ttl_recently_viewed_bytes,
     )
+
+
+@singleton
+def get_github_repository() -> "GitHubRepository":
+    from repositories.github_repository import GitHubRepository
+
+    cache = get_cache()
+    http_client = _get_configured_http_client()
+    return GitHubRepository(http_client, cache)

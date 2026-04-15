@@ -47,7 +47,8 @@ LABEL org.opencontainers.image.title="MusicSeerr" \
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PORT=8688 \
-    COMMIT_TAG=${COMMIT_TAG}
+    COMMIT_TAG=${COMMIT_TAG} \
+    BUILD_DATE=${BUILD_DATE}
 
 WORKDIR /app
 
