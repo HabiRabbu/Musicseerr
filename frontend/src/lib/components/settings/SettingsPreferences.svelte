@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { getApiUrl } from '$lib/api/api-utils';
+	import { api } from '$lib/api/client';
 	import { preferencesStore } from '$lib/stores/preferences';
 	import { integrationStore } from '$lib/stores/integration';
 	import type {
@@ -110,27 +110,18 @@
 		lidarrError = '';
 		try {
 			if (lidarrProfiles.length === 0) {
-				const profilesRes = await fetch(getApiUrl('/api/v1/settings/lidarr/metadata-profiles'));
-				if (profilesRes.ok) {
-					lidarrProfiles = await profilesRes.json();
-				}
+				lidarrProfiles = await api.get<MetadataProfile[]>('/api/v1/settings/lidarr/metadata-profiles') ?? [];
 			}
 
 			const params = selectedProfileId != null ? `?profile_id=${selectedProfileId}` : '';
-			const response = await fetch(
-				getApiUrl(`/api/v1/settings/lidarr/metadata-profile/preferences${params}`)
+			lidarrPrefs = await api.get<LidarrMetadataProfilePreferences>(
+				`/api/v1/settings/lidarr/metadata-profile/preferences${params}`
 			);
-			if (response.ok) {
-				lidarrPrefs = await response.json();
-				if (selectedProfileId == null && lidarrPrefs) {
-					selectedProfileId = lidarrPrefs.profile_id;
-				}
-			} else {
-				lidarrError = 'Could not load Lidarr metadata profile';
-				lidarrPrefs = null;
+			if (selectedProfileId == null && lidarrPrefs) {
+				selectedProfileId = lidarrPrefs.profile_id;
 			}
 		} catch {
-			lidarrError = 'Could not connect to Lidarr';
+			lidarrError = 'Could not load Lidarr metadata profile';
 			lidarrPrefs = null;
 		} finally {
 			lidarrLoading = false;
@@ -142,30 +133,16 @@
 		lidarrMessage = '';
 		try {
 			const params = selectedProfileId != null ? `?profile_id=${selectedProfileId}` : '';
-			const response = await fetch(
-				getApiUrl(`/api/v1/settings/lidarr/metadata-profile/preferences${params}`),
-				{
-					method: 'PUT',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify(preferences)
-				}
+			lidarrPrefs = await api.put<LidarrMetadataProfilePreferences>(
+				`/api/v1/settings/lidarr/metadata-profile/preferences${params}`,
+				preferences
 			);
-			if (response.ok) {
-				lidarrPrefs = await response.json();
-				lidarrMessage = 'Lidarr metadata profile updated successfully';
-				setTimeout(() => {
-					lidarrMessage = '';
-				}, 5000);
-			} else {
-				try {
-					const err = await response.json();
-					lidarrMessage = err.error?.message || 'Failed to update Lidarr metadata profile';
-				} catch {
-					lidarrMessage = 'Failed to update Lidarr metadata profile';
-				}
-			}
-		} catch {
-			lidarrMessage = 'Failed to connect to Lidarr';
+			lidarrMessage = 'Lidarr metadata profile updated successfully';
+			setTimeout(() => {
+				lidarrMessage = '';
+			}, 5000);
+		} catch (e: unknown) {
+			lidarrMessage = e instanceof Error ? e.message : 'Failed to update Lidarr metadata profile';
 		} finally {
 			lidarrSyncing = false;
 		}

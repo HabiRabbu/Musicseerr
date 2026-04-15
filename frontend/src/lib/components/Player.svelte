@@ -13,6 +13,7 @@
 	import NowPlayingIndicator from '$lib/components/NowPlayingIndicator.svelte';
 	import { getCoverUrl } from '$lib/utils/errorHandling';
 	import { API } from '$lib/constants';
+	import { api } from '$lib/api/client';
 	import {
 		X,
 		Music,
@@ -63,15 +64,15 @@
 			} else {
 				return;
 			}
-			const res = await fetch(url);
-			if (!res.ok) {
+			const data = await api.global.get(url).catch((e: unknown) => {
+				const status = (e as { status?: number })?.status;
 				lyricsText = '';
 				lyricsLines = [];
 				lyricsIsSynced = false;
-				if (res.status !== 404) lyricsError = true;
-				return;
-			}
-			const data = await res.json();
+				if (status !== 404) lyricsError = true;
+				return null;
+			});
+			if (data === null) return;
 			if (np.sourceType === 'navidrome') {
 				lyricsText = data.text ?? '';
 				lyricsIsSynced = data.is_synced ?? false;

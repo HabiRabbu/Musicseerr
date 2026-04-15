@@ -1,4 +1,5 @@
 import { API } from '$lib/constants';
+import { api } from '$lib/api/client';
 import { integrationStore } from '$lib/stores/integration';
 import { get } from 'svelte/store';
 import { SvelteMap, SvelteSet } from 'svelte/reactivity';
@@ -99,9 +100,7 @@ function createNowPlayingStore() {
 		source: SourceKey
 	): Promise<NowPlayingSession[] | typeof FETCH_FAILED> {
 		try {
-			const r = await fetch(url);
-			if (!r.ok) return FETCH_FAILED;
-			const data: T = await r.json();
+			const data = await api.global.get<T>(url);
 			const mapped = mapper(data);
 			lastGoodSessions.set(source, mapped);
 			return mapped;

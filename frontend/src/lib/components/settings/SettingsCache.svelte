@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { getApiUrl } from '$lib/api/api-utils';
+	import { api } from '$lib/api/client';
 	interface CacheStats {
 		memory_entries: number;
 		memory_size_bytes: number;
@@ -30,12 +30,7 @@
 		loading = true;
 		message = '';
 		try {
-			const response = await fetch(getApiUrl('/api/v1/cache/stats'));
-			if (response.ok) {
-				cacheStats = await response.json();
-			} else {
-				message = "Couldn't load cache stats";
-			}
+			cacheStats = await api.get('/api/v1/cache/stats');
 		} catch {
 			message = "Couldn't load cache stats";
 		} finally {
@@ -61,23 +56,14 @@
 		clearing = true;
 		message = '';
 		try {
-			const response = await fetch(getApiUrl(`/api/v1/cache/clear/${type}`), {
-				method: 'POST'
-			});
-
-			if (response.ok) {
-				const result = await response.json();
-				message = result.message;
-				await load();
-				setTimeout(() => {
-					message = '';
-				}, 5000);
-			} else {
-				const error = await response.json();
-				message = error.error?.message || "Couldn't clear the cache";
-			}
-		} catch {
-			message = "Couldn't clear the cache";
+			const result = await api.post<{ message: string }>(`/api/v1/cache/clear/${type}`);
+			message = result.message;
+			await load();
+			setTimeout(() => {
+				message = '';
+			}, 5000);
+		} catch (e: unknown) {
+			message = e instanceof Error ? e.message : "Couldn't clear the cache";
 		} finally {
 			clearing = false;
 		}
