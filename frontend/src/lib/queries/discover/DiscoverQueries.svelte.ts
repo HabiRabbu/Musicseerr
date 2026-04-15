@@ -6,14 +6,17 @@ import { createQuery } from '@tanstack/svelte-query';
 import { DiscoverQueryKeyFactory } from './DiscoverQueryKeyFactory';
 import type { Getter } from 'runed';
 
+const MAX_RETRY_TIME = 5 * 60 * 1000; // 5 minutes
+
 export const getDiscoverQuery = (getSource: Getter<MusicSource>) => {
-	let shouldRefetch = $state(false);
+	let shouldRefetchStart = $state<false | Date>(false);
 
 	const query = createQuery(() => ({
 		staleTime: CACHE_TTL.DISCOVER,
 		queryKey: DiscoverQueryKeyFactory.discover(getSource()),
 		refetchInterval: () => {
-			if (shouldRefetch) {
+			const now = Date.now();
+			if (shouldRefetchStart && now - (shouldRefetchStart as Date).getTime() < MAX_RETRY_TIME) {
 				return 3_000; // Refetch every 3 seconds if data is empty
 			}
 			return undefined;
@@ -33,9 +36,10 @@ export const getDiscoverQuery = (getSource: Getter<MusicSource>) => {
 
 	$effect(() => {
 		if (!query.isLoading && !query.isFetching && !dataHasContent) {
-			shouldRefetch = true;
+			// eslint-disable-next-line svelte/prefer-svelte-reactivity
+			shouldRefetchStart = new Date();
 		} else {
-			shouldRefetch = false;
+			shouldRefetchStart = false;
 		}
 	});
 
