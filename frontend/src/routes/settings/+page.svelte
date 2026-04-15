@@ -213,9 +213,12 @@
 							</div>
 
 							{#if authToggleNeedsSetup}
-								<div class="alert alert-warning text-sm py-2 gap-2">
-									<Lock class="h-4 w-4 shrink-0" />
-									No admin account exists yet. <a href="/setup" class="link link-warning font-medium">Create one first</a>.
+								<div class="alert alert-warning text-sm py-2 gap-2 flex-col items-start">
+									<div class="flex gap-2 items-center">
+										<Lock class="h-4 w-4 shrink-0" />
+										<span>No admin account exists yet. Create one before enabling login.</span>
+									</div>
+									<a href="/setup" class="btn btn-sm btn-warning w-full">Go to /setup</a>
 								</div>
 							{:else if authToggleError}
 								<div class="alert alert-error text-sm py-2">{authToggleError}</div>
