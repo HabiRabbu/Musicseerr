@@ -77,7 +77,7 @@ async def update_auth_settings(
     if body.enabled and auth.user_count() == 0:
         raise HTTPException(
             status_code=400,
-            detail="Create an admin account via /auth/setup before enabling authentication",
+            detail="NO_USERS",
         )
     auth.set_auth_enabled(body.enabled)
     return AuthSettingsResponse(enabled=auth.is_auth_enabled())

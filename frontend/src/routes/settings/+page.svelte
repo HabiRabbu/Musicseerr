@@ -35,15 +35,22 @@
 
 	let authToggling = $state(false);
 	let authToggleError = $state('');
+	let authToggleNeedsSetup = $state(false);
 
 	async function toggleAuth(enabled: boolean) {
 		authToggling = true;
 		authToggleError = '';
+		authToggleNeedsSetup = false;
 		try {
 			await api.put('/api/v1/auth/settings', { enabled });
 			await authStore.checkStatus();
 		} catch (e: unknown) {
-			authToggleError = e instanceof Error ? e.message : 'Failed to update auth setting';
+			const msg = e instanceof Error ? e.message : '';
+			if (msg === 'NO_USERS') {
+				authToggleNeedsSetup = true;
+			} else {
+				authToggleError = msg || 'Failed to update auth setting';
+			}
 		} finally {
 			authToggling = false;
 		}
@@ -205,7 +212,12 @@
 								</p>
 							</div>
 
-							{#if authToggleError}
+							{#if authToggleNeedsSetup}
+								<div class="alert alert-warning text-sm py-2 gap-2">
+									<Lock class="h-4 w-4 shrink-0" />
+									No admin account exists yet. <a href="/setup" class="link link-warning font-medium">Create one first</a>.
+								</div>
+							{:else if authToggleError}
 								<div class="alert alert-error text-sm py-2">{authToggleError}</div>
 							{/if}
 
