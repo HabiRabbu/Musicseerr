@@ -5,6 +5,7 @@
 	import { libraryStore } from '$lib/stores/library';
 	import { integrationStore } from '$lib/stores/integration';
 	import { requestAlbum } from '$lib/utils/albumRequest';
+	import { toggleAlbumMonitored } from '$lib/utils/monitorAlbum';
 	import { formatListenCount } from '$lib/utils/formatting';
 	import { getListenTitle } from '$lib/utils/enrichment';
 	import { Download, Music2 } from 'lucide-svelte';
@@ -29,6 +30,7 @@
 	let listenTitle = $derived(getListenTitle(enrichmentSource, 'album'));
 
 	let requesting = $state(false);
+	let monitoredLoading = $state(false);
 
 	let inLibrary = $derived(
 		libraryStore.isInLibrary(album.musicbrainz_id) || album.in_library || false
@@ -37,6 +39,11 @@
 		!inLibrary &&
 			!album.in_library &&
 			(album.requested || libraryStore.isRequested(album.musicbrainz_id))
+	);
+	let isMonitored = $derived(
+		!inLibrary &&
+			!isRequested &&
+			(album.monitored || libraryStore.isMonitored(album.musicbrainz_id))
 	);
 
 	async function handleRequest(e: Event) {
@@ -56,9 +63,21 @@
 		}
 	}
 
+	async function handleToggleMonitored() {
+		monitoredLoading = true;
+		try {
+			await toggleAlbumMonitored(album.musicbrainz_id, false);
+			album.monitored = false;
+			album = album;
+		} finally {
+			monitoredLoading = false;
+		}
+	}
+
 	function handleDeleted() {
 		album.in_library = false;
 		album.requested = false;
+		album.monitored = false;
 		album = album;
 		onremoved?.();
 	}
@@ -160,6 +179,15 @@
 					albumTitle={album.title}
 					artistName={album.artist || 'Unknown'}
 					ondeleted={handleDeleted}
+				/>
+			{:else if isMonitored}
+				<LibraryBadge
+					status="monitored"
+					musicbrainzId={album.musicbrainz_id}
+					albumTitle={album.title}
+					artistName={album.artist || 'Unknown'}
+					ontogglemonitored={handleToggleMonitored}
+					{monitoredLoading}
 				/>
 			{/if}
 		{/if}

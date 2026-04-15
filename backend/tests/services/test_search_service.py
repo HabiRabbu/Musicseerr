@@ -59,6 +59,8 @@ def _make_service(
     else:
         lidarr_repo.get_queue = AsyncMock(return_value=queue_items or [])
 
+    lidarr_repo.get_monitored_no_files_mbids = AsyncMock(return_value=set())
+
     coverart_repo = MagicMock()
     preferences_service = MagicMock()
     preferences_service.get_preferences.return_value = _make_preferences()
@@ -300,6 +302,7 @@ async def test_suggest_deduplication_single_mb_call():
     lidarr_repo = MagicMock()
     lidarr_repo.get_library_mbids = AsyncMock(return_value=set())
     lidarr_repo.get_queue = AsyncMock(return_value=[])
+    lidarr_repo.get_monitored_no_files_mbids = AsyncMock(return_value=set())
 
     coverart_repo = MagicMock()
     preferences_service = MagicMock()

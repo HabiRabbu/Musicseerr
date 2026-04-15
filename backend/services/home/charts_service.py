@@ -109,15 +109,17 @@ class HomeChartsService:
         self, genre: str, limit: int = 100, artist_offset: int = 0, album_offset: int = 0
     ) -> GenreDetailResponse:
         lidarr_results = await asyncio.gather(
-            self._lidarr_repo.get_artists_from_library(),
-            self._lidarr_repo.get_library(),
+            self._lidarr_repo.get_artists_from_library(include_unmonitored=True),
+            self._lidarr_repo.get_library(include_unmonitored=True),
+            self._lidarr_repo.get_monitored_no_files_mbids(),
             return_exceptions=True,
         )
-        lidarr_failed = any(isinstance(r, BaseException) for r in lidarr_results)
+        lidarr_failed = any(isinstance(r, BaseException) for r in lidarr_results[:2])
         if lidarr_failed:
             logger.warning("Lidarr unavailable for genre '%s', proceeding with MusicBrainz data only", genre)
         library_artists = lidarr_results[0] if not isinstance(lidarr_results[0], BaseException) else []
         library_albums = lidarr_results[1] if not isinstance(lidarr_results[1], BaseException) else []
+        monitored_mbids = lidarr_results[2] if not isinstance(lidarr_results[2], BaseException) else set()
         library_mbids = {a.get("mbid", "").lower() for a in library_artists if a.get("mbid")}
         library_album_mbids = {a.musicbrainz_id.lower() for a in library_albums if a.musicbrainz_id}
         library_section = None
@@ -177,6 +179,7 @@ class HomeChartsService:
                 image_url=None,
                 release_date=str(result.year) if result.year else None,
                 in_library=result.musicbrainz_id.lower() in library_album_mbids,
+                monitored=result.musicbrainz_id.lower() not in library_album_mbids and result.musicbrainz_id.lower() in monitored_mbids,
             )
             for result in mb_album_results
         ]
@@ -203,7 +206,7 @@ class HomeChartsService:
         if resolved == "lastfm" and self._lfm_repo:
             return await self._get_trending_artists_lastfm(limit)
 
-        library_artists = await self._lidarr_repo.get_artists_from_library()
+        library_artists = await self._lidarr_repo.get_artists_from_library(include_unmonitored=True)
         library_mbids = {a.get("mbid", "").lower() for a in library_artists if a.get("mbid")}
         ranges = ["this_week", "this_month", "this_year", "all_time"]
         tasks = {r: self._lb_repo.get_sitewide_top_artists(range_=r, count=limit + 1) for r in ranges}
@@ -249,7 +252,7 @@ class HomeChartsService:
                 offset=offset,
             )
         library_artists, lb_artists = await asyncio.gather(
-            self._lidarr_repo.get_artists_from_library(),
+            self._lidarr_repo.get_artists_from_library(include_unmonitored=True),
             self._lb_repo.get_sitewide_top_artists(
                 range_=range_key, count=limit + 1, offset=offset
             ),
@@ -275,15 +278,19 @@ class HomeChartsService:
         if resolved == "lastfm" and self._lfm_repo:
             return await self._get_popular_albums_lastfm(limit)
 
-        library_albums = await self._lidarr_repo.get_library()
+        library_albums = await self._lidarr_repo.get_library(include_unmonitored=True)
         library_mbids = {(a.musicbrainz_id or "").lower() for a in library_albums if a.musicbrainz_id}
+        try:
+            monitored_mbids = await self._lidarr_repo.get_monitored_no_files_mbids()
+        except Exception:  # noqa: BLE001
+            monitored_mbids = set()
         ranges = ["this_week", "this_month", "this_year", "all_time"]
         tasks = {r: self._lb_repo.get_sitewide_top_release_groups(range_=r, count=limit + 1) for r in ranges}
         results = await self._execute_tasks(tasks)
         response_data = {}
         for r in ranges:
             lb_albums = results.get(r) or []
-            albums = [self._transformers.lb_release_to_home(a, library_mbids) for a in lb_albums]
+            albums = [self._transformers.lb_release_to_home(a, library_mbids, monitored_mbids) for a in lb_albums]
             featured = albums[0] if albums else None
             items = albums[1:limit] if len(albums) > 1 else []
             response_data[r] = PopularTimeRange(
@@ -317,14 +324,16 @@ class HomeChartsService:
                 limit=limit,
                 offset=offset,
             )
-        library_albums, lb_albums = await asyncio.gather(
-            self._lidarr_repo.get_library(),
+        library_albums, lb_albums, monitored_mbids_result = await asyncio.gather(
+            self._lidarr_repo.get_library(include_unmonitored=True),
             self._lb_repo.get_sitewide_top_release_groups(
                 range_=range_key, count=limit + 1, offset=offset
             ),
+            self._lidarr_repo.get_monitored_no_files_mbids(),
         )
         library_mbids = {(a.musicbrainz_id or "").lower() for a in library_albums if a.musicbrainz_id}
-        albums = [self._transformers.lb_release_to_home(a, library_mbids) for a in lb_albums]
+        monitored_mbids = monitored_mbids_result if not isinstance(monitored_mbids_result, BaseException) else set()
+        albums = [self._transformers.lb_release_to_home(a, library_mbids, monitored_mbids) for a in lb_albums]
         has_more = len(albums) > limit
         items = albums[:limit]
         return PopularAlbumsRangeResponse(
@@ -337,7 +346,7 @@ class HomeChartsService:
         )
 
     async def _get_trending_artists_lastfm(self, limit: int = 10) -> TrendingArtistsResponse:
-        library_artists = await self._lidarr_repo.get_artists_from_library()
+        library_artists = await self._lidarr_repo.get_artists_from_library(include_unmonitored=True)
         library_mbids = {a.get("mbid", "").lower() for a in library_artists if a.get("mbid")}
         lfm_artists = await self._lfm_repo.get_global_top_artists(limit=limit + 1)
         artists = [
@@ -366,10 +375,14 @@ class HomeChartsService:
 
     async def _get_popular_albums_lastfm(self, limit: int = 10) -> PopularAlbumsResponse:
         ranges = ["this_week", "this_month", "this_year", "all_time"]
-        library_albums = await self._lidarr_repo.get_library()
+        library_albums, monitored_mbids_result = await asyncio.gather(
+            self._lidarr_repo.get_library(include_unmonitored=True),
+            self._lidarr_repo.get_monitored_no_files_mbids(),
+        )
         library_mbids = {
             (a.musicbrainz_id or "").lower() for a in library_albums if a.musicbrainz_id
         }
+        monitored_mbids = monitored_mbids_result if not isinstance(monitored_mbids_result, BaseException) else set()
         lfm_username = self._get_lastfm_username()
         if lfm_username:
             tasks = {
@@ -408,6 +421,7 @@ class HomeChartsService:
                     image_url=album.image_url or None,
                     listen_count=album.playcount,
                     in_library=(album.mbid or "").lower() in library_mbids if album.mbid else False,
+                    monitored=not ((album.mbid or "").lower() in library_mbids) and (album.mbid or "").lower() in monitored_mbids if album.mbid else False,
                     source="lastfm",
                 )
                 for album in lfm_albums
@@ -433,7 +447,7 @@ class HomeChartsService:
         total_to_fetch = min(limit + offset + 1, 200)
         lfm_artists, library_artists = await asyncio.gather(
             self._lfm_repo.get_global_top_artists(limit=total_to_fetch),
-            self._lidarr_repo.get_artists_from_library(),
+            self._lidarr_repo.get_artists_from_library(include_unmonitored=True),
         )
         library_mbids = {a.get("mbid", "").lower() for a in library_artists if a.get("mbid")}
         artists = [
@@ -470,17 +484,19 @@ class HomeChartsService:
             )
 
         total_to_fetch = min(limit + offset + 1, 200)
-        lfm_albums, library_albums = await asyncio.gather(
+        lfm_albums, library_albums, monitored_mbids_result = await asyncio.gather(
             self._lfm_repo.get_user_top_albums(
                 lfm_username,
                 period=self._lastfm_period_for_range(range_key),
                 limit=total_to_fetch,
             ),
-            self._lidarr_repo.get_library(),
+            self._lidarr_repo.get_library(include_unmonitored=True),
+            self._lidarr_repo.get_monitored_no_files_mbids(),
         )
         library_mbids = {
             (a.musicbrainz_id or "").lower() for a in library_albums if a.musicbrainz_id
         }
+        monitored_mbids = monitored_mbids_result if not isinstance(monitored_mbids_result, BaseException) else set()
         albums = [
             HomeAlbum(
                 mbid=album.mbid,
@@ -490,6 +506,7 @@ class HomeChartsService:
                 image_url=album.image_url or None,
                 listen_count=album.playcount,
                 in_library=(album.mbid or "").lower() in library_mbids if album.mbid else False,
+                monitored=not ((album.mbid or "").lower() in library_mbids) and (album.mbid or "").lower() in monitored_mbids if album.mbid else False,
                 source="lastfm",
             )
             for album in lfm_albums
@@ -521,10 +538,14 @@ class HomeChartsService:
                 this_week=empty, this_month=empty, this_year=empty, all_time=empty
             )
 
-        library_albums = await self._lidarr_repo.get_library()
+        library_albums, monitored_mbids_result = await asyncio.gather(
+            self._lidarr_repo.get_library(include_unmonitored=True),
+            self._lidarr_repo.get_monitored_no_files_mbids(),
+        )
         library_mbids = {
             (a.musicbrainz_id or "").lower() for a in library_albums if a.musicbrainz_id
         }
+        monitored_mbids = monitored_mbids_result if not isinstance(monitored_mbids_result, BaseException) else set()
         ranges = ["this_week", "this_month", "this_year", "all_time"]
         tasks = {
             r: self._lb_repo.get_user_top_release_groups(
@@ -536,7 +557,7 @@ class HomeChartsService:
         response_data: dict[str, PopularTimeRange] = {}
         for r in ranges:
             rgs = results.get(r) or []
-            albums = [self._transformers.lb_release_to_home(rg, library_mbids) for rg in rgs]
+            albums = [self._transformers.lb_release_to_home(rg, library_mbids, monitored_mbids) for rg in rgs]
             response_data[r] = PopularTimeRange(
                 range_key=r,
                 label=HomeDataTransformers.get_range_label(r),
@@ -578,16 +599,18 @@ class HomeChartsService:
                 has_more=False,
             )
 
-        library_albums, rgs = await asyncio.gather(
-            self._lidarr_repo.get_library(),
+        library_albums, rgs, monitored_mbids_result = await asyncio.gather(
+            self._lidarr_repo.get_library(include_unmonitored=True),
             self._lb_repo.get_user_top_release_groups(
                 username=lb_username, range_=range_key, count=limit + 1, offset=offset
             ),
+            self._lidarr_repo.get_monitored_no_files_mbids(),
         )
         library_mbids = {
             (a.musicbrainz_id or "").lower() for a in library_albums if a.musicbrainz_id
         }
-        albums = [self._transformers.lb_release_to_home(rg, library_mbids) for rg in rgs]
+        monitored_mbids = monitored_mbids_result if not isinstance(monitored_mbids_result, BaseException) else set()
+        albums = [self._transformers.lb_release_to_home(rg, library_mbids, monitored_mbids) for rg in rgs]
         has_more = len(albums) > limit
         items = albums[:limit]
         return PopularAlbumsRangeResponse(

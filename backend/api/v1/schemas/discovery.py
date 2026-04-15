@@ -41,6 +41,7 @@ class TopAlbum(AppStruct):
     listen_count: int = 0
     in_library: bool = False
     requested: bool = False
+    monitored: bool = False
     cover_url: str | None = None
 
 
@@ -58,6 +59,7 @@ class DiscoveryAlbum(AppStruct):
     year: int | None = None
     in_library: bool = False
     requested: bool = False
+    monitored: bool = False
     cover_url: str | None = None
 
 

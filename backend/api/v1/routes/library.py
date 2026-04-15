@@ -112,11 +112,12 @@ async def get_library_stats(
 async def get_library_mbids(
     library_service: LibraryService = Depends(get_library_service)
 ):
-    mbids, requested = await asyncio.gather(
+    mbids, requested, monitored = await asyncio.gather(
         library_service.get_library_mbids(),
         library_service.get_requested_mbids(),
+        library_service.get_monitored_mbids(),
     )
-    return LibraryMbidsResponse(mbids=mbids, requested_mbids=requested)
+    return LibraryMbidsResponse(mbids=mbids, requested_mbids=requested, monitored_mbids=monitored)
 
 
 @router.get("/grouped", response_model=LibraryGroupedResponse)

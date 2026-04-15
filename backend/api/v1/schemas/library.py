@@ -73,6 +73,7 @@ class SyncLibraryResponse(AppStruct):
 class LibraryMbidsResponse(AppStruct):
     mbids: list[str] = []
     requested_mbids: list[str] = []
+    monitored_mbids: list[str] = []
 
 
 class LibraryGroupedResponse(AppStruct):

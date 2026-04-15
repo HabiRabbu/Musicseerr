@@ -129,6 +129,7 @@ def lidarr_to_basic_info(lidarr_album: dict, release_group_id: str, in_library: 
         "disambiguation": lidarr_album.get("disambiguation"),
         "in_library": in_library,
         "requested": is_requested and not in_library,
+        "monitored": lidarr_album.get("monitored", False),
         "cover_url": lidarr_album.get("cover_url"),
     }
 
@@ -146,5 +147,6 @@ def mb_to_basic_info(release_group: dict, release_group_id: str, in_library: boo
         "disambiguation": release_group.get("disambiguation"),
         "in_library": in_library,
         "requested": is_requested and not in_library,
+        "monitored": False,
         "cover_url": None,
     }

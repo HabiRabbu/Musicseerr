@@ -3,6 +3,8 @@
 	import { ChevronDown, Download } from 'lucide-svelte';
 	import { colors } from '$lib/colors';
 	import { libraryStore } from '$lib/stores/library';
+	import { toggleAlbumMonitored } from '$lib/utils/monitorAlbum';
+	import { toastStore } from '$lib/stores/toast';
 	import AlbumImage from './AlbumImage.svelte';
 	import LibraryBadge from './LibraryBadge.svelte';
 
@@ -12,6 +14,7 @@
 		year?: number | null;
 		in_library?: boolean;
 		requested?: boolean;
+		monitored?: boolean;
 	}
 
 	interface RemoveResult {
@@ -46,10 +49,37 @@
 	function handleDeleted(rg: Release, result: RemoveResult) {
 		rg.in_library = false;
 		rg.requested = false;
+		rg.monitored = false;
 		releases = releases;
 		onRemoved?.(result);
 	}
 </script>
+
+{#snippet requestButton(rg: Release, ariaLabel: string)}
+	<button
+		class="w-8 h-8 sm:w-10 sm:h-10 rounded-full opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity duration-200 border-none flex items-center justify-center shadow-sm"
+		style="background-color: {colors.accent};"
+		onclick={(e) => {
+			e.stopPropagation();
+			onRequest(rg.id, rg.title);
+		}}
+		disabled={requestingIds.has(rg.id)}
+		aria-label={ariaLabel}
+	>
+		{#if requestingIds.has(rg.id)}
+			<span
+				class="loading loading-spinner loading-xs"
+				style="color: {colors.secondary};"
+			></span>
+		{:else}
+			<Download
+				class="h-4 w-4 sm:h-5 sm:w-5"
+				color={colors.secondary}
+				strokeWidth={2.5}
+			/>
+		{/if}
+	</button>
+{/snippet}
 
 <div class="mb-6">
 	<div class="bg-base-300 rounded-t-box">
@@ -105,30 +135,28 @@
 									size="lg"
 									ondeleted={(result) => handleDeleted(rg, result)}
 								/>
+							{:else if !libraryStore.isInLibrary(rg.id) && !libraryStore.isRequested(rg.id) && (rg.monitored || libraryStore.isMonitored(rg.id))}
+								<div class="flex items-center gap-1.5">
+									{@render requestButton(rg, `Request ${rg.title}`)}
+									<LibraryBadge
+										status="monitored"
+										musicbrainzId={rg.id}
+										albumTitle={rg.title}
+										{artistName}
+										size="lg"
+										ontogglemonitored={async () => {
+											try {
+												await toggleAlbumMonitored(rg.id, false);
+												rg.monitored = false;
+												releases = releases;
+											} catch {
+												toastStore.show({ message: 'Failed to update monitoring status', type: 'error' });
+											}
+										}}
+									/>
+								</div>
 							{:else}
-								<button
-									class="w-8 h-8 sm:w-10 sm:h-10 rounded-full opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity duration-200 border-none flex items-center justify-center shadow-sm"
-									style="background-color: {colors.accent};"
-									onclick={(e) => {
-										e.stopPropagation();
-										onRequest(rg.id, rg.title);
-									}}
-									disabled={requestingIds.has(rg.id)}
-									aria-label="Request {title.toLowerCase().slice(0, -1)}"
-								>
-									{#if requestingIds.has(rg.id)}
-										<span
-											class="loading loading-spinner loading-xs"
-											style="color: {colors.secondary};"
-										></span>
-									{:else}
-										<Download
-											class="h-4 w-4 sm:h-5 sm:w-5"
-											color={colors.secondary}
-											strokeWidth={2.5}
-										/>
-									{/if}
-								</button>
+								{@render requestButton(rg, `Request ${title.toLowerCase().slice(0, -1)}`)}
 							{/if}
 						</div>
 					</div>

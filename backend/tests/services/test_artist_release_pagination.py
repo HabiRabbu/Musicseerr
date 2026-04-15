@@ -53,6 +53,7 @@ def _make_service(
     lidarr_repo.get_artist_details = AsyncMock(return_value=lidarr_artist)
     lidarr_repo.get_library_mbids = AsyncMock(return_value=set())
     lidarr_repo.get_requested_mbids = AsyncMock(return_value=set())
+    lidarr_repo.get_monitored_no_files_mbids = AsyncMock(return_value=set())
     lidarr_repo.get_artist_mbids = AsyncMock(return_value=set())
 
     wikidata_repo = AsyncMock()

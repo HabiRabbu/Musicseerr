@@ -26,6 +26,7 @@ class ReleaseItem(AppStruct):
     year: int | None = None
     in_library: bool = False
     requested: bool = False
+    monitored: bool = False
 
 
 class ArtistInfo(AppStruct):

@@ -10,6 +10,7 @@
 		ArrowRight,
 		X,
 		Check,
+		Bookmark,
 		Music2,
 		Tv,
 		Sparkles,
@@ -184,7 +185,7 @@
 								{/if}
 								{#if item.in_library}
 									<div class="absolute top-2 right-2 badge badge-success badge-sm">
-										<Check class="w-3 h-3" />
+										<Check class="w-3.5 h-3.5" />
 									</div>
 								{/if}
 							</figure>
@@ -217,7 +218,11 @@
 								/>
 								{#if item.in_library}
 									<div class="absolute top-2 left-2 z-20 badge badge-success badge-sm">
-										<Check class="w-3 h-3" />
+										<Check class="w-3.5 h-3.5" />
+									</div>
+								{:else if item.monitored && !item.requested}
+									<div class="absolute top-2 left-2 z-20 badge badge-neutral badge-sm">
+										<Bookmark class="w-3.5 h-3.5" />
 									</div>
 								{/if}
 								{#if item.mbid && item.in_library}

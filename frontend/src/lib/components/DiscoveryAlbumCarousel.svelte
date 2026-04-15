@@ -28,6 +28,7 @@
 			musicbrainz_id: da.musicbrainz_id,
 			in_library: da.in_library,
 			requested: da.requested,
+			monitored: da.monitored,
 			cover_url: da.cover_url
 		};
 	}

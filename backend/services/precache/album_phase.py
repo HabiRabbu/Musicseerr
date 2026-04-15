@@ -29,7 +29,7 @@ class AlbumPhase:
     async def precache_album_data(
         self,
         release_group_ids: list[str],
-        monitored_mbids: set[str],
+        library_mbids: set[str],
         status_service: CacheStatusService,
         library_album_mbids: dict[str, Any] = None,
         offset: int = 0,
@@ -48,11 +48,11 @@ class AlbumPhase:
                 cached_info = await album_service._cache.get(cache_key)
                 if not cached_info:
                     await status_service.update_progress(index + 1, f"Fetching metadata for {rgid[:8]}...", processed_albums=offset + index + 1, generation=generation)
-                    await album_service.get_album_info(rgid, monitored_mbids=monitored_mbids)
+                    await album_service.get_album_info(rgid, library_mbids=library_mbids)
                     metadata_fetched = True
                 else:
                     await status_service.update_progress(index + 1, f"Cached: {rgid[:8]}...", processed_albums=offset + index + 1, generation=generation)
-                if rgid.lower() in monitored_mbids:
+                if rgid.lower() in library_mbids:
                     cache_filename = get_cache_filename(f"rg_{rgid}", "500")
                     file_path = self._cover_repo.cache_dir / f"{cache_filename}.bin"
                     if not file_path.exists():
