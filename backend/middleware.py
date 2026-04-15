@@ -130,6 +130,10 @@ _AUTH_EXEMPT = {
     "/api/v1/auth/status",
     "/api/v1/auth/login",
     "/api/v1/auth/setup",
+    "/api/v1/auth/plex/login",
+    "/api/v1/auth/emby/login",
+    "/api/v1/plex/auth/pin",
+    "/api/v1/plex/auth/poll",
 }
 
 
@@ -151,13 +155,14 @@ class AuthMiddleware(BaseHTTPMiddleware):
         auth = get_auth_service()
 
         if not auth.is_auth_enabled():
+            request.state.current_user = None
             return await call_next(request)
 
         token = request.headers.get("Authorization", "")
         if token.startswith("Bearer "):
             token = token[7:]
 
-        if not token or not auth.validate_token(token):
+        if not token:
             return MsgSpecJSONResponse(
                 status_code=401,
                 content={
@@ -169,4 +174,18 @@ class AuthMiddleware(BaseHTTPMiddleware):
                 },
             )
 
+        payload = auth.validate_token(token)
+        if not payload:
+            return MsgSpecJSONResponse(
+                status_code=401,
+                content={
+                    "error": {
+                        "code": "UNAUTHORIZED",
+                        "message": "Authentication required",
+                        "details": None,
+                    }
+                },
+            )
+
+        request.state.current_user = {"username": payload["sub"], "role": payload["role"]}
         return await call_next(request)

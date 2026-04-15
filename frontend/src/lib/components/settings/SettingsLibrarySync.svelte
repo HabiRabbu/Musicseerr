@@ -82,7 +82,11 @@
 						<div class="stat-title">Last Sync</div>
 						<div class="stat-value text-lg">{formatLastSync(form.data.last_sync)}</div>
 						<div class="stat-desc">
-							{#if form.data.last_sync_success === true}
+							{#if syncStatus.isActive}
+								<span class="text-info inline-flex items-center gap-0.5">
+									<span class="loading loading-spinner loading-xs"></span> In progress
+								</span>
+							{:else if form.data.last_sync_success === true}
 								<span class="text-success inline-flex items-center gap-0.5"
 									><Check class="h-3 w-3" /> Successful</span
 								>

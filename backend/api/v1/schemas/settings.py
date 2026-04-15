@@ -336,3 +336,14 @@ class LidarrMetadataProfilePreferences(AppStruct):
     primary_types: list[str] = []
     secondary_types: list[str] = []
     release_statuses: list[str] = []
+
+
+class EmbyAuthSettings(AppStruct):
+    emby_url: str = ""
+    enabled: bool = False
+
+
+class EmbyVerifyResponse(AppStruct):
+    success: bool
+    message: str
+

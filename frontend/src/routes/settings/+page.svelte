@@ -17,6 +17,8 @@
 	import SettingsScrobbling from '$lib/components/settings/SettingsScrobbling.svelte';
 	import SettingsMusicSource from '$lib/components/settings/SettingsMusicSource.svelte';
 	import SettingsAdvanced from '$lib/components/settings/SettingsAdvanced.svelte';
+	import SettingsUsers from '$lib/components/settings/SettingsUsers.svelte';
+	import SettingsEmbyAuth from '$lib/components/settings/SettingsEmbyAuth.svelte';
 	import {
 		Settings2,
 		Music,
@@ -203,50 +205,53 @@
 				{:else if activeTab === 'advanced'}
 					<SettingsAdvanced />
 				{:else if activeTab === 'users'}
-					<div class="card bg-base-200">
-						<div class="card-body gap-6">
-							<div>
-								<h2 class="card-title text-xl">Users & Access</h2>
-								<p class="text-base-content/60 text-sm mt-1">
-									Control whether a login is required to access Musicseerr.
-								</p>
-							</div>
-
-							{#if authToggleNeedsSetup}
-								<div class="alert alert-warning text-sm py-2 gap-2 flex-col items-start">
-									<div class="flex gap-2 items-center">
-										<Lock class="h-4 w-4 shrink-0" />
-										<span>No admin account exists yet. Create one before enabling login.</span>
-									</div>
-									<a href="/setup" class="btn btn-sm btn-warning w-full">Go to /setup</a>
-								</div>
-							{:else if authToggleError}
-								<div class="alert alert-error text-sm py-2">{authToggleError}</div>
-							{/if}
-
-							<div class="flex items-center justify-between gap-4 bg-base-100 rounded-box p-4">
+					<div class="space-y-6">
+						<div class="card bg-base-200">
+							<div class="card-body gap-4">
 								<div>
-									<p class="font-medium">Require Login</p>
-									<p class="text-sm text-base-content/60">
-										When enabled, users must sign in with a username and password.
+									<h2 class="card-title text-xl">Authentication</h2>
+									<p class="text-base-content/60 text-sm mt-1">
+										Control whether a login is required to access Musicseerr.
 									</p>
 								</div>
-								<input
-									type="checkbox"
-									class="toggle toggle-primary"
-									checked={authStore.authEnabled}
-									disabled={authToggling}
-									onchange={(e) => toggleAuth((e.target as HTMLInputElement).checked)}
-								/>
-							</div>
 
-							{#if authStore.authEnabled}
-								<div class="alert alert-info text-sm gap-2 py-2">
-									<Lock class="h-4 w-4 shrink-0" />
-									Auth is active. To add more users, use the backend CLI or API (user management UI coming soon).
+								{#if authToggleNeedsSetup}
+									<div class="alert alert-warning text-sm py-2 gap-2 flex-col items-start">
+										<div class="flex gap-2 items-center">
+											<Lock class="h-4 w-4 shrink-0" />
+											<span>No admin account exists yet. Create one before enabling login.</span>
+										</div>
+										<a href="/setup" class="btn btn-sm btn-warning w-full">Go to /setup</a>
+									</div>
+								{:else if authToggleError}
+									<div class="alert alert-error text-sm py-2">{authToggleError}</div>
+								{/if}
+
+								<div class="flex items-center justify-between gap-4 bg-base-100 rounded-box p-4">
+									<div>
+										<p class="font-medium">Require Login</p>
+										<p class="text-sm text-base-content/60">
+											When enabled, users must sign in with a username and password.
+										</p>
+									</div>
+									<input
+										type="checkbox"
+										class="toggle toggle-primary"
+										checked={authStore.authEnabled}
+										disabled={authToggling}
+										onchange={(e) => toggleAuth((e.target as HTMLInputElement).checked)}
+									/>
 								</div>
-							{/if}
+							</div>
 						</div>
+
+						{#if authStore.authEnabled && authStore.role === 'admin'}
+							<div>
+								<h3 class="text-xs font-semibold uppercase tracking-widest text-base-content/50 mb-3">Authentication Providers</h3>
+								<SettingsEmbyAuth />
+							</div>
+							<SettingsUsers />
+						{/if}
 					</div>
 				{/if}
 			</main>

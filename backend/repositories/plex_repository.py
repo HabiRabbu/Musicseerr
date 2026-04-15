@@ -772,6 +772,49 @@ class PlexRepository:
         except Exception as exc:  # noqa: BLE001
             return False, f"Connection failed: {exc}"
 
+    async def get_plex_user_info(self, user_token: str) -> dict | None:
+        """Fetch the Plex account info for a given user token from plex.tv."""
+        async with httpx.AsyncClient(timeout=httpx.Timeout(10.0)) as client:
+            response = await client.get(
+                f"{_PLEX_TV_BASE}/user",
+                headers={
+                    "X-Plex-Token": user_token,
+                    "X-Plex-Product": "MusicSeerr",
+                    "Accept": "application/json",
+                },
+            )
+            if response.status_code != 200:
+                return None
+            return response.json()
+
+    async def verify_user_server_access(self, user_token: str) -> tuple[bool, str]:
+        """Check whether the given user token can access the configured Plex server.
+
+        Returns (True, server_name) on success, (False, error_message) on failure.
+        """
+        if not self._configured:
+            return False, "Plex is not configured on this server"
+        try:
+            response = await self._client.get(
+                f"{self._url}/",
+                headers={
+                    "X-Plex-Token": user_token,
+                    "X-Plex-Product": "MusicSeerr",
+                    "Accept": "application/json",
+                },
+                timeout=10.0,
+            )
+            if response.status_code in (401, 403):
+                return False, "Your Plex account does not have access to this server"
+            if response.status_code == 200:
+                name = response.json().get("MediaContainer", {}).get("friendlyName", "the Plex server")
+                return True, name
+            return False, f"Plex server returned status {response.status_code}"
+        except httpx.TimeoutException:
+            return False, "Plex server timed out"
+        except Exception as exc:  # noqa: BLE001
+            return False, f"Could not reach Plex server: {exc}"
+
     async def create_oauth_pin(self, client_id: str) -> PlexOAuthPin:
         async with httpx.AsyncClient(timeout=httpx.Timeout(15.0)) as client:
             response = await client.post(

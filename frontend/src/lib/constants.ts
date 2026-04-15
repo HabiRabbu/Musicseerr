@@ -223,6 +223,13 @@ export const API = {
 	settingsPlexLibraries: () => '/api/v1/settings/plex/libraries',
 	plexAuthPin: () => '/api/v1/plex/auth/pin',
 	plexAuthPoll: (pinId: number) => `/api/v1/plex/auth/poll?pin_id=${pinId}`,
+	plexLogin: () => '/api/v1/auth/plex/login',
+	embyAuthSettings: () => '/api/v1/emby/auth/settings',
+	embyAuthVerify: () => '/api/v1/emby/auth/verify',
+	embyLogin: () => '/api/v1/auth/emby/login',
+	adminUsers: () => '/api/v1/admin/users',
+	adminUser: (username: string) => `/api/v1/admin/users/${encodeURIComponent(username)}`,
+	adminRequestSettings: () => '/api/v1/admin/settings/requests',
 	settingsLocalFiles: () => '/api/v1/settings/local-files',
 	settingsLocalFilesVerify: () => '/api/v1/settings/local-files/verify',
 	profile: {

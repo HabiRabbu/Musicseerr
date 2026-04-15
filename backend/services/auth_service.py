@@ -97,9 +97,142 @@ class AuthService:
 
     def _find_user(self, username: str) -> Optional[dict]:
         for u in self._load_users():
-            if u["username"].lower() == username.lower():
+            if u["username"].lower() == username.lower() and not u.get("auth_provider"):
                 return u
         return None
+
+    def _find_plex_user(self, plex_username: str) -> Optional[dict]:
+        for u in self._load_users():
+            if u["username"].lower() == plex_username.lower() and u.get("auth_provider") == "plex":
+                return u
+        return None
+
+    def create_or_get_emby_user(self, emby_username: str) -> dict:
+        """Return existing Emby-linked account or create one with role 'user'."""
+        with self._lock:
+            for u in self._load_users():
+                if u["username"].lower() == emby_username.lower() and u.get("auth_provider") == "emby":
+                    return u
+            user: dict = {
+                "username": emby_username,
+                "password_hash": "",
+                "role": "user",
+                "auth_provider": "emby",
+            }
+            users = self._load_users()
+            users.append(user)
+            self._save_users(users)
+            return user
+
+    def create_or_get_plex_user(self, plex_username: str) -> dict:
+        """Return existing Plex-linked account or create one with role 'user'."""
+        with self._lock:
+            existing = self._find_plex_user(plex_username)
+            if existing:
+                return existing
+            user: dict = {
+                "username": plex_username,
+                "password_hash": "",
+                "role": "user",
+                "auth_provider": "plex",
+            }
+            users = self._load_users()
+            users.append(user)
+            self._save_users(users)
+            return user
+
+    def get_all_users(self) -> list[dict]:
+        """Return all users, scrubbing password hashes."""
+        return [
+            {
+                "username": u["username"],
+                "role": u.get("role", "user"),
+                "auth_provider": u.get("auth_provider"),
+                "can_request": u.get("can_request", True),
+                "request_quota": u.get("request_quota"),
+                "quota_days": u.get("quota_days"),
+            }
+            for u in self._load_users()
+        ]
+
+    def update_user(
+        self,
+        username: str,
+        *,
+        role: Optional[str] = None,
+        can_request: Optional[bool] = None,
+        request_quota: Optional[int] = None,
+        quota_days: Optional[int] = None,
+        clear_quota: bool = False,
+    ) -> bool:
+        """Update mutable fields on a user. Returns False if user not found."""
+        with self._lock:
+            users = self._load_users()
+            for u in users:
+                if u["username"].lower() == username.lower():
+                    if role is not None:
+                        u["role"] = role
+                    if can_request is not None:
+                        u["can_request"] = can_request
+                    if clear_quota:
+                        u.pop("request_quota", None)
+                        u.pop("quota_days", None)
+                    else:
+                        if request_quota is not None:
+                            u["request_quota"] = request_quota
+                        if quota_days is not None:
+                            u["quota_days"] = quota_days
+                    self._save_users(users)
+                    return True
+            return False
+
+    def delete_user(self, username: str) -> bool:
+        """Remove a user. Returns False if not found."""
+        with self._lock:
+            users = self._load_users()
+            new_users = [u for u in users if u["username"].lower() != username.lower()]
+            if len(new_users) == len(users):
+                return False
+            self._save_users(new_users)
+            return True
+
+    def get_default_request_settings(self) -> dict:
+        try:
+            data = read_json(self._settings_path, default={})
+            return data.get("request_defaults", {"quota": 20, "quota_days": 7, "can_request": True})
+        except Exception:  # noqa: BLE001
+            return {"quota": 20, "quota_days": 7, "can_request": True}
+
+    def set_default_request_settings(self, quota: Optional[int], quota_days: int, can_request: bool) -> None:
+        data: dict = {}
+        if self._settings_path.exists():
+            try:
+                data = read_json(self._settings_path, default={})
+            except Exception:  # noqa: BLE001
+                pass
+        data["request_defaults"] = {"quota": quota, "quota_days": quota_days, "can_request": can_request}
+        self._settings_path.parent.mkdir(parents=True, exist_ok=True)
+        atomic_write_json(self._settings_path, data)
+
+    def get_effective_request_settings(self, username: str) -> tuple[bool, Optional[int], int]:
+        """Return (can_request, quota_limit, quota_days). quota_limit=None means unlimited."""
+        user = None
+        for u in self._load_users():
+            if u["username"].lower() == username.lower():
+                user = u
+                break
+
+        if not user:
+            return True, None, 7
+
+        if user.get("role") == "admin":
+            return True, None, 7
+
+        defaults = self.get_default_request_settings()
+        can_request = user.get("can_request", defaults.get("can_request", True))
+        quota = user.get("request_quota", defaults.get("quota"))  # None = unlimited
+        quota_days = user.get("quota_days") or defaults.get("quota_days", 7)
+        return bool(can_request), quota, int(quota_days)
 
     def verify_password(self, username: str, password: str) -> Optional[dict]:
         user = self._find_user(username)

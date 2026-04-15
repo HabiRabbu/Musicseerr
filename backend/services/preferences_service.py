@@ -21,6 +21,7 @@ from api.v1.schemas.settings import (
     NAVIDROME_PASSWORD_MASK,
     PlexConnectionSettings,
     PLEX_TOKEN_MASK,
+    EmbyAuthSettings,
 )
 from api.v1.schemas.profile import ProfileSettings
 from api.v1.schemas.advanced_settings import AdvancedSettings
@@ -405,6 +406,16 @@ class PreferencesService:
         except Exception as e:  # noqa: BLE001
             logger.error("Failed to save profile settings: %s", e)
             raise ConfigurationError(f"Failed to save profile settings: {e}")
+
+    def get_emby_auth_settings(self) -> EmbyAuthSettings:
+        return self._get_section("emby_auth_settings", EmbyAuthSettings)
+
+    def save_emby_auth_settings(self, settings: EmbyAuthSettings) -> None:
+        try:
+            self._save_section("emby_auth_settings", settings)
+        except Exception as e:  # noqa: BLE001
+            logger.error("Failed to save Emby auth settings: %s", e)
+            raise ConfigurationError(f"Failed to save Emby auth settings: {e}")
 
     def get_setting(self, key: str) -> Any:
         config = self._load_config()

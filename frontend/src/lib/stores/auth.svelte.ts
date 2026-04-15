@@ -8,6 +8,7 @@ function createAuthStore() {
 	let role = $state<string | null>(null);
 	let authEnabled = $state(false);
 	let setupRequired = $state(false);
+	let embySsoEnabled = $state(false);
 	let checked = $state(false);
 
 	async function checkStatus() {
@@ -17,6 +18,7 @@ function createAuthStore() {
 				const data = await res.json();
 				authEnabled = data.auth_enabled;
 				setupRequired = data.setup_required;
+				embySsoEnabled = data.emby_enabled ?? false;
 			}
 		} catch {
 			// backend unreachable — assume no auth
@@ -61,6 +63,9 @@ function createAuthStore() {
 		},
 		get setupRequired() {
 			return setupRequired;
+		},
+		get embySsoEnabled() {
+			return embySsoEnabled;
 		},
 		get checked() {
 			return checked;

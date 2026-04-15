@@ -28,6 +28,7 @@ class RequestService:
         artist_mbid: str | None = None,
         monitor_artist: bool = False,
         auto_download_artist: bool = False,
+        requested_by: str | None = None,
     ) -> RequestAcceptedResponse:
         if not self._lidarr_repo.is_configured():
             raise ExternalServiceError("Lidarr isn't configured. Add an API key in Settings before requesting albums.")
@@ -56,6 +57,7 @@ class RequestService:
                 artist_mbid=artist_mbid,
                 monitor_artist=monitor_artist,
                 auto_download_artist=auto_download_artist,
+                requested_by=requested_by,
             )
         except Exception as e:  # noqa: BLE001
             logger.error("Failed to record request history for %s: %s", musicbrainz_id, e)

@@ -144,6 +144,18 @@ Create playlists from any mix of Jellyfin, Navidrome, Plex, local, and YouTube t
 
 Set a display name and avatar, view connected services, and check your library statistics from a profile page.
 
+### Authentication & Multi-User
+
+MusicSeerr includes an optional authentication system for multi-user deployments:
+
+- **Local accounts** — username and password login. The first account is created at `/setup` and gets admin privileges.
+- **Plex SSO** — users can sign in with their Plex account. MusicSeerr verifies they have access to the configured Plex server and creates a local account automatically.
+- **Emby SSO** — users can sign in with their Emby credentials. Configure the Emby server URL under Settings > Users & Access.
+- **Per-user request limits** — admins can set a request quota (e.g. 10 requests per 7 days) globally or override it per user. Users who hit their quota get a clear error. Admins are always unlimited.
+- **User management** — admins can view all accounts, change roles, adjust quotas, toggle request permissions, and remove users from Settings > Users & Access.
+
+Authentication is entirely optional. When disabled, the app behaves exactly as before — no login required.
+
 ---
 
 ## Integrations
@@ -157,7 +169,8 @@ Set a display name and avatar, view connected services, and check your library s
 | [Wikidata](https://www.wikidata.org/) | Artist descriptions and external links |
 | [Jellyfin](https://jellyfin.org/) | Audio streaming and library browsing |
 | [Navidrome](https://www.navidrome.org/) | Audio streaming via Subsonic API |
-| [Plex](https://www.plex.tv/) | Audio streaming and library browsing via Plex Media Server |
+| [Plex](https://www.plex.tv/) | Audio streaming, library browsing, and SSO login |
+| [Emby](https://emby.media/) | SSO login (authenticate users against your Emby server) |
 | [ListenBrainz](https://listenbrainz.org/) | Listening history, discovery, scrobbling, weekly playlists |
 | [Last.fm](https://www.last.fm/) | Scrobbling and listen tracking |
 | YouTube | Album playback when no local copy exists |
@@ -199,6 +212,20 @@ Run `id` on your host to find your PUID and PGID values.
 | Scrobbling toggles per service | Settings > Scrobbling |
 | Home page layout preferences | Settings > Preferences |
 | AudioDB settings and cache TTLs | Settings > Advanced |
+| Require login, user accounts, request quotas | Settings > Users & Access |
+| Emby SSO server URL | Settings > Users & Access > Authentication Providers |
+
+### Setting Up Authentication
+
+Authentication is disabled by default. To enable it:
+
+1. Navigate to `/setup` (or visit Settings > Users & Access and follow the prompt) to create the first admin account.
+2. Toggle **Require Login** on in Settings > Users & Access.
+
+Once enabled, users can sign in with:
+- A local username and password
+- Their Plex account (if Plex is configured under Settings > Plex)
+- Their Emby account (configure the Emby server URL under Settings > Users & Access > Authentication Providers)
 
 ### Setting Up Last.fm
 
@@ -268,7 +295,7 @@ Map both `/app/config` and `/app/cache` to persistent host directories so they s
 
 ## API
 
-Interactive API docs (Swagger UI) are available at `/api/v1/docs` on your MusicSeerr instance.
+Interactive API docs (Swagger UI) are available at `/api/v1/docs` on your MusicSeerr instance (development mode only).
 
 A health check endpoint is at `/health`.
 

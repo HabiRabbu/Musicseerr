@@ -23,6 +23,7 @@ class RequestHistoryRecord(msgspec.Struct):
     lidarr_album_id: int | None = None
     monitor_artist: bool = False
     auto_download_artist: bool = False
+    requested_by: str | None = None
 
 
 class RequestHistoryStore:
@@ -67,13 +68,20 @@ class RequestHistoryStore:
             conn.execute(
                 "CREATE INDEX IF NOT EXISTS idx_request_history_status_requested_at ON request_history(status, requested_at DESC)"
             )
-            # Migrate existing tables missing the monitoring columns
-            for col in ("monitor_artist", "auto_download_artist"):
+            # Migrate existing tables missing columns
+            for col, definition in [
+                ("monitor_artist", "INTEGER NOT NULL DEFAULT 0"),
+                ("auto_download_artist", "INTEGER NOT NULL DEFAULT 0"),
+                ("requested_by", "TEXT"),
+            ]:
                 try:
-                    conn.execute(f"ALTER TABLE request_history ADD COLUMN {col} INTEGER NOT NULL DEFAULT 0")
+                    conn.execute(f"ALTER TABLE request_history ADD COLUMN {col} {definition}")
                 except sqlite3.OperationalError as e:
                     if "duplicate column" not in str(e).lower():
                         logger.warning("Unexpected error adding column %s: %s", col, e)
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_request_history_requested_by ON request_history(requested_by, requested_at DESC)"
+            )
             conn.commit()
         finally:
             conn.close()
@@ -118,6 +126,7 @@ class RequestHistoryStore:
             lidarr_album_id=row["lidarr_album_id"],
             monitor_artist=bool(row["monitor_artist"]) if row["monitor_artist"] is not None else False,
             auto_download_artist=bool(row["auto_download_artist"]) if row["auto_download_artist"] is not None else False,
+            requested_by=row["requested_by"] if "requested_by" in row.keys() else None,
         )
 
     async def async_record_request(
@@ -131,6 +140,7 @@ class RequestHistoryStore:
         lidarr_album_id: int | None = None,
         monitor_artist: bool = False,
         auto_download_artist: bool = False,
+        requested_by: str | None = None,
     ) -> None:
         requested_at = datetime.now(timezone.utc).isoformat()
         normalized_mbid = musicbrainz_id.lower()
@@ -141,8 +151,8 @@ class RequestHistoryStore:
                 INSERT INTO request_history (
                     musicbrainz_id_lower, musicbrainz_id, artist_name, album_title,
                     artist_mbid, year, cover_url, requested_at, completed_at, status, lidarr_album_id,
-                    monitor_artist, auto_download_artist
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, 'pending', ?, ?, ?)
+                    monitor_artist, auto_download_artist, requested_by
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, 'pending', ?, ?, ?, ?)
                 ON CONFLICT(musicbrainz_id_lower) DO UPDATE SET
                     musicbrainz_id = excluded.musicbrainz_id,
                     artist_name = excluded.artist_name,
@@ -155,7 +165,8 @@ class RequestHistoryStore:
                     status = 'pending',
                     lidarr_album_id = COALESCE(excluded.lidarr_album_id, request_history.lidarr_album_id),
                     monitor_artist = excluded.monitor_artist,
-                    auto_download_artist = excluded.auto_download_artist
+                    auto_download_artist = excluded.auto_download_artist,
+                    requested_by = COALESCE(excluded.requested_by, request_history.requested_by)
                 """,
                 (
                     normalized_mbid,
@@ -169,10 +180,25 @@ class RequestHistoryStore:
                     lidarr_album_id,
                     int(monitor_artist),
                     int(auto_download_artist),
+                    requested_by,
                 ),
             )
 
         await self._write(operation)
+
+    async def async_count_user_requests(self, username: str, days: int) -> int:
+        """Count how many requests this user has made in the last N days."""
+        from datetime import timedelta
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+
+        def operation(conn: sqlite3.Connection) -> int:
+            row = conn.execute(
+                "SELECT COUNT(*) AS count FROM request_history WHERE requested_by = ? AND requested_at >= ?",
+                (username, cutoff),
+            ).fetchone()
+            return int(row["count"] if row else 0)
+
+        return await self._read(operation)
 
     async def async_get_record(self, musicbrainz_id: str) -> RequestHistoryRecord | None:
         normalized_mbid = musicbrainz_id.lower()
