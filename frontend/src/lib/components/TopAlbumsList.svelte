@@ -54,10 +54,10 @@
 
 	function isMonitored(album: TopAlbum): boolean {
 		if (isInLibrary(album) || isRequested(album)) return false;
-		if (album.monitored) return true;
 		const mbid = album.release_group_mbid?.toLowerCase();
 		if (!mbid) return false;
-		return monitoredMbids.has(mbid);
+		if (storeInitialized) return monitoredMbids.has(mbid);
+		return album.monitored || monitoredMbids.has(mbid);
 	}
 
 	function isRequesting(album: TopAlbum): boolean {
@@ -154,7 +154,10 @@
 										try {
 											await toggleAlbumMonitored(album.release_group_mbid, false);
 										} catch {
-											toastStore.show({ message: 'Failed to update monitoring status', type: 'error' });
+											toastStore.show({
+												message: 'Failed to update monitoring status',
+												type: 'error'
+											});
 										}
 									}}
 								/>

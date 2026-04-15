@@ -59,11 +59,11 @@
 	function handleClick(e: Event) {
 		e.stopPropagation();
 		e.preventDefault();
-		if (status === 'monitored' && ontogglemonitored) {
-			ontogglemonitored();
-		} else {
-			showDeleteModal = true;
+		if (status === 'monitored') {
+			ontogglemonitored?.();
+			return;
 		}
+		showDeleteModal = true;
 	}
 
 	function handleDeleted(result: { artist_removed: boolean; artist_name?: string | null }) {

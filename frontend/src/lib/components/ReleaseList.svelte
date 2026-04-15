@@ -67,16 +67,9 @@
 		aria-label={ariaLabel}
 	>
 		{#if requestingIds.has(rg.id)}
-			<span
-				class="loading loading-spinner loading-xs"
-				style="color: {colors.secondary};"
-			></span>
+			<span class="loading loading-spinner loading-xs" style="color: {colors.secondary};"></span>
 		{:else}
-			<Download
-				class="h-4 w-4 sm:h-5 sm:w-5"
-				color={colors.secondary}
-				strokeWidth={2.5}
-			/>
+			<Download class="h-4 w-4 sm:h-5 sm:w-5" color={colors.secondary} strokeWidth={2.5} />
 		{/if}
 	</button>
 {/snippet}
@@ -150,7 +143,10 @@
 												rg.monitored = false;
 												releases = releases;
 											} catch {
-												toastStore.show({ message: 'Failed to update monitoring status', type: 'error' });
+												toastStore.show({
+													message: 'Failed to update monitoring status',
+													type: 'error'
+												});
 											}
 										}}
 									/>

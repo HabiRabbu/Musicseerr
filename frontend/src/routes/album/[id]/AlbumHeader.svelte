@@ -235,7 +235,7 @@
 			{/if}
 
 			{#if showMonitorToggle}
-				<div class="flex items-center gap-2 pt-2">
+				<label class="flex items-center gap-2 pt-2 cursor-pointer">
 					<Bookmark class="h-4 w-4 text-base-content/70" />
 					<span class="text-sm text-base-content/70">Monitor</span>
 					{#if monitorToggleLoading}
@@ -248,7 +248,7 @@
 							class="toggle toggle-sm toggle-accent"
 						/>
 					{/if}
-				</div>
+				</label>
 			{/if}
 		</div>
 	</div>

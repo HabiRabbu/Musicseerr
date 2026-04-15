@@ -1,4 +1,3 @@
-from typing import Optional
 import logging
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, status
@@ -180,6 +179,11 @@ async def set_album_monitored(
         return {"success": True}
     except HTTPException:
         raise
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid album request"
+        )
     except Exception as e:  # noqa: BLE001
         logger.error(f"Failed to update monitoring status: {e}")
         raise HTTPException(

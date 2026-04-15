@@ -330,6 +330,7 @@ class HomeChartsService:
                 range_=range_key, count=limit + 1, offset=offset
             ),
             self._lidarr_repo.get_monitored_no_files_mbids(),
+            return_exceptions=True,
         )
         library_mbids = {(a.musicbrainz_id or "").lower() for a in library_albums if a.musicbrainz_id}
         monitored_mbids = monitored_mbids_result if not isinstance(monitored_mbids_result, BaseException) else set()
@@ -378,6 +379,7 @@ class HomeChartsService:
         library_albums, monitored_mbids_result = await asyncio.gather(
             self._lidarr_repo.get_library(include_unmonitored=True),
             self._lidarr_repo.get_monitored_no_files_mbids(),
+            return_exceptions=True,
         )
         library_mbids = {
             (a.musicbrainz_id or "").lower() for a in library_albums if a.musicbrainz_id
@@ -492,6 +494,7 @@ class HomeChartsService:
             ),
             self._lidarr_repo.get_library(include_unmonitored=True),
             self._lidarr_repo.get_monitored_no_files_mbids(),
+            return_exceptions=True,
         )
         library_mbids = {
             (a.musicbrainz_id or "").lower() for a in library_albums if a.musicbrainz_id
@@ -541,6 +544,7 @@ class HomeChartsService:
         library_albums, monitored_mbids_result = await asyncio.gather(
             self._lidarr_repo.get_library(include_unmonitored=True),
             self._lidarr_repo.get_monitored_no_files_mbids(),
+            return_exceptions=True,
         )
         library_mbids = {
             (a.musicbrainz_id or "").lower() for a in library_albums if a.musicbrainz_id
@@ -605,6 +609,7 @@ class HomeChartsService:
                 username=lb_username, range_=range_key, count=limit + 1, offset=offset
             ),
             self._lidarr_repo.get_monitored_no_files_mbids(),
+            return_exceptions=True,
         )
         library_mbids = {
             (a.musicbrainz_id or "").lower() for a in library_albums if a.musicbrainz_id

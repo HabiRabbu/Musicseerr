@@ -6,6 +6,7 @@
 	import { integrationStore } from '$lib/stores/integration';
 	import { requestAlbum } from '$lib/utils/albumRequest';
 	import { toggleAlbumMonitored } from '$lib/utils/monitorAlbum';
+	import { toastStore } from '$lib/stores/toast';
 	import { formatListenCount } from '$lib/utils/formatting';
 	import { getListenTitle } from '$lib/utils/enrichment';
 	import { Download, Music2 } from 'lucide-svelte';
@@ -69,6 +70,8 @@
 			await toggleAlbumMonitored(album.musicbrainz_id, false);
 			album.monitored = false;
 			album = album;
+		} catch {
+			toastStore.show({ message: 'Failed to update monitoring status', type: 'error' });
 		} finally {
 			monitoredLoading = false;
 		}
