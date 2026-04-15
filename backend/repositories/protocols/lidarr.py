@@ -49,6 +49,9 @@ class LidarrRepositoryProtocol(Protocol):
     async def get_requested_mbids(self) -> set[str]:
         ...
 
+    async def get_monitored_no_files_mbids(self) -> set[str]:
+        ...
+
     async def delete_album(self, album_id: int, delete_files: bool = False) -> bool:
         ...
 
@@ -91,4 +94,7 @@ class LidarrRepositoryProtocol(Protocol):
     async def update_artist_monitoring(
         self, artist_mbid: str, *, monitored: bool, monitor_new_items: str = "none",
     ) -> dict[str, Any]:
+        ...
+
+    async def set_monitored(self, album_mbid: str, monitored: bool) -> bool:
         ...

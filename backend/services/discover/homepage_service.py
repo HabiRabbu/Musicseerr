@@ -167,6 +167,13 @@ class DiscoverHomepageService:
 
         library_mbids = await self._mbid.get_library_artist_mbids(lidarr_configured)
 
+        monitored_mbids: set[str] = set()
+        if lidarr_configured:
+            try:
+                monitored_mbids = await self._lidarr_repo.get_monitored_no_files_mbids()
+            except Exception:  # noqa: BLE001
+                logger.debug("Failed to fetch monitored MBIDs for discover page")
+
         seed_artists = await self._get_seed_artists(
             lb_enabled, username, jf_enabled,
             resolved_source=resolved_source,
@@ -214,8 +221,8 @@ class DiscoverHomepageService:
             tasks["jf_most_played"] = self._jf_repo.get_most_played_artists(limit=50)
 
         if lidarr_configured:
-            tasks["library_artists"] = self._lidarr_repo.get_artists_from_library()
-            tasks["library_albums"] = self._lidarr_repo.get_library()
+            tasks["library_artists"] = self._lidarr_repo.get_artists_from_library(include_unmonitored=True)
+            tasks["library_albums"] = self._lidarr_repo.get_library(include_unmonitored=True)
 
         results = await self._execute_tasks(tasks)
 
@@ -231,15 +238,15 @@ class DiscoverHomepageService:
         )
         await self._enrich_because_sections_audiodb(response.because_you_listen_to)
 
-        response.fresh_releases = self._build_fresh_releases(results, library_mbids)
+        response.fresh_releases = self._build_fresh_releases(results, library_mbids, monitored_mbids)
 
         post_tasks: dict[str, Any] = {
-            "missing_essentials": self._build_missing_essentials(results, library_mbids),
+            "missing_essentials": self._build_missing_essentials(results, library_mbids, monitored_mbids),
             "lastfm_weekly_album_chart": self._build_lastfm_weekly_album_chart(
-                results, library_mbids
+                results, library_mbids, monitored_mbids
             ),
             "lastfm_recent_scrobbles": self._build_lastfm_recent_scrobbles(
-                results, library_mbids
+                results, library_mbids, monitored_mbids
             ),
         }
         if resolved_source == "listenbrainz" and lb_enabled and username:
@@ -464,7 +471,8 @@ class DiscoverHomepageService:
         return sections
 
     def _build_fresh_releases(
-        self, results: dict[str, Any], library_mbids: set[str]
+        self, results: dict[str, Any], library_mbids: set[str],
+        monitored_mbids: set[str] | None = None,
     ) -> HomeSection | None:
         releases = results.get("lb_fresh")
         if not releases:
@@ -475,16 +483,22 @@ class DiscoverHomepageService:
                 if isinstance(r, dict):
                     mbid = r.get("release_group_mbid", "")
                     artist_mbids = r.get("artist_mbids", [])
+                    in_lib = mbid.lower() in library_mbids if isinstance(mbid, str) and mbid else False
+                    is_monitored = (
+                        not in_lib and bool(monitored_mbids) and isinstance(mbid, str) and mbid
+                        and mbid.lower() in monitored_mbids
+                    )
                     items.append(HomeAlbum(
                         mbid=mbid,
                         name=r.get("title", r.get("release_group_name", "Unknown")),
                         artist_name=r.get("artist_credit_name", r.get("artist_name", "")),
                         artist_mbid=artist_mbids[0] if artist_mbids else None,
                         listen_count=r.get("listen_count"),
-                        in_library=mbid.lower() in library_mbids if isinstance(mbid, str) and mbid else False,
+                        in_library=in_lib,
+                        monitored=is_monitored,
                     ))
                 else:
-                    items.append(self._transformers.lb_release_to_home(r, library_mbids))
+                    items.append(self._transformers.lb_release_to_home(r, library_mbids, monitored_mbids))
             except Exception as e:  # noqa: BLE001
                 logger.debug(f"Skipping fresh release item: {e}")
                 continue
@@ -498,7 +512,8 @@ class DiscoverHomepageService:
         )
 
     async def _build_missing_essentials(
-        self, results: dict[str, Any], library_mbids: set[str]
+        self, results: dict[str, Any], library_mbids: set[str],
+        monitored_mbids: set[str] | None = None,
     ) -> HomeSection | None:
         library_artists = results.get("library_artists") or []
         library_albums = results.get("library_albums") or []
@@ -551,6 +566,7 @@ class DiscoverHomepageService:
                     artist_name=rg.artist_name,
                     listen_count=rg.listen_count,
                     in_library=False,
+                    monitored=bool(monitored_mbids) and rg_mbid.lower() in monitored_mbids,
                 ))
                 artist_missing += 1
 
@@ -904,6 +920,7 @@ class DiscoverHomepageService:
         self,
         results: dict[str, Any],
         library_mbids: set[str],
+        monitored_mbids: set[str] | None = None,
     ) -> HomeSection | None:
         albums = results.get("lfm_weekly_albums") or []
         if not albums:
@@ -914,7 +931,7 @@ class DiscoverHomepageService:
 
         items = []
         for album in albums[:20]:
-            home_album = self._transformers.lastfm_album_to_home(album, library_mbids)
+            home_album = self._transformers.lastfm_album_to_home(album, library_mbids, monitored_mbids)
             if home_album and home_album.mbid:
                 home_album.mbid = rg_map.get(home_album.mbid, home_album.mbid)
                 items.append(home_album)
@@ -933,6 +950,7 @@ class DiscoverHomepageService:
         self,
         results: dict[str, Any],
         library_mbids: set[str],
+        monitored_mbids: set[str] | None = None,
     ) -> HomeSection | None:
         tracks = results.get("lfm_recent") or []
         if not tracks:
@@ -944,7 +962,7 @@ class DiscoverHomepageService:
         items = []
         seen_album_mbids: set[str] = set()
         for track in tracks[:30]:
-            home_album = self._transformers.lastfm_recent_to_home(track, library_mbids)
+            home_album = self._transformers.lastfm_recent_to_home(track, library_mbids, monitored_mbids)
             if home_album and home_album.mbid:
                 resolved = rg_map.get(home_album.mbid, home_album.mbid)
                 home_album.mbid = resolved

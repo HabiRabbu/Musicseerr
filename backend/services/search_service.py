@@ -164,7 +164,7 @@ class SearchService:
             limits["albums"] = limit_albums
         
         try:
-            grouped, library_mbids_raw, queue_items_raw = await self._safe_gather(
+            grouped, library_mbids_raw, queue_items_raw, monitored_mbids_raw = await self._safe_gather(
                 self._mb_repo.search_grouped(
                     query,
                     limits=limits,
@@ -173,10 +173,11 @@ class SearchService:
                 ),
                 self._lidarr_repo.get_library_mbids(include_release_ids=True),
                 self._lidarr_repo.get_queue(),
+                self._lidarr_repo.get_monitored_no_files_mbids(),
             )
         except Exception as e:  # noqa: BLE001
             logger.error(f"Search gather failed unexpectedly: {e}")
-            grouped, library_mbids_raw, queue_items_raw = None, None, None
+            grouped, library_mbids_raw, queue_items_raw, monitored_mbids_raw = None, None, None, None
         
         if grouped is None:
             logger.warning("MusicBrainz search returned no results or failed")
@@ -188,10 +189,13 @@ class SearchService:
         else:
             queued_mbids = set()
 
+        monitored_mbids = monitored_mbids_raw or set()
+
         for item in grouped.get("albums", []):
             mbid_lower = (item.musicbrainz_id or "").lower()
             item.in_library = mbid_lower in library_mbids
             item.requested = mbid_lower in queued_mbids and not item.in_library
+            item.monitored = mbid_lower in monitored_mbids and not item.in_library and not item.requested
 
         all_results = grouped.get("artists", []) + grouped.get("albums", [])
         await self._apply_audiodb_search_overlay(all_results)
@@ -246,9 +250,10 @@ class SearchService:
             return [], None
         
         if bucket == "albums":
-            library_mbids_raw, queue_items_raw = await self._safe_gather(
+            library_mbids_raw, queue_items_raw, monitored_mbids_raw = await self._safe_gather(
                 self._lidarr_repo.get_library_mbids(include_release_ids=True),
                 self._lidarr_repo.get_queue(),
+                self._lidarr_repo.get_monitored_no_files_mbids(),
             )
             library_mbids = library_mbids_raw or set()
             if queue_items_raw:
@@ -256,10 +261,13 @@ class SearchService:
             else:
                 queued_mbids = set()
 
+            monitored_mbids = monitored_mbids_raw or set()
+
             for item in results:
                 mbid_lower = (item.musicbrainz_id or "").lower()
                 item.in_library = mbid_lower in library_mbids
                 item.requested = mbid_lower in queued_mbids and not item.in_library
+                item.monitored = mbid_lower in monitored_mbids and not item.in_library and not item.requested
 
         await self._apply_audiodb_search_overlay(results)
 
@@ -288,9 +296,10 @@ class SearchService:
 
         grouped = grouped or {"artists": [], "albums": []}
 
-        library_mbids_raw, queue_items_raw = await self._safe_gather(
+        library_mbids_raw, queue_items_raw, monitored_mbids_raw = await self._safe_gather(
             self._lidarr_repo.get_library_mbids(include_release_ids=True),
             self._lidarr_repo.get_queue(),
+            self._lidarr_repo.get_monitored_no_files_mbids(),
         )
         library_mbids = library_mbids_raw or set()
         if queue_items_raw:
@@ -298,10 +307,13 @@ class SearchService:
         else:
             queued_mbids = set()
 
+        monitored_mbids = monitored_mbids_raw or set()
+
         for item in grouped.get("albums", []):
             mbid_lower = (item.musicbrainz_id or "").lower()
             item.in_library = mbid_lower in library_mbids
             item.requested = mbid_lower in queued_mbids and not item.in_library
+            item.monitored = mbid_lower in monitored_mbids and not item.in_library and not item.requested
 
         suggestions: list[SuggestResult] = []
         for item in grouped.get("artists", []) + grouped.get("albums", []):
@@ -313,6 +325,7 @@ class SearchService:
                 musicbrainz_id=item.musicbrainz_id,
                 in_library=item.in_library,
                 requested=item.requested,
+                monitored=item.monitored,
                 disambiguation=item.disambiguation,
                 score=item.score,
             ))

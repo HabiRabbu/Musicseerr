@@ -162,9 +162,10 @@ class HomeService:
                 )
 
         if lidarr_configured:
-            tasks["library_albums"] = self._lidarr_repo.get_library()
-            tasks["library_artists"] = self._lidarr_repo.get_artists_from_library()
+            tasks["library_albums"] = self._lidarr_repo.get_library(include_unmonitored=True)
+            tasks["library_artists"] = self._lidarr_repo.get_artists_from_library(include_unmonitored=True)
             tasks["recently_imported"] = self._lidarr_repo.get_recently_imported(limit=15)
+            tasks["monitored_mbids"] = self._lidarr_repo.get_monitored_no_files_mbids()
 
         if resolved_source == "listenbrainz" and lb_enabled and username:
             lb_settings = self._preferences.get_listenbrainz_connection()
@@ -195,6 +196,7 @@ class HomeService:
         library_album_mbids = {
             (a.musicbrainz_id or "").lower() for a in library_albums if a.musicbrainz_id
         }
+        monitored_mbids: set[str] = results.get("monitored_mbids") or set()
 
         response = HomeResponse(integration_status=integration_status)
 
@@ -207,10 +209,10 @@ class HomeService:
                 results, library_artist_mbids
             )
             response.popular_albums = self._builders.build_popular_albums_section(
-                results, library_album_mbids
+                results, library_album_mbids, monitored_mbids
             )
             response.your_top_albums = self._builders.build_lb_user_top_albums_section(
-                results, library_album_mbids
+                results, library_album_mbids, monitored_mbids
             )
             response.recently_played = self._builders.build_listenbrainz_recent_section(results)
             response.favorite_artists = self._builders.build_listenbrainz_favorites_section(results)
@@ -220,7 +222,7 @@ class HomeService:
                 results, library_artist_mbids
             )
             response.your_top_albums = self._builders.build_lastfm_top_albums_section(
-                results, library_album_mbids
+                results, library_album_mbids, monitored_mbids
             )
             response.recently_played = self._builders.build_lastfm_recent_section(results)
             response.favorite_artists = self._builders.build_lastfm_favorites_section(results)

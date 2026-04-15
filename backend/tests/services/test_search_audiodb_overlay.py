@@ -56,6 +56,7 @@ def _search_service(audiodb=None) -> SearchService:
     lidarr_repo = MagicMock()
     lidarr_repo.get_library_mbids = AsyncMock(return_value=set())
     lidarr_repo.get_queue = AsyncMock(return_value=[])
+    lidarr_repo.get_monitored_no_files_mbids = AsyncMock(return_value=set())
     coverart_repo = MagicMock()
     prefs = MagicMock()
     prefs.get_preferences.return_value = MagicMock(secondary_types=[])

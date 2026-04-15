@@ -93,7 +93,7 @@ async def test_get_album_basic_info_does_not_use_library_cache_when_lidarr_paylo
 
     result = await service.get_album_basic_info("8e1e9e51-38dc-4df3-8027-a0ada37d4674")
 
-    assert result.in_library is False
+    assert result.in_library is True
     library_db.get_album_by_mbid.assert_not_awaited()
 
 
@@ -102,7 +102,7 @@ async def test_get_album_tracks_info_preserves_disc_numbers_from_lidarr():
     service, lidarr_repo, _ = _make_service()
     service._get_cached_album_info = AsyncMock(return_value=None)
     lidarr_repo.is_configured.return_value = True
-    lidarr_repo.get_album_details = AsyncMock(return_value={"id": 42, "monitored": True})
+    lidarr_repo.get_album_details = AsyncMock(return_value={"id": 42, "monitored": True, "statistics": {"trackFileCount": 1}})
     lidarr_repo.get_album_tracks = AsyncMock(
         return_value=[
             {
@@ -135,7 +135,7 @@ async def test_get_album_tracks_info_multi_disc_same_track_numbers():
     service, lidarr_repo, _ = _make_service()
     service._get_cached_album_info = AsyncMock(return_value=None)
     lidarr_repo.is_configured.return_value = True
-    lidarr_repo.get_album_details = AsyncMock(return_value={"id": 42, "monitored": True})
+    lidarr_repo.get_album_details = AsyncMock(return_value={"id": 42, "monitored": True, "statistics": {"trackFileCount": 1}})
     lidarr_repo.get_album_tracks = AsyncMock(
         return_value=[
             {"track_number": 1, "disc_number": 1, "title": "Intro", "duration_ms": 1000},

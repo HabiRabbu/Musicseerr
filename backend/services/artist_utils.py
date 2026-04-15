@@ -106,11 +106,14 @@ def categorize_release_groups(
     included_primary_types: Optional[set[str]] = None,
     included_secondary_types: Optional[set[str]] = None,
     requested_mbids: Optional[set[str]] = None,
+    monitored_mbids: Optional[set[str]] = None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
     if included_primary_types is None:
         included_primary_types = {"album", "single", "ep", "broadcast", "other"}
     if requested_mbids is None:
         requested_mbids = set()
+    if monitored_mbids is None:
+        monitored_mbids = set()
     albums: list[ReleaseItem] = []
     singles: list[ReleaseItem] = []
     eps: list[ReleaseItem] = []
@@ -130,6 +133,7 @@ def categorize_release_groups(
             rg_id_lower = rg_id.lower() if rg_id else ""
             in_library = rg_id_lower in album_mbids if rg_id else False
             requested = rg_id_lower in requested_mbids if rg_id and not in_library else False
+            is_monitored = rg_id_lower in monitored_mbids if rg_id and not in_library and not requested else False
             rg_data = ReleaseItem(
                 id=rg_id,
                 title=rg.get("title"),
@@ -137,6 +141,7 @@ def categorize_release_groups(
                 first_release_date=rg.get("first-release-date"),
                 in_library=in_library,
                 requested=requested,
+                monitored=is_monitored,
             )
             if date := rg_data.first_release_date:
                 try:
@@ -182,6 +187,7 @@ def categorize_lidarr_albums(
         track_file_count = album.get("track_file_count", 0)
         in_library = track_file_count > 0 or (mbid_lower in _cache_mbids)
         requested = mbid_lower in _requested_mbids and not in_library
+        is_monitored = album.get("monitored", False) and not in_library and not requested
         album_data = ReleaseItem(
             id=mbid,
             title=album.get("title"),
@@ -190,6 +196,7 @@ def categorize_lidarr_albums(
             year=album.get("year"),
             in_library=in_library,
             requested=requested,
+            monitored=is_monitored,
         )
         if album_type == "album":
             albums.append(album_data)

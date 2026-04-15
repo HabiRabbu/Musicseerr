@@ -5,7 +5,7 @@ import time
 from typing import Any, Optional
 from core.config import Settings
 from core.exceptions import ExternalServiceError
-from infrastructure.cache.cache_keys import lidarr_raw_albums_key, lidarr_requested_mbids_key, LIDARR_PREFIX
+from infrastructure.cache.cache_keys import lidarr_raw_albums_key, lidarr_requested_mbids_key, lidarr_monitored_mbids_key, LIDARR_PREFIX
 from infrastructure.cache.memory_cache import CacheInterface
 from infrastructure.http.deduplication import get_deduplicator
 from infrastructure.resilience.retry import with_retry, CircuitBreaker
@@ -141,6 +141,7 @@ class LidarrBase:
         await self._cache.delete(lidarr_raw_albums_key())
         await self._cache.clear_prefix(f"{LIDARR_PREFIX}library:")
         await self._cache.delete(lidarr_requested_mbids_key())
+        await self._cache.delete(lidarr_monitored_mbids_key())
 
     async def _post(self, endpoint: str, data: dict[str, Any]) -> Any:
         return await self._request("POST", endpoint, json_data=data)

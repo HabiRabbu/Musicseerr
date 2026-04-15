@@ -167,6 +167,15 @@ class LibraryService:
         except Exception as e:  # noqa: BLE001
             logger.error(f"Failed to fetch requested mbids: {e}")
             raise ExternalServiceError(f"Failed to fetch requested mbids: {e}")
+
+    async def get_monitored_mbids(self) -> list[str]:
+        if not self._lidarr_repo.is_configured():
+            return []
+        try:
+            return list(await self._lidarr_repo.get_monitored_no_files_mbids())
+        except Exception as e:  # noqa: BLE001
+            logger.error(f"Failed to fetch monitored mbids: {e}")
+            raise ExternalServiceError(f"Failed to fetch monitored mbids: {e}")
     
     async def get_artists(self, limit: int | None = None) -> list[LibraryArtist]:
         try:
@@ -348,8 +357,8 @@ class LibraryService:
             
             sync_succeeded = False
             try:
-                albums = await self._lidarr_repo.get_library()
-                artists = await self._lidarr_repo.get_artists_from_library()
+                albums = await self._lidarr_repo.get_library(include_unmonitored=True)
+                artists = await self._lidarr_repo.get_artists_from_library(include_unmonitored=True)
                 
                 albums_data = [
                     {

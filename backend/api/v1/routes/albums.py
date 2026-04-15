@@ -1,4 +1,4 @@
-from typing import Optional
+import logging
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, status
 from core.exceptions import ClientDisconnectedError
@@ -11,9 +11,12 @@ from services.album_enrichment_service import AlbumEnrichmentService
 from services.navidrome_library_service import NavidromeLibraryService
 from infrastructure.validators import is_unknown_mbid
 from infrastructure.degradation import try_get_degradation_context
-from infrastructure.msgspec_fastapi import MsgSpecRoute
+from infrastructure.msgspec_fastapi import AppStruct, MsgSpecBody, MsgSpecRoute
 
 import msgspec.structs
+import msgspec
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(route_class=MsgSpecRoute, prefix="/albums", tags=["album"])
 
@@ -149,6 +152,44 @@ async def get_more_by_artist(
             detail="Invalid or unknown artist ID"
         )
     return await discovery_service.get_more_by_artist(artist_id, album_id, count)
+
+
+class MonitorRequest(AppStruct):
+    monitored: bool
+
+
+@router.put("/{album_id}/monitor")
+async def set_album_monitored(
+    album_id: str,
+    body: MonitorRequest = MsgSpecBody(MonitorRequest),
+    album_service: AlbumService = Depends(get_album_service),
+):
+    if is_unknown_mbid(album_id):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid or unknown album ID: {album_id}"
+        )
+    try:
+        success = await album_service.set_album_monitored(album_id, body.monitored)
+        if not success:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Album not found in Lidarr: {album_id}"
+            )
+        return {"success": True}
+    except HTTPException:
+        raise
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid album request"
+        )
+    except Exception as e:  # noqa: BLE001
+        logger.error(f"Failed to update monitoring status: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update monitoring status"
+        )
 
 
 @router.get("/{album_id}/lastfm", response_model=LastFmAlbumEnrichment)

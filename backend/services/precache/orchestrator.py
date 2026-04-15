@@ -210,12 +210,12 @@ class LibraryPrecacheService:
             if status_service.is_cancelled():
                 return
 
-            monitored_mbids: set[str] = set()
+            library_album_mbids_set: set[str] = set()
             for a in albums:
                 mbid = getattr(a, 'musicbrainz_id', None) if hasattr(a, 'musicbrainz_id') else a.get('mbid') if isinstance(a, dict) else None
                 if not is_unknown_mbid(mbid):
-                    monitored_mbids.add(mbid.lower())
-            deduped_release_groups = list(monitored_mbids)
+                    library_album_mbids_set.add(mbid.lower())
+            deduped_release_groups = list(library_album_mbids_set)
             if status_service.is_cancelled():
                 return
             items_needing_metadata = []
@@ -234,7 +234,7 @@ class LibraryPrecacheService:
             for rgid in deduped_release_groups:
                 if rgid in processed_albums:
                     continue
-                if rgid.lower() in monitored_mbids:
+                if rgid.lower() in library_album_mbids_set:
                     cache_filename = get_cache_filename(f"rg_{rgid}", "500")
                     file_path = self._cover_repo.cache_dir / f"{cache_filename}.bin"
                     cover_paths.append((rgid, file_path))
@@ -245,7 +245,7 @@ class LibraryPrecacheService:
             already_cached = len(deduped_release_groups) - len(items_to_process) - len(processed_albums)
             if items_to_process:
                 await status_service.update_phase('albums', len(items_to_process), generation=generation)
-                await self._album_phase.precache_album_data(items_to_process, monitored_mbids, status_service, library_album_mbids, len(processed_albums), generation=generation)
+                await self._album_phase.precache_album_data(items_to_process, library_album_mbids_set, status_service, library_album_mbids, len(processed_albums), generation=generation)
             else:
                 await status_service.skip_phase('albums', generation=generation)
 

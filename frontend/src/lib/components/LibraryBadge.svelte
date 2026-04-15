@@ -1,18 +1,20 @@
 <script lang="ts">
-	import { Check, Clock, Trash2 } from 'lucide-svelte';
+	import { Check, Clock, Trash2, Bookmark, BookmarkX } from 'lucide-svelte';
 	import { colors } from '$lib/colors';
 	import { STATUS_COLORS } from '$lib/constants';
 	import DeleteAlbumModal from './DeleteAlbumModal.svelte';
 	import ArtistRemovedModal from './ArtistRemovedModal.svelte';
 
 	interface Props {
-		status: 'library' | 'requested';
+		status: 'library' | 'requested' | 'monitored';
 		musicbrainzId: string;
 		albumTitle: string;
 		artistName: string;
 		size?: 'sm' | 'md' | 'lg';
 		positioning?: string;
 		ondeleted?: (result: { artist_removed: boolean; artist_name?: string | null }) => void;
+		ontogglemonitored?: () => void;
+		monitoredLoading?: boolean;
 	}
 
 	let {
@@ -22,7 +24,9 @@
 		artistName,
 		size = 'md',
 		positioning = '',
-		ondeleted
+		ondeleted,
+		ontogglemonitored,
+		monitoredLoading = false
 	}: Props = $props();
 
 	let showDeleteModal = $state(false);
@@ -31,11 +35,11 @@
 
 	const sizeClasses = $derived(
 		{
-			sm: { button: 'p-0.5', icon: 'w-2.5 h-2.5', strokeWidth: status === 'library' ? '3' : '2' },
-			md: { button: 'p-1.5', icon: 'h-4 w-4', strokeWidth: status === 'library' ? '3' : '2' },
+			sm: { button: 'p-1', icon: 'w-3.5 h-3.5', strokeWidth: status === 'library' ? '3' : '2' },
+			md: { button: 'p-1.5', icon: 'h-5 w-5', strokeWidth: status === 'library' ? '3' : '2' },
 			lg: {
 				button: 'p-0',
-				icon: 'h-4 w-4 sm:h-5 sm:w-5',
+				icon: 'h-5 w-5 sm:h-6 sm:w-6',
 				strokeWidth: status === 'library' ? '3' : '2'
 			}
 		}[size]
@@ -44,11 +48,21 @@
 	const lgButtonClass = $derived(
 		size === 'lg' ? 'w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center' : ''
 	);
-	const bgColor = $derived(status === 'library' ? colors.accent : STATUS_COLORS.REQUESTED);
+	const bgColor = $derived(
+		status === 'library'
+			? colors.accent
+			: status === 'requested'
+				? STATUS_COLORS.REQUESTED
+				: STATUS_COLORS.MONITORED
+	);
 
 	function handleClick(e: Event) {
 		e.stopPropagation();
 		e.preventDefault();
+		if (status === 'monitored') {
+			ontogglemonitored?.();
+			return;
+		}
 		showDeleteModal = true;
 	}
 
@@ -66,31 +80,62 @@
 	class="{positioning} rounded-full shadow-sm transition-colors duration-200 group/badge {sizeClasses.button} {lgButtonClass}"
 	style="background-color: {bgColor};"
 	onclick={handleClick}
-	onmouseenter={(e) => {
-		e.currentTarget.style.backgroundColor = '#ef4444';
-	}}
+	onmouseenter={status === 'monitored'
+		? (e) => {
+				e.currentTarget.style.filter = 'brightness(1.3)';
+			}
+		: (e) => {
+				e.currentTarget.style.backgroundColor = '#ef4444';
+			}}
 	onmouseleave={(e) => {
 		e.currentTarget.style.backgroundColor = bgColor;
+		e.currentTarget.style.filter = '';
 	}}
-	aria-label={status === 'library' ? 'Remove from library' : 'Remove request'}
+	aria-label={status === 'library'
+		? 'Remove from library'
+		: status === 'requested'
+			? 'Remove request'
+			: 'Toggle monitoring'}
+	disabled={monitoredLoading}
 >
-	{#if status === 'library'}
+	{#if monitoredLoading}
+		<span class="loading loading-spinner {sizeClasses.icon}" style="color: {colors.secondary};"
+		></span>
+	{:else if status === 'library'}
 		<Check
 			class="{sizeClasses.icon} group-hover/badge:hidden"
 			color={colors.secondary}
 			strokeWidth={Number(sizeClasses.strokeWidth)}
 		/>
-	{:else}
+	{:else if status === 'requested'}
 		<Clock
 			class="{sizeClasses.icon} group-hover/badge:hidden"
 			color={colors.secondary}
 			strokeWidth={Number(sizeClasses.strokeWidth)}
 		/>
+	{:else}
+		<Bookmark
+			class="{sizeClasses.icon} group-hover/badge:hidden"
+			color={colors.secondary}
+			strokeWidth={Number(sizeClasses.strokeWidth)}
+		/>
 	{/if}
-	<Trash2 class="{sizeClasses.icon} hidden group-hover/badge:block" color="white" strokeWidth={2} />
+	{#if status === 'monitored' && !monitoredLoading}
+		<BookmarkX
+			class="{sizeClasses.icon} hidden group-hover/badge:block"
+			color={colors.secondary}
+			strokeWidth={2}
+		/>
+	{:else if status !== 'monitored'}
+		<Trash2
+			class="{sizeClasses.icon} hidden group-hover/badge:block"
+			color="white"
+			strokeWidth={2}
+		/>
+	{/if}
 </button>
 
-{#if showDeleteModal}
+{#if status !== 'monitored' && showDeleteModal}
 	<DeleteAlbumModal
 		{albumTitle}
 		{artistName}

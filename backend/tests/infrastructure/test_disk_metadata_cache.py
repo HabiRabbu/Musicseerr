@@ -8,6 +8,10 @@ from infrastructure.cache.disk_cache import DiskMetadataCache
 from repositories.audiodb_models import AudioDBArtistImages, AudioDBAlbumImages
 
 
+def _cache_hash(identifier: str) -> str:
+    return hashlib.sha1(f"{DiskMetadataCache._CACHE_VERSION}:{identifier}".encode()).hexdigest()
+
+
 @pytest.mark.asyncio
 async def test_set_album_serializes_msgspec_struct_as_mapping(tmp_path):
     cache = DiskMetadataCache(base_path=tmp_path)
@@ -22,7 +26,7 @@ async def test_set_album_serializes_msgspec_struct_as_mapping(tmp_path):
 
     await cache.set_album(mbid, album_info, is_monitored=True)
 
-    cache_hash = hashlib.sha1(mbid.encode()).hexdigest()
+    cache_hash = _cache_hash(mbid)
     cache_file = tmp_path / "persistent" / "albums" / f"{cache_hash}.json"
     payload = json.loads(cache_file.read_text())
 
@@ -39,7 +43,7 @@ async def test_get_album_deletes_corrupt_string_payload(tmp_path):
     cache = DiskMetadataCache(base_path=tmp_path)
     mbid = "8e1e9e51-38dc-4df3-8027-a0ada37d4674"
 
-    cache_hash = hashlib.sha1(mbid.encode()).hexdigest()
+    cache_hash = _cache_hash(mbid)
     cache_file = tmp_path / "persistent" / "albums" / f"{cache_hash}.json"
     cache_file.parent.mkdir(parents=True, exist_ok=True)
     cache_file.write_text(json.dumps("AlbumInfo(title='Corrupt')"))
@@ -69,7 +73,7 @@ async def test_audiodb_artist_entity_routing(tmp_path):
     assert result["fanart_url"] == "https://example.com/fanart.jpg"
     assert result["lookup_source"] == "mbid"
 
-    cache_hash = hashlib.sha1(mbid.encode()).hexdigest()
+    cache_hash = _cache_hash(mbid)
     data_file = tmp_path / "recent" / "audiodb_artists" / f"{cache_hash}.json"
     assert data_file.exists()
 
@@ -93,7 +97,7 @@ async def test_audiodb_album_entity_routing(tmp_path):
     assert result["album_back_url"] == "https://example.com/album_back.jpg"
     assert result["lookup_source"] == "name"
 
-    cache_hash = hashlib.sha1(mbid.encode()).hexdigest()
+    cache_hash = _cache_hash(mbid)
     persistent_file = tmp_path / "persistent" / "audiodb_albums" / f"{cache_hash}.json"
     assert persistent_file.exists()
 
@@ -160,7 +164,7 @@ async def test_audiodb_monitored_persistent_vs_recent(tmp_path):
 
     await cache._set_entity("audiodb_artist", mbid, images, is_monitored=True, ttl_seconds=None)
 
-    cache_hash = hashlib.sha1(mbid.encode()).hexdigest()
+    cache_hash = _cache_hash(mbid)
     persistent_file = tmp_path / "persistent" / "audiodb_artists" / f"{cache_hash}.json"
     recent_file = tmp_path / "recent" / "audiodb_artists" / f"{cache_hash}.json"
     assert persistent_file.exists()

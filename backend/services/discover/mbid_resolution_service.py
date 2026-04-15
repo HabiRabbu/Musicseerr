@@ -223,7 +223,7 @@ class MbidResolutionService:
         if not lidarr_configured:
             return set()
         try:
-            artists = await self._lidarr_repo.get_artists_from_library()
+            artists = await self._lidarr_repo.get_artists_from_library(include_unmonitored=True)
             return {a.get("mbid", "").lower() for a in artists if a.get("mbid")}
         except Exception:  # noqa: BLE001
             logger.warning("Failed to fetch library artists from Lidarr")
