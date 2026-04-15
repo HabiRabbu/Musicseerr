@@ -66,7 +66,7 @@ class TestCooldownOnlyOnSuccess:
     async def test_retry_after_failed_sync_is_not_cooldown_blocked(self):
         call_count = 0
 
-        async def fail_then_succeed():
+        async def fail_then_succeed(**kwargs):
             nonlocal call_count
             call_count += 1
             if call_count == 1:
@@ -94,7 +94,7 @@ class TestSyncFutureDedup:
         call_count = 0
         sync_event = asyncio.Event()
 
-        async def slow_get_library():
+        async def slow_get_library(**kwargs):
             nonlocal call_count
             call_count += 1
             sync_event.set()
@@ -118,7 +118,7 @@ class TestSyncFutureDedup:
     @pytest.mark.asyncio
     async def test_concurrent_sync_failure_propagates_to_waiter(self):
         """When the producer fails, deduped waiters get the real exception."""
-        async def failing_get_library():
+        async def failing_get_library(**kwargs):
             await asyncio.sleep(0.05)
             raise RuntimeError("Lidarr DNS failure")
 

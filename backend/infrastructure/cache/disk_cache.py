@@ -18,6 +18,8 @@ def _decode_json(text: str) -> Any:
 
 
 class DiskMetadataCache:
+    _CACHE_VERSION = "v3"
+
     def __init__(
         self,
         base_path: Path,
@@ -57,7 +59,7 @@ class DiskMetadataCache:
 
     @staticmethod
     def _cache_hash(identifier: str) -> str:
-        return hashlib.sha1(identifier.encode()).hexdigest()
+        return hashlib.sha1(f"{DiskMetadataCache._CACHE_VERSION}:{identifier}".encode()).hexdigest()
 
     @staticmethod
     def _meta_path(file_path: Path) -> Path:

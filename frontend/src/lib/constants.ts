@@ -131,7 +131,8 @@ export const PLACEHOLDER_COLORS = {
 } as const;
 
 export const STATUS_COLORS = {
-	REQUESTED: '#F59E0B'
+	REQUESTED: '#F59E0B',
+	MONITORED: '#6B7280'
 } as const;
 
 export const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

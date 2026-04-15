@@ -32,6 +32,7 @@
 			musicbrainz_id: rg.id,
 			in_library: libraryStore.isInLibrary(rg.id) || rg.in_library,
 			requested: rg.requested,
+			monitored: rg.monitored,
 			cover_url: null,
 			type_info: rg.type
 		};

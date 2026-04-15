@@ -20,6 +20,7 @@ export type Album = {
 	musicbrainz_id: string;
 	in_library: boolean;
 	requested?: boolean;
+	monitored?: boolean;
 	cover_url?: string | null;
 	album_thumb_url?: string | null;
 	album_back_url?: string | null;
@@ -63,6 +64,7 @@ export type SuggestResult = {
 	musicbrainz_id: string;
 	in_library: boolean;
 	requested?: boolean;
+	monitored?: boolean;
 	disambiguation?: string | null;
 	score: number;
 };
@@ -111,6 +113,7 @@ export type ReleaseGroup = {
 	first_release_date?: string;
 	in_library: boolean;
 	requested?: boolean;
+	monitored?: boolean;
 };
 
 export type ExternalLink = {
@@ -207,6 +210,7 @@ export type AlbumInfo = {
 	total_length?: number | null;
 	in_library: boolean;
 	requested?: boolean;
+	monitored?: boolean;
 	cover_url?: string | null;
 	album_thumb_url?: string | null;
 	album_back_url?: string | null;
@@ -229,6 +233,7 @@ export type AlbumBasicInfo = {
 	disambiguation?: string | null;
 	in_library: boolean;
 	requested?: boolean;
+	monitored?: boolean;
 	cover_url?: string | null;
 	album_thumb_url?: string | null;
 };
@@ -274,6 +279,7 @@ export type HomeArtist = {
 	image_url: string | null;
 	listen_count: number | null;
 	in_library: boolean;
+	monitored?: boolean;
 };
 
 export type HomeAlbum = {
@@ -286,6 +292,7 @@ export type HomeAlbum = {
 	listen_count: number | null;
 	in_library: boolean;
 	requested?: boolean;
+	monitored?: boolean;
 };
 
 export type HomeTrack = {
@@ -506,6 +513,7 @@ export type SimilarArtist = {
 	name: string;
 	listen_count: number;
 	in_library: boolean;
+	monitored?: boolean;
 	image_url?: string | null;
 };
 
@@ -552,6 +560,7 @@ export type TopAlbum = {
 	listen_count: number;
 	in_library: boolean;
 	requested?: boolean;
+	monitored?: boolean;
 	cover_url?: string | null;
 };
 
@@ -569,6 +578,7 @@ export type DiscoveryAlbum = {
 	year?: number | null;
 	in_library: boolean;
 	requested?: boolean;
+	monitored?: boolean;
 	cover_url?: string | null;
 };
 
@@ -587,6 +597,7 @@ export type DiscoverQueueItemLight = {
 	recommendation_reason: string;
 	is_wildcard: boolean;
 	in_library: boolean;
+	monitored?: boolean;
 };
 
 export type DiscoverQueueEnrichment = {
@@ -747,6 +758,7 @@ export type RequestHistoryItem = {
 	completed_at?: string | null;
 	status: string;
 	in_library: boolean;
+	monitored?: boolean;
 };
 
 export type ActiveRequestsResponse = {

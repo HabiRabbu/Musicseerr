@@ -5,7 +5,7 @@
 	import AlbumImage from '$lib/components/AlbumImage.svelte';
 	import HeroBackdrop from '$lib/components/HeroBackdrop.svelte';
 	import { formatTotalDuration } from '$lib/utils/formatting';
-	import { Check, Trash2, Clock, Plus, RefreshCw } from 'lucide-svelte';
+	import { Check, Trash2, Clock, Plus, RefreshCw, Bookmark } from 'lucide-svelte';
 
 	interface Props {
 		album: AlbumBasicInfo;
@@ -13,16 +13,20 @@
 		loadingTracks: boolean;
 		inLibrary: boolean;
 		isRequested: boolean;
+		albumMonitored: boolean;
 		requesting: boolean;
 		refreshing: boolean;
 		pollingForSources: boolean;
 		lidarrConfigured: boolean;
+		monitorToggleLoading?: boolean;
 
 		artistMonitored?: boolean;
+		artistInLidarr?: boolean;
 		onrequest: (opts?: { monitorArtist?: boolean; autoDownloadArtist?: boolean }) => void;
 		ondelete: () => void;
 		onrefresh: () => void;
 		onartistclick: () => void;
+		ontogglemonitored: (monitored: boolean) => void;
 	}
 
 	let {
@@ -31,15 +35,19 @@
 		loadingTracks,
 		inLibrary,
 		isRequested,
+		albumMonitored,
 		requesting,
 		refreshing,
 		pollingForSources,
 		lidarrConfigured,
+		monitorToggleLoading = false,
 		artistMonitored = false,
+		artistInLidarr = false,
 		onrequest,
 		ondelete,
 		onrefresh,
-		onartistclick
+		onartistclick,
+		ontogglemonitored
 	}: Props = $props();
 
 	let monitorArtist = $state(false);
@@ -59,6 +67,8 @@
 				? getApiUrl(`/api/v1/covers/release-group/${album.musicbrainz_id}?size=250`)
 				: null)
 	);
+
+	const showMonitorToggle = $derived(lidarrConfigured && artistInLidarr);
 </script>
 
 <div class="album-hero group relative overflow-hidden rounded-2xl transition-all duration-500">
@@ -72,7 +82,7 @@
 	/>
 
 	<div class="relative z-10 flex flex-col lg:flex-row gap-6 lg:gap-8 p-4 sm:p-6 lg:p-8">
-		{#if (inLibrary || isRequested) && lidarrConfigured}
+		{#if (inLibrary || isRequested || albumMonitored) && lidarrConfigured}
 			<button
 				class="absolute top-3 right-3 btn btn-sm btn-ghost btn-circle z-20"
 				onclick={onrefresh}
@@ -222,6 +232,23 @@
 						</div>
 					{/if}
 				</div>
+			{/if}
+
+			{#if showMonitorToggle}
+				<label class="flex items-center gap-2 pt-2 cursor-pointer">
+					<Bookmark class="h-4 w-4 text-base-content/70" />
+					<span class="text-sm text-base-content/70">Monitor</span>
+					{#if monitorToggleLoading}
+						<span class="loading loading-spinner loading-xs"></span>
+					{:else}
+						<input
+							type="checkbox"
+							checked={albumMonitored}
+							onchange={() => ontogglemonitored(!albumMonitored)}
+							class="toggle toggle-sm toggle-accent"
+						/>
+					{/if}
+				</label>
 			{/if}
 		</div>
 	</div>

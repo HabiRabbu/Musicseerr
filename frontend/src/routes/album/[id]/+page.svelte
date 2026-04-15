@@ -59,15 +59,19 @@
 				loadingTracks={state.loadingTracks}
 				inLibrary={state.inLibrary}
 				isRequested={state.isRequested}
+				albumMonitored={state.albumMonitored}
 				requesting={state.requesting}
 				refreshing={state.refreshing}
 				pollingForSources={state.pollingForSources}
 				lidarrConfigured={$integrationStore.lidarr}
+				monitorToggleLoading={state.monitorToggleLoading}
 				artistMonitored={state.artistMonitored}
+				artistInLidarr={state.artistInLidarr}
 				onrequest={state.handleRequest}
 				ondelete={state.handleDeleteClick}
 				onrefresh={state.refreshAll}
 				onartistclick={state.goToArtist}
+				ontogglemonitored={state.handleToggleMonitored}
 			/>
 
 			{#if state.loadingTracks}

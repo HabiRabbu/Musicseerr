@@ -218,8 +218,15 @@ class ArtistService:
         library_album_mbids: dict[str, Any] | None,
     ) -> ArtistInfo:
         lidarr_artist = await self._lidarr_repo.get_artist_details(artist_id) if self._lidarr_repo.is_configured() else None
-        in_library = lidarr_artist is not None and lidarr_artist.get("monitored", False)
-        if in_library and lidarr_artist:
+        use_lidarr_data = False
+        if lidarr_artist is not None:
+            artist_monitored = lidarr_artist.get("monitored", False)
+            has_albums_with_files = any(
+                a.get("statistics", {}).get("trackFileCount", 0) > 0
+                for a in (lidarr_artist.get("albums") or [])
+            )
+            use_lidarr_data = artist_monitored or has_albums_with_files
+        if use_lidarr_data and lidarr_artist:
             artist_info = await self._build_artist_from_lidarr(artist_id, lidarr_artist, library_album_mbids)
         else:
             artist_info = await self._build_artist_from_musicbrainz(artist_id, library_artist_mbids, library_album_mbids)
@@ -390,11 +397,11 @@ class ArtistService:
         include_extended: bool = True,
         include_releases: bool = True,
     ) -> ArtistInfo:
-        mb_artist, library_mbids, album_mbids, requested_mbids = await self._fetch_artist_data(
+        mb_artist, library_mbids, album_mbids, requested_mbids, monitored_mbids = await self._fetch_artist_data(
             artist_id, library_artist_mbids, library_album_mbids
         )
         in_library = artist_id.lower() in library_mbids
-        albums, singles, eps = (await self._get_categorized_releases(mb_artist, album_mbids, requested_mbids)) if include_releases else ([], [], [])
+        albums, singles, eps = (await self._get_categorized_releases(mb_artist, album_mbids, requested_mbids, monitored_mbids)) if include_releases else ([], [], [])
         description, image = (await self._fetch_wikidata_info(mb_artist)) if include_extended else (None, None)
         info = build_base_artist_info(
             mb_artist, artist_id, in_library,
@@ -440,9 +447,10 @@ class ArtistService:
         if not self._lidarr_repo.is_configured():
             return
         try:
-            library_mbids, requested_mbids, artist_mbids = await asyncio.gather(
+            library_mbids, requested_mbids, monitored_mbids, artist_mbids = await asyncio.gather(
                 self._lidarr_repo.get_library_mbids(include_release_ids=False),
                 self._lidarr_repo.get_requested_mbids(),
+                self._lidarr_repo.get_monitored_no_files_mbids(),
                 self._lidarr_repo.get_artist_mbids(),
             )
             for release_list in (artist_info.albums, artist_info.singles, artist_info.eps):
@@ -452,6 +460,7 @@ class ArtistService:
                         continue
                     rg.in_library = rg_id in library_mbids
                     rg.requested = rg_id in requested_mbids and not rg.in_library
+                    rg.monitored = rg_id in monitored_mbids
             mbid_lower = artist_info.musicbrainz_id.lower()
             is_in_artist_mbids = mbid_lower in artist_mbids
             artist_info.in_library = is_in_artist_mbids
@@ -530,12 +539,20 @@ class ArtistService:
     ) -> ArtistReleases:
         try:
             lidarr_artist = await self._lidarr_repo.get_artist_details(artist_id)
-            in_library = lidarr_artist is not None and lidarr_artist.get("monitored", False)
+            has_lidarr_data = False
+            if lidarr_artist is not None:
+                artist_monitored = lidarr_artist.get("monitored", False)
+                has_albums_with_files = any(
+                    a.get("statistics", {}).get("trackFileCount", 0) > 0
+                    for a in (lidarr_artist.get("albums") or [])
+                )
+                has_lidarr_data = artist_monitored or has_albums_with_files
 
-            album_mbids, requested_mbids, cache_mbids = await asyncio.gather(
+            album_mbids, requested_mbids, cache_mbids, monitored_mbids = await asyncio.gather(
                 self._lidarr_repo.get_library_mbids(include_release_ids=True),
                 self._lidarr_repo.get_requested_mbids(),
                 self._get_library_cache_mbids(),
+                self._lidarr_repo.get_monitored_no_files_mbids(),
             )
             album_mbids = album_mbids | cache_mbids
 
@@ -543,7 +560,7 @@ class ArtistService:
             included_primary_types = set(t.lower() for t in prefs.primary_types)
             included_secondary_types = set(t.lower() for t in prefs.secondary_types)
 
-            if in_library:
+            if has_lidarr_data:
                 if offset == 0:
                     lidarr_albums = await self._lidarr_repo.get_artist_albums(artist_id)
                     albums, singles, eps = self._categorize_lidarr_albums(lidarr_albums, album_mbids, requested_mbids=requested_mbids)
@@ -567,7 +584,7 @@ class ArtistService:
 
             return await self._filter_aware_release_page(
                 artist_id, offset, limit, album_mbids, requested_mbids,
-                included_primary_types, included_secondary_types,
+                included_primary_types, included_secondary_types, monitored_mbids,
             )
         except Exception as e:  # noqa: BLE001
             logger.error(f"Error fetching releases for artist {artist_id} at offset {offset}: {e}")
@@ -586,6 +603,7 @@ class ArtistService:
         requested_mbids: set[str],
         included_primary_types: set[str],
         included_secondary_types: set[str],
+        monitored_mbids: set[str] | None = None,
     ) -> ArtistReleases:
         if not included_primary_types:
             return ArtistReleases(
@@ -618,7 +636,7 @@ class ArtistService:
             temp_artist = {"release-group-list": release_groups}
             page_albums, page_singles, page_eps = categorize_release_groups(
                 temp_artist, album_mbids, included_primary_types,
-                included_secondary_types, requested_mbids,
+                included_secondary_types, requested_mbids, monitored_mbids,
             )
 
             for item in page_albums:
@@ -669,24 +687,27 @@ class ArtistService:
         artist_id: str,
         library_artist_mbids: set[str] = None,
         library_album_mbids: dict[str, Any] = None
-    ) -> tuple[dict, set[str], set[str], set[str]]:
+    ) -> tuple[dict, set[str], set[str], set[str], set[str]]:
         if library_artist_mbids is not None and library_album_mbids is not None:
             mb_artist = await self._mb_repo.get_artist_by_id(artist_id)
             library_mbids = library_artist_mbids
             album_mbids = library_album_mbids
-            requested_result = await asyncio.gather(
+            requested_result, monitored_result = await asyncio.gather(
                 self._lidarr_repo.get_requested_mbids(),
+                self._lidarr_repo.get_monitored_no_files_mbids(),
                 return_exceptions=True,
             )
-            requested_mbids = requested_result[0] if not isinstance(requested_result[0], BaseException) else set()
-            if isinstance(requested_result[0], BaseException):
-                logger.warning(f"Lidarr unavailable, proceeding without requested data: {requested_result[0]}")
+            requested_mbids = requested_result if not isinstance(requested_result, BaseException) else set()
+            monitored_mbids = monitored_result if not isinstance(monitored_result, BaseException) else set()
+            if isinstance(requested_result, BaseException):
+                logger.warning(f"Lidarr unavailable, proceeding without requested data: {requested_result}")
         else:
             mb_artist, *lidarr_results = await asyncio.gather(
                 self._mb_repo.get_artist_by_id(artist_id),
                 self._lidarr_repo.get_artist_mbids(),
                 self._lidarr_repo.get_library_mbids(include_release_ids=True),
                 self._lidarr_repo.get_requested_mbids(),
+                self._lidarr_repo.get_monitored_no_files_mbids(),
                 return_exceptions=True,
             )
             if isinstance(mb_artist, BaseException):
@@ -698,16 +719,15 @@ class ArtistService:
             library_mbids = lidarr_results[0] if not isinstance(lidarr_results[0], BaseException) else set()
             album_mbids = lidarr_results[1] if not isinstance(lidarr_results[1], BaseException) else set()
             requested_mbids = lidarr_results[2] if not isinstance(lidarr_results[2], BaseException) else set()
+            monitored_mbids = lidarr_results[3] if not isinstance(lidarr_results[3], BaseException) else set()
 
-        # Supplement with LibraryDB so monitored albums (even with trackFileCount=0)
-        # are recognised as "in library", consistent with the Library page.
         cache_mbids = await self._get_library_cache_mbids()
         album_mbids = album_mbids | cache_mbids
 
         if not mb_artist:
             raise ResourceNotFoundError("Artist not found")
 
-        return mb_artist, library_mbids, album_mbids, requested_mbids
+        return mb_artist, library_mbids, album_mbids, requested_mbids, monitored_mbids
     
     def _build_external_links(self, mb_artist: dict[str, Any]) -> list[ExternalLink]:
         external_links_data = extract_external_links(mb_artist)
@@ -720,7 +740,8 @@ class ArtistService:
         self,
         mb_artist: dict[str, Any],
         album_mbids: set[str],
-        requested_mbids: set[str] = None
+        requested_mbids: set[str] = None,
+        monitored_mbids: set[str] = None,
     ) -> tuple[list[ReleaseItem], list[ReleaseItem], list[ReleaseItem]]:
         prefs = self._preferences_service.get_preferences()
         included_primary_types = set(t.lower() for t in prefs.primary_types)
@@ -730,7 +751,8 @@ class ArtistService:
             album_mbids,
             included_primary_types,
             included_secondary_types,
-            requested_mbids or set()
+            requested_mbids or set(),
+            monitored_mbids or set(),
         )
     
     async def _fetch_wikidata_info(self, mb_artist: dict[str, Any]) -> tuple[Optional[str], Optional[str]]:

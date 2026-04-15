@@ -296,6 +296,20 @@ class LidarrAlbumRepository(LidarrHistoryRepository):
             logger.error(f"Failed to delete album {album_id}: {e}")
             raise
 
+    async def set_monitored(self, album_mbid: str, monitored: bool) -> bool:
+        lidarr_album = await self._get_album_by_foreign_id(album_mbid)
+        if not lidarr_album:
+            return False
+        album_id = lidarr_album.get("id")
+        artist_mbid = (lidarr_album.get("artist", {}).get("foreignArtistId") or "")
+        if not album_id:
+            return False
+        lock = _get_artist_lock(artist_mbid)
+        async with lock:
+            await self._update_album(album_id, {"monitored": monitored})
+        await self._invalidate_album_list_caches()
+        return True
+
     async def add_album(self, musicbrainz_id: str, artist_repo) -> dict:
         t0 = time.monotonic()
         if not musicbrainz_id or not isinstance(musicbrainz_id, str):

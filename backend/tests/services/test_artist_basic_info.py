@@ -42,6 +42,7 @@ def _make_service(*, cached_artist: ArtistInfo | None = None) -> tuple[ArtistSer
     lidarr_repo.is_configured.return_value = False
     lidarr_repo.get_library_mbids = AsyncMock(return_value=set())
     lidarr_repo.get_requested_mbids = AsyncMock(return_value=set())
+    lidarr_repo.get_monitored_no_files_mbids = AsyncMock(return_value=set())
     lidarr_repo.get_artist_mbids = AsyncMock(return_value=set())
 
     wikidata_repo = AsyncMock()

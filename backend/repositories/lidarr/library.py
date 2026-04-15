@@ -9,6 +9,7 @@ from infrastructure.cache.cache_keys import (
     lidarr_artist_mbids_key,
     lidarr_library_grouped_key,
     lidarr_requested_mbids_key,
+    lidarr_monitored_mbids_key,
 )
 from .base import LidarrBase
 
@@ -31,8 +32,14 @@ class LidarrLibraryRepository(LidarrBase):
 
         for item in data:
             is_monitored = item.get("monitored", False)
+            statistics = item.get("statistics", {})
+            has_files = statistics.get("trackFileCount", 0) > 0
 
             if not is_monitored and not include_unmonitored:
+                filtered_count += 1
+                continue
+
+            if not has_files:
                 filtered_count += 1
                 continue
 
@@ -92,8 +99,14 @@ class LidarrLibraryRepository(LidarrBase):
 
         for item in albums_data:
             is_monitored = item.get("monitored", False)
+            statistics = item.get("statistics", {})
+            has_files = statistics.get("trackFileCount", 0) > 0
 
             if not is_monitored and not include_unmonitored:
+                filtered_count += 1
+                continue
+
+            if not has_files:
                 filtered_count += 1
                 continue
 
@@ -139,6 +152,10 @@ class LidarrLibraryRepository(LidarrBase):
         grouped: dict[str, list[LibraryGroupedAlbum]] = {}
 
         for item in data:
+            statistics = item.get("statistics", {})
+            if statistics.get("trackFileCount", 0) == 0:
+                continue
+
             artist = item.get("artist", {}).get("artistName", "Unknown")
             title = item.get("title")
             year = None
@@ -182,9 +199,6 @@ class LidarrLibraryRepository(LidarrBase):
         data = await self._get_all_albums_raw()
         ids: set[str] = set()
         for item in data:
-            if not item.get("monitored", False):
-                continue
-
             statistics = item.get("statistics", {})
             track_file_count = statistics.get("trackFileCount", 0)
             if track_file_count == 0:
@@ -212,7 +226,9 @@ class LidarrLibraryRepository(LidarrBase):
         data = await self._get("/api/v1/artist")
         ids: set[str] = set()
         for item in data:
-            if not item.get("monitored", False):
+            is_monitored = item.get("monitored", False)
+            has_files = item.get("statistics", {}).get("trackFileCount", 0) > 0
+            if not is_monitored and not has_files:
                 continue
             mbid = item.get("foreignArtistId") or item.get("mbId")
             if isinstance(mbid, str):
@@ -232,7 +248,7 @@ class LidarrLibraryRepository(LidarrBase):
 
     async def get_monitored_no_files_mbids(self) -> set[str]:
         """Return monitored Lidarr albums that have no downloaded track files."""
-        cache_key = lidarr_requested_mbids_key()
+        cache_key = lidarr_monitored_mbids_key()
 
         cached_result = await self._cache.get(cache_key)
         if cached_result is not None:

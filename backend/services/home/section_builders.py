@@ -60,24 +60,24 @@ class HomeSectionBuilders:
         )
 
     def build_popular_albums_section(
-        self, results: dict[str, Any], library_mbids: set[str]
+        self, results: dict[str, Any], library_mbids: set[str], monitored_mbids: set[str] | None = None
     ) -> HomeSection:
         albums = results.get("lb_trending_albums") or []
         return HomeSection(
             title="Popular Right Now",
             type="albums",
-            items=[self._transformers.lb_release_to_home(a, library_mbids) for a in albums[:15]],
+            items=[self._transformers.lb_release_to_home(a, library_mbids, monitored_mbids) for a in albums[:15]],
             source="listenbrainz" if albums else None,
         )
 
     def build_lb_user_top_albums_section(
-        self, results: dict[str, Any], library_mbids: set[str]
+        self, results: dict[str, Any], library_mbids: set[str], monitored_mbids: set[str] | None = None
     ) -> HomeSection | None:
         release_groups = results.get("lb_user_top_rgs") or []
         if not release_groups:
             return None
         items = [
-            self._transformers.lb_release_to_home(rg, library_mbids)
+            self._transformers.lb_release_to_home(rg, library_mbids, monitored_mbids)
             for rg in release_groups[:15]
         ]
         return HomeSection(
@@ -95,7 +95,8 @@ class HomeSectionBuilders:
         return HomeSection(title="Browse by Genre", type="genres", items=genres, source=source)
 
     def build_fresh_releases_section(
-        self, results: dict[str, Any], library_mbids: set[str]
+        self, results: dict[str, Any], library_mbids: set[str],
+        monitored_mbids: set[str] | None = None,
     ) -> HomeSection | None:
         releases = results.get("lb_fresh")
         if not releases:
@@ -103,7 +104,7 @@ class HomeSectionBuilders:
         return HomeSection(
             title="New From Artists You Follow",
             type="albums",
-            items=[self._transformers.lb_release_to_home(r, library_mbids) for r in releases[:15]],
+            items=[self._transformers.lb_release_to_home(r, library_mbids, monitored_mbids) for r in releases[:15]],
             source="listenbrainz",
         )
 
@@ -170,12 +171,12 @@ class HomeSectionBuilders:
         )
 
     def build_lastfm_top_albums_section(
-        self, results: dict[str, Any], library_mbids: set[str]
+        self, results: dict[str, Any], library_mbids: set[str], monitored_mbids: set[str] | None = None
     ) -> HomeSection:
         albums = results.get("lfm_top_albums") or []
         items = [
             a for a in (
-                self._transformers.lastfm_album_to_home(album, library_mbids)
+                self._transformers.lastfm_album_to_home(album, library_mbids, monitored_mbids)
                 for album in albums[:15]
             )
             if a is not None

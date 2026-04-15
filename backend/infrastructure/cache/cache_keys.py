@@ -154,6 +154,10 @@ def lidarr_requested_mbids_key() -> str:
     return f"{LIDARR_REQUESTED_PREFIX}_mbids"
 
 
+def lidarr_monitored_mbids_key() -> str:
+    return f"{LIDARR_PREFIX}monitored_mbids"
+
+
 def lidarr_status_key() -> str:
     return f"{LIDARR_PREFIX}status"
 

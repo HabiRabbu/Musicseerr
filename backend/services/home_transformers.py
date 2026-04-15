@@ -70,9 +70,15 @@ class HomeDataTransformers:
     def lb_release_to_home(
         self,
         release: ListenBrainzReleaseGroup,
-        library_mbids: set[str]
+        library_mbids: set[str],
+        monitored_mbids: set[str] | None = None,
     ) -> HomeAlbum:
         artist_mbid = release.artist_mbids[0] if release.artist_mbids else None
+        mbid_lower = (release.release_group_mbid or "").lower()
+        in_library = mbid_lower in library_mbids
+        monitored = (
+            not in_library and bool(monitored_mbids) and mbid_lower in monitored_mbids
+        )
         return HomeAlbum(
             mbid=release.release_group_mbid,
             name=release.release_group_name,
@@ -81,7 +87,8 @@ class HomeDataTransformers:
             image_url=None,
             release_date=None,
             listen_count=release.listen_count,
-            in_library=(release.release_group_mbid or "").lower() in library_mbids,
+            in_library=in_library,
+            monitored=monitored,
         )
 
     def jf_item_to_artist(
@@ -130,7 +137,13 @@ class HomeDataTransformers:
         self,
         album: LastFmAlbum,
         library_mbids: set[str],
+        monitored_mbids: set[str] | None = None,
     ) -> HomeAlbum | None:
+        mbid_lower = album.mbid.lower() if album.mbid else ""
+        in_library = mbid_lower in library_mbids if mbid_lower else False
+        monitored = (
+            not in_library and bool(monitored_mbids) and mbid_lower in monitored_mbids
+        ) if mbid_lower else False
         return HomeAlbum(
             mbid=None,
             name=album.name,
@@ -138,7 +151,8 @@ class HomeDataTransformers:
             artist_mbid=None,
             image_url=album.image_url or None,
             listen_count=album.playcount,
-            in_library=album.mbid.lower() in library_mbids if album.mbid else False,
+            in_library=in_library,
+            monitored=monitored,
             source="lastfm",
         )
 
@@ -159,14 +173,21 @@ class HomeDataTransformers:
         self,
         track: LastFmRecentTrack,
         library_mbids: set[str],
+        monitored_mbids: set[str] | None = None,
     ) -> HomeAlbum | None:
+        mbid_lower = (track.album_mbid or "").lower()
+        in_library = mbid_lower in library_mbids if track.album_mbid else False
+        monitored = (
+            not in_library and bool(monitored_mbids) and bool(mbid_lower) and mbid_lower in monitored_mbids
+        )
         return HomeAlbum(
             mbid=track.album_mbid,
             name=track.album_name or track.track_name,
             artist_name=track.artist_name,
             artist_mbid=track.artist_mbid,
             image_url=track.image_url or None,
-            in_library=track.album_mbid.lower() in library_mbids if track.album_mbid else False,
+            in_library=in_library,
+            monitored=monitored,
             source="lastfm",
         )
 

@@ -24,6 +24,7 @@ class DiscoverQueueItemLight(AppStruct):
     cover_url: str | None = None
     is_wildcard: bool = False
     in_library: bool = False
+    monitored: bool = False
 
 
 class DiscoverQueueEnrichment(AppStruct):

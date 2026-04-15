@@ -108,6 +108,7 @@ export function createAlbumPageState(albumIdGetter: () => string) {
 	let playlistModalRef = $state<{ open: (tracks: QueueItem[]) => void } | null>(null);
 	let abortController: AbortController | null = null;
 	let refreshing = $state(false);
+	let monitorToggleLoading = $state(false);
 	let pollingForSources = $state(false);
 	let pollTimer: ReturnType<typeof setInterval> | null = null;
 	let artistInLidarr = $state(false);
@@ -129,6 +130,17 @@ export function createAlbumPageState(albumIdGetter: () => string) {
 	);
 	const isRequested = $derived(
 		!!(album && !inLibrary && (album.requested || libraryStore.isRequested(album.musicbrainz_id)))
+	);
+	const isMonitored = $derived(
+		!!(
+			album &&
+			!inLibrary &&
+			!isRequested &&
+			(album.monitored || libraryStore.isMonitored(album.musicbrainz_id))
+		)
+	);
+	const albumMonitored = $derived(
+		!!(album && (album.monitored || libraryStore.isMonitored(album.musicbrainz_id)))
 	);
 
 	function resetState() {
@@ -562,6 +574,7 @@ export function createAlbumPageState(albumIdGetter: () => string) {
 		setShowDeleteModal: (v) => (showDeleteModal = v),
 		setShowArtistRemovedModal: (v) => (showArtistRemovedModal = v),
 		setRemovedArtistName: (v) => (removedArtistName = v),
+		setMonitorToggleLoading: (v) => (monitorToggleLoading = v),
 		setToast: (msg, type) => {
 			toastMessage = msg;
 			toastType = type;
@@ -800,6 +813,12 @@ export function createAlbumPageState(albumIdGetter: () => string) {
 		get isRequested() {
 			return isRequested;
 		},
+		get isMonitored() {
+			return isMonitored;
+		},
+		get albumMonitored() {
+			return albumMonitored;
+		},
 		get artistInLidarr() {
 			return artistInLidarr;
 		},
@@ -808,6 +827,9 @@ export function createAlbumPageState(albumIdGetter: () => string) {
 		},
 		get refreshing() {
 			return refreshing;
+		},
+		get monitorToggleLoading() {
+			return monitorToggleLoading;
 		},
 		get pollingForSources() {
 			return pollingForSources;

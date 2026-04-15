@@ -26,6 +26,7 @@ def _sample_album_data() -> list[dict]:
             "releaseDate": "2023-01-15",
             "added": "2023-01-10T12:00:00Z",
             "images": [],
+            "statistics": {"trackFileCount": 5},
             "artist": {
                 "artistName": "Artist A",
                 "foreignArtistId": "artist-a-mbid",
@@ -39,6 +40,7 @@ def _sample_album_data() -> list[dict]:
             "releaseDate": "2024-06-01",
             "added": "2024-06-01T08:00:00Z",
             "images": [],
+            "statistics": {"trackFileCount": 8},
             "artist": {
                 "artistName": "Artist B",
                 "foreignArtistId": "artist-b-mbid",
@@ -52,6 +54,7 @@ def _sample_album_data() -> list[dict]:
             "releaseDate": "2020-03-01",
             "added": "2020-03-01T00:00:00Z",
             "images": [],
+            "statistics": {"trackFileCount": 3},
             "artist": {
                 "artistName": "Artist C",
                 "foreignArtistId": "artist-c-mbid",
