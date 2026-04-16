@@ -597,6 +597,11 @@ class SettingsService:
             http_client = get_http_client(app_settings)
 
             current = self._preferences_service.get_lastfm_connection()
+
+            api_key = settings.api_key
+            if api_key.startswith(LASTFM_SECRET_MASK):
+                api_key = current.api_key
+
             shared_secret = settings.shared_secret
             if shared_secret.startswith(LASTFM_SECRET_MASK):
                 shared_secret = current.shared_secret
@@ -608,7 +613,7 @@ class SettingsService:
             temp_repo = LastFmRepository(
                 http_client=http_client,
                 cache=InMemoryCache(),
-                api_key=settings.api_key,
+                api_key=api_key,
                 shared_secret=shared_secret,
                 session_key=session_key,
             )

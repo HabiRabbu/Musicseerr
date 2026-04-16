@@ -341,7 +341,12 @@ class PreferencesService:
         try:
             current = self.get_lastfm_connection()
 
-            api_key = settings.api_key.strip()
+            api_key = settings.api_key
+            if api_key.startswith(LASTFM_SECRET_MASK):
+                api_key = current.api_key
+            else:
+                api_key = api_key.strip()
+
             shared_secret = settings.shared_secret
             if shared_secret.startswith(LASTFM_SECRET_MASK):
                 shared_secret = current.shared_secret
