@@ -72,13 +72,13 @@
 					lines?: LyricLine[];
 				}>(url)
 				.catch((e: unknown) => {
-				const status = (e as { status?: number })?.status;
-				lyricsText = '';
-				lyricsLines = [];
-				lyricsIsSynced = false;
-				if (status !== 404) lyricsError = true;
-				return null;
-			});
+					const status = (e as { status?: number })?.status;
+					lyricsText = '';
+					lyricsLines = [];
+					lyricsIsSynced = false;
+					if (status !== 404) lyricsError = true;
+					return null;
+				});
 			if (data === null) return;
 			if (np.sourceType === 'navidrome') {
 				lyricsText = data.text ?? '';
