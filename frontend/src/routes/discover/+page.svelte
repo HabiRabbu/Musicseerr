@@ -7,239 +7,59 @@
 	import DiscoverQueueModal from '$lib/components/DiscoverQueueModal.svelte';
 	import WeeklyExploration from '$lib/components/WeeklyExploration.svelte';
 	import ServicePromptCard from '$lib/components/ServicePromptCard.svelte';
-	import SourceSwitcher from '$lib/components/SourceSwitcher.svelte';
 	import DiscoverArtistHero from '$lib/components/DiscoverArtistHero.svelte';
 	import SectionDivider from '$lib/components/SectionDivider.svelte';
-	import type { DiscoverResponse } from '$lib/types';
 	import CarouselSkeleton from '$lib/components/CarouselSkeleton.svelte';
 	import PageHeader from '$lib/components/PageHeader.svelte';
-	import {
-		getDiscoverCachedData,
-		setDiscoverCachedData,
-		isDiscoverCacheStale
-	} from '$lib/utils/discoverCache';
 	import { removeAllQueueCachedData } from '$lib/utils/discoverQueueCache';
-	import { isAbortError } from '$lib/utils/errorHandling';
-	import { api } from '$lib/api/client';
 	import { isDismissed } from '$lib/utils/dismissedPrompts';
-	import { musicSourceStore, type MusicSource } from '$lib/stores/musicSource';
+	import { type MusicSource } from '$lib/stores/musicSource';
 	import { discoverQueueStatusStore } from '$lib/stores/discoverQueueStatus';
 	import { Compass, CircleAlert, Sparkles, Music, BarChart3 } from 'lucide-svelte';
+	import { PAGE_SOURCE_KEYS } from '$lib/constants';
+	import type { PageProps } from './$types';
+	import { PersistedState } from 'runed';
+	import { getDiscoverQuery } from '$lib/queries/discover/DiscoverQueries.svelte';
+	import SimpleSourceSwitcher from '$lib/components/SimpleSourceSwitcher.svelte';
+	import { createDiscoverRefreshMutation } from '$lib/queries/discover/DiscoverMutations.svelte';
 
-	let discoverData = $state<DiscoverResponse | null>(null);
-	let loading = $state(true);
-	let refreshing = $state(false);
-	let isUpdating = $state(false);
-	let error = $state('');
-	let lastUpdated = $state<Date | null>(null);
-	let abortController: AbortController | null = null;
+	const { data }: PageProps = $props();
+
+	// svelte-ignore state_referenced_locally
+	const activeSource = new PersistedState<MusicSource>(
+		PAGE_SOURCE_KEYS['discover'],
+		data.primarySource
+	);
+
+	const discoverQuery = getDiscoverQuery(() => activeSource.current);
+	const discoverData = $derived(discoverQuery.data);
+
+	const discoverRefreshMutation = createDiscoverRefreshMutation();
+
+	const loading = $derived(discoverQuery.isLoading);
+	let isUpdating = $derived(discoverQuery.isRefetching);
+	const lastUpdated = $derived(
+		discoverQuery.dataUpdatedAt ? new Date(discoverQuery.dataUpdatedAt) : null
+	);
 	let queueModalOpen = $state(false);
-	let activeSource: MusicSource = $state('listenbrainz');
-	let pollRunId = 0;
-
-	function resolveDiscoverSource(source?: MusicSource): MusicSource {
-		return source ?? activeSource;
-	}
-
-	function cancelDiscoverPolling(): void {
-		pollRunId += 1;
-	}
-
-	async function loadDiscoverData(forceRefresh = false, sourceOverride?: MusicSource) {
-		const source = resolveDiscoverSource(sourceOverride);
-		const cached = getDiscoverCachedData(source);
-		if (cached && !forceRefresh) {
-			// Guard: when the backend is still computing async recommendations,
-			// all personalized sections are null/empty. Don't use a cached response
-			// that has no content — it represents a transient "still computing" state.
-			const cachedHasContent =
-				(cached.data.because_you_listen_to?.length ?? 0) > 0 ||
-				cached.data.fresh_releases != null ||
-				cached.data.missing_essentials != null ||
-				cached.data.globally_trending != null;
-			if (cachedHasContent) {
-				discoverData = cached.data;
-				lastUpdated = new Date(cached.timestamp);
-				loading = false;
-				if (isDiscoverCacheStale(cached.timestamp)) {
-					refreshInBackground(source);
-				}
-				return;
-			}
-		}
-
-		if (abortController) abortController.abort();
-		abortController = new AbortController();
-		cancelDiscoverPolling();
-
-		if (!discoverData) {
-			loading = true;
-		} else {
-			refreshing = true;
-		}
-		error = '';
-
-		try {
-			const data: DiscoverResponse = await api.get(
-				`/api/v1/discover?source=${encodeURIComponent(source)}`,
-				{
-					signal: abortController.signal
-				}
-			);
-			discoverData = data;
-			lastUpdated = new Date();
-			const dataHasContent =
-				(data.because_you_listen_to?.length ?? 0) > 0 ||
-				data.fresh_releases != null ||
-				data.missing_essentials != null ||
-				data.globally_trending != null;
-			if (dataHasContent) {
-				setDiscoverCachedData(data, source);
-			}
-			if (!dataHasContent && data.refreshing) {
-				pollForReady(source);
-			}
-		} catch (e) {
-			if (isAbortError(e)) return;
-			if (!discoverData) error = "Couldn't load Discover right now";
-		} finally {
-			loading = false;
-			refreshing = false;
-		}
-	}
-
-	async function refreshInBackground(sourceOverride?: MusicSource) {
-		if (refreshing) return;
-		if (abortController) abortController.abort();
-		abortController = new AbortController();
-		refreshing = true;
-		isUpdating = true;
-		const source = resolveDiscoverSource(sourceOverride);
-
-		try {
-			const data: DiscoverResponse = await api.get(
-				`/api/v1/discover?source=${encodeURIComponent(source)}`,
-				{
-					signal: abortController.signal
-				}
-			);
-			const hasContent =
-				(data.because_you_listen_to?.length ?? 0) > 0 ||
-				data.fresh_releases != null ||
-				data.missing_essentials != null ||
-				data.globally_trending != null;
-			if (hasContent) {
-				discoverData = data;
-				lastUpdated = new Date();
-				setDiscoverCachedData(data, source);
-			}
-		} catch (e) {
-			if (isAbortError(e)) return;
-		} finally {
-			refreshing = false;
-			isUpdating = false;
-		}
-	}
-
-	async function pollForReady(source: MusicSource) {
-		const runId = ++pollRunId;
-		isUpdating = true;
-		try {
-			for (let i = 0; i < 15; i++) {
-				if (runId !== pollRunId) return;
-				await new Promise((r) => setTimeout(r, 3000));
-				if (runId !== pollRunId) return;
-				try {
-					const data: DiscoverResponse = await api.get(
-						`/api/v1/discover?source=${encodeURIComponent(source)}`
-					);
-					const ready =
-						(data.because_you_listen_to?.length ?? 0) > 0 ||
-						data.fresh_releases != null ||
-						data.missing_essentials != null ||
-						data.globally_trending != null;
-					if (ready || !data.refreshing) {
-						discoverData = data;
-						lastUpdated = new Date();
-						if (ready) setDiscoverCachedData(data, source);
-						break;
-					}
-				} catch (e) {
-					if (isAbortError(e)) return;
-					break;
-				}
-			}
-		} finally {
-			if (runId === pollRunId) {
-				isUpdating = false;
-			}
-		}
-	}
-
-	async function handleRefresh(sourceOverride?: MusicSource) {
-		const source = resolveDiscoverSource(sourceOverride);
-		const runId = ++pollRunId;
-		refreshing = true;
-		isUpdating = true;
-		try {
-			await api.global.post('/api/v1/discover/refresh');
-		} catch {
-			// Ignore errors
-		}
-
-		try {
-			const maxPolls = 30;
-			for (let i = 0; i < maxPolls; i++) {
-				if (runId !== pollRunId) return;
-				await new Promise((r) => setTimeout(r, 2000));
-				if (runId !== pollRunId) return;
-				try {
-					const data: DiscoverResponse = await api.get(
-						`/api/v1/discover?source=${encodeURIComponent(source)}`
-					);
-					if (!data.refreshing) {
-						discoverData = data;
-						lastUpdated = new Date();
-						setDiscoverCachedData(data, source);
-						break;
-					}
-				} catch (e) {
-					if (isAbortError(e)) return;
-					break;
-				}
-			}
-		} finally {
-			if (runId === pollRunId) {
-				refreshing = false;
-				isUpdating = false;
-			}
-		}
-	}
 
 	function cleanup() {
-		cancelDiscoverPolling();
-		if (abortController) {
-			abortController.abort();
-			abortController = null;
-		}
+		discoverQueueStatusStore.stopPolling();
 	}
 
-	onMount(async () => {
-		await musicSourceStore.load();
-		activeSource = musicSourceStore.getPageSource('discover');
-		loadDiscoverData(false, activeSource);
-		discoverQueueStatusStore.init(activeSource);
+	onMount(() => {
+		discoverQueueStatusStore.init(activeSource.current);
 	});
-	onDestroy(() => {
-		cleanup();
-		discoverQueueStatusStore.stopPolling();
-	});
+	onDestroy(cleanup);
 	beforeNavigate(cleanup);
 
+	function handleRefresh() {
+		discoverRefreshMutation.mutate();
+	}
+
 	function handleSourceChange(source: MusicSource) {
-		activeSource = source;
+		activeSource.current = source;
 		removeAllQueueCachedData();
-		loadDiscoverData(true, source);
 		discoverQueueStatusStore.reset();
 		discoverQueueStatusStore.init(source);
 	}
@@ -264,7 +84,7 @@
 	let hasCuratedGroup = $derived(
 		(discoverData?.because_you_listen_to?.length ?? 0) > 0 ||
 			discoverData?.discover_queue_enabled ||
-			(activeSource === 'listenbrainz' &&
+			(activeSource.current === 'listenbrainz' &&
 				discoverData?.weekly_exploration &&
 				discoverData.weekly_exploration.tracks.length > 0)
 	);
@@ -299,11 +119,11 @@
 		subtitle="Personalized music recommendations based on your listening habits."
 		gradientClass="bg-gradient-to-br from-info/30 via-primary/20 to-secondary/10"
 		{loading}
-		{refreshing}
+		refreshing={isUpdating}
 		{isUpdating}
 		{lastUpdated}
 		refreshLabel="Refresh"
-		onRefresh={() => handleRefresh()}
+		onRefresh={handleRefresh}
 	>
 		{#snippet title()}
 			<Compass class="inline h-8 w-8 sm:h-10 sm:w-10 lg:h-12 lg:w-12 mr-2 align-text-bottom" />
@@ -312,15 +132,19 @@
 	</PageHeader>
 
 	<div class="flex justify-end px-4 -mt-4 mb-4 sm:px-6 lg:px-8">
-		<SourceSwitcher pageKey="discover" onSourceChange={handleSourceChange} />
+		<SimpleSourceSwitcher
+			currentSource={activeSource.current}
+			onSourceChange={handleSourceChange}
+		/>
 	</div>
 
-	{#if error && !discoverData}
+	{#if discoverQuery.error && !discoverData}
 		<div class="mt-16 flex flex-col items-center justify-center px-4">
 			<CircleAlert class="mb-4 h-10 w-10 text-base-content/50" />
-			<p class="text-base-content/70">{error}</p>
-			<button class="btn btn-primary mt-4" onclick={() => loadDiscoverData(true, activeSource)}
-				>Try Again</button
+			<p class="text-base-content/70">
+				{discoverQuery.error.message ?? 'Failed to load Discover data'}
+			</p>
+			<button class="btn btn-primary mt-4" onclick={() => discoverQuery.refetch()}>Try Again</button
 			>
 		</div>
 	{:else}
@@ -361,12 +185,12 @@
 
 								<div>
 									<DiscoverQueueCard
-										source={activeSource}
+										source={activeSource.current}
 										onLaunch={() => (queueModalOpen = true)}
 									/>
 								</div>
 
-								{#if activeSource === 'listenbrainz' && discoverData.weekly_exploration && discoverData.weekly_exploration.tracks.length > 0}
+								{#if activeSource.current === 'listenbrainz' && discoverData.weekly_exploration && discoverData.weekly_exploration.tracks.length > 0}
 									<div>
 										<WeeklyExploration
 											section={discoverData.weekly_exploration}
@@ -378,7 +202,10 @@
 						</div>
 					{:else}
 						<div>
-							<DiscoverQueueCard source={activeSource} onLaunch={() => (queueModalOpen = true)} />
+							<DiscoverQueueCard
+								source={activeSource.current}
+								onLaunch={() => (queueModalOpen = true)}
+							/>
 						</div>
 					{/if}
 
@@ -415,7 +242,9 @@
 					{#if hasChartsGroup}
 						<div>
 							<SectionDivider label="Charts & Activity">
-								{#snippet icon()}<BarChart3 class="w-3.5 h-3.5" />{/snippet}
+								{#snippet icon()}
+									<BarChart3 class="w-3.5 h-3.5" />
+								{/snippet}
 							</SectionDivider>
 
 							<div class="discover-section-enter space-y-2">
@@ -472,10 +301,10 @@
 								</p>
 								<button
 									class="btn btn-primary"
-									onclick={() => void handleRefresh()}
-									disabled={refreshing}
+									onclick={() => discoverQuery.refetch()}
+									disabled={isUpdating}
 								>
-									{#if refreshing}
+									{#if isUpdating}
 										<span class="loading loading-spinner loading-sm"></span>
 									{/if}
 									Refresh Recommendations
@@ -501,4 +330,4 @@
 	{/if}
 </div>
 
-<DiscoverQueueModal bind:open={queueModalOpen} source={activeSource} />
+<DiscoverQueueModal bind:open={queueModalOpen} source={activeSource.current} />

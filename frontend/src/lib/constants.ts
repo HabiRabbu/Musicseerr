@@ -190,7 +190,7 @@ export const API = {
 	},
 	home: (source: string) => `/api/v1/home?source=${encodeURIComponent(source)}`,
 	homeIntegrationStatus: () => '/api/v1/home/integration-status',
-	discover: () => '/api/v1/discover',
+	discover: (source: MusicSource) => `/api/v1/discover?source=${encodeURIComponent(source)}`,
 	discoverRefresh: () => '/api/v1/discover/refresh',
 	discoverQueue: (source?: string) => `/api/v1/discover/queue${source ? `?source=${source}` : ''}`,
 	discoverQueueStatus: (source?: string) =>
