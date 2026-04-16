@@ -149,11 +149,7 @@
 				{/if}
 
 				<div class="flex justify-between items-center pt-2">
-					<button
-						type="button"
-						class="btn btn-outline btn-error btn-sm"
-						onclick={resetToDefaults}
-					>
+					<button type="button" class="btn btn-outline btn-error btn-sm" onclick={resetToDefaults}>
 						Reset to Defaults
 					</button>
 					<div class="flex gap-2">
@@ -168,7 +164,11 @@
 							{/if}
 							Test Connection
 						</button>
-						<div class="tooltip" class:tooltip-left={!hasPassedTest} data-tip={!hasPassedTest ? 'Test connection before saving' : ''}>
+						<div
+							class="tooltip"
+							class:tooltip-left={!hasPassedTest}
+							data-tip={!hasPassedTest ? 'Test connection before saving' : ''}
+						>
 							<button
 								type="button"
 								class="btn btn-primary"
