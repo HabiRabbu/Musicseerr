@@ -75,3 +75,9 @@ class TokenBucketRateLimiter:
     def update_capacity(self, new_capacity: int) -> None:
         self.capacity = new_capacity
         self._tokens = min(self._tokens, float(new_capacity))
+
+    def update_rate(self, new_rate: float) -> None:
+        """Update the token refill rate (tokens/sec)."""
+        if new_rate <= 0:
+            raise ValueError(f"Rate must be positive, got {new_rate}")
+        self.rate = new_rate

@@ -27,6 +27,10 @@ class RequestDeduplicator:
         self._pending: dict[str, asyncio.Future[Any]] = {}
         self._lock = asyncio.Lock()
 
+    def clear(self) -> None:
+        """Clear all pending deduplication entries (e.g. after endpoint change)."""
+        self._pending.clear()
+
     async def dedupe(
         self,
         key: str,

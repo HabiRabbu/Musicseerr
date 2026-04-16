@@ -93,13 +93,6 @@
 		step={0.1}
 		unit="sec"
 	/>
-	<SettingsNumberField
-		label="MusicBrainz Searches"
-		description="Parallel API requests (default: 3)"
-		bind:value={data.musicbrainz_concurrent_searches}
-		min={2}
-		max={5}
-	/>
 </div>
 <div class="divider my-4"></div>
 <h4 class="font-medium text-sm text-base-content/70 mb-3">Library Sync</h4>

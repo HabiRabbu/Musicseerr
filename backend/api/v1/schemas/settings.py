@@ -227,6 +227,22 @@ class PrimaryMusicSourceSettings(AppStruct):
     source: Literal["listenbrainz", "lastfm"] = "listenbrainz"
 
 
+class MusicBrainzConnectionSettings(AppStruct):
+    api_url: str = "https://musicbrainz.org/ws/2"
+    rate_limit: float = 1.0
+    concurrent_searches: int = 6
+
+    def __post_init__(self) -> None:
+        self.api_url = self.api_url.strip()
+        if not self.api_url or not self.api_url.startswith(("http://", "https://")):
+            self.api_url = "https://musicbrainz.org/ws/2"
+        self.api_url = self.api_url.rstrip("/")
+        if self.rate_limit < 0.1 or self.rate_limit > 50.0:
+            raise msgspec.ValidationError("rate_limit must be between 0.1 and 50.0")
+        if self.concurrent_searches < 1 or self.concurrent_searches > 30:
+            raise msgspec.ValidationError("concurrent_searches must be between 1 and 30")
+
+
 class LidarrMetadataProfilePreferences(AppStruct):
     profile_id: int
     profile_name: str

@@ -34,7 +34,6 @@ export interface AdvancedSettingsForm {
 	recent_metadata_max_size_mb: number;
 	recent_covers_max_size_mb: number;
 	persistent_metadata_ttl_hours: number;
-	musicbrainz_concurrent_searches: number;
 	discover_queue_size: number;
 	discover_queue_ttl: number;
 	discover_queue_auto_generate: boolean;

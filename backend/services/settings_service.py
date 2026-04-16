@@ -18,6 +18,7 @@ from api.v1.schemas.settings import (
     LASTFM_SECRET_MASK,
     PlexConnectionSettings,
     PLEX_TOKEN_MASK,
+    MusicBrainzConnectionSettings,
 )
 from core.config import Settings, get_settings
 from core.exceptions import ExternalServiceError
@@ -68,6 +69,11 @@ class YouTubeVerifyResult(msgspec.Struct):
 
 
 class LastFmVerifyResult(msgspec.Struct):
+    valid: bool
+    message: str
+
+
+class MusicBrainzVerifyResult(msgspec.Struct):
     valid: bool
     message: str
 
@@ -725,3 +731,65 @@ class SettingsService:
         temp_repo.configure(url=raw.plex_url, token=raw.plex_token, client_id=client_id)
         sections = await temp_repo.get_music_libraries()
         return [(s.key, s.title) for s in sections]
+
+    async def verify_musicbrainz(
+        self, settings: MusicBrainzConnectionSettings
+    ) -> MusicBrainzVerifyResult:
+        try:
+            import httpx
+            from infrastructure.validators import validate_service_url
+            from core.exceptions import ValidationError as AppValidationError
+            from repositories.musicbrainz_base import mb_circuit_breaker
+
+            validate_service_url(settings.api_url, label="MusicBrainz API URL")
+            mb_circuit_breaker.reset()
+
+            app_settings = get_settings()
+            client = get_http_client(app_settings)
+            response = await client.get(
+                f"{settings.api_url.rstrip('/')}/artist",
+                params={"query": "test", "fmt": "json", "limit": 1},
+            )
+            if response.status_code == 200:
+                return MusicBrainzVerifyResult(
+                    valid=True, message="Connected to MusicBrainz"
+                )
+            if response.status_code == 503:
+                return MusicBrainzVerifyResult(
+                    valid=True,
+                    message="Connected, but rate-limited. Try lowering your rate limit.",
+                )
+            return MusicBrainzVerifyResult(
+                valid=False,
+                message=f"Unexpected response: HTTP {response.status_code}",
+            )
+        except AppValidationError as e:
+            return MusicBrainzVerifyResult(valid=False, message=str(e))
+        except httpx.ConnectError:
+            return MusicBrainzVerifyResult(
+                valid=False, message="Could not connect to the specified endpoint"
+            )
+        except Exception as e:  # noqa: BLE001
+            logger.exception("Failed to verify MusicBrainz connection: %s", e)
+            return MusicBrainzVerifyResult(
+                valid=False, message="Couldn't finish the connection test"
+            )
+
+    async def on_musicbrainz_settings_changed(
+        self, settings: MusicBrainzConnectionSettings
+    ) -> None:
+        from repositories.musicbrainz_base import (
+            set_mb_api_base, mb_rate_limiter, mb_circuit_breaker, mb_deduplicator,
+        )
+
+        set_mb_api_base(settings.api_url)
+        mb_rate_limiter.update_rate(settings.rate_limit)
+        mb_rate_limiter.update_capacity(settings.concurrent_searches)
+        mb_circuit_breaker.reset()
+        mb_deduplicator.clear()
+
+        total = 0
+        for prefix in musicbrainz_prefixes():
+            total += await self._cache.clear_prefix(prefix)
+        if total:
+            logger.info(f"Cleared {total} MusicBrainz cache entries after settings change")

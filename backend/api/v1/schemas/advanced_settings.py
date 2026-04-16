@@ -76,7 +76,6 @@ class AdvancedSettings(AppStruct):
     recent_metadata_max_size_mb: int = 500
     recent_covers_max_size_mb: int = 1024
     persistent_metadata_ttl_hours: int = 24
-    musicbrainz_concurrent_searches: int = 6
     discover_queue_size: int = 10
     discover_queue_ttl: int = 86400
     discover_queue_auto_generate: bool = True
@@ -163,7 +162,6 @@ class AdvancedSettings(AppStruct):
             "recent_metadata_max_size_mb": (100, 5000),
             "recent_covers_max_size_mb": (100, 10000),
             "persistent_metadata_ttl_hours": (1, 168),
-            "musicbrainz_concurrent_searches": (2, 10),
             "artist_discovery_precache_concurrency": (1, 8),
             "sync_stall_timeout_minutes": (2, 30),
             "sync_max_timeout_hours": (1, 48),
@@ -261,7 +259,6 @@ class AdvancedSettingsFrontend(AppStruct):
     recent_metadata_max_size_mb: int = 500
     recent_covers_max_size_mb: int = 1024
     persistent_metadata_ttl_hours: int = 24
-    musicbrainz_concurrent_searches: int = 6
     discover_queue_size: int = 10
     discover_queue_ttl: int = 24
     discover_queue_auto_generate: bool = True
@@ -385,7 +382,6 @@ class AdvancedSettingsFrontend(AppStruct):
             "recent_metadata_max_size_mb": (100, 5000),
             "recent_covers_max_size_mb": (100, 10000),
             "persistent_metadata_ttl_hours": (1, 168),
-            "musicbrainz_concurrent_searches": (2, 10),
             "discover_queue_size": (1, 20),
             "discover_queue_ttl": (1, 168),
             "discover_queue_polling_interval": (1, 30),
@@ -469,7 +465,6 @@ class AdvancedSettingsFrontend(AppStruct):
             recent_metadata_max_size_mb=settings.recent_metadata_max_size_mb,
             recent_covers_max_size_mb=settings.recent_covers_max_size_mb,
             persistent_metadata_ttl_hours=settings.persistent_metadata_ttl_hours,
-            musicbrainz_concurrent_searches=settings.musicbrainz_concurrent_searches,
             discover_queue_size=settings.discover_queue_size,
             discover_queue_ttl=settings.discover_queue_ttl // 3600,
             discover_queue_auto_generate=settings.discover_queue_auto_generate,
@@ -556,7 +551,6 @@ class AdvancedSettingsFrontend(AppStruct):
             recent_metadata_max_size_mb=self.recent_metadata_max_size_mb,
             recent_covers_max_size_mb=self.recent_covers_max_size_mb,
             persistent_metadata_ttl_hours=self.persistent_metadata_ttl_hours,
-            musicbrainz_concurrent_searches=self.musicbrainz_concurrent_searches,
             discover_queue_size=self.discover_queue_size,
             discover_queue_ttl=self.discover_queue_ttl * 3600,
             discover_queue_auto_generate=self.discover_queue_auto_generate,

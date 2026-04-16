@@ -7,7 +7,7 @@ import httpx
 from models.search import SearchResult
 from services.preferences_service import PreferencesService
 from infrastructure.cache.memory_cache import CacheInterface
-from repositories.musicbrainz_base import mb_rate_limiter, set_mb_http_client
+from repositories.musicbrainz_base import mb_rate_limiter, set_mb_http_client, set_mb_api_base
 from repositories.musicbrainz_artist import MusicBrainzArtistMixin
 from repositories.musicbrainz_album import MusicBrainzAlbumMixin
 
@@ -19,6 +19,14 @@ class MusicBrainzRepository(MusicBrainzArtistMixin, MusicBrainzAlbumMixin):
         self._cache = cache
         self._preferences_service = preferences_service
         set_mb_http_client(http_client)
+        self._apply_settings()
+
+    def _apply_settings(self) -> None:
+        settings = self._preferences_service.get_musicbrainz_connection()
+        set_mb_api_base(settings.api_url)
+        mb_rate_limiter.update_rate(settings.rate_limit)
+        if mb_rate_limiter.capacity != settings.concurrent_searches:
+            mb_rate_limiter.update_capacity(settings.concurrent_searches)
 
     async def search_grouped(
         self,
@@ -27,11 +35,6 @@ class MusicBrainzRepository(MusicBrainzArtistMixin, MusicBrainzAlbumMixin):
         buckets: Optional[list[str]] = None,
         included_secondary_types: Optional[set[str]] = None
     ) -> dict[str, list[SearchResult]]:
-        advanced_settings = self._preferences_service.get_advanced_settings()
-        new_capacity = advanced_settings.musicbrainz_concurrent_searches
-        if mb_rate_limiter.capacity != new_capacity:
-            mb_rate_limiter.update_capacity(new_capacity)
-
         tasks = []
         task_keys = []
 

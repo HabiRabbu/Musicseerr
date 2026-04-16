@@ -24,6 +24,7 @@ from api.v1.schemas.settings import (
     PrimaryMusicSourceSettings,
     PlexConnectionSettings,
     PlexVerifyResponse,
+    MusicBrainzConnectionSettings,
 )
 from api.v1.schemas.plex import PlexLibrarySectionInfo
 from api.v1.schemas.common import VerifyConnectionResponse
@@ -520,3 +521,34 @@ async def update_primary_music_source(
     except ConfigurationError as e:
         logger.warning("Configuration error updating primary music source: %s", e)
         raise HTTPException(status_code=400, detail="Invalid primary music source")
+
+
+@router.get("/musicbrainz", response_model=MusicBrainzConnectionSettings)
+async def get_musicbrainz_settings(
+    preferences_service: PreferencesService = Depends(get_preferences_service),
+):
+    return preferences_service.get_musicbrainz_connection()
+
+
+@router.put("/musicbrainz", response_model=MusicBrainzConnectionSettings)
+async def update_musicbrainz_settings(
+    settings: MusicBrainzConnectionSettings = MsgSpecBody(MusicBrainzConnectionSettings),
+    preferences_service: PreferencesService = Depends(get_preferences_service),
+    settings_service: SettingsService = Depends(get_settings_service),
+):
+    try:
+        preferences_service.save_musicbrainz_connection(settings)
+        await settings_service.on_musicbrainz_settings_changed(settings)
+        return settings
+    except ConfigurationError as e:
+        logger.warning(f"Configuration error updating MusicBrainz settings: {e}")
+        raise HTTPException(status_code=400, detail="MusicBrainz settings are incomplete or invalid")
+
+
+@router.post("/musicbrainz/verify", response_model=VerifyConnectionResponse)
+async def verify_musicbrainz_connection(
+    settings: MusicBrainzConnectionSettings = MsgSpecBody(MusicBrainzConnectionSettings),
+    settings_service: SettingsService = Depends(get_settings_service),
+):
+    result = await settings_service.verify_musicbrainz(settings)
+    return VerifyConnectionResponse(valid=result.valid, message=result.message)

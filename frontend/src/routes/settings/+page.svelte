@@ -17,6 +17,7 @@
 	import SettingsScrobbling from '$lib/components/settings/SettingsScrobbling.svelte';
 	import SettingsMusicSource from '$lib/components/settings/SettingsMusicSource.svelte';
 	import SettingsAdvanced from '$lib/components/settings/SettingsAdvanced.svelte';
+	import SettingsMusicBrainz from '$lib/components/settings/SettingsMusicBrainz.svelte';
 	import SettingsAbout from '$lib/components/settings/SettingsAbout.svelte';
 	import { getUpdateCheckQuery } from '$lib/queries/VersionQuery.svelte';
 	import {
@@ -31,7 +32,8 @@
 		Activity,
 		BarChart3,
 		Info,
-		ArrowUpCircle
+		ArrowUpCircle,
+		Globe
 	} from 'lucide-svelte';
 	import JellyfinIcon from '$lib/components/JellyfinIcon.svelte';
 	import NavidromeIcon from '$lib/components/NavidromeIcon.svelte';
@@ -84,6 +86,7 @@
 		{ id: 'youtube', label: 'YouTube', group: 'Library & Sources', icon: Youtube },
 		{ id: 'local-files', label: 'Local Files', group: 'Library & Sources', icon: Headphones },
 		{ id: 'cache', label: 'Cache', group: 'System', icon: Database },
+		{ id: 'musicbrainz', label: 'MusicBrainz', group: 'System', icon: Globe },
 		{ id: 'advanced', label: 'Advanced', group: 'System', icon: Settings },
 		{ id: 'about', label: 'About', group: 'System', icon: Info }
 	];
@@ -189,6 +192,8 @@
 					<SettingsLastFm />
 				{:else if activeTab === 'scrobbling'}
 					<SettingsScrobbling />
+				{:else if activeTab === 'musicbrainz'}
+					<SettingsMusicBrainz />
 				{:else if activeTab === 'advanced'}
 					<SettingsAdvanced />
 				{:else if activeTab === 'about'}

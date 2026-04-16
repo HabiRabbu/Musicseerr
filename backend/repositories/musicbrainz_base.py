@@ -9,7 +9,16 @@ from infrastructure.resilience.rate_limiter import TokenBucketRateLimiter
 from infrastructure.queue.priority_queue import RequestPriority, get_priority_queue
 from infrastructure.http.deduplication import RequestDeduplicator
 
-MB_API_BASE = "https://musicbrainz.org/ws/2"
+_mb_api_base: str = "https://musicbrainz.org/ws/2"
+
+
+def get_mb_api_base() -> str:
+    return _mb_api_base
+
+
+def set_mb_api_base(url: str) -> None:
+    global _mb_api_base
+    _mb_api_base = url.rstrip("/")
 
 mb_circuit_breaker = CircuitBreaker(
     failure_threshold=5,
@@ -67,7 +76,7 @@ async def mb_api_get(
     async with semaphore:
         await mb_rate_limiter.acquire()
         client = get_mb_http_client()
-        url = f"{MB_API_BASE}{path}"
+        url = f"{get_mb_api_base()}{path}"
         request_params = dict(params) if params else {}
         request_params["fmt"] = "json"
         response = await client.get(url, params=request_params)
