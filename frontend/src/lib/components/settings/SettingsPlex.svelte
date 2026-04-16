@@ -49,14 +49,23 @@
 	async function startOAuth() {
 		oauthPending = true;
 		oauthUrl = null;
+		// Open a blank window synchronously so popup blockers don't interfere.
+		// After the async PIN request, we navigate it to the real auth URL.
+		const win = window.open('', '_blank', 'noopener,noreferrer');
 		try {
 			const res = await api.global.post<{ pin_id: number; pin_code: string; auth_url: string }>(
 				API.plexAuthPin()
 			);
 			oauthUrl = res.auth_url;
-			window.open(res.auth_url, '_blank', 'noopener');
+			if (win && !win.closed) {
+				win.location.href = res.auth_url;
+			} else {
+				// Fallback if the blank window was closed before we could navigate it
+				window.open(res.auth_url, '_blank', 'noopener,noreferrer');
+			}
 			await pollForToken(res.pin_id);
 		} catch {
+			if (win && !win.closed) win.close();
 			oauthPending = false;
 		}
 	}
