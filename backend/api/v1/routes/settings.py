@@ -331,8 +331,12 @@ async def update_plex_settings(
 @router.post("/plex/verify", response_model=PlexVerifyResponse)
 async def verify_plex_connection(
     settings: PlexConnectionSettings = MsgSpecBody(PlexConnectionSettings),
+    preferences_service: PreferencesService = Depends(get_preferences_service),
     settings_service: SettingsService = Depends(get_settings_service),
 ):
+    if _is_masked(settings.plex_token):
+        current = preferences_service.get_plex_connection()
+        settings = msgspec.structs.replace(settings, plex_token=current.plex_token)
     result = await settings_service.verify_plex(settings)
     libs = [PlexLibrarySectionInfo(key=k, title=t) for k, t in result.libraries]
     return PlexVerifyResponse(valid=result.valid, message=result.message, libraries=libs)
