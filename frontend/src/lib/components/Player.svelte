@@ -64,7 +64,14 @@
 			} else {
 				return;
 			}
-			const data = await api.global.get(url).catch((e: unknown) => {
+			const data = await api.global
+				.get<{
+					text?: string;
+					lyrics_text?: string;
+					is_synced?: boolean;
+					lines?: LyricLine[];
+				}>(url)
+				.catch((e: unknown) => {
 				const status = (e as { status?: number })?.status;
 				lyricsText = '';
 				lyricsLines = [];
