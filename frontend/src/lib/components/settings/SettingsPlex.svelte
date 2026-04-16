@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { createSettingsForm } from '$lib/utils/settingsForm.svelte';
-	import { onDestroy } from 'svelte';
+	import { onMount, onDestroy } from 'svelte';
 	import { API } from '$lib/constants';
 	import { api } from '$lib/api/client';
 	import { resetPlexScrobblePreference } from '$lib/player/plexPlaybackApi';
@@ -114,13 +114,11 @@
 	let hasCredentials = $derived(Boolean(form.data?.plex_url && form.data?.plex_token));
 	let hasLibrarySelected = $derived(Boolean(form.data?.music_library_ids?.length));
 
-	$effect(() => {
-		(async () => {
-			await form.load();
-			if (form.data?.plex_url && form.data?.plex_token) {
-				await fetchLibraries();
-			}
-		})();
+	onMount(async () => {
+		await form.load();
+		if (form.data?.plex_url && form.data?.plex_token) {
+			await fetchLibraries();
+		}
 	});
 
 	onDestroy(() => {
