@@ -247,7 +247,11 @@
 
 						{#if authStore.authEnabled && authStore.role === 'admin'}
 							<div>
-								<h3 class="text-xs font-semibold uppercase tracking-widest text-base-content/50 mb-3">Authentication Providers</h3>
+								<h3
+									class="text-xs font-semibold uppercase tracking-widest text-base-content/50 mb-3"
+								>
+									Authentication Providers
+								</h3>
 								<SettingsEmbyAuth />
 							</div>
 							<SettingsUsers />

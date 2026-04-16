@@ -74,7 +74,7 @@ function createAuthStore() {
 		getToken,
 		setToken,
 		clearToken,
-		isLoggedIn,
+		isLoggedIn
 	};
 }
 

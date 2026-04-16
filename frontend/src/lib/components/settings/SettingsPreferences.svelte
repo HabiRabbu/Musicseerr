@@ -110,7 +110,8 @@
 		lidarrError = '';
 		try {
 			if (lidarrProfiles.length === 0) {
-				lidarrProfiles = await api.get<MetadataProfile[]>('/api/v1/settings/lidarr/metadata-profiles') ?? [];
+				lidarrProfiles =
+					(await api.get<MetadataProfile[]>('/api/v1/settings/lidarr/metadata-profiles')) ?? [];
 			}
 
 			const params = selectedProfileId != null ? `?profile_id=${selectedProfileId}` : '';

@@ -27,7 +27,7 @@
 			const res = await fetch('/api/v1/auth/login', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ username, password }),
+				body: JSON.stringify({ username, password })
 			});
 
 			if (!res.ok) {
@@ -86,7 +86,7 @@
 		const res = await fetch(API.plexLogin(), {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ plex_token: plexToken }),
+			body: JSON.stringify({ plex_token: plexToken })
 		});
 		if (!res.ok) {
 			const data = await res.json().catch(() => ({}));
@@ -111,7 +111,7 @@
 			const res = await fetch(API.embyLogin(), {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ username: embyUsername, password: embyPassword }),
+				body: JSON.stringify({ username: embyUsername, password: embyPassword })
 			});
 			if (!res.ok) {
 				const data = await res.json().catch(() => ({}));
@@ -237,7 +237,11 @@
 							<button
 								type="button"
 								class="btn btn-ghost btn-sm"
-								onclick={() => { embyExpanded = false; embyUsername = ''; embyPassword = ''; }}
+								onclick={() => {
+									embyExpanded = false;
+									embyUsername = '';
+									embyPassword = '';
+								}}
 							>
 								Cancel
 							</button>

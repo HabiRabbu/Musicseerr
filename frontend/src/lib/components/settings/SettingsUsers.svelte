@@ -2,7 +2,16 @@
 	import { onMount } from 'svelte';
 	import { API } from '$lib/constants';
 	import { api } from '$lib/api/client';
-	import { Users, Shield, Trash2, Pencil, Check, X, Infinity, RotateCcw } from 'lucide-svelte';
+	import {
+		Users,
+		Shield,
+		Trash2,
+		Pencil,
+		Check,
+		X,
+		Infinity as InfinityIcon,
+		RotateCcw
+	} from 'lucide-svelte';
 
 	interface User {
 		username: string;
@@ -36,7 +45,7 @@
 		try {
 			[users, defaults] = await Promise.all([
 				api.global.get<User[]>(API.adminUsers()),
-				api.global.get<DefaultSettings>(API.adminRequestSettings()),
+				api.global.get<DefaultSettings>(API.adminRequestSettings())
 			]);
 		} catch {
 			error = 'Failed to load users';
@@ -51,7 +60,7 @@
 			role: user.role,
 			can_request: user.can_request,
 			request_quota: user.request_quota,
-			quota_days: user.quota_days,
+			quota_days: user.quota_days
 		};
 	}
 
@@ -65,7 +74,7 @@
 		try {
 			const body: Record<string, unknown> = {
 				role: editForm.role,
-				can_request: editForm.can_request,
+				can_request: editForm.can_request
 			};
 			// null quota_days means "use default"
 			if (editForm.request_quota === null && editForm.quota_days === null) {
@@ -150,7 +159,9 @@
 							defaults.quota = v === '' ? null : parseInt(v);
 						}}
 					/>
-					<div class="label"><span class="label-text-alt text-base-content/50">0 or blank = unlimited</span></div>
+					<div class="label">
+						<span class="label-text-alt text-base-content/50">0 or blank = unlimited</span>
+					</div>
 				</label>
 
 				<label class="form-control">
@@ -177,7 +188,11 @@
 			</div>
 
 			<div class="flex items-center gap-3">
-				<button class="btn btn-primary btn-sm" onclick={() => void saveDefaults()} disabled={savingDefaults}>
+				<button
+					class="btn btn-primary btn-sm"
+					onclick={() => void saveDefaults()}
+					disabled={savingDefaults}
+				>
 					{#if savingDefaults}
 						<span class="loading loading-spinner loading-xs"></span>
 					{/if}
@@ -243,7 +258,11 @@
 											</select>
 										</td>
 										<td>
-											<input type="checkbox" class="toggle toggle-primary toggle-xs" bind:checked={editForm.can_request} />
+											<input
+												type="checkbox"
+												class="toggle toggle-primary toggle-xs"
+												bind:checked={editForm.can_request}
+											/>
 										</td>
 										<td>
 											<div class="flex items-center gap-1">
@@ -275,7 +294,11 @@
 										</td>
 										<td>
 											<div class="flex gap-1">
-												<button class="btn btn-ghost btn-xs btn-circle" onclick={() => void saveUser(user.username)} disabled={savingUser}>
+												<button
+													class="btn btn-ghost btn-xs btn-circle"
+													onclick={() => void saveUser(user.username)}
+													disabled={savingUser}
+												>
 													{#if savingUser}
 														<span class="loading loading-spinner loading-xs"></span>
 													{:else}
@@ -299,7 +322,11 @@
 											</div>
 										</td>
 										<td>
-											<span class="badge badge-sm {user.role === 'admin' ? 'badge-primary' : 'badge-ghost'}">
+											<span
+												class="badge badge-sm {user.role === 'admin'
+													? 'badge-primary'
+													: 'badge-ghost'}"
+											>
 												{user.role}
 											</span>
 										</td>
@@ -313,7 +340,7 @@
 										<td class="text-sm text-base-content/70">
 											{#if user.role === 'admin'}
 												<span class="flex items-center gap-1 text-base-content/40">
-													<Infinity class="h-3.5 w-3.5" /> Unlimited
+													<InfinityIcon class="h-3.5 w-3.5" /> Unlimited
 												</span>
 											{:else}
 												{effectiveQuota(user)}
@@ -324,7 +351,10 @@
 										</td>
 										<td>
 											<div class="flex gap-1">
-												<button class="btn btn-ghost btn-xs btn-circle" onclick={() => startEdit(user)}>
+												<button
+													class="btn btn-ghost btn-xs btn-circle"
+													onclick={() => startEdit(user)}
+												>
 													<Pencil class="h-3.5 w-3.5" />
 												</button>
 												<button

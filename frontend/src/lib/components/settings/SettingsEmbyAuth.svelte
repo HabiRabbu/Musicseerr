@@ -64,7 +64,9 @@
 <div class="card bg-base-200">
 	<div class="card-body gap-4">
 		<div class="flex items-center gap-3">
-			<div class="flex h-10 w-10 items-center justify-center rounded-xl bg-green-500/10 text-green-400">
+			<div
+				class="flex h-10 w-10 items-center justify-center rounded-xl bg-green-500/10 text-green-400"
+			>
 				<EmbyIcon class="h-5 w-5" />
 			</div>
 			<div>
@@ -94,7 +96,11 @@
 				</label>
 
 				{#if testResult}
-					<div class="flex items-center gap-2 text-sm {testResult.success ? 'text-success' : 'text-error'}">
+					<div
+						class="flex items-center gap-2 text-sm {testResult.success
+							? 'text-success'
+							: 'text-error'}"
+					>
 						{#if testResult.success}
 							<CircleCheck class="h-4 w-4 shrink-0" />
 						{:else}
@@ -105,13 +111,21 @@
 				{/if}
 
 				<div class="flex items-center gap-2">
-					<button class="btn btn-outline btn-sm" onclick={() => void test()} disabled={testing || !settings.emby_url}>
+					<button
+						class="btn btn-outline btn-sm"
+						onclick={() => void test()}
+						disabled={testing || !settings.emby_url}
+					>
 						{#if testing}
 							<span class="loading loading-spinner loading-xs"></span>
 						{/if}
 						Test Connection
 					</button>
-					<button class="btn btn-primary btn-sm gap-1" onclick={() => void save()} disabled={saving}>
+					<button
+						class="btn btn-primary btn-sm gap-1"
+						onclick={() => void save()}
+						disabled={saving}
+					>
 						{#if saving}
 							<span class="loading loading-spinner loading-xs"></span>
 						{:else}
@@ -126,7 +140,11 @@
 			</div>
 		{:else}
 			<div class="flex gap-2">
-				<button class="btn btn-primary btn-sm" onclick={() => void save()} disabled={saving || loading}>
+				<button
+					class="btn btn-primary btn-sm"
+					onclick={() => void save()}
+					disabled={saving || loading}
+				>
 					Save
 				</button>
 				{#if saveMessage}
