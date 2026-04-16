@@ -121,6 +121,14 @@
 	onMount(async () => {
 		await form.load();
 		credsPersisted = !!(form.data?.api_key && form.data?.shared_secret);
+		// Auto-verify on load so a broken API key surfaces immediately
+		if (form.data?.username && form.data?.session_key && form.data?.enabled) {
+			await form.test();
+			const result = form.testResult as ConnectionTestResult | null;
+			if (result && !result.valid) {
+				showDetails = true;
+			}
+		}
 	});
 
 	onDestroy(() => form.cleanup());
@@ -145,17 +153,30 @@
 			</ul>
 
 			{#if fullyConnected}
-				<div class="alert alert-success mb-4">
-					<CircleCheck class="w-5 h-5 shrink-0" />
-					<span>Connected as <strong>{form.data.username}</strong></span>
-					<button
-						type="button"
-						class="btn btn-ghost btn-sm ml-auto"
-						onclick={() => (showDetails = !showDetails)}
-					>
-						{showDetails ? 'Hide details' : 'Edit settings'}
-					</button>
-				</div>
+				{#if testResult && !testResult.valid}
+					<div class="alert alert-error mb-4">
+						<span>Last.fm API key is invalid — update your credentials below.</span>
+						<button
+							type="button"
+							class="btn btn-ghost btn-sm ml-auto"
+							onclick={() => (showDetails = !showDetails)}
+						>
+							{showDetails ? 'Hide details' : 'Edit settings'}
+						</button>
+					</div>
+				{:else}
+					<div class="alert alert-success mb-4">
+						<CircleCheck class="w-5 h-5 shrink-0" />
+						<span>Connected as <strong>{form.data.username}</strong></span>
+						<button
+							type="button"
+							class="btn btn-ghost btn-sm ml-auto"
+							onclick={() => (showDetails = !showDetails)}
+						>
+							{showDetails ? 'Hide details' : 'Edit settings'}
+						</button>
+					</div>
+				{/if}
 			{/if}
 
 			{#if showForm}
