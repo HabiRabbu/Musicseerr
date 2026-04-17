@@ -128,6 +128,7 @@
 						plexEnabled={$integrationStore.plex}
 						jellyfinCallbacks={state.jellyfinCallbacks}
 						localCallbacks={state.localCallbacks}
+						localDownloadCallback={state.localDownloadCallback}
 						navidromeCallbacks={state.navidromeCallbacks}
 						plexCallbacks={state.plexCallbacks}
 						onTrackLinksUpdate={state.handleTrackLinksUpdate}

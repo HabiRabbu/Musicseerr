@@ -39,6 +39,7 @@
 		plexEnabled: boolean;
 		jellyfinCallbacks: SourceCallbacks;
 		localCallbacks: SourceCallbacks;
+		localDownloadCallback?: { callback: (() => void) | undefined };
 		navidromeCallbacks: SourceCallbacks;
 		plexCallbacks: SourceCallbacks;
 		onTrackLinksUpdate: (links: YouTubeTrackLink[]) => void;
@@ -67,6 +68,7 @@
 		plexEnabled,
 		jellyfinCallbacks,
 		localCallbacks,
+		localDownloadCallback,
 		navidromeCallbacks,
 		plexCallbacks,
 		onTrackLinksUpdate,
@@ -129,6 +131,7 @@
 			onAddAllToQueue={localCallbacks.onAddAllToQueue}
 			onPlayAllNext={localCallbacks.onPlayAllNext}
 			onAddAllToPlaylist={localCallbacks.onAddAllToPlaylist}
+			onDownload={localDownloadCallback?.callback}
 		>
 			{#snippet icon()}
 				<LocalFilesIcon class="h-5 w-5" />

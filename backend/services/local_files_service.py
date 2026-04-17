@@ -1,7 +1,10 @@
 import asyncio
 import logging
 import os
+import re
 import shutil
+import tempfile
+import zipfile
 from collections.abc import AsyncGenerator
 from pathlib import Path
 from typing import Any
@@ -43,6 +46,13 @@ CONTENT_TYPE_MAP: dict[str, str] = {
     ".wma": "audio/x-ms-wma",
     ".opus": "audio/opus",
 }
+
+_INVALID_FILENAME_CHARS = re.compile(r'[\x00-\x1f\\/:*?"<>|]')
+
+
+def sanitize_filename(name: str) -> str:
+    """Replace characters that are invalid in filenames across OS platforms."""
+    return _INVALID_FILENAME_CHARS.sub("_", name).strip() or "Untitled"
 
 
 class LocalFilesService:
@@ -346,10 +356,93 @@ class LocalFilesService:
 
         return LocalAlbumMatch(
             found=bool(result_tracks),
+            lidarr_album_id=album_id,
             tracks=result_tracks,
             total_size_bytes=total_size,
             primary_format=primary_format,
         )
+
+    async def get_download_track(self, track_file_id: int) -> tuple[Path, str, str]:
+        """Resolve a track file for download. Returns (path, filename, media_type)."""
+        lidarr_path = await self.get_track_file_path(track_file_id)
+        file_path = self._resolve_and_validate_path(lidarr_path)
+        suffix = file_path.suffix.lower()
+        if suffix not in AUDIO_EXTENSIONS:
+            raise ExternalServiceError(f"Unsupported audio format: {suffix}")
+        media_type = CONTENT_TYPE_MAP.get(suffix, "application/octet-stream")
+        filename = file_path.name
+        return file_path, filename, media_type
+
+    async def create_album_zip(self, album_id: int) -> tuple[Path, str]:
+        """Build a ZIP of all tracks in an album. Returns (zip_path, zip_filename)."""
+        album_data = await self._lidarr.get_album_by_id(album_id)
+        if not album_data:
+            raise ResourceNotFoundError(f"Album {album_id} not found in Lidarr")
+
+        album_title = album_data.get("title") or "Unknown Album"
+        artist_data = album_data.get("artist") or {}
+        artist_name = artist_data.get("artistName") or "Unknown Artist"
+
+        result_tracks, _, _ = await self._build_track_list(album_id)
+        if not result_tracks:
+            raise ResourceNotFoundError(f"No track files found for album {album_id}")
+
+        # Pre-resolve all paths in the async context
+        resolved: list[tuple[Path, LocalTrackInfo]] = []
+        for track in result_tracks:
+            try:
+                lidarr_path = await self.get_track_file_path(track.track_file_id)
+                file_path = self._resolve_and_validate_path(lidarr_path)
+                resolved.append((file_path, track))
+            except (ResourceNotFoundError, PermissionError, ExternalServiceError):
+                logger.warning(
+                    "Skipping track %s in album %s ZIP",
+                    track.track_file_id,
+                    album_id,
+                )
+                continue
+
+        if not resolved:
+            raise ResourceNotFoundError(f"No accessible files for album {album_id}")
+
+        zip_filename = sanitize_filename(f"{artist_name} - {album_title}.zip")
+        tmp_path = await asyncio.to_thread(self._write_zip_sync, resolved)
+        return tmp_path, zip_filename
+
+    async def create_album_zip_by_mbid(self, mbid: str) -> tuple[Path, str]:
+        """Build a ZIP by MusicBrainz release-group ID."""
+        album_data = await self._lidarr.get_album_by_mbid(mbid)
+        if not album_data:
+            raise ResourceNotFoundError(f"Album with MBID {mbid} not found in Lidarr")
+        album_id = album_data.get("id")
+        if not album_id:
+            raise ResourceNotFoundError(f"Album with MBID {mbid} has no Lidarr ID")
+        return await self.create_album_zip(album_id)
+
+    @staticmethod
+    def _write_zip_sync(
+        resolved: list[tuple[Path, "LocalTrackInfo"]],
+    ) -> Path:
+        tmp = tempfile.NamedTemporaryFile(suffix=".zip", delete=False)
+        try:
+            multi_disc = len({t.disc_number for _, t in resolved}) > 1
+            with zipfile.ZipFile(tmp, "w", zipfile.ZIP_STORED) as zf:
+                for file_path, track in sorted(
+                    resolved, key=lambda r: (r[1].disc_number, r[1].track_number)
+                ):
+                    ext = file_path.suffix.lower()
+                    title = sanitize_filename(track.title)
+                    if multi_disc:
+                        arcname = f"{track.disc_number:02d}-{track.track_number:02d} {title}{ext}"
+                    else:
+                        arcname = f"{track.track_number:02d} {title}{ext}"
+                    zf.write(file_path, arcname)
+            tmp.close()
+            return Path(tmp.name)
+        except BaseException:
+            tmp.close()
+            Path(tmp.name).unlink(missing_ok=True)
+            raise
 
     def _library_album_to_summary(
         self, item: Any, album_id: int, track_file_count: int

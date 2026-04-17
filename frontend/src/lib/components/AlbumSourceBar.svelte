@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
-	import { Shuffle, Play, ListPlus, ListStart, ListMusic } from 'lucide-svelte';
+	import { Shuffle, Play, ListPlus, ListStart, ListMusic, Download } from 'lucide-svelte';
 	import ContextMenu from '$lib/components/ContextMenu.svelte';
 	import type { MenuItem } from '$lib/components/ContextMenu.svelte';
 
@@ -15,6 +15,7 @@
 		onAddAllToQueue?: () => void;
 		onPlayAllNext?: () => void;
 		onAddAllToPlaylist?: () => void;
+		onDownload?: () => void;
 		icon: Snippet;
 	}
 
@@ -29,6 +30,7 @@
 		onAddAllToQueue,
 		onPlayAllNext,
 		onAddAllToPlaylist,
+		onDownload,
 		icon
 	}: Props = $props();
 
@@ -45,6 +47,9 @@
 		}
 		if (onAddAllToPlaylist) {
 			items.push({ label: 'Add All to Playlist', icon: ListMusic, onclick: onAddAllToPlaylist });
+		}
+		if (onDownload) {
+			items.push({ label: 'Download Album', icon: Download, onclick: onDownload });
 		}
 		return items;
 	});

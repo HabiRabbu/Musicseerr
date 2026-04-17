@@ -27,7 +27,9 @@ import { launchNavidromePlayback } from '$lib/player/launchNavidromePlayback';
 import { launchPlexPlayback } from '$lib/player/launchPlexPlayback';
 import { playerStore } from '$lib/stores/player.svelte';
 import type { MenuItem } from '$lib/components/ContextMenu.svelte';
-import { ListPlus, ListStart, ListMusic } from 'lucide-svelte';
+import { ListPlus, ListStart, ListMusic, Download } from 'lucide-svelte';
+import { downloadFile } from '$lib/utils/downloadHelper';
+import { API } from '$lib/constants';
 import type { SourceCallbacks } from './albumPageState.svelte';
 
 export function getPlaybackMeta(album: AlbumBasicInfo): PlaybackMeta {
@@ -153,7 +155,7 @@ export function getTrackContextMenuItems(
 		resolvedPlex
 	);
 	const hasSource = queueItem !== null;
-	return [
+	const items: MenuItem[] = [
 		{
 			label: 'Add to Queue',
 			icon: ListPlus,
@@ -179,6 +181,14 @@ export function getTrackContextMenuItems(
 			disabled: !hasSource
 		}
 	];
+	if (resolvedLocal) {
+		items.push({
+			label: 'Download',
+			icon: Download,
+			onclick: () => downloadFile(API.download.localTrack(resolvedLocal.track_file_id))
+		});
+	}
+	return items;
 }
 
 function getSourceQueueItems(

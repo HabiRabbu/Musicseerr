@@ -15,6 +15,7 @@ class LocalTrackInfo(AppStruct):
 
 class LocalAlbumMatch(AppStruct):
     found: bool
+    lidarr_album_id: int | None = None
     tracks: list[LocalTrackInfo] = []
     total_size_bytes: int = 0
     primary_format: str | None = None

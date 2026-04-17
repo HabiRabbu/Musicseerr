@@ -58,6 +58,25 @@ class LidarrAlbumRepository(LidarrHistoryRepository):
     async def get_all_albums(self) -> list[dict[str, Any]]:
         return await self._get_all_albums_raw()
 
+    async def get_album_by_id(self, album_id: int) -> dict[str, Any] | None:
+        try:
+            data = await self._get(f"/api/v1/album/{album_id}")
+            return data
+        except Exception as e:  # noqa: BLE001
+            logger.error("Failed to get album %s from Lidarr: %s", album_id, e)
+            return None
+
+    async def get_album_by_mbid(self, mbid: str) -> dict[str, Any] | None:
+        """Look up a Lidarr album by MusicBrainz release-group ID."""
+        try:
+            data = await self._get("/api/v1/album", params={"foreignAlbumId": mbid})
+            if not data or not isinstance(data, list) or len(data) == 0:
+                return None
+            return data[0]
+        except Exception as e:  # noqa: BLE001
+            logger.error("Failed to get album by MBID %s from Lidarr: %s", mbid, e)
+            return None
+
     async def search_for_album(self, term: str) -> list[dict]:
         params = {"term": term}
         return await self._get("/api/v1/album/lookup", params=params)

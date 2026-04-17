@@ -1,7 +1,8 @@
 <script lang="ts">
-	import { Shuffle, Play, X, ListPlus, ListStart, ListMusic, Info } from 'lucide-svelte';
+	import { Shuffle, Play, X, ListPlus, ListStart, ListMusic, Info, Download } from 'lucide-svelte';
 	import { goto } from '$app/navigation';
 	import { API } from '$lib/constants';
+	import { downloadFile } from '$lib/utils/downloadHelper';
 	import { playerStore } from '$lib/stores/player.svelte';
 	import { launchJellyfinPlayback } from '$lib/player/launchJellyfinPlayback';
 	import { launchLocalPlayback } from '$lib/player/launchLocalPlayback';
@@ -425,17 +426,26 @@
 	}
 
 	function getBulkMenuItems(): MenuItem[] {
-		return [
+		const items: MenuItem[] = [
 			{ label: 'Add All to Queue', icon: ListPlus, onclick: addAllToQueue },
 			{ label: 'Play All Next', icon: ListStart, onclick: playAllNext },
 			{ label: 'Add All to Playlist', icon: ListMusic, onclick: addAllToPlaylist }
 		];
+		if (sourceType === 'local' && album) {
+			const localAlbum = album as import('$lib/types').LocalAlbumSummary;
+			items.push({
+				label: 'Download Album',
+				icon: Download,
+				onclick: () => downloadFile(API.download.localAlbum(localAlbum.lidarr_album_id))
+			});
+		}
+		return items;
 	}
 
 	function getTrackContextMenuItems(index: number): MenuItem[] {
 		const queueItem = buildTrackQueueItem(index);
 		const hasQueueItem = queueItem !== null;
-		return [
+		const items: MenuItem[] = [
 			{
 				label: 'Add to Queue',
 				icon: ListPlus,
@@ -459,6 +469,17 @@
 				disabled: !hasQueueItem
 			}
 		];
+		if (sourceType === 'local') {
+			const track = localTracks[index];
+			if (track) {
+				items.push({
+					label: 'Download',
+					icon: Download,
+					onclick: () => downloadFile(API.download.localTrack(track.track_file_id))
+				});
+			}
+		}
+		return items;
 	}
 
 	function getTrackName(index: number): string {

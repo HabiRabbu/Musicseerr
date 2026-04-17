@@ -4,7 +4,10 @@ import { toastStore } from '$lib/stores/toast';
 import { playerStore } from '$lib/stores/player.svelte';
 import type { QueueItem } from '$lib/player/types';
 import type { MenuItem } from '$lib/components/ContextMenu.svelte';
-import { ListPlus, ListStart, ListMusic } from 'lucide-svelte';
+import { ListPlus, ListStart, ListMusic, Download } from 'lucide-svelte';
+import { downloadFile } from '$lib/utils/downloadHelper';
+import { API } from '$lib/constants';
+import type { LocalAlbumSummary } from '$lib/types';
 
 export const PAGE_SIZE = 48;
 
@@ -339,7 +342,7 @@ export function createLibraryController<TAlbum>(
 
 	function getAlbumMenuItems(album: TAlbum): MenuItem[] {
 		const isLoading = menuLoadingAlbumId === adapter.getAlbumId(album);
-		return [
+		const items: MenuItem[] = [
 			{
 				label: 'Add to Queue',
 				icon: ListPlus,
@@ -359,6 +362,15 @@ export function createLibraryController<TAlbum>(
 				disabled: isLoading
 			}
 		];
+		if (adapter.sourceType === 'local') {
+			const localAlbum = album as LocalAlbumSummary;
+			items.push({
+				label: 'Download Album',
+				icon: Download,
+				onclick: () => downloadFile(API.download.localAlbum(localAlbum.lidarr_album_id))
+			});
+		}
+		return items;
 	}
 
 	function init(): void {

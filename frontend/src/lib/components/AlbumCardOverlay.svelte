@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Play, Shuffle, ListPlus, ListStart, ListMusic } from 'lucide-svelte';
+	import { Play, Shuffle, ListPlus, ListStart, ListMusic, Download } from 'lucide-svelte';
 	import ContextMenu from './ContextMenu.svelte';
 	import type { MenuItem } from './ContextMenu.svelte';
 	import { integrationStore } from '$lib/stores/integration';
@@ -12,6 +12,8 @@
 		type AlbumCardMeta
 	} from '$lib/utils/albumCardPlayback';
 	import { openGlobalPlaylistModal } from './AddToPlaylistModal.svelte';
+	import { downloadFile } from '$lib/utils/downloadHelper';
+	import { API } from '$lib/constants';
 
 	interface Props {
 		mbid: string;
@@ -36,7 +38,7 @@
 	}
 
 	function getMenuItems(): MenuItem[] {
-		return [
+		const items: MenuItem[] = [
 			{
 				label: 'Add to Queue',
 				icon: ListPlus,
@@ -56,6 +58,14 @@
 				}
 			}
 		];
+		if ($integrationStore.localfiles) {
+			items.push({
+				label: 'Download Album',
+				icon: Download,
+				onclick: () => downloadFile(API.download.localAlbumByMbid(mbid))
+			});
+		}
+		return items;
 	}
 
 	async function handlePlay(e: Event) {

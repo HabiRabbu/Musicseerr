@@ -273,6 +273,11 @@ export const API = {
 		plexStopped: (ratingKey: string) => `/api/v1/stream/plex/${ratingKey}/stopped`,
 		local: (trackId: number | string) => `/api/v1/stream/local/${trackId}`
 	},
+	download: {
+		localTrack: (trackId: number) => `/api/v1/download/local/track/${trackId}`,
+		localAlbum: (albumId: number) => `/api/v1/download/local/album/${albumId}`,
+		localAlbumByMbid: (mbid: string) => `/api/v1/download/local/album/mbid/${mbid}`
+	},
 	jellyfinLibrary: {
 		albumMatch: (mbid: string) => `/api/v1/jellyfin/albums/match/${mbid}`,
 		albums: (
