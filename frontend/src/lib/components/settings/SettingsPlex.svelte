@@ -84,6 +84,8 @@
 					oauthPending = false;
 					oauthUrl = null;
 					await test();
+					const result = form.testResult as { valid?: boolean } | null;
+					if (result?.valid) await save();
 					return;
 				}
 			} catch {
