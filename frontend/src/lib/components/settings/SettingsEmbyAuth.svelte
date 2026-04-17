@@ -60,7 +60,11 @@
 		try {
 			testResult = await api.global.post<{ success: boolean; message: string }>(
 				API.embyAuthVerify(),
-				{ emby_url: settings.emby_url, enabled: settings.enabled, emby_api_key: settings.emby_api_key }
+				{
+					emby_url: settings.emby_url,
+					enabled: settings.enabled,
+					emby_api_key: settings.emby_api_key
+				}
 			);
 		} catch {
 			testResult = { success: false, message: 'Could not reach server' };

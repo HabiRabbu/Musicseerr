@@ -131,10 +131,10 @@
 				</div>
 
 				<div class="flex items-center gap-3">
-					<button type="button" class="btn btn-sm" disabled>
-						Sign in with Plex
-					</button>
-					<span class="text-sm text-base-content/50">Sign-in temporarily disabled — paste your token above.</span>
+					<button type="button" class="btn btn-sm" disabled> Sign in with Plex </button>
+					<span class="text-sm text-base-content/50"
+						>Sign-in temporarily disabled — paste your token above.</span
+					>
 				</div>
 
 				{#if hasCredentials || libraries.length > 0 || loadingLibraries}
