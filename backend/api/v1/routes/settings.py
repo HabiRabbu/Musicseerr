@@ -181,8 +181,12 @@ async def update_lidarr_connection(
 @router.post("/lidarr/verify", response_model=LidarrVerifyResponse)
 async def verify_lidarr_connection(
     settings: LidarrConnectionSettings = MsgSpecBody(LidarrConnectionSettings),
+    preferences_service: PreferencesService = Depends(get_preferences_service),
     settings_service: SettingsService = Depends(get_settings_service),
 ):
+    if _is_masked(settings.lidarr_api_key):
+        current = preferences_service.get_lidarr_connection()
+        settings = msgspec.structs.replace(settings, lidarr_api_key=current.lidarr_api_key)
     return await settings_service.verify_lidarr(settings)
 
 

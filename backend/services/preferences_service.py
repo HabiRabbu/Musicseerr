@@ -40,12 +40,16 @@ _CREDENTIAL_FIELDS = [
     # (section_key, field_key) — nested sections
     ("navidrome_settings", "password"),
     ("plex_settings", "plex_token"),
-    ("lidarr_connection", "lidarr_api_key"),
     ("jellyfin_settings", "api_key"),
     ("listenbrainz_settings", "user_token"),
     ("lastfm_settings", "api_key"),
     ("lastfm_settings", "shared_secret"),
     ("lastfm_settings", "session_key"),
+]
+
+# Top-level credential keys (stored directly in config root, not in a nested section)
+_TOP_LEVEL_CREDENTIAL_FIELDS = [
+    "lidarr_api_key",
 ]
 
 
@@ -84,6 +88,14 @@ class PreferencesService:
                         section_key, field_key,
                     )
                     section[field_key] = ""
+                    changed = True
+            for field_key in _TOP_LEVEL_CREDENTIAL_FIELDS:
+                if _is_corrupted(config.get(field_key)):
+                    logger.warning(
+                        "Clearing corrupted top-level credential %s (contained mask character)",
+                        field_key,
+                    )
+                    config[field_key] = ""
                     changed = True
             if changed:
                 with self._cache_lock:
