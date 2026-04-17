@@ -186,4 +186,6 @@
 		bind:value={data.discover_picks_genre_affinity_weight}
 		min={0}
 		max={1}
-		step={0.1
+		step={0.1}
+	/>
+</div>
