@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import msgspec
 from fastapi import APIRouter, Depends, HTTPException
@@ -286,7 +287,10 @@ async def update_navidrome_settings(
             current = preferences_service.get_navidrome_connection_raw()
             settings = msgspec.structs.replace(settings, password=current.password)
         preferences_service.save_navidrome_connection(settings)
-        await settings_service.on_navidrome_settings_changed(enabled=settings.enabled)
+        try:
+            await asyncio.wait_for(settings_service.on_navidrome_settings_changed(enabled=settings.enabled), timeout=8.0)
+        except asyncio.TimeoutError:
+            logger.warning("on_navidrome_settings_changed timed out — cache flush deferred")
         return NavidromeConnectionSettingsResponse.from_settings(preferences_service.get_navidrome_connection())
     except ConfigurationError as e:
         logger.warning("Configuration error updating Navidrome settings: %s", e)
@@ -320,7 +324,10 @@ async def update_plex_settings(
             current = preferences_service.get_plex_connection_raw()
             settings = msgspec.structs.replace(settings, plex_token=current.plex_token)
         preferences_service.save_plex_connection(settings)
-        await settings_service.on_plex_settings_changed(enabled=settings.enabled)
+        try:
+            await asyncio.wait_for(settings_service.on_plex_settings_changed(enabled=settings.enabled), timeout=8.0)
+        except asyncio.TimeoutError:
+            logger.warning("on_plex_settings_changed timed out — cache flush deferred")
         logger.info("Updated Plex connection settings")
         return PlexConnectionSettingsResponse.from_settings(preferences_service.get_plex_connection())
     except ConfigurationError as e:
