@@ -649,11 +649,12 @@ export function createAlbumPageState(albumIdGetter: () => string) {
 		);
 	}
 
-	const localDownloadCallback = $derived<{ callback: (() => void) | undefined }>({
-		callback: localMatch?.lidarr_album_id
-			? () => downloadFile(API.download.localAlbum(localMatch.lidarr_album_id!))
-			: undefined
-	});
+	const localDownloadCallback = $derived<{ callback: (() => void) | undefined }>(
+		(() => {
+			const id = localMatch?.lidarr_album_id;
+			return { callback: id ? () => downloadFile(API.download.localAlbum(id)) : undefined };
+		})()
+	);
 
 	const jellyfinCallbacks: SourceCallbacks = buildSourceCallbacks(
 		() => jellyfinMatch,

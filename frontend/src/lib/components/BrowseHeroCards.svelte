@@ -47,15 +47,22 @@
 
 	let hoveredIndex = $state<number | null>(null);
 	let cardEls: HTMLAnchorElement[] = [];
-	let cardCount = $derived(cards.length);
-	let tiltStyles: string[] = $state(Array(cardCount).fill(''));
-	let specularStyles: string[] = $state(Array(cardCount).fill(''));
 
 	const tweenDuration = reducedMotion ? 0 : 1200;
-	const counters: Tweened<number>[] = Array.from({ length: cardCount }, () =>
-		tweened(0, { duration: tweenDuration, easing: cubicOut })
-	);
-	let counterValues: number[] = $state(Array(cardCount).fill(0));
+	let tiltStyles: string[] = $state([]);
+	let specularStyles: string[] = $state([]);
+	let counters: Tweened<number>[] = $state([]);
+	let counterValues: number[] = $state([]);
+
+	$effect(() => {
+		const count = cards.length;
+		tiltStyles = Array(count).fill('');
+		specularStyles = Array(count).fill('');
+		counterValues = Array(count).fill(0);
+		counters = Array.from({ length: count }, () =>
+			tweened(0, { duration: tweenDuration, easing: cubicOut })
+		);
+	});
 
 	$effect(() => {
 		const unsubs = counters.map((c, i) =>
