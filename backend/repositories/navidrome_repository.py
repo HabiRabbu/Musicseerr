@@ -267,6 +267,43 @@ class NavidromeRepository:
             _record_degradation("Navidrome ping failed")
             return False
 
+    async def verify_credentials(self) -> tuple[bool, str]:
+        """Single-shot credential check that bypasses the retry decorator.
+
+        Returns (True, message) on success, (False, message) on auth failure,
+        and raises ExternalServiceError for connectivity problems so the caller
+        can distinguish "wrong password" from "can't reach server".
+        """
+        if not self._configured:
+            return False, "Navidrome is not configured"
+        params = self._build_auth_params()
+        params["type"] = "newest"
+        params["size"] = "1"
+        url = f"{self._url}/rest/getAlbumList2"
+        try:
+            response = await self._client.get(url, params=params, timeout=10.0)
+        except httpx.TimeoutException as exc:
+            raise ExternalServiceError(f"Navidrome request timed out: {exc}") from exc
+        except httpx.HTTPError as exc:
+            raise ExternalServiceError(f"Navidrome request failed: {exc}") from exc
+        if response.status_code in (401, 403):
+            return False, "Authentication failed — check your username and password"
+        if response.status_code != 200:
+            raise ExternalServiceError(f"Navidrome returned status {response.status_code}")
+        try:
+            data: dict = response.json()
+        except Exception as exc:  # noqa: BLE001
+            raise ExternalServiceError("Navidrome returned invalid JSON") from exc
+        resp = data.get("subsonic-response", {})
+        if resp.get("status") != "ok":
+            error = resp.get("error", {})
+            code = error.get("code", 0)
+            msg = error.get("message", "Authentication failed")
+            if code in (40, 41):
+                return False, f"Authentication failed — {msg}"
+            raise ExternalServiceError(f"Navidrome error {code}: {msg}")
+        return True, "Connected to Navidrome successfully"
+
     async def get_album_list(
         self,
         type: str,

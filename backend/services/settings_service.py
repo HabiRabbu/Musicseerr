@@ -549,20 +549,8 @@ class SettingsService:
                 password=password,
             )
 
-            # ping() alone is unreliable — some Navidrome versions return ok on
-            # ping even with wrong credentials. Use get_album_list which always
-            # requires a valid auth token.
-            try:
-                await temp_repo.get_album_list(type="newest", size=1)
-                return NavidromeVerifyResult(
-                    valid=True, message="Connected to Navidrome successfully"
-                )
-            except Exception as auth_err:  # noqa: BLE001
-                logger.debug("Navidrome auth check failed: %s", auth_err)
-                return NavidromeVerifyResult(
-                    valid=False,
-                    message="Navidrome rejected the credentials. Check your username and password.",
-                )
+            valid, message = await temp_repo.verify_credentials()
+            return NavidromeVerifyResult(valid=valid, message=message)
         except Exception as e:  # noqa: BLE001
             logger.exception("Failed to verify Navidrome connection: %s", e)
             return NavidromeVerifyResult(
