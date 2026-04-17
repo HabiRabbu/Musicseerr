@@ -539,7 +539,7 @@ class SettingsService:
             temp_repo = NavidromeRepository(http_client=http_client, cache=temp_cache)
 
             password = settings.password
-            if password == NAVIDROME_PASSWORD_MASK:
+            if password == NAVIDROME_PASSWORD_MASK or password.startswith(LASTFM_SECRET_MASK):
                 raw = self._preferences_service.get_navidrome_connection_raw()
                 password = raw.password
 
@@ -653,7 +653,7 @@ class SettingsService:
             temp_cache = InMemoryCache(max_entries=100)
 
             token = settings.plex_token
-            if token == PLEX_TOKEN_MASK:
+            if token == PLEX_TOKEN_MASK or token.startswith(LASTFM_SECRET_MASK):
                 raw = self._preferences_service.get_plex_connection_raw()
                 token = raw.plex_token
 

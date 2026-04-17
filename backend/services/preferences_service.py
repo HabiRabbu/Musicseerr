@@ -128,9 +128,12 @@ class PreferencesService:
     def save_lidarr_connection(self, settings: LidarrConnectionSettings) -> None:
         try:
             config = self._load_config().copy()
+            lidarr_api_key = settings.lidarr_api_key
+            if lidarr_api_key.startswith(LASTFM_SECRET_MASK):
+                lidarr_api_key = config.get("lidarr_api_key", self._settings.lidarr_api_key)
             config.update({
                 "lidarr_url": settings.lidarr_url,
-                "lidarr_api_key": settings.lidarr_api_key,
+                "lidarr_api_key": lidarr_api_key,
                 "quality_profile_id": settings.quality_profile_id,
                 "metadata_profile_id": settings.metadata_profile_id,
                 "root_folder_path": settings.root_folder_path,
@@ -138,7 +141,7 @@ class PreferencesService:
             self._save_config(config)
 
             self._settings.lidarr_url = settings.lidarr_url
-            self._settings.lidarr_api_key = settings.lidarr_api_key
+            self._settings.lidarr_api_key = lidarr_api_key
             self._settings.quality_profile_id = settings.quality_profile_id
             self._settings.metadata_profile_id = settings.metadata_profile_id
             self._settings.root_folder_path = settings.root_folder_path
@@ -159,10 +162,13 @@ class PreferencesService:
     def save_jellyfin_connection(self, settings: JellyfinConnectionSettings) -> None:
         try:
             config = self._load_config().copy()
+            api_key = settings.api_key
+            if api_key.startswith(LASTFM_SECRET_MASK):
+                api_key = config.get("jellyfin_settings", {}).get("api_key", "")
             config["jellyfin_url"] = settings.jellyfin_url
             config["jellyfin_settings"] = {
                 "jellyfin_url": settings.jellyfin_url,
-                "api_key": settings.api_key,
+                "api_key": api_key,
                 "user_id": settings.user_id,
                 "enabled": settings.enabled,
             }
@@ -200,7 +206,7 @@ class PreferencesService:
             current_data = config.get("navidrome_settings", {})
 
             password = settings.password
-            if password == NAVIDROME_PASSWORD_MASK:
+            if password == NAVIDROME_PASSWORD_MASK or password.startswith(LASTFM_SECRET_MASK):
                 password = current_data.get("password", "")
 
             config["navidrome_settings"] = {
@@ -245,7 +251,7 @@ class PreferencesService:
             current_data = config.get("plex_settings", {})
 
             token = settings.plex_token
-            if token == PLEX_TOKEN_MASK:
+            if token == PLEX_TOKEN_MASK or token.startswith(LASTFM_SECRET_MASK):
                 token = current_data.get("plex_token", "")
 
             config["plex_settings"] = {
@@ -273,9 +279,12 @@ class PreferencesService:
     def save_listenbrainz_connection(self, settings: ListenBrainzConnectionSettings) -> None:
         try:
             config = self._load_config().copy()
+            user_token = settings.user_token
+            if user_token.startswith(LASTFM_SECRET_MASK):
+                user_token = config.get("listenbrainz_settings", {}).get("user_token", "")
             config["listenbrainz_settings"] = {
                 "username": settings.username,
-                "user_token": settings.user_token,
+                "user_token": user_token,
                 "enabled": settings.enabled,
             }
             self._save_config(config)
@@ -303,8 +312,13 @@ class PreferencesService:
     def save_youtube_connection(self, settings: YouTubeConnectionSettings) -> None:
         try:
             config = self._load_config().copy()
+            api_key = settings.api_key
+            if api_key.startswith(LASTFM_SECRET_MASK):
+                api_key = config.get("youtube_settings", {}).get("api_key", "")
+            else:
+                api_key = api_key.strip()
             config["youtube_settings"] = {
-                "api_key": settings.api_key.strip(),
+                "api_key": api_key,
                 "enabled": settings.enabled,
                 "api_enabled": settings.api_enabled,
                 "daily_quota_limit": settings.daily_quota_limit,
