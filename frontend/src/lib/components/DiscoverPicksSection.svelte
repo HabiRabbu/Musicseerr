@@ -43,7 +43,7 @@
 					<div>
 						<div class="flex items-center gap-2">
 							<h2 class="text-lg font-bold sm:text-xl">{section.title}</h2>
-							<SourceBadge source={section.source} />
+							<SourceBadge source={section.source ?? undefined} />
 						</div>
 						<p class="text-xs text-base-content/50">Picked for you</p>
 					</div>

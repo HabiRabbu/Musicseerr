@@ -99,7 +99,7 @@
 				{:else}
 					<h2 class="text-lg sm:text-xl font-bold">{section.title}</h2>
 				{/if}
-				<SourceBadge source={section.source} />
+				<SourceBadge source={section.source ?? undefined} />
 			</div>
 			{#if headerActions}
 				{@render headerActions()}

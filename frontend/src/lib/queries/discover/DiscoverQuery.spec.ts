@@ -130,7 +130,7 @@ describe('getPlaylistSuggestionsQuery source propagation', () => {
 		expect(mockCreateQuery).toHaveBeenCalled();
 		const factory = mockCreateQuery.mock.calls[
 			mockCreateQuery.mock.calls.length - 1
-		][0] as () => Record<string, unknown>;
+		][0] as unknown as () => Record<string, unknown>;
 		const opts = factory();
 		const queryFn = opts.queryFn as (ctx: { signal: AbortSignal }) => Promise<unknown>;
 		await queryFn({ signal: new AbortController().signal });
@@ -156,7 +156,7 @@ describe('getPlaylistSuggestionsQuery source propagation', () => {
 
 		const factory = mockCreateQuery.mock.calls[
 			mockCreateQuery.mock.calls.length - 1
-		][0] as () => Record<string, unknown>;
+		][0] as unknown as () => Record<string, unknown>;
 		const opts = factory();
 		const queryFn = opts.queryFn as (ctx: { signal: AbortSignal }) => Promise<unknown>;
 		await queryFn({ signal: new AbortController().signal });
@@ -183,7 +183,7 @@ describe('getRadioQuery source propagation', () => {
 
 		const factory = mockCreateQuery.mock.calls[
 			mockCreateQuery.mock.calls.length - 1
-		][0] as () => Record<string, unknown>;
+		][0] as unknown as () => Record<string, unknown>;
 		const opts = factory();
 		const queryFn = opts.queryFn as (ctx: { signal: AbortSignal }) => Promise<unknown>;
 		await queryFn({ signal: new AbortController().signal });
@@ -208,7 +208,7 @@ describe('getRadioQuery source propagation', () => {
 
 		const factory = mockCreateQuery.mock.calls[
 			mockCreateQuery.mock.calls.length - 1
-		][0] as () => Record<string, unknown>;
+		][0] as unknown as () => Record<string, unknown>;
 		const opts = factory();
 		const queryFn = opts.queryFn as (ctx: { signal: AbortSignal }) => Promise<unknown>;
 		await queryFn({ signal: new AbortController().signal });
