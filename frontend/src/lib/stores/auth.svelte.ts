@@ -2,10 +2,24 @@ import { browser } from '$app/environment';
 
 const TOKEN_KEY = 'musicseerr_token';
 
+function parseJwtPayload(token: string): Record<string, unknown> | null {
+	try {
+		const parts = token.split('.');
+		if (parts.length !== 3) return null;
+		const payload = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+		return JSON.parse(atob(payload));
+	} catch {
+		return null;
+	}
+}
+
 function createAuthStore() {
-	let token = $state<string | null>(browser ? localStorage.getItem(TOKEN_KEY) : null);
-	let username = $state<string | null>(null);
-	let role = $state<string | null>(null);
+	const storedToken = browser ? localStorage.getItem(TOKEN_KEY) : null;
+	const storedPayload = storedToken ? parseJwtPayload(storedToken) : null;
+
+	let token = $state<string | null>(storedToken);
+	let username = $state<string | null>(storedPayload ? String(storedPayload.sub ?? '') : null);
+	let role = $state<string | null>(storedPayload ? String(storedPayload.role ?? '') : null);
 	let authEnabled = $state(false);
 	let setupRequired = $state(false);
 	let embySsoEnabled = $state(false);
