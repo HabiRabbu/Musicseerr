@@ -84,3 +84,7 @@ class IntegrationHelpers:
             youtube=self.is_youtube_api_enabled(),
             lastfm=self.is_lastfm_enabled(),
         )
+
+    def get_discover_picks_settings(self) -> tuple[float, int]:
+        adv = self._preferences.get_advanced_settings()
+        return adv.discover_picks_genre_affinity_weight, adv.discover_picks_count

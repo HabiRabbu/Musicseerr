@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { albumHref } from '$lib/utils/entityRoutes';
 	import { onMount } from 'svelte';
-	import { Music2, Download } from 'lucide-svelte';
+	import { Disc3, Download } from 'lucide-svelte';
 	import type { TopAlbum } from '$lib/types';
 	import { colors } from '$lib/colors';
 	import { libraryStore } from '$lib/stores/library';
@@ -208,8 +208,8 @@
 						{#if source === 'lastfm'}
 							<LastFmPlaceholder />
 						{:else}
-							<div class="w-12 h-12 shrink-0 bg-base-300 rounded flex items-center justify-center">
-								<Music2 class="w-6 h-6 opacity-50" />
+							<div class="w-12 h-12 shrink-0 bg-base-200 rounded flex items-center justify-center">
+								<Disc3 class="w-6 h-6 text-base-content/20" />
 							</div>
 						{/if}
 

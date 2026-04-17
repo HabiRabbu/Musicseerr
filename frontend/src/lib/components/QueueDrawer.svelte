@@ -4,7 +4,7 @@
 	import { playerStore } from '$lib/stores/player.svelte';
 	import { playbackToast } from '$lib/stores/playbackToast.svelte';
 	import { getCoverUrl } from '$lib/utils/errorHandling';
-	import { X, GripVertical, ListMusic, Music, Shuffle, Trash2 } from 'lucide-svelte';
+	import { X, GripVertical, ListMusic, Disc3, Shuffle, Trash2 } from 'lucide-svelte';
 	import JellyfinIcon from '$lib/components/JellyfinIcon.svelte';
 	import LocalFilesIcon from '$lib/components/LocalFilesIcon.svelte';
 	import NavidromeIcon from '$lib/components/NavidromeIcon.svelte';
@@ -294,8 +294,8 @@
 								{#if coverUrl}
 									<img src={coverUrl} alt={item.albumName} class="w-full h-full object-cover" />
 								{:else}
-									<div class="w-full h-full bg-base-300 flex items-center justify-center">
-										<Music class="h-4 w-4 opacity-30" />
+									<div class="w-full h-full bg-base-200 flex items-center justify-center">
+										<Disc3 class="h-4 w-4 text-base-content/20" />
 									</div>
 								{/if}
 							</div>

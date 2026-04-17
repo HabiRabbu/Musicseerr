@@ -11,6 +11,9 @@ from api.v1.schemas.discover import (
     DiscoverQueueStatusResponse,
     QueueGenerateRequest,
     QueueGenerateResponse,
+    RadioRequest,
+    PlaylistSuggestionsRequest,
+    PlaylistSuggestionsResponse,
     YouTubeSearchResponse,
     YouTubeQuotaResponse,
     TrackCacheCheckRequest,
@@ -18,6 +21,7 @@ from api.v1.schemas.discover import (
     TrackCacheCheckResponseItem,
 )
 from api.v1.schemas.common import StatusMessageResponse
+from api.v1.schemas.home import HomeSection
 from core.dependencies import get_discover_service, get_discover_queue_manager, get_youtube_repo
 from infrastructure.degradation import try_get_degradation_context
 from infrastructure.msgspec_fastapi import MsgSpecBody, MsgSpecRoute
@@ -48,6 +52,22 @@ async def refresh_discover_data(
 ):
     await discover_service.refresh_discover_data()
     return StatusMessageResponse(status="ok", message="Discover refresh triggered")
+
+
+@router.post("/radio", response_model=HomeSection)
+async def discover_radio(
+    body: RadioRequest = MsgSpecBody(RadioRequest),
+    service: DiscoverService = Depends(get_discover_service),
+) -> HomeSection:
+    return await service.generate_radio(body)
+
+
+@router.post("/playlist-suggestions", response_model=PlaylistSuggestionsResponse)
+async def playlist_suggestions(
+    body: PlaylistSuggestionsRequest = MsgSpecBody(PlaylistSuggestionsRequest),
+    service: DiscoverService = Depends(get_discover_service),
+) -> PlaylistSuggestionsResponse:
+    return await service.get_playlist_suggestions(body)
 
 
 @router.get("/queue", response_model=DiscoverQueueResponse)

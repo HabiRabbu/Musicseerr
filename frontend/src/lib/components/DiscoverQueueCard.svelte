@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Music, Play, Loader2, RefreshCw } from 'lucide-svelte';
+	import { Disc3, Play, Loader2, RefreshCw } from 'lucide-svelte';
 	import { getQueueCachedData, subscribeQueueCacheChanges } from '$lib/utils/discoverQueueCache';
 	import type { MusicSource } from '$lib/stores/musicSource';
 	import { discoverQueueStatusStore, type QueueBuildStatus } from '$lib/stores/discoverQueueStatus';
@@ -53,7 +53,7 @@
 		style="border: 2px dashed rgb(var(--brand-discover) / 0.25); border-radius: inherit;"
 	></div>
 	<div class="card-body items-center gap-5 py-12 text-center">
-		<div class="text-primary opacity-70">
+		<div class="text-base-content/20">
 			{#if isBuilding && !hasCachedQueue}
 				<div class="flex items-end gap-0.75 h-10 w-10 justify-center pb-1">
 					<span class="w-1.5 bg-primary rounded-full animate-equalizer-1" style="height: 60%;"
@@ -68,7 +68,7 @@
 					></span>
 				</div>
 			{:else}
-				<Music class="h-10 w-10" strokeWidth={1.5} />
+				<Disc3 class="h-10 w-10" strokeWidth={1.5} />
 			{/if}
 		</div>
 		<div class="flex flex-col gap-1">

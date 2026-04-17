@@ -2,8 +2,9 @@
 	import { run } from 'svelte/legacy';
 
 	import { onDestroy } from 'svelte';
+	import { Disc3, Users } from 'lucide-svelte';
 	import { lazyImage, resetLazyImage } from '$lib/utils/lazyImage';
-	import { PLACEHOLDER_COLORS, API_SIZES } from '$lib/constants';
+	import { API_SIZES } from '$lib/constants';
 	import { isValidMbid } from '$lib/utils/formatting';
 	import { imageSettingsStore } from '$lib/stores/imageSettings';
 	import { appendAudioDBSizeSuffix } from '$lib/utils/imageSuffix';
@@ -187,51 +188,13 @@
 	});
 </script>
 
-<div
-	class="relative overflow-hidden shrink-0 {sizeClass} {roundedClass} {className}"
-	style="background-color: {PLACEHOLDER_COLORS.DARK};"
->
+<div class="relative overflow-hidden shrink-0 bg-base-200 {sizeClass} {roundedClass} {className}">
 	{#if showPlaceholder && (!imgLoaded || imgError || !hasSource)}
 		<div class="absolute inset-0 w-full h-full flex items-center justify-center">
 			{#if imageType === 'album'}
-				<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" class="w-full h-full">
-					<rect fill={PLACEHOLDER_COLORS.DARK} width="200" height="200" />
-					<circle
-						cx="100"
-						cy="100"
-						r="70"
-						fill={PLACEHOLDER_COLORS.MEDIUM}
-						stroke={PLACEHOLDER_COLORS.LIGHT}
-						stroke-width="2"
-					/>
-					<circle
-						cx="100"
-						cy="100"
-						r="50"
-						fill="none"
-						stroke={PLACEHOLDER_COLORS.LIGHT}
-						stroke-width="1"
-					/>
-					<circle
-						cx="100"
-						cy="100"
-						r="30"
-						fill="none"
-						stroke={PLACEHOLDER_COLORS.LIGHT}
-						stroke-width="1"
-					/>
-					<circle cx="100" cy="100" r="12" fill={PLACEHOLDER_COLORS.LIGHT} />
-					<circle cx="100" cy="100" r="4" fill={PLACEHOLDER_COLORS.DARK} />
-				</svg>
+				<Disc3 class="h-1/3 w-1/3 text-base-content/20" />
 			{:else}
-				<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" class="w-full h-full">
-					<rect fill={PLACEHOLDER_COLORS.DARK} width="200" height="200" />
-					<circle cx="100" cy="80" r="30" fill={PLACEHOLDER_COLORS.LIGHT} />
-					<path
-						d="M60 120 Q100 140 140 120 L140 160 Q100 180 60 160 Z"
-						fill={PLACEHOLDER_COLORS.LIGHT}
-					/>
-				</svg>
+				<Users class="h-1/3 w-1/3 text-base-content/20" />
 			{/if}
 		</div>
 	{/if}

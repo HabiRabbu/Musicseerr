@@ -2,7 +2,6 @@ import { browser } from '$app/environment';
 import { CACHE_TTL } from '$lib/constants';
 import { api } from '$lib/api/client';
 import { updateHomeCacheTTL } from '$lib/utils/homeCache';
-import { updateDiscoverCacheTTL } from '$lib/utils/discoverCache';
 import { updateDiscoveryCacheTTL } from '$lib/stores/discoveryCache';
 import { updateDiscoverQueueCacheTTL } from '$lib/utils/discoverQueueCache';
 import { updateSearchCacheTTL } from '$lib/stores/search';
@@ -50,7 +49,6 @@ let initialized = false;
 
 function applyTTLs(ttls: CacheTTLs): void {
 	updateHomeCacheTTL(ttls.home);
-	updateDiscoverCacheTTL(ttls.discover);
 	libraryStore.updateCacheTTL(ttls.library);
 	recentlyAddedStore.updateCacheTTL(ttls.recentlyAdded);
 	updateDiscoveryCacheTTL(ttls.discover);

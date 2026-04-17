@@ -322,6 +322,8 @@ export type HomeSection = {
 	source: string | null;
 	fallback_message: string | null;
 	connect_service: string | null;
+	radio_seed_type?: string | null;
+	radio_seed_id?: string | null;
 };
 
 export type ServicePrompt = {
@@ -402,11 +404,40 @@ export type DiscoverResponse = {
 	lastfm_weekly_artist_chart: HomeSection | null;
 	lastfm_weekly_album_chart: HomeSection | null;
 	lastfm_recent_scrobbles: HomeSection | null;
+	daily_mixes: HomeSection[];
+	radio_sections: HomeSection[];
+	discover_picks: HomeSection | null;
+	unexplored_genres: HomeSection | null;
 	genre_artists: Record<string, string | null>;
 	genre_artist_images: Record<string, string | null>;
 	integration_status: Record<string, boolean>;
 	service_prompts: ServicePrompt[];
 	refreshing: boolean;
+	service_status: Record<string, string> | null;
+};
+
+export type RadioRequest = {
+	seed_type: 'artist' | 'album' | 'genre';
+	seed_id: string;
+	count?: number;
+	source?: string | null;
+};
+
+export type PlaylistProfile = {
+	artist_mbids: string[];
+	genre_distribution: Record<string, string[]>;
+	track_count: number;
+};
+
+export type PlaylistSuggestionsRequest = {
+	playlist_id: string;
+	count?: number;
+};
+
+export type PlaylistSuggestionsResponse = {
+	suggestions: HomeSection;
+	playlist_id: string;
+	profile: PlaylistProfile;
 };
 
 export type QualityProfile = {

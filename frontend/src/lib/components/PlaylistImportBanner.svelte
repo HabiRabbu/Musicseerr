@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { SourcePlaylistSummary } from '$lib/types';
 	import type { Snippet } from 'svelte';
-	import { ListMusic, ChevronRight, CheckCircle2, ArrowRight } from 'lucide-svelte';
+	import { Disc3, ChevronRight, CheckCircle2, ArrowRight } from 'lucide-svelte';
 	import { reveal } from '$lib/actions/reveal';
 
 	interface Props {
@@ -70,13 +70,13 @@
 					{#each [0, 1, 2] as i (i)}
 						{@const angle = [-6, 0, 6][i]}
 						<div
-							class="absolute flex h-20 w-20 items-center justify-center overflow-hidden rounded-xl border-2 border-base-100 bg-gradient-to-br from-primary/15 to-secondary/15 shadow-md transition-all duration-500"
+							class="absolute flex h-20 w-20 items-center justify-center overflow-hidden rounded-xl border-2 border-base-100 bg-base-200 shadow-md transition-all duration-500"
 							style="
 								transform: rotate({isHovered ? angle * 1.4 : angle}deg);
 								z-index: {i};
 							"
 						>
-							<ListMusic class="h-8 w-8 text-base-content/20" />
+							<Disc3 class="h-8 w-8 text-base-content/20" />
 						</div>
 					{/each}
 				{/if}

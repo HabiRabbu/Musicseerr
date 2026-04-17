@@ -20,6 +20,14 @@ from repositories.protocols import (
 from repositories.listenbrainz_models import ListenBrainzArtist
 from services.discover.integration_helpers import IntegrationHelpers
 from services.discover.mbid_resolution_service import MbidResolutionService
+from services.discover.queue_strategies import (
+    build_similar_artist_pools,
+    discover_by_genres,
+    get_artist_deep_cuts,
+    get_trending_filler,
+    interleave_at_positions,
+    round_robin_dedup_select,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -208,54 +216,10 @@ class DiscoverQueueService:
         excluded_mbids: set[str],
         qs: QueueSettings,
     ) -> list[list[DiscoverQueueItemLight]]:
-        pools: list[list[DiscoverQueueItemLight]] = [[] for _ in range(len(seeds))]
-
-        async def _process_seed(i: int, seed: ListenBrainzArtist) -> None:
-            seed_mbid = seed.artist_mbids[0] if seed.artist_mbids else None
-            if not seed_mbid:
-                return
-
-            pool_seen: set[str] = set()
-            try:
-                similar = await self._lb_repo.get_similar_artists(
-                    seed_mbid,
-                    max_similar=qs.similar_artists_limit,
-                )
-                for sim_artist in similar:
-                    sim_mbid = self._mbid.normalize_mbid(sim_artist.artist_mbid)
-                    if not sim_mbid or sim_mbid == VARIOUS_ARTISTS_MBID:
-                        continue
-
-                    try:
-                        release_groups = await self._lb_repo.get_artist_top_release_groups(
-                            sim_mbid,
-                            count=qs.albums_per_similar,
-                        )
-                    except Exception as e:  # noqa: BLE001
-                        logger.debug(f"Failed to get releases for similar artist: {e}")
-                        continue
-
-                    for rg in release_groups:
-                        rg_mbid = self._mbid.normalize_mbid(rg.release_group_mbid)
-                        if not rg_mbid:
-                            continue
-                        if rg_mbid in excluded_mbids or rg_mbid in pool_seen:
-                            continue
-                        pools[i].append(
-                            self._mbid.make_queue_item(
-                                release_group_mbid=rg_mbid,
-                                album_name=rg.release_group_name,
-                                artist_name=rg.artist_name,
-                                artist_mbid=sim_mbid,
-                                reason=f"Similar to {seed.artist_name}",
-                            )
-                        )
-                        pool_seen.add(rg_mbid)
-            except Exception as e:  # noqa: BLE001
-                logger.debug(f"Failed to get similar artists for seed {seed_mbid[:8]}: {e}")
-
-        await asyncio.gather(*[_process_seed(i, seed) for i, seed in enumerate(seeds)])
-        return pools
+        return await build_similar_artist_pools(
+            seeds, excluded_mbids, qs.similar_artists_limit,
+            qs.albums_per_similar, lb_repo=self._lb_repo, mbid_svc=self._mbid,
+        )
 
     async def _strategy_lb_genre_discovery(
         self,
@@ -263,48 +227,19 @@ class DiscoverQueueService:
         excluded_mbids: set[str],
     ) -> list[DiscoverQueueItemLight]:
         try:
-            genres = await self._lb_repo.get_user_genre_activity(username)
+            genre_activity = await self._lb_repo.get_user_genre_activity(username)
         except Exception:  # noqa: BLE001
             logger.warning("Failed to fetch user genre activity from ListenBrainz")
             return []
 
-        if not genres:
+        if not genre_activity:
             return []
 
-        top_genres = [genre.genre for genre in genres[:4] if getattr(genre, "genre", None)]
-        if not top_genres:
-            return []
-
-        search_results = await asyncio.gather(
-            *[
-                self._mb_repo.search_release_groups_by_tag(tag=genre, limit=8)
-                for genre in top_genres
-            ],
-            return_exceptions=True,
+        genres = [g.genre for g in genre_activity if getattr(g, "genre", None)]
+        return await discover_by_genres(
+            genres, excluded_mbids,
+            mb_repo=self._mb_repo, mbid_svc=self._mbid,
         )
-
-        items: list[DiscoverQueueItemLight] = []
-        seen: set[str] = set()
-        for genre, result in zip(top_genres, search_results):
-            if isinstance(result, Exception):
-                continue
-            for release in result:
-                rg_mbid = self._mbid.normalize_mbid(getattr(release, "musicbrainz_id", None))
-                if not rg_mbid:
-                    continue
-                if rg_mbid in excluded_mbids or rg_mbid in seen:
-                    continue
-                items.append(
-                    self._mbid.make_queue_item(
-                        release_group_mbid=rg_mbid,
-                        album_name=getattr(release, "title", "Unknown"),
-                        artist_name=getattr(release, "artist", "Unknown") or "Unknown",
-                        artist_mbid="",
-                        reason=f"Because you listen to {genre}",
-                    )
-                )
-                seen.add(rg_mbid)
-        return items
 
     async def _strategy_lb_fresh_releases(
         self,
@@ -420,78 +355,10 @@ class DiscoverQueueService:
         listened_mbids: set[str],
         albums_per_artist: int,
     ) -> list[DiscoverQueueItemLight]:
-        try:
-            top_release_groups = await self._lb_repo.get_user_top_release_groups(
-                username=username,
-                range_="this_month",
-                count=25,
-            )
-        except Exception:  # noqa: BLE001
-            logger.warning("Failed to fetch top release groups from ListenBrainz for deep cuts")
-            return []
-
-        if not top_release_groups:
-            return []
-
-        current_top_mbids = {
-            rg.release_group_mbid.lower()
-            for rg in top_release_groups
-            if getattr(rg, "release_group_mbid", None)
-        }
-
-        artist_seed_names: dict[str, str] = {}
-        for rg in top_release_groups:
-            rg_artist_mbids = getattr(rg, "artist_mbids", None) or []
-            if not rg_artist_mbids:
-                continue
-            artist_mbid = self._mbid.normalize_mbid(rg_artist_mbids[0])
-            if not artist_mbid or artist_mbid in artist_seed_names:
-                continue
-            artist_seed_names[artist_mbid] = getattr(rg, "artist_name", "")
-            if len(artist_seed_names) >= 6:
-                break
-
-        if not artist_seed_names:
-            return []
-
-        artist_mbid_list = list(artist_seed_names.keys())
-        results = await asyncio.gather(
-            *[
-                self._lb_repo.get_artist_top_release_groups(
-                    a_mbid,
-                    count=max(albums_per_artist + 2, 4),
-                )
-                for a_mbid in artist_mbid_list
-            ],
-            return_exceptions=True,
+        return await get_artist_deep_cuts(
+            username, excluded_mbids, listened_mbids,
+            albums_per_artist, lb_repo=self._lb_repo, mbid_svc=self._mbid,
         )
-
-        items: list[DiscoverQueueItemLight] = []
-        seen_rg_mbids: set[str] = set()
-        for a_mbid, result in zip(artist_mbid_list, results):
-            if isinstance(result, Exception):
-                continue
-            for rg in result:
-                rg_mbid = self._mbid.normalize_mbid(rg.release_group_mbid)
-                if not rg_mbid:
-                    continue
-                if rg_mbid in current_top_mbids or rg_mbid in listened_mbids:
-                    continue
-                if rg_mbid in excluded_mbids or rg_mbid in seen_rg_mbids:
-                    continue
-
-                source_artist_name = artist_seed_names.get(a_mbid) or rg.artist_name
-                items.append(
-                    self._mbid.make_queue_item(
-                        release_group_mbid=rg_mbid,
-                        album_name=rg.release_group_name,
-                        artist_name=rg.artist_name,
-                        artist_mbid=a_mbid,
-                        reason=f"More from {source_artist_name}",
-                    )
-                )
-                seen_rg_mbids.add(rg_mbid)
-        return items
 
     async def _build_personalized_queue(
         self,
@@ -639,160 +506,26 @@ class DiscoverQueueService:
     def _round_robin_select(
         self, pools: list[list[DiscoverQueueItemLight]], count: int
     ) -> list[DiscoverQueueItemLight]:
-        selected: list[DiscoverQueueItemLight] = []
-        seen_mbids: set[str] = set()
-        artist_counts: dict[str, int] = {}
-        max_per_artist = 2
-
-        for pool in pools:
-            random.shuffle(pool)
-
-        pool_indices = [0] * len(pools)
-
-        for _ in range(count * 3):
-            if len(selected) >= count:
-                break
-            for pool_idx in range(len(pools)):
-                if len(selected) >= count:
-                    break
-                pool = pools[pool_idx]
-                idx = pool_indices[pool_idx]
-                while idx < len(pool):
-                    item = pool[idx]
-                    idx += 1
-                    pool_indices[pool_idx] = idx
-                    mbid_lower = item.release_group_mbid.lower()
-                    artist_key = item.artist_mbid.lower() if item.artist_mbid else ""
-                    if mbid_lower in seen_mbids:
-                        continue
-                    if artist_key and artist_counts.get(artist_key, 0) >= max_per_artist:
-                        continue
-                    selected.append(item)
-                    seen_mbids.add(mbid_lower)
-                    if artist_key:
-                        artist_counts[artist_key] = artist_counts.get(artist_key, 0) + 1
-                    break
-
-        return selected
+        return round_robin_dedup_select(pools, count)
 
     async def _get_wildcard_albums(
         self, count: int, ignored_mbids: set[str], library_album_mbids: set[str],
         seen_mbids: set[str] | None = None,
         resolved_source: str = "listenbrainz",
     ) -> list[DiscoverQueueItemLight]:
-        if count <= 0:
-            return []
-        exclude = ignored_mbids | library_album_mbids | (seen_mbids or set())
-        use_lastfm = resolved_source == "lastfm" and self._integration.is_lastfm_enabled() and self._lfm_repo is not None
-        target = max(count * 2, 6)
-
-        try:
-            if use_lastfm:
-                top_artists = await self._lfm_repo.get_global_top_artists(limit=15)
-                random.shuffle(top_artists)
-                valid_artists = [
-                    a
-                    for a in top_artists[:10]
-                    if self._mbid.normalize_mbid(a.mbid) != VARIOUS_ARTISTS_MBID
-                ]
-                album_fetch_results = await asyncio.gather(
-                    *[
-                        self._lfm_repo.get_artist_top_albums(
-                            a.name, mbid=a.mbid, limit=3
-                        )
-                        for a in valid_artists
-                    ],
-                    return_exceptions=True,
-                )
-                artist_albums_pairs: list[tuple[Any, list]] = []
-                for artist, result in zip(valid_artists, album_fetch_results):
-                    if isinstance(result, Exception):
-                        continue
-                    artist_albums_pairs.append((artist, result))
-                wildcards = await self._mbid.lastfm_albums_to_queue_items(
-                    artist_albums_pairs,
-                    exclude=exclude,
-                    target=target,
-                    reason="Trending on Last.fm",
-                    is_wildcard=True,
-                )
-            else:
-                rgs = await self._lb_repo.get_sitewide_top_release_groups(count=25)
-                random.shuffle(rgs)
-                wildcards: list[DiscoverQueueItemLight] = []
-                for rg in rgs:
-                    if len(wildcards) >= target:
-                        break
-                    rg_mbid = rg.release_group_mbid
-                    if not rg_mbid or rg_mbid.lower() in exclude:
-                        continue
-                    artist_mbid = rg.artist_mbids[0] if rg.artist_mbids else ""
-                    if artist_mbid.lower() == VARIOUS_ARTISTS_MBID:
-                        continue
-                    wildcards.append(DiscoverQueueItemLight(
-                        release_group_mbid=rg_mbid,
-                        album_name=rg.release_group_name,
-                        artist_name=rg.artist_name,
-                        artist_mbid=artist_mbid,
-                        cover_url=f"/api/v1/covers/release-group/{rg_mbid}?size=500",
-                        recommendation_reason="Trending This Week",
-                        is_wildcard=True,
-                        in_library=False,
-                    ))
-        except Exception as e:  # noqa: BLE001
-            logger.debug(f"Failed to get wildcard albums: {e}")
-            wildcards = []
-
-        if not wildcards:
-            if use_lastfm:
-                decade_tags = ["2020s", "2010s", "2000s", "1990s", "1980s", "1970s"]
-                for decade in decade_tags:
-                    if len(wildcards) >= target:
-                        break
-                    try:
-                        decade_releases = await self._mb_repo.search_release_groups_by_tag(
-                            tag=decade,
-                            limit=25,
-                            offset=0,
-                        )
-                    except Exception:  # noqa: BLE001
-                        logger.warning("Failed to search release groups for decade tag %s", decade)
-                        continue
-                    for release in decade_releases:
-                        if len(wildcards) >= target:
-                            break
-                        rg_mbid = self._mbid.normalize_mbid(getattr(release, "musicbrainz_id", None))
-                        if not rg_mbid or rg_mbid.lower() in exclude:
-                            continue
-                        wildcards.append(DiscoverQueueItemLight(
-                            release_group_mbid=rg_mbid,
-                            album_name=getattr(release, "title", "Unknown"),
-                            artist_name=getattr(release, "artist", "Unknown") or "Unknown",
-                            artist_mbid="",
-                            cover_url=f"/api/v1/covers/release-group/{rg_mbid}?size=500",
-                            recommendation_reason="Trending on Last.fm",
-                            is_wildcard=True,
-                            in_library=False,
-                        ))
-                        exclude.add(rg_mbid.lower())
-
-        if not wildcards:
-            logger.warning("Failed to populate any wildcard albums for discover queue")
-
-        return wildcards[:count]
+        return await get_trending_filler(
+            count, ignored_mbids, library_album_mbids, seen_mbids,
+            resolved_source, lb_repo=self._lb_repo, mb_repo=self._mb_repo,
+            mbid_svc=self._mbid, lfm_repo=self._lfm_repo,
+            is_lastfm_enabled=self._integration.is_lastfm_enabled(),
+        )
 
     def _interleave_wildcards(
         self,
         personalized: list[DiscoverQueueItemLight],
         wildcards: list[DiscoverQueueItemLight],
     ) -> list[DiscoverQueueItemLight]:
-        result = list(personalized)
-        positions = [2, 7]
-        for i, wc in enumerate(wildcards):
-            pos = positions[i] if i < len(positions) else len(result)
-            pos = min(pos, len(result))
-            result.insert(pos, wc)
-        return result
+        return interleave_at_positions(personalized, wildcards)
 
     async def _build_anonymous_queue(
         self, count: int, ignored_mbids: set[str], library_album_mbids: set[str],

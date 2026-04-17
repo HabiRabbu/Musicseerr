@@ -51,6 +51,8 @@ class HomeSection(AppStruct):
     source: str | None = None
     fallback_message: str | None = None
     connect_service: str | None = None
+    radio_seed_type: str | None = None
+    radio_seed_id: str | None = None
 
 
 class ServicePrompt(AppStruct):

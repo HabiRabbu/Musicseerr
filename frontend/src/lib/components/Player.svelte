@@ -16,6 +16,7 @@
 	import {
 		X,
 		Music,
+		Disc3,
 		Shuffle,
 		SkipBack,
 		AlertCircle,
@@ -126,7 +127,7 @@
 					<div
 						class="w-15 h-15 rounded-lg shadow-lg bg-base-200 flex items-center justify-center shrink-0"
 					>
-						<Music class="h-6 w-6 opacity-40" />
+						<Disc3 class="h-6 w-6 text-base-content/20" />
 					</div>
 				{/if}
 				{#if playerStore.isPlaying}

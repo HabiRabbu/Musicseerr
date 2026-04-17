@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Music } from 'lucide-svelte';
+	import { Disc3 } from 'lucide-svelte';
 
 	interface Props {
 		coverUrls?: string[];
@@ -25,10 +25,8 @@
 </script>
 
 {#snippet gridFallback()}
-	<div
-		class="bg-linear-to-br from-base-300 to-base-200 w-full h-full flex items-center justify-center"
-	>
-		<Music class="w-1/3 h-1/3 text-base-content/30" />
+	<div class="bg-base-200 w-full h-full flex items-center justify-center">
+		<Disc3 class="w-1/3 h-1/3 text-base-content/20" />
 	</div>
 {/snippet}
 
@@ -91,10 +89,8 @@
 		</div>
 	{:else if urls.length === 1}
 		{#if imageErrors[0]}
-			<div
-				class="bg-linear-to-br from-base-300 to-base-200 w-full h-full flex items-center justify-center"
-			>
-				<Music class="w-1/3 h-1/3 text-base-content/30" />
+			<div class="bg-base-200 w-full h-full flex items-center justify-center">
+				<Disc3 class="w-1/3 h-1/3 text-base-content/20" />
 			</div>
 		{:else}
 			<img
@@ -106,10 +102,8 @@
 			/>
 		{/if}
 	{:else}
-		<div
-			class="bg-linear-to-br from-base-300 to-base-200 w-full h-full flex items-center justify-center"
-		>
-			<Music class="w-1/3 h-1/3 text-base-content/30" />
+		<div class="bg-base-200 w-full h-full flex items-center justify-center">
+			<Disc3 class="w-1/3 h-1/3 text-base-content/20" />
 		</div>
 	{/if}
 </div>

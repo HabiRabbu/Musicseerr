@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { getApiUrl } from '$lib/api/api-utils';
-	import { Search } from 'lucide-svelte';
+	import { Disc3, Search } from 'lucide-svelte';
 	import type { SuggestResult } from '$lib/types';
 	import { API } from '$lib/constants';
 	import { isAbortError } from '$lib/utils/errorHandling';
@@ -29,6 +29,7 @@
 	const listboxId = $derived(`${id}-listbox`);
 
 	let suggestions = $state<SuggestResult[]>([]);
+	let imageErrors = $state<Record<string, boolean>>({});
 	let loading = $state(false);
 	let showDropdown = $state(false);
 	let activeIndex = $state(-1);
@@ -234,15 +235,19 @@
 					tabindex="-1"
 				>
 					<div class="avatar avatar-placeholder">
-						<div class="w-10 h-10 rounded bg-base-300">
-							<img
-								src={coverUrl(result)}
-								alt={result.title}
-								onerror={(e: Event) => {
-									const target = e.currentTarget as HTMLImageElement;
-									target.style.display = 'none';
-								}}
-							/>
+						<div class="w-10 h-10 rounded bg-base-200 flex items-center justify-center">
+							{#if imageErrors[result.musicbrainz_id]}
+								<Disc3 class="h-5 w-5 text-base-content/20" />
+							{:else}
+								<img
+									src={coverUrl(result)}
+									alt={result.title}
+									class="w-full h-full object-cover rounded"
+									onerror={() => {
+										imageErrors[result.musicbrainz_id] = true;
+									}}
+								/>
+							{/if}
 						</div>
 					</div>
 					<div class="flex-1 min-w-0">

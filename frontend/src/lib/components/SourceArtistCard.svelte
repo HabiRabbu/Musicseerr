@@ -1,7 +1,7 @@
 <script lang="ts">
 	import ArtistImage from './ArtistImage.svelte';
 	import ArtistCardDownloadButton from './ArtistCardDownloadButton.svelte';
-	import { Music2 } from 'lucide-svelte';
+	import { Users } from 'lucide-svelte';
 
 	interface Props {
 		name: string;
@@ -35,9 +35,9 @@
 				/>
 			{:else}
 				<div
-					class="flex h-full w-full items-center justify-center rounded-full bg-base-200 text-base-content/30"
+					class="flex h-full w-full items-center justify-center rounded-full bg-base-200 text-base-content/20"
 				>
-					<Music2 class="h-12 w-12" />
+					<Users class="h-12 w-12" />
 				</div>
 			{/if}
 		</figure>
@@ -62,9 +62,9 @@
 				/>
 			{:else}
 				<div
-					class="flex h-full w-full items-center justify-center rounded-full bg-base-200 text-base-content/30"
+					class="flex h-full w-full items-center justify-center rounded-full bg-base-200 text-base-content/20"
 				>
-					<Music2 class="h-12 w-12" />
+					<Users class="h-12 w-12" />
 				</div>
 			{/if}
 		</figure>

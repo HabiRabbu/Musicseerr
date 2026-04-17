@@ -9,10 +9,14 @@ from __future__ import annotations
 import asyncio
 from typing import Any
 
+from fastapi import HTTPException
+
 from api.v1.schemas.discover import (
     DiscoverQueueEnrichment,
     DiscoverQueueResponse,
     DiscoverIgnoredRelease,
+    PlaylistSuggestionsRequest,
+    PlaylistSuggestionsResponse,
 )
 from api.v1.schemas.home import DiscoverPreview
 from infrastructure.cache.memory_cache import CacheInterface
@@ -24,11 +28,13 @@ from repositories.protocols import (
     MusicBrainzRepositoryProtocol,
     LastFmRepositoryProtocol,
 )
+from api.v1.schemas.home import HomeSection
 from services.discover.enrichment_service import QueueEnrichmentService
 from services.discover.homepage_service import DiscoverHomepageService
 from services.discover.integration_helpers import IntegrationHelpers
 from services.discover.mbid_resolution_service import MbidResolutionService
 from services.discover.queue_service import DiscoverQueueService
+from services.discover.radio_service import DiscoverRadioService
 from services.preferences_service import PreferencesService
 
 
@@ -52,6 +58,9 @@ class DiscoverService:
         wikidata_repo: Any = None,
         lastfm_repo: LastFmRepositoryProtocol | None = None,
         audiodb_image_service: Any = None,
+        genre_index: Any = None,
+        radio_service: Any = None,
+        playlist_service: Any = None,
     ):
         self._integration = IntegrationHelpers(preferences_service)
 
@@ -94,8 +103,12 @@ class DiscoverService:
             memory_cache=memory_cache,
             lastfm_repo=lastfm_repo,
             audiodb_image_service=audiodb_image_service,
+            genre_index=genre_index,
+            mbid_store=mbid_store,
         )
 
+        self._radio = radio_service
+        self._playlist_service = playlist_service
 
     async def get_discover_data(self, source: str | None = None):
         return await self._homepage.get_discover_data(source)
@@ -112,6 +125,29 @@ class DiscoverService:
     async def build_discover_data(self, source: str | None = None):
         return await self._homepage.build_discover_data(source)
 
+    async def generate_radio(self, request: Any) -> HomeSection:
+        if self._radio is None:
+            raise HTTPException(status_code=501, detail="Radio service not configured")
+        return await self._radio.generate_radio(request)
+
+    async def get_playlist_suggestions(
+        self, request: PlaylistSuggestionsRequest,
+    ) -> PlaylistSuggestionsResponse:
+        profile = await self._playlist_service.analyse_playlist_profile(
+            request.playlist_id,
+        )
+        if profile is None:
+            raise HTTPException(status_code=404, detail="Playlist not found")
+        if not profile.artist_mbids:
+            raise HTTPException(status_code=422, detail="This playlist has no artist data to base suggestions on")
+        section = await self._homepage.build_playlist_suggestions(
+            profile, request.count, request.source,
+        )
+        return PlaylistSuggestionsResponse(
+            suggestions=section,
+            playlist_id=request.playlist_id,
+            profile=profile,
+        )
 
     async def build_queue(self, count: int | None = None, source: str | None = None) -> DiscoverQueueResponse:
         return await self._queue.build_queue(count, source)
@@ -126,7 +162,6 @@ class DiscoverService:
 
     async def get_ignored_releases(self) -> list[DiscoverIgnoredRelease]:
         return await self._queue.get_ignored_releases()
-
 
     async def enrich_queue_item(self, release_group_mbid: str) -> DiscoverQueueEnrichment:
         return await self._enrichment.enrich_queue_item(release_group_mbid)

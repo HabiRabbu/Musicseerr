@@ -31,9 +31,16 @@ NPM    ?= pnpm
 	backend-test-coverart-audiodb \
 	backend-test-dedup-cancellation \
 	backend-test-discovery \
+	backend-test-discover-schemas \
+	backend-test-daily-mix \
+	backend-test-discover-picks \
+	backend-test-discover-radio \
+	backend-test-playlist-suggestions \
+	backend-test-unexplored-genres \
 	backend-test-deep-discovery \
 	backend-test-discovery-precache \
 	backend-test-exception-handling \
+	backend-test-genre-index \
 	backend-test-home \
 	backend-test-now-playing \
 	backend-test-home-genre \
@@ -52,6 +59,7 @@ NPM    ?= pnpm
 	backend-test-plex-repository \
 	backend-test-plex-routes \
 	backend-test-playlist \
+	backend-test-queue-strategies \
 	backend-test-request-queue \
 	backend-test-request-service \
 	backend-test-search-top-result \
@@ -62,11 +70,14 @@ NPM    ?= pnpm
 	backend-test-sync-watchdog \
 	backend-test-content-enrichment \
 	backend-test-peer-review-fixes \
+	backend-test-discover-all \
+	test-discover-all \
 	test-audiodb-all test-mus14-all test-sync-all \
 	frontend-install frontend-build frontend-browser-install \
 	frontend-format-check frontend-check frontend-lint frontend-test frontend-test-server \
 	frontend-test-album-page \
 	frontend-test-audiodb-images \
+	frontend-test-discover-page \
 	frontend-test-jellyfin \
 	frontend-test-monitored-artists \
 	frontend-test-navidrome \
@@ -147,6 +158,27 @@ backend-test-discovery-precache: $(BACKEND_VENV_STAMP) ## Run artist discovery p
 backend-test-exception-handling: $(BACKEND_VENV_STAMP) ## Run exception-handling regressions
 	$(PYTEST) tests/routes/test_scrobble_routes.py tests/routes/test_scrobble_settings_routes.py tests/test_error_leakage.py tests/test_background_task_logging.py
 
+backend-test-genre-index: $(BACKEND_VENV_STAMP) ## Run genre index tests
+	$(PYTEST) tests/infrastructure/test_genre_index.py -v
+
+backend-test-discover-schemas: $(BACKEND_VENV_STAMP) ## Run discover schema roundtrip tests
+	$(PYTEST) tests/schemas/test_discover_schemas.py -v
+
+backend-test-daily-mix: $(BACKEND_VENV_STAMP) ## Run daily mix section builder tests
+	$(PYTEST) tests/services/test_daily_mix.py -v
+
+backend-test-discover-picks: $(BACKEND_VENV_STAMP) ## Run discover picks section builder tests
+	$(PYTEST) tests/services/test_discover_picks.py -v
+
+backend-test-discover-radio: $(BACKEND_VENV_STAMP) ## Run discover radio tests
+	$(PYTEST) tests/services/test_discover_radio.py tests/routes/test_discover_radio_routes.py -v
+
+backend-test-playlist-suggestions: $(BACKEND_VENV_STAMP) ## Run playlist suggestion tests
+	$(PYTEST) tests/services/test_playlist_suggestions.py tests/routes/test_playlist_suggestions_routes.py -v
+
+backend-test-unexplored-genres: $(BACKEND_VENV_STAMP) ## Run unexplored genres tests
+	$(PYTEST) tests/services/test_unexplored_genres.py -v
+
 backend-test-now-playing: $(BACKEND_VENV_STAMP) ## Run now-playing service and route tests
 	$(PYTEST) tests/services/test_now_playing.py tests/routes/test_now_playing_routes.py -v
 
@@ -195,6 +227,9 @@ backend-test-performance: $(BACKEND_VENV_STAMP) ## Run performance regression te
 backend-test-playlist: $(BACKEND_VENV_STAMP) ## Run playlist tests
 	$(PYTEST) tests/services/test_playlist_service.py tests/services/test_playlist_source_resolution.py tests/repositories/test_playlist_repository.py tests/routes/test_playlist_routes.py
 
+backend-test-queue-strategies: $(BACKEND_VENV_STAMP) ## Run queue strategy extraction tests
+	$(PYTEST) tests/services/test_queue_strategies.py -v
+
 backend-test-request-queue: $(BACKEND_VENV_STAMP) ## Run MUS-14 request queue tests (dedup, cancel, concurrency)
 	$(PYTEST) tests/infrastructure/test_request_queue_mus14.py tests/infrastructure/test_queue_persistence.py -v
 
@@ -236,6 +271,10 @@ backend-test-sync-resume: $(BACKEND_VENV_STAMP) ## Run sync resume-on-failure te
 
 backend-test-sync-watchdog: $(BACKEND_VENV_STAMP) ## Run adaptive watchdog timeout tests
 	$(PYTEST) tests/test_sync_watchdog.py -v
+
+backend-test-discover-all: backend-test-queue-strategies backend-test-daily-mix backend-test-discover-picks backend-test-discover-radio backend-test-unexplored-genres backend-test-playlist-suggestions backend-test-genre-index ## Run all discover expansion tests
+
+test-discover-all: backend-test-discover-all frontend-test-discover-page ## Run all discover expansion tests (backend + frontend)
 
 test-audiodb-all: backend-test-audiodb backend-test-audiodb-prewarm backend-test-audiodb-settings backend-test-coverart-audiodb backend-test-audiodb-phase8 backend-test-audiodb-phase9 frontend-test-audiodb-images ## Run every AudioDB test target
 
@@ -292,6 +331,9 @@ frontend-test-navidrome: ## Run Navidrome frontend tests
 
 frontend-test-jellyfin: ## Run Jellyfin frontend tests
 	cd "$(FRONTEND_DIR)" && $(NPM) exec vitest run --project server src/lib/player/jellyfinPlaybackApi.spec.ts
+
+frontend-test-discover-page: ## Run discover page and query tests
+	cd "$(FRONTEND_DIR)" && $(NPM) exec vitest run --project server src/lib/queries/discover/DiscoverQuery.spec.ts
 
 rebuild: ## Rebuild the application
 	cd "$(ROOT_DIR)" && ./manage.sh --rebuild

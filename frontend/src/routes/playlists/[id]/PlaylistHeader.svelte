@@ -5,12 +5,13 @@
 		deletePlaylistCover,
 		type PlaylistDetail
 	} from '$lib/api/playlists';
+	import PlaylistDiscoveryModal from '$lib/components/PlaylistDiscoveryModal.svelte';
 	import { toastStore } from '$lib/stores/toast';
 	import { formatTotalDurationSec, formatRelativeTime } from '$lib/utils/formatting';
 	import PlaylistMosaic from '$lib/components/PlaylistMosaic.svelte';
 	import ContextMenu from '$lib/components/ContextMenu.svelte';
 	import type { MenuItem } from '$lib/components/ContextMenu.svelte';
-	import { Play, Shuffle, Pencil, Check, X, Tv } from 'lucide-svelte';
+	import { Play, Shuffle, Pencil, Check, X, Tv, Sparkles } from 'lucide-svelte';
 	import NavidromeIcon from '$lib/components/NavidromeIcon.svelte';
 	import PlexIcon from '$lib/components/PlexIcon.svelte';
 	import { getSourceColor, getSourceLabel } from '$lib/utils/sources';
@@ -40,6 +41,7 @@
 	let coverInput = $state<HTMLInputElement | null>(null);
 	let uploading = $state(false);
 	let coverPreview = $state<string | null>(null);
+	let discoverModalOpen = $state(false);
 
 	$effect(() => {
 		if (editingName && nameInputEl) {
@@ -317,7 +319,23 @@
 				<Shuffle class="h-4 w-4" />
 				Shuffle
 			</button>
+			<button
+				type="button"
+				class="btn btn-ghost"
+				onclick={() => (discoverModalOpen = true)}
+				disabled={playlist.track_count === 0}
+			>
+				<Sparkles class="h-4 w-4" />
+				Discover
+			</button>
 			<ContextMenu items={getHeaderMenuItems()} position="end" size="sm" />
 		</div>
 	</div>
 </div>
+
+<PlaylistDiscoveryModal
+	bind:open={discoverModalOpen}
+	playlistId={playlist.id}
+	playlistName={playlist.name}
+	source="listenbrainz"
+/>

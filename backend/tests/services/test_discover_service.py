@@ -706,3 +706,49 @@ class TestShowGloballyTrendingSetting:
 
         assert response.globally_trending is None
         assert response.service_prompts is not None
+
+
+class TestDailyMixesWiring:
+    """Integration: verify build_discover_data() populates response.daily_mixes
+    via post_tasks wiring (Phase 5 acceptance)."""
+
+    @pytest.mark.asyncio
+    async def test_daily_mixes_populated_via_post_tasks(self, monkeypatch):
+        from api.v1.schemas.home import HomeSection
+
+        service, _lb, _lfm, _prefs = _make_service(
+            lb_enabled=True, lfm_enabled=True, primary_source="listenbrainz"
+        )
+        stub_sections = [
+            HomeSection(title="Your Rock Mix", type="albums", items=[], source="listenbrainz"),
+            HomeSection(title="Your Pop Mix", type="albums", items=[], source="listenbrainz"),
+        ]
+
+        async def fake_daily_mix(resolved_source, library_mbids=None):
+            assert resolved_source == "listenbrainz"
+            return stub_sections
+
+        monkeypatch.setattr(
+            service._homepage, "_build_daily_mix_sections", fake_daily_mix
+        )
+
+        response = await service.build_discover_data(source="listenbrainz")
+
+        assert response.daily_mixes == stub_sections
+
+    @pytest.mark.asyncio
+    async def test_daily_mixes_empty_when_builder_returns_none(self, monkeypatch):
+        service, _lb, _lfm, _prefs = _make_service(
+            lb_enabled=True, lfm_enabled=True, primary_source="listenbrainz"
+        )
+
+        async def fake_daily_mix(resolved_source, library_mbids=None):
+            return None
+
+        monkeypatch.setattr(
+            service._homepage, "_build_daily_mix_sections", fake_daily_mix
+        )
+
+        response = await service.build_discover_data(source="listenbrainz")
+
+        assert response.daily_mixes == []
