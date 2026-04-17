@@ -283,7 +283,7 @@ async def update_navidrome_settings(
 ):
     try:
         if _is_masked(settings.password):
-            current = preferences_service.get_navidrome_connection()
+            current = preferences_service.get_navidrome_connection_raw()
             settings = msgspec.structs.replace(settings, password=current.password)
         preferences_service.save_navidrome_connection(settings)
         await settings_service.on_navidrome_settings_changed(enabled=settings.enabled)
@@ -317,7 +317,7 @@ async def update_plex_settings(
 ):
     try:
         if _is_masked(settings.plex_token):
-            current = preferences_service.get_plex_connection()
+            current = preferences_service.get_plex_connection_raw()
             settings = msgspec.structs.replace(settings, plex_token=current.plex_token)
         preferences_service.save_plex_connection(settings)
         await settings_service.on_plex_settings_changed(enabled=settings.enabled)
@@ -335,7 +335,7 @@ async def verify_plex_connection(
     settings_service: SettingsService = Depends(get_settings_service),
 ):
     if _is_masked(settings.plex_token):
-        current = preferences_service.get_plex_connection()
+        current = preferences_service.get_plex_connection_raw()
         settings = msgspec.structs.replace(settings, plex_token=current.plex_token)
     result = await settings_service.verify_plex(settings)
     libs = [PlexLibrarySectionInfo(key=k, title=t) for k, t in result.libraries]
