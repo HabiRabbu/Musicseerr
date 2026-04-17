@@ -278,7 +278,7 @@
 							<SettingsUsers />
 						{/if}
 					</div>
-				{:else if activeTab === "about"}
+				{:else if activeTab === 'about'}
 					<SettingsAbout />
 				{/if}
 			</main>
