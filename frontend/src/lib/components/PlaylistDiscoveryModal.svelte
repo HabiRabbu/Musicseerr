@@ -296,7 +296,7 @@
 								</div>
 							</div>
 							<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-								{#each Array(8) as _}
+								{#each Array(8) as _, i (i)}
 									<div class="flex flex-col gap-2">
 										<div class="skeleton aspect-square w-full rounded-2xl"></div>
 										<div class="skeleton h-4 w-3/4 rounded"></div>
@@ -395,7 +395,7 @@
 											>
 												{#if expandLoading}
 													<div class="flex flex-col gap-1.5 py-1">
-														{#each Array(4) as _}
+														{#each Array(4) as _, i (i)}
 															<div class="skeleton h-6 w-full rounded"></div>
 														{/each}
 													</div>

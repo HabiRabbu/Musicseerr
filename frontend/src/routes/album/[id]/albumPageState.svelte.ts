@@ -115,7 +115,7 @@ export function createAlbumPageState(albumIdGetter: () => string) {
 	let pollTimer: ReturnType<typeof setInterval> | null = null;
 	let artistInLidarr = $state(false);
 	let artistMonitored = $state(false);
-	let previewCacheMap = new SvelteMap<string, boolean>();
+	const previewCacheMap = new SvelteMap<string, boolean>();
 	let lastPreviewCacheKey = '';
 	let previewCacheAbort: AbortController | null = null;
 
