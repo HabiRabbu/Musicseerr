@@ -405,7 +405,7 @@ class TestBuildSuggestionsEmptyResultsReturnsFallback:
 
         assert result.items == []
         assert result.fallback_message is not None
-        assert "couldn't find" in result.fallback_message.lower()
+        assert "not enough suggestions" in result.fallback_message.lower()
 
 
 class TestBuildSuggestionsCapsAtCount:
@@ -471,8 +471,7 @@ class TestBuildSuggestionsDisabledSourceReturnsFallback:
 
         assert result.items == []
         assert result.fallback_message is not None
-        assert "not configured" in result.fallback_message.lower()
-
+        assert "isn't set up yet" in result.fallback_message.lower()
 
 class TestBuildSuggestionsDisabledSourceNoneReturnsFallback:
     """Regression: when source=None and both providers disabled, fallback must trigger."""
@@ -486,7 +485,7 @@ class TestBuildSuggestionsDisabledSourceNoneReturnsFallback:
 
         assert result.items == []
         assert result.fallback_message is not None
-        assert "not configured" in result.fallback_message.lower()
+        assert "isn't set up yet" in result.fallback_message.lower()
 
 
 class TestBuildSuggestionsLastfmPathCallsLastfmRepo:
