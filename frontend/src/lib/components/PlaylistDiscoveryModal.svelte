@@ -47,6 +47,7 @@
 	let expandedAlbumId = $state<string | null>(null);
 	let expandedTracks = $state<Track[]>([]);
 	let expandLoading = $state(false);
+	let expandAbortController = $state<AbortController | null>(null);
 
 	const isPreselected = $derived(!!playlistId);
 	const activePlaylistId = $derived(isPreselected ? playlistId : selectedPlaylistId);
@@ -103,6 +104,8 @@
 			selectedPlaylistName = '';
 		}
 		ignoredIds = new Set();
+		expandAbortController?.abort();
+		expandAbortController = null;
 		expandedAlbumId = null;
 		expandedTracks = [];
 	}
@@ -136,30 +139,38 @@
 	async function toggleExpand(album: HomeAlbum) {
 		const key = album.mbid ?? album.name;
 		if (expandedAlbumId === key) {
+			expandAbortController?.abort();
+			expandAbortController = null;
 			expandedAlbumId = null;
 			expandedTracks = [];
 			return;
 		}
 
+		expandAbortController?.abort();
 		expandedAlbumId = key;
 		expandedTracks = [];
 
 		if (!album.mbid) return;
 
+		const controller = new AbortController();
+		expandAbortController = controller;
 		expandLoading = true;
 		try {
-			const data = await fetchAlbumTracks(album.mbid);
+			const data = await fetchAlbumTracks(album.mbid, controller.signal);
 			if (expandedAlbumId === key) {
 				expandedTracks = data.tracks;
 			}
 		} catch (e) {
+			if (controller.signal.aborted) return;
 			toastStore.show({
 				message: e instanceof Error ? e.message : 'Failed to load album tracks',
 				type: 'error'
 			});
 			expandedTracks = [];
 		} finally {
-			expandLoading = false;
+			if (!controller.signal.aborted) {
+				expandLoading = false;
+			}
 		}
 	}
 	const countOptions = [10, 15, 20, 30] as const;

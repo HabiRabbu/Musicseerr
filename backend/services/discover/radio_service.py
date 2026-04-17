@@ -63,7 +63,7 @@ class DiscoverRadioService:
             else request.source or "listenbrainz"
         )
 
-        if request.source is not None and self._integration:
+        if self._integration:
             lb_enabled = self._integration.is_listenbrainz_enabled()
             lfm_enabled = self._integration.is_lastfm_enabled()
             source_available = (
@@ -75,8 +75,8 @@ class DiscoverRadioService:
                     title="Radio",
                     type="albums",
                     items=[],
-                    source=request.source,
-                    fallback_message=f"{request.source} is not enabled",
+                    source=resolved_source,
+                    fallback_message=f"{resolved_source} is not enabled",
                 )
 
         library_mbids = await self._mbid.get_library_artist_mbids(

@@ -15,6 +15,7 @@
 	import NavidromeIcon from '$lib/components/NavidromeIcon.svelte';
 	import PlexIcon from '$lib/components/PlexIcon.svelte';
 	import { getSourceColor, getSourceLabel } from '$lib/utils/sources';
+	import { musicSourceStore } from '$lib/stores/musicSource';
 
 	interface Props {
 		playlist: PlaylistDetail;
@@ -337,5 +338,5 @@
 	bind:open={discoverModalOpen}
 	playlistId={playlist.id}
 	playlistName={playlist.name}
-	source="listenbrainz"
+	source={musicSourceStore.getCachedSource()}
 />
