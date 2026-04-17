@@ -1,248 +1,82 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
-	import { beforeNavigate } from '$app/navigation';
 	import HomeSection from '$lib/components/HomeSection.svelte';
+	import DailyMixCard from '$lib/components/DailyMixCard.svelte';
+	import RadioCard from '$lib/components/RadioCard.svelte';
+	import DiscoverPicksSection from '$lib/components/DiscoverPicksSection.svelte';
+	import GenrePills from '$lib/components/GenrePills.svelte';
 	import GenreGrid from '$lib/components/GenreGrid.svelte';
 	import DiscoverQueueCard from '$lib/components/DiscoverQueueCard.svelte';
 	import DiscoverQueueModal from '$lib/components/DiscoverQueueModal.svelte';
+	import PlaylistDiscoveryModal from '$lib/components/PlaylistDiscoveryModal.svelte';
 	import WeeklyExploration from '$lib/components/WeeklyExploration.svelte';
 	import ServicePromptCard from '$lib/components/ServicePromptCard.svelte';
 	import SourceSwitcher from '$lib/components/SourceSwitcher.svelte';
 	import DiscoverArtistHero from '$lib/components/DiscoverArtistHero.svelte';
+	import DiscoverArtistMiniBand from '$lib/components/DiscoverArtistMiniBand.svelte';
 	import SectionDivider from '$lib/components/SectionDivider.svelte';
-	import type { DiscoverResponse } from '$lib/types';
 	import CarouselSkeleton from '$lib/components/CarouselSkeleton.svelte';
 	import PageHeader from '$lib/components/PageHeader.svelte';
-	import {
-		getDiscoverCachedData,
-		setDiscoverCachedData,
-		isDiscoverCacheStale
-	} from '$lib/utils/discoverCache';
 	import { removeAllQueueCachedData } from '$lib/utils/discoverQueueCache';
-	import { isAbortError } from '$lib/utils/errorHandling';
 	import { api } from '$lib/api/client';
 	import { isDismissed } from '$lib/utils/dismissedPrompts';
 	import { musicSourceStore, type MusicSource } from '$lib/stores/musicSource';
 	import { discoverQueueStatusStore } from '$lib/stores/discoverQueueStatus';
-	import { Compass, CircleAlert, Sparkles, Music, BarChart3 } from 'lucide-svelte';
+	import {
+		Compass,
+		CircleAlert,
+		Sparkles,
+		Music,
+		Music2,
+		Radio,
+		Library,
+		TrendingUp,
+		LayoutGrid,
+		Wand2,
+		Heart
+	} from 'lucide-svelte';
+	import { getDiscoverQuery } from '$lib/queries/discover/DiscoverQuery.svelte';
+	import { DiscoverQueryKeyFactory } from '$lib/queries/discover/DiscoverQueryKeyFactory';
+	import { invalidateQueriesWithPersister } from '$lib/queries/QueryClient';
+	import { API } from '$lib/constants';
 
-	let discoverData = $state<DiscoverResponse | null>(null);
-	let loading = $state(true);
-	let refreshing = $state(false);
-	let isUpdating = $state(false);
-	let error = $state('');
-	let lastUpdated = $state<Date | null>(null);
-	let abortController: AbortController | null = null;
 	let queueModalOpen = $state(false);
+	let playlistDiscoverOpen = $state(false);
 	let activeSource: MusicSource = $state('listenbrainz');
-	let pollRunId = 0;
 
-	function resolveDiscoverSource(source?: MusicSource): MusicSource {
-		return source ?? activeSource;
+	const discoverQuery = getDiscoverQuery(() => activeSource);
+	const discoverData = $derived(discoverQuery.data ?? null);
+	const loading = $derived(discoverQuery.isLoading);
+	const refreshing = $derived(discoverQuery.isFetching && !discoverQuery.isLoading);
+	const isUpdating = $derived(discoverQuery.isRefetching && !!discoverData);
+	const lastUpdated = $derived(
+		discoverQuery.dataUpdatedAt ? new Date(discoverQuery.dataUpdatedAt) : null
+	);
+	const error = $derived(discoverQuery.error?.message ?? '');
+
+	async function handleRefresh() {
+		await api.global.post(API.discoverRefresh());
+		await invalidateQueriesWithPersister({
+			queryKey: DiscoverQueryKeyFactory.discover(activeSource)
+		});
 	}
 
-	function cancelDiscoverPolling(): void {
-		pollRunId += 1;
-	}
-
-	async function loadDiscoverData(forceRefresh = false, sourceOverride?: MusicSource) {
-		const source = resolveDiscoverSource(sourceOverride);
-		const cached = getDiscoverCachedData(source);
-		if (cached && !forceRefresh) {
-			// Guard: when the backend is still computing async recommendations,
-			// all personalized sections are null/empty. Don't use a cached response
-			// that has no content — it represents a transient "still computing" state.
-			const cachedHasContent =
-				(cached.data.because_you_listen_to?.length ?? 0) > 0 ||
-				cached.data.fresh_releases != null ||
-				cached.data.missing_essentials != null ||
-				cached.data.globally_trending != null;
-			if (cachedHasContent) {
-				discoverData = cached.data;
-				lastUpdated = new Date(cached.timestamp);
-				loading = false;
-				if (isDiscoverCacheStale(cached.timestamp)) {
-					refreshInBackground(source);
-				}
-				return;
-			}
-		}
-
-		if (abortController) abortController.abort();
-		abortController = new AbortController();
-		cancelDiscoverPolling();
-
-		if (!discoverData) {
-			loading = true;
-		} else {
-			refreshing = true;
-		}
-		error = '';
-
-		try {
-			const data: DiscoverResponse = await api.get(
-				`/api/v1/discover?source=${encodeURIComponent(source)}`,
-				{
-					signal: abortController.signal
-				}
-			);
-			discoverData = data;
-			lastUpdated = new Date();
-			const dataHasContent =
-				(data.because_you_listen_to?.length ?? 0) > 0 ||
-				data.fresh_releases != null ||
-				data.missing_essentials != null ||
-				data.globally_trending != null;
-			if (dataHasContent) {
-				setDiscoverCachedData(data, source);
-			}
-			if (!dataHasContent && data.refreshing) {
-				pollForReady(source);
-			}
-		} catch (e) {
-			if (isAbortError(e)) return;
-			if (!discoverData) error = "Couldn't load Discover right now";
-		} finally {
-			loading = false;
-			refreshing = false;
-		}
-	}
-
-	async function refreshInBackground(sourceOverride?: MusicSource) {
-		if (refreshing) return;
-		if (abortController) abortController.abort();
-		abortController = new AbortController();
-		refreshing = true;
-		isUpdating = true;
-		const source = resolveDiscoverSource(sourceOverride);
-
-		try {
-			const data: DiscoverResponse = await api.get(
-				`/api/v1/discover?source=${encodeURIComponent(source)}`,
-				{
-					signal: abortController.signal
-				}
-			);
-			const hasContent =
-				(data.because_you_listen_to?.length ?? 0) > 0 ||
-				data.fresh_releases != null ||
-				data.missing_essentials != null ||
-				data.globally_trending != null;
-			if (hasContent) {
-				discoverData = data;
-				lastUpdated = new Date();
-				setDiscoverCachedData(data, source);
-			}
-		} catch (e) {
-			if (isAbortError(e)) return;
-		} finally {
-			refreshing = false;
-			isUpdating = false;
-		}
-	}
-
-	async function pollForReady(source: MusicSource) {
-		const runId = ++pollRunId;
-		isUpdating = true;
-		try {
-			for (let i = 0; i < 15; i++) {
-				if (runId !== pollRunId) return;
-				await new Promise((r) => setTimeout(r, 3000));
-				if (runId !== pollRunId) return;
-				try {
-					const data: DiscoverResponse = await api.get(
-						`/api/v1/discover?source=${encodeURIComponent(source)}`
-					);
-					const ready =
-						(data.because_you_listen_to?.length ?? 0) > 0 ||
-						data.fresh_releases != null ||
-						data.missing_essentials != null ||
-						data.globally_trending != null;
-					if (ready || !data.refreshing) {
-						discoverData = data;
-						lastUpdated = new Date();
-						if (ready) setDiscoverCachedData(data, source);
-						break;
-					}
-				} catch (e) {
-					if (isAbortError(e)) return;
-					break;
-				}
-			}
-		} finally {
-			if (runId === pollRunId) {
-				isUpdating = false;
-			}
-		}
-	}
-
-	async function handleRefresh(sourceOverride?: MusicSource) {
-		const source = resolveDiscoverSource(sourceOverride);
-		const runId = ++pollRunId;
-		refreshing = true;
-		isUpdating = true;
-		try {
-			await api.global.post('/api/v1/discover/refresh');
-		} catch {
-			// Ignore errors
-		}
-
-		try {
-			const maxPolls = 30;
-			for (let i = 0; i < maxPolls; i++) {
-				if (runId !== pollRunId) return;
-				await new Promise((r) => setTimeout(r, 2000));
-				if (runId !== pollRunId) return;
-				try {
-					const data: DiscoverResponse = await api.get(
-						`/api/v1/discover?source=${encodeURIComponent(source)}`
-					);
-					if (!data.refreshing) {
-						discoverData = data;
-						lastUpdated = new Date();
-						setDiscoverCachedData(data, source);
-						break;
-					}
-				} catch (e) {
-					if (isAbortError(e)) return;
-					break;
-				}
-			}
-		} finally {
-			if (runId === pollRunId) {
-				refreshing = false;
-				isUpdating = false;
-			}
-		}
-	}
-
-	function cleanup() {
-		cancelDiscoverPolling();
-		if (abortController) {
-			abortController.abort();
-			abortController = null;
-		}
+	function handleSourceChange(source: MusicSource) {
+		activeSource = source;
+		removeAllQueueCachedData();
+		discoverQueueStatusStore.reset();
+		discoverQueueStatusStore.init(source);
 	}
 
 	onMount(async () => {
 		await musicSourceStore.load();
 		activeSource = musicSourceStore.getPageSource('discover');
-		loadDiscoverData(false, activeSource);
 		discoverQueueStatusStore.init(activeSource);
 	});
+
 	onDestroy(() => {
-		cleanup();
 		discoverQueueStatusStore.stopPolling();
 	});
-	beforeNavigate(cleanup);
-
-	function handleSourceChange(source: MusicSource) {
-		activeSource = source;
-		removeAllQueueCachedData();
-		loadDiscoverData(true, source);
-		discoverQueueStatusStore.reset();
-		discoverQueueStatusStore.init(source);
-	}
 
 	let hasContent = $derived(
 		(discoverData?.because_you_listen_to?.length ?? 0) > 0 ||
@@ -255,38 +89,84 @@
 			discoverData?.lastfm_weekly_artist_chart != null ||
 			discoverData?.lastfm_weekly_album_chart != null ||
 			discoverData?.lastfm_recent_scrobbles != null ||
-			(discoverData?.genre_list?.items?.length ?? 0) > 0
+			(discoverData?.genre_list?.items?.length ?? 0) > 0 ||
+			(discoverData?.daily_mixes?.length ?? 0) > 0 ||
+			(discoverData?.radio_sections?.length ?? 0) > 0 ||
+			discoverData?.discover_picks != null ||
+			discoverData?.unexplored_genres != null
 	);
-	let servicePrompts = $derived(
-		(discoverData?.service_prompts ?? []).filter((p) => !isDismissed(p.service))
+	let dismissVersion = $state(0);
+	let servicePrompts = $derived.by(() => {
+		void dismissVersion;
+		return (discoverData?.service_prompts ?? []).filter((p) => !isDismissed(p.service));
+	});
+
+	let hasWeeklyExploration = $derived(
+		activeSource === 'listenbrainz' &&
+			!!discoverData?.weekly_exploration &&
+			discoverData.weekly_exploration.tracks.length > 0
 	);
 
-	let hasCuratedGroup = $derived(
+	let queueIsHero = $derived(!hasWeeklyExploration && !!discoverData?.discover_queue_enabled);
+
+	let hasHero = $derived(hasWeeklyExploration || queueIsHero);
+	let showQueueInQuickActions = $derived(!!discoverData?.discover_queue_enabled && !queueIsHero);
+
+	let hasMadeForYou = $derived(
+		(discoverData?.daily_mixes?.length ?? 0) > 0 || (discoverData?.radio_sections?.length ?? 0) > 0
+	);
+
+	let hasBecauseYouListened = $derived(
 		(discoverData?.because_you_listen_to?.length ?? 0) > 0 ||
-			discoverData?.discover_queue_enabled ||
-			(activeSource === 'listenbrainz' &&
-				discoverData?.weekly_exploration &&
-				discoverData.weekly_exploration.tracks.length > 0)
-	);
-
-	let hasExploreGroup = $derived(
-		(discoverData?.fresh_releases?.items?.length ?? 0) > 0 ||
-			(discoverData?.missing_essentials?.items?.length ?? 0) > 0 ||
-			(discoverData?.rediscover?.items?.length ?? 0) > 0 ||
 			(discoverData?.artists_you_might_like?.items?.length ?? 0) > 0 ||
 			(discoverData?.popular_in_your_genres?.items?.length ?? 0) > 0
 	);
 
-	let hasChartsGroup = $derived(
-		(discoverData?.globally_trending?.items?.length ?? 0) > 0 ||
-			(discoverData?.lastfm_recent_scrobbles?.items?.length ?? 0) > 0 ||
-			(discoverData?.lastfm_weekly_artist_chart?.items?.length ?? 0) > 0 ||
-			(discoverData?.lastfm_weekly_album_chart?.items?.length ?? 0) > 0 ||
+	let hasNewFresh = $derived(
+		(discoverData?.fresh_releases?.items?.length ?? 0) > 0 ||
+			(discoverData?.discover_picks?.items?.length ?? 0) > 0 ||
+			(discoverData?.missing_essentials?.items?.length ?? 0) > 0
+	);
+
+	let hasFromYourLibrary = $derived(
+		(discoverData?.rediscover?.items?.length ?? 0) > 0 ||
+			(discoverData?.lastfm_recent_scrobbles?.items?.length ?? 0) > 0
+	);
+
+	let hasBrowseGenres = $derived(
+		(discoverData?.unexplored_genres?.items?.length ?? 0) > 0 ||
 			(discoverData?.genre_list?.items?.length ?? 0) > 0
 	);
 
+	let hasTrending = $derived(
+		(discoverData?.globally_trending?.items?.length ?? 0) > 0 ||
+			(discoverData?.lastfm_weekly_artist_chart?.items?.length ?? 0) > 0 ||
+			(discoverData?.lastfm_weekly_album_chart?.items?.length ?? 0) > 0
+	);
+
+	let shuffledGenres = $state<
+		{ name: string; listen_count?: number | null; artist_count?: number | null }[]
+	>([]);
+	$effect(() => {
+		const items = discoverData?.unexplored_genres?.items;
+		if (items && items.length > 0) {
+			shuffledGenres = [...(items as typeof shuffledGenres)];
+		} else {
+			shuffledGenres = [];
+		}
+	});
+
+	function shuffleGenres() {
+		const copy = [...shuffledGenres];
+		for (let i = copy.length - 1; i > 0; i--) {
+			const j = Math.floor(Math.random() * (i + 1));
+			[copy[i], copy[j]] = [copy[j], copy[i]];
+		}
+		shuffledGenres = copy;
+	}
+
 	function handlePromptDismiss(_service: string) {
-		servicePrompts = (discoverData?.service_prompts ?? []).filter((p) => !isDismissed(p.service));
+		dismissVersion++;
 	}
 </script>
 
@@ -296,7 +176,7 @@
 
 <div class="min-h-[calc(100vh-200px)]">
 	<PageHeader
-		subtitle="Personalized music recommendations based on your listening habits."
+		subtitle="Music recommendations based on what you listen to."
 		gradientClass="bg-gradient-to-br from-info/30 via-primary/20 to-secondary/10"
 		{loading}
 		{refreshing}
@@ -319,8 +199,7 @@
 		<div class="mt-16 flex flex-col items-center justify-center px-4">
 			<CircleAlert class="mb-4 h-10 w-10 text-base-content/50" />
 			<p class="text-base-content/70">{error}</p>
-			<button class="btn btn-primary mt-4" onclick={() => loadDiscoverData(true, activeSource)}
-				>Try Again</button
+			<button class="btn btn-primary mt-4" onclick={() => discoverQuery.refetch()}>Try Again</button
 			>
 		</div>
 	{:else}
@@ -344,47 +223,137 @@
 				</div>
 			{:else if discoverData}
 				<div class="space-y-10 sm:space-y-12">
-					{#if hasCuratedGroup}
+					<!-- §1 HERO -->
+					{#if hasHero}
+						<div class="discover-section-enter">
+							{#if hasWeeklyExploration && discoverData.weekly_exploration}
+								<WeeklyExploration
+									section={discoverData.weekly_exploration}
+									ytConfigured={discoverData.integration_status?.youtube ?? false}
+								/>
+							{:else if queueIsHero}
+								<DiscoverQueueCard source={activeSource} onLaunch={() => (queueModalOpen = true)} />
+							{/if}
+						</div>
+					{/if}
+
+					<!-- §2 QUICK ACTIONS -->
+					<div class="discover-section-enter">
+						<div class="grid grid-cols-1 gap-4 {showQueueInQuickActions ? 'md:grid-cols-2' : ''}">
+							{#if showQueueInQuickActions}
+								<DiscoverQueueCard source={activeSource} onLaunch={() => (queueModalOpen = true)} />
+							{/if}
+							<button
+								type="button"
+								class="group relative w-full overflow-hidden rounded-2xl border border-primary/15 bg-gradient-to-br from-primary/8 via-base-200/50 to-secondary/8 px-5 py-7 backdrop-blur-sm shadow-[0_4px_24px_oklch(var(--p)/0.06)] transition-all duration-300 cursor-pointer text-left motion-safe:hover:-translate-y-0.5 hover:shadow-[0_8px_32px_oklch(var(--p)/0.15)] hover:border-primary/25 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 focus-visible:ring-offset-base-100"
+								onclick={() => (playlistDiscoverOpen = true)}
+							>
+								<div
+									class="pointer-events-none absolute inset-0 rounded-2xl bg-gradient-to-br from-white/[0.03] to-transparent"
+								></div>
+								<div class="flex items-center gap-4">
+									<div
+										class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/15 shadow-[0_0_16px_oklch(var(--p)/0.15)]"
+									>
+										<Wand2 class="h-5 w-5 text-primary" />
+									</div>
+									<div class="flex-1 min-w-0">
+										<h3 class="font-bold text-sm sm:text-base">Discover for a Playlist</h3>
+										<p class="text-xs text-base-content/50 mt-0.5">
+											Get album suggestions based on any playlist.
+										</p>
+									</div>
+									<div
+										class="shrink-0 text-primary/50 transition-transform duration-300 group-hover:translate-x-1"
+									>
+										<Sparkles class="h-5 w-5" />
+									</div>
+								</div>
+							</button>
+						</div>
+					</div>
+
+					<!-- §3 MADE FOR YOU -->
+					{#if hasMadeForYou}
 						<div>
-							<SectionDivider label="Curated For You">
+							<SectionDivider label="Made For You">
 								{#snippet icon()}<Sparkles class="w-3.5 h-3.5" />{/snippet}
 							</SectionDivider>
 
-							<div class="discover-section-enter space-y-5 sm:space-y-6">
-								{#if discoverData.because_you_listen_to.length > 0}
-									{#each discoverData.because_you_listen_to as entry (entry.seed_artist_mbid || entry.seed_artist)}
-										<div>
-											<DiscoverArtistHero {entry} />
+							<div class="discover-section-enter space-y-8 sm:space-y-10">
+								{#if discoverData.daily_mixes?.length}
+									<div>
+										<h3
+											class="text-sm font-semibold text-base-content/70 mb-3 flex items-center gap-2"
+										>
+											<Music2 class="h-4 w-4" />
+											Daily Mixes
+										</h3>
+										<div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+											{#each discoverData.daily_mixes as mix, i (`${mix.title}-${i}`)}
+												<DailyMixCard section={mix} />
+											{/each}
 										</div>
-									{/each}
+									</div>
 								{/if}
 
-								<div>
-									<DiscoverQueueCard
-										source={activeSource}
-										onLaunch={() => (queueModalOpen = true)}
-									/>
-								</div>
-
-								{#if activeSource === 'listenbrainz' && discoverData.weekly_exploration && discoverData.weekly_exploration.tracks.length > 0}
+								{#if discoverData.radio_sections?.length}
 									<div>
-										<WeeklyExploration
-											section={discoverData.weekly_exploration}
-											ytConfigured={discoverData.integration_status?.youtube ?? false}
-										/>
+										<h3
+											class="text-sm font-semibold text-base-content/70 mb-3 flex items-center gap-2"
+										>
+											<Radio class="h-4 w-4" />
+											Radio Stations
+										</h3>
+										<div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+											{#each discoverData.radio_sections as radio (`radio-${radio.radio_seed_id}`)}
+												<RadioCard
+													seedType={radio.radio_seed_type ?? 'artist'}
+													seedId={radio.radio_seed_id ?? ''}
+													source={activeSource}
+													initialSection={radio}
+												/>
+											{/each}
+										</div>
 									</div>
 								{/if}
 							</div>
 						</div>
-					{:else}
+					{/if}
+
+					<!-- §4 BECAUSE YOU LISTENED -->
+					{#if hasBecauseYouListened}
 						<div>
-							<DiscoverQueueCard source={activeSource} onLaunch={() => (queueModalOpen = true)} />
+							<SectionDivider label="Because You Listened">
+								{#snippet icon()}<Heart class="w-3.5 h-3.5" />{/snippet}
+							</SectionDivider>
+
+							<div class="discover-section-enter space-y-5 sm:space-y-6">
+								{#each discoverData.because_you_listen_to as entry, i (entry.seed_artist_mbid || entry.seed_artist)}
+									<div>
+										{#if i === 0}
+											<DiscoverArtistHero {entry} />
+										{:else}
+											<DiscoverArtistMiniBand {entry} />
+										{/if}
+									</div>
+								{/each}
+
+								{#if discoverData.artists_you_might_like && discoverData.artists_you_might_like.items.length > 0}
+									<div><HomeSection section={discoverData.artists_you_might_like} /></div>
+								{/if}
+
+								{#if discoverData.popular_in_your_genres && discoverData.popular_in_your_genres.items.length > 0}
+									<div><HomeSection section={discoverData.popular_in_your_genres} /></div>
+								{/if}
+							</div>
 						</div>
 					{/if}
 
-					{#if hasExploreGroup}
+					<!-- §5 NEW & FRESH -->
+					{#if hasNewFresh}
 						<div>
-							<SectionDivider label="Explore New Music">
+							<SectionDivider label="New & Fresh">
 								{#snippet icon()}<Music class="w-3.5 h-3.5" />{/snippet}
 							</SectionDivider>
 
@@ -393,42 +362,52 @@
 									<HomeSection section={discoverData.fresh_releases} />
 								{/if}
 
+								{#if discoverData.discover_picks && discoverData.discover_picks.items.length > 0}
+									<DiscoverPicksSection section={discoverData.discover_picks} />
+								{/if}
+
 								{#if discoverData.missing_essentials && discoverData.missing_essentials.items.length > 0}
 									<HomeSection section={discoverData.missing_essentials} />
-								{/if}
-
-								{#if discoverData.rediscover && discoverData.rediscover.items.length > 0}
-									<HomeSection section={discoverData.rediscover} />
-								{/if}
-
-								{#if discoverData.artists_you_might_like && discoverData.artists_you_might_like.items.length > 0}
-									<HomeSection section={discoverData.artists_you_might_like} />
-								{/if}
-
-								{#if discoverData.popular_in_your_genres && discoverData.popular_in_your_genres.items.length > 0}
-									<HomeSection section={discoverData.popular_in_your_genres} />
 								{/if}
 							</div>
 						</div>
 					{/if}
 
-					{#if hasChartsGroup}
+					<!-- §6 FROM YOUR LIBRARY -->
+					{#if hasFromYourLibrary}
 						<div>
-							<SectionDivider label="Charts & Activity">
-								{#snippet icon()}<BarChart3 class="w-3.5 h-3.5" />{/snippet}
+							<SectionDivider label="From Your Library">
+								{#snippet icon()}<Library class="w-3.5 h-3.5" />{/snippet}
 							</SectionDivider>
 
 							<div class="discover-section-enter space-y-2">
-								{#if discoverData.globally_trending && discoverData.globally_trending.items.length > 0}
-									<HomeSection section={discoverData.globally_trending} />
+								{#if discoverData.rediscover && discoverData.rediscover.items.length > 0}
+									<HomeSection section={discoverData.rediscover} />
 								{/if}
 
 								{#if discoverData.lastfm_recent_scrobbles && discoverData.lastfm_recent_scrobbles.items.length > 0}
 									<HomeSection section={discoverData.lastfm_recent_scrobbles} />
 								{/if}
+							</div>
+						</div>
+					{/if}
 
-								{#if discoverData.lastfm_weekly_artist_chart && discoverData.lastfm_weekly_artist_chart.items.length > 0}
-									<HomeSection section={discoverData.lastfm_weekly_artist_chart} />
+					<!-- §7 BROWSE GENRES -->
+					{#if hasBrowseGenres}
+						<div>
+							<SectionDivider label="Browse Genres">
+								{#snippet icon()}<LayoutGrid class="w-3.5 h-3.5" />{/snippet}
+							</SectionDivider>
+
+							<div class="discover-section-enter space-y-2">
+								{#if discoverData.unexplored_genres && shuffledGenres.length > 0}
+									<div class="mt-4 mb-4">
+										<GenrePills
+											title={discoverData.unexplored_genres.title}
+											genres={shuffledGenres}
+											onShuffle={shuffleGenres}
+										/>
+									</div>
 								{/if}
 
 								{#if discoverData.genre_list && discoverData.genre_list.items.length > 0}
@@ -440,6 +419,25 @@
 											genreArtistImages={discoverData.genre_artist_images}
 										/>
 									</div>
+								{/if}
+							</div>
+						</div>
+					{/if}
+
+					<!-- §8 TRENDING NOW -->
+					{#if hasTrending}
+						<div>
+							<SectionDivider label="Trending Now">
+								{#snippet icon()}<TrendingUp class="w-3.5 h-3.5" />{/snippet}
+							</SectionDivider>
+
+							<div class="discover-section-enter space-y-2">
+								{#if discoverData.globally_trending && discoverData.globally_trending.items.length > 0}
+									<HomeSection section={discoverData.globally_trending} />
+								{/if}
+
+								{#if discoverData.lastfm_weekly_artist_chart && discoverData.lastfm_weekly_artist_chart.items.length > 0}
+									<HomeSection section={discoverData.lastfm_weekly_artist_chart} />
 								{/if}
 
 								{#if discoverData.lastfm_weekly_album_chart && discoverData.lastfm_weekly_album_chart.items.length > 0}
@@ -457,18 +455,16 @@
 									Building Your Recommendations
 								</h2>
 								<p class="max-w-md px-4 text-center text-sm text-base-content/70 sm:text-base">
-									We're analyzing your listening history and building personalized recommendations.
-									This may take a moment on first load.
+									Looking through your listening history to build recommendations. Give it a moment
+									on first load.
 								</p>
 							</div>
 						{:else}
 							<div class="flex flex-col items-center justify-center py-12 sm:py-16">
 								<Compass class="mb-4 h-12 w-12 sm:mb-6 sm:h-14 sm:w-14 text-base-content/50" />
-								<h2 class="mb-2 text-center text-xl font-bold sm:text-2xl">
-									Building Recommendations
-								</h2>
+								<h2 class="mb-2 text-center text-xl font-bold sm:text-2xl">Still Loading</h2>
 								<p class="mb-6 max-w-md px-4 text-center text-sm text-base-content/70 sm:text-base">
-									Your personalized recommendations are being prepared. Try refreshing in a moment.
+									Your recommendations are still loading. Try refreshing.
 								</p>
 								<button
 									class="btn btn-primary"
@@ -489,8 +485,8 @@
 								Nothing to Discover Yet
 							</h2>
 							<p class="mb-6 max-w-md px-4 text-center text-sm text-base-content/70 sm:text-base">
-								Connect your music services to get personalized recommendations. The more services
-								you connect, the better your recommendations will be.
+								Connect a music service to get recommendations. The more you connect, the better
+								they get.
 							</p>
 							<a href="/settings" class="btn btn-primary">Connect Services</a>
 						</div>
@@ -502,3 +498,4 @@
 </div>
 
 <DiscoverQueueModal bind:open={queueModalOpen} source={activeSource} />
+<PlaylistDiscoveryModal bind:open={playlistDiscoverOpen} source={activeSource} />

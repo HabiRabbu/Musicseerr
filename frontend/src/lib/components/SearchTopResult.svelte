@@ -3,7 +3,7 @@
 	import { artistHref, albumHref } from '$lib/utils/entityRoutes';
 	import HeroBackdrop from './HeroBackdrop.svelte';
 	import ArtistImage from './ArtistImage.svelte';
-	import { ArrowRight } from 'lucide-svelte';
+	import { ArrowRight, Disc3 } from 'lucide-svelte';
 
 	interface Props {
 		artist?: Artist | null;
@@ -78,23 +78,8 @@
 				{#if album.cover_url}
 					<img src={album.cover_url} alt={album.title} class="w-full h-full object-cover" />
 				{:else}
-					<div
-						class="w-full h-full bg-base-300 flex items-center justify-center text-base-content/30"
-					>
-						<svg
-							xmlns="http://www.w3.org/2000/svg"
-							class="h-8 w-8"
-							fill="none"
-							viewBox="0 0 24 24"
-							stroke="currentColor"
-						>
-							<path
-								stroke-linecap="round"
-								stroke-linejoin="round"
-								stroke-width="1.5"
-								d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"
-							/>
-						</svg>
+					<div class="w-full h-full bg-base-200 flex items-center justify-center">
+						<Disc3 class="h-8 w-8 text-base-content/20" />
 					</div>
 				{/if}
 			</div>

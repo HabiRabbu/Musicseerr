@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Music } from 'lucide-svelte';
+	import { Disc3 } from 'lucide-svelte';
 	import { nowPlayingMerged } from '$lib/stores/nowPlayingMerged.svelte';
 
 	const session = $derived(nowPlayingMerged.primarySession);
@@ -40,8 +40,8 @@
 					loading="lazy"
 				/>
 			{:else}
-				<div class="flex h-full w-full items-center justify-center bg-base-300">
-					<Music class="h-10 w-10 text-base-content/30" />
+				<div class="flex h-full w-full items-center justify-center bg-base-200">
+					<Disc3 class="h-10 w-10 text-base-content/20" />
 				</div>
 			{/if}
 		</div>

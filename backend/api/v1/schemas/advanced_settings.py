@@ -87,6 +87,8 @@ class AdvancedSettings(AppStruct):
     discover_queue_albums_per_similar: int = 5
     discover_queue_enrich_ttl: int = 86400
     discover_queue_lastfm_mbid_max_lookups: int = 10
+    discover_picks_genre_affinity_weight: float = 0.7
+    discover_picks_count: int = 12
     frontend_ttl_home: int = 300000
     frontend_ttl_discover: int = 1800000
     frontend_ttl_library: int = 300000
@@ -177,6 +179,8 @@ class AdvancedSettings(AppStruct):
             "discover_queue_albums_per_similar": (1, 20),
             "discover_queue_enrich_ttl": (3600, 604800),
             "discover_queue_lastfm_mbid_max_lookups": (1, 50),
+            "discover_picks_genre_affinity_weight": (0.0, 1.0),
+            "discover_picks_count": (4, 30),
             "frontend_ttl_home": (60000, 3600000),
             "frontend_ttl_discover": (60000, 86400000),
             "frontend_ttl_library": (60000, 3600000),
@@ -270,6 +274,8 @@ class AdvancedSettingsFrontend(AppStruct):
     discover_queue_albums_per_similar: int = 5
     discover_queue_enrich_ttl: int = 24
     discover_queue_lastfm_mbid_max_lookups: int = 10
+    discover_picks_genre_affinity_weight: float = 0.7
+    discover_picks_count: int = 12
     frontend_ttl_home: int = 5
     frontend_ttl_discover: int = 30
     frontend_ttl_library: int = 5
@@ -335,6 +341,7 @@ class AdvancedSettingsFrontend(AppStruct):
             "ignored_releases_retention_days",
             "orphan_cover_demote_interval_hours",
             "store_prune_interval_hours",
+            "discover_picks_count",
         ]
         for field_name in int_coerce_fields:
             setattr(self, field_name, _coerce_positive_int(getattr(self, field_name), field_name))
@@ -391,6 +398,8 @@ class AdvancedSettingsFrontend(AppStruct):
             "discover_queue_albums_per_similar": (1, 20),
             "discover_queue_enrich_ttl": (1, 168),
             "discover_queue_lastfm_mbid_max_lookups": (1, 50),
+            "discover_picks_genre_affinity_weight": (0.0, 1.0),
+            "discover_picks_count": (4, 30),
             "frontend_ttl_home": (1, 60),
             "frontend_ttl_discover": (1, 1440),
             "frontend_ttl_library": (1, 60),
@@ -476,6 +485,8 @@ class AdvancedSettingsFrontend(AppStruct):
             discover_queue_albums_per_similar=settings.discover_queue_albums_per_similar,
             discover_queue_enrich_ttl=settings.discover_queue_enrich_ttl // 3600,
             discover_queue_lastfm_mbid_max_lookups=settings.discover_queue_lastfm_mbid_max_lookups,
+            discover_picks_genre_affinity_weight=settings.discover_picks_genre_affinity_weight,
+            discover_picks_count=settings.discover_picks_count,
             frontend_ttl_home=settings.frontend_ttl_home // 60000,
             frontend_ttl_discover=settings.frontend_ttl_discover // 60000,
             frontend_ttl_library=settings.frontend_ttl_library // 60000,
@@ -562,6 +573,8 @@ class AdvancedSettingsFrontend(AppStruct):
             discover_queue_albums_per_similar=self.discover_queue_albums_per_similar,
             discover_queue_enrich_ttl=self.discover_queue_enrich_ttl * 3600,
             discover_queue_lastfm_mbid_max_lookups=self.discover_queue_lastfm_mbid_max_lookups,
+            discover_picks_genre_affinity_weight=self.discover_picks_genre_affinity_weight,
+            discover_picks_count=self.discover_picks_count,
             frontend_ttl_home=self.frontend_ttl_home * 60000,
             frontend_ttl_discover=self.frontend_ttl_discover * 60000,
             frontend_ttl_library=self.frontend_ttl_library * 60000,

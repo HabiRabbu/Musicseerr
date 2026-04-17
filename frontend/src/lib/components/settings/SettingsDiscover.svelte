@@ -1,14 +1,15 @@
 <script lang="ts">
 	import type { HomeSettings } from '$lib/types';
 	import { createSettingsForm } from '$lib/utils/settingsForm.svelte';
-	import { removeDiscoverCachedData } from '$lib/utils/discoverCache';
+	import { invalidateQueriesWithPersister } from '$lib/queries/QueryClient';
+	import { DiscoverQueryKeyFactory } from '$lib/queries/discover/DiscoverQueryKeyFactory';
 	import { onMount, onDestroy } from 'svelte';
 
 	const form = createSettingsForm<HomeSettings>({
 		loadEndpoint: '/api/v1/settings/home',
 		saveEndpoint: '/api/v1/settings/home',
 		afterSave: async () => {
-			removeDiscoverCachedData();
+			await invalidateQueriesWithPersister({ queryKey: DiscoverQueryKeyFactory.prefix });
 		}
 	});
 
@@ -30,7 +31,7 @@
 <div class="card bg-base-200">
 	<div class="card-body">
 		<h2 class="card-title text-2xl">Discover</h2>
-		<p class="text-base-content/70 mb-4">Choose what shows up on the Discover page.</p>
+		<p class="text-base-content/70 mb-4">Pick what appears on the Discover page.</p>
 
 		{#if form.loading}
 			<div class="flex justify-center items-center py-12">
@@ -48,7 +49,7 @@
 						<div>
 							<span class="label-text font-medium">Show Globally Trending</span>
 							<p class="text-xs text-base-content/50">
-								Shows trending artists from around the world in Charts & Activity.
+								Shows trending artists worldwide in Charts & Activity.
 							</p>
 						</div>
 					</label>

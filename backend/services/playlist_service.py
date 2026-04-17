@@ -75,10 +75,17 @@ def _fuzzy_name_match(name1: str, name2: str) -> bool:
 
 
 class PlaylistService:
-    def __init__(self, repo: PlaylistRepository, cache_dir: Path, cache: Optional[CacheInterface] = None):
+    def __init__(
+        self,
+        repo: PlaylistRepository,
+        cache_dir: Path,
+        cache: Optional[CacheInterface] = None,
+        genre_index: Any = None,
+    ):
         self._repo = AsyncPlaylistRepository(repo)
         self._cover_dir = cache_dir / "covers" / "playlists"
         self._cache = cache
+        self._genre_index = genre_index
 
 
     async def create_playlist(self, name: str, *, source_ref: str | None = None) -> PlaylistRecord:
@@ -256,6 +263,28 @@ class PlaylistService:
 
     async def get_tracks(self, playlist_id: str) -> list[PlaylistTrackRecord]:
         return await self._repo.get_tracks(playlist_id)
+
+    async def analyse_playlist_profile(
+        self, playlist_id: str,
+    ) -> "PlaylistProfile | None":
+        from api.v1.schemas.discover import PlaylistProfile
+
+        playlist = await self._repo.get_playlist(playlist_id)
+        if playlist is None:
+            return None
+
+        tracks = await self._repo.get_tracks(playlist_id)
+        artist_mbids = list({t.artist_id for t in tracks if t.artist_id})
+
+        genre_distribution: dict[str, list[str]] = {}
+        if artist_mbids and self._genre_index is not None:
+            genre_distribution = await self._genre_index.get_genres_for_artists(artist_mbids)
+
+        return PlaylistProfile(
+            artist_mbids=artist_mbids,
+            genre_distribution=genre_distribution,
+            track_count=len(tracks),
+        )
 
     async def check_track_membership(
         self, tracks: list[tuple[str, str, str]],

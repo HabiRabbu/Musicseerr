@@ -6,33 +6,46 @@
 		HomeTrack,
 		HomeGenre
 	} from '$lib/types';
+	import type { Snippet } from 'svelte';
 	import {
 		ArrowRight,
 		X,
 		Check,
 		Bookmark,
+		Disc3,
 		Music2,
 		Tv,
 		Sparkles,
-		Search,
-		Radio,
-		Headphones
+		Search
 	} from 'lucide-svelte';
 	import { goto } from '$app/navigation';
 	import { albumHrefOrNull, artistHrefOrNull } from '$lib/utils/entityRoutes';
 	import { formatListenCount, formatListenedAt } from '$lib/utils/formatting';
+	import { integrationStore } from '$lib/stores/integration';
+	import { libraryStore } from '$lib/stores/library';
 	import ArtistImage from './ArtistImage.svelte';
 	import AlbumImage from './AlbumImage.svelte';
 	import AlbumCardOverlay from './AlbumCardOverlay.svelte';
+	import AlbumRequestButton from './AlbumRequestButton.svelte';
 	import HorizontalCarousel from './HorizontalCarousel.svelte';
+	import SourceBadge from './SourceBadge.svelte';
+	import TrackPreviewButton from './TrackPreviewButton.svelte';
 
 	interface Props {
 		section: HomeSectionType;
 		showConnectCard?: boolean;
 		headerLink?: string | null;
+		headerActions?: Snippet;
+		hideHeader?: boolean;
 	}
 
-	let { section, showConnectCard = true, headerLink = null }: Props = $props();
+	let {
+		section,
+		showConnectCard = true,
+		headerLink = null,
+		headerActions,
+		hideHeader = false
+	}: Props = $props();
 
 	function getGenreHref(genre: HomeGenre): string {
 		return `/genre?name=${encodeURIComponent(genre.name)}`;
@@ -73,48 +86,35 @@
 </script>
 
 <section class="mb-6 sm:mb-8">
-	<div class="flex items-center justify-between mb-3 sm:mb-4">
-		<div class="flex items-center gap-2">
+	{#if !hideHeader}
+		<div class="flex items-center justify-between mb-3 sm:mb-4">
+			<div class="flex items-center gap-2">
+				{#if headerLink}
+					<a
+						href={headerLink}
+						class="text-lg sm:text-xl font-bold hover:text-primary transition-colors"
+					>
+						{section.title}
+					</a>
+				{:else}
+					<h2 class="text-lg sm:text-xl font-bold">{section.title}</h2>
+				{/if}
+				<SourceBadge source={section.source ?? undefined} />
+			</div>
+			{#if headerActions}
+				{@render headerActions()}
+			{/if}
 			{#if headerLink}
 				<a
 					href={headerLink}
-					class="text-lg sm:text-xl font-bold hover:text-primary transition-colors"
+					class="text-sm text-base-content/50 hover:text-primary transition-colors flex items-center gap-1"
 				>
-					{section.title}
+					See all
+					<ArrowRight class="w-3.5 h-3.5" />
 				</a>
-			{:else}
-				<h2 class="text-lg sm:text-xl font-bold">{section.title}</h2>
-			{/if}
-			{#if section.source === 'lastfm'}
-				<span
-					class="badge badge-xs sm:badge-sm border-0 gap-1"
-					style="background-color: rgb(var(--brand-lastfm) / 0.15); color: rgb(var(--brand-lastfm));"
-				>
-					<Radio class="w-2.5 h-2.5 sm:w-3 sm:h-3" />
-					Last.fm
-				</span>
-			{:else if section.source === 'listenbrainz'}
-				<span
-					class="badge badge-xs sm:badge-sm border-0 gap-1"
-					style="background-color: rgb(var(--brand-listenbrainz) / 0.15); color: rgb(var(--brand-listenbrainz));"
-				>
-					<Headphones class="w-2.5 h-2.5 sm:w-3 sm:h-3" />
-					ListenBrainz
-				</span>
-			{:else if section.source}
-				<span class="badge badge-ghost badge-xs sm:badge-sm capitalize">{section.source}</span>
 			{/if}
 		</div>
-		{#if headerLink}
-			<a
-				href={headerLink}
-				class="text-sm text-base-content/50 hover:text-primary transition-colors flex items-center gap-1"
-			>
-				See all
-				<ArrowRight class="w-3.5 h-3.5" />
-			</a>
-		{/if}
-	</div>
+	{/if}
 
 	{#if section.items.length === 0 && section.fallback_message && showConnectCard}
 		<div class="card bg-base-200 border border-dashed border-base-300">
@@ -199,6 +199,7 @@
 					</div>
 				{:else if isAlbum(item)}
 					{@const albumHref = albumHrefOrNull(item.mbid)}
+					{@const isItemRequested = item.requested || libraryStore.isRequested(item.mbid)}
 					<div class="w-32 sm:w-36 md:w-44 shrink-0">
 						<svelte:element
 							this={albumHref ? 'a' : 'div'}
@@ -255,6 +256,27 @@
 								{/if}
 							</div>
 						</svelte:element>
+						{#if item.mbid}
+							<div class="flex items-center justify-center gap-1 mt-1 pb-1">
+								{#if $integrationStore.lidarr && !item.in_library && !isItemRequested}
+									<AlbumRequestButton
+										mbid={item.mbid}
+										artistName={item.artist_name ?? ''}
+										albumName={item.name}
+										artistMbid={item.artist_mbid ?? undefined}
+									/>
+								{/if}
+								<TrackPreviewButton
+									artist={item.artist_name ?? ''}
+									track={item.name}
+									ytConfigured={$integrationStore.youtube_api}
+									size="sm"
+									albumId={item.mbid}
+									coverUrl={item.image_url}
+									artistId={item.artist_mbid ?? undefined}
+								/>
+							</div>
+						{/if}
 					</div>
 				{:else if isTrack(item)}
 					{@const trackArtistHref = artistHrefOrNull(item.artist_mbid)}
@@ -275,7 +297,7 @@
 									/>
 								{:else}
 									<div class="w-full h-full flex items-center justify-center text-2xl bg-base-200">
-										<Music2 class="h-6 w-6 text-base-content/40" />
+										<Disc3 class="h-6 w-6 text-base-content/20" />
 									</div>
 								{/if}
 							</figure>

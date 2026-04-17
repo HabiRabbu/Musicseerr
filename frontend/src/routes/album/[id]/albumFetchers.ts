@@ -1,6 +1,5 @@
 import type {
 	AlbumBasicInfo,
-	AlbumTracksInfo,
 	MoreByArtistResponse,
 	SimilarAlbumsResponse,
 	YouTubeLink,
@@ -15,18 +14,13 @@ import { api } from '$lib/api/client';
 import { API } from '$lib/constants';
 import { compareDiscTrack } from '$lib/player/queueHelpers';
 
+export { fetchAlbumTracks } from '$lib/api/albums';
+
 export async function fetchAlbumBasic(
 	albumId: string,
 	signal?: AbortSignal
 ): Promise<AlbumBasicInfo> {
 	return api.get<AlbumBasicInfo>(`/api/v1/albums/${albumId}/basic`, { signal });
-}
-
-export async function fetchAlbumTracks(
-	albumId: string,
-	signal?: AbortSignal
-): Promise<AlbumTracksInfo> {
-	return api.get<AlbumTracksInfo>(`/api/v1/albums/${albumId}/tracks`, { signal });
 }
 
 export async function fetchDiscovery(

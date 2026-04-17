@@ -69,8 +69,8 @@
 <h4 class="font-medium text-sm text-base-content/70 mb-3">Discover Queue</h4>
 <div class="alert alert-info alert-soft mb-4">
 	<span class="text-sm"
-		>These settings control how Discover Queue is prepared in the background so it is ready when you
-		open Discover.</span
+		>Controls how the Discover Queue is built in the background so it's ready when you open
+		Discover.</span
 	>
 </div>
 <h4 class="font-medium text-sm text-base-content/70 mb-3">Background Generation</h4>
@@ -167,5 +167,25 @@
 		bind:value={data.discover_queue_lastfm_mbid_max_lookups}
 		min={1}
 		max={50}
+	/>
+</div>
+<div class="divider my-4"></div>
+<h4 class="font-medium text-sm text-base-content/70 mb-3">Discover Picks</h4>
+<div class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
+	<SettingsNumberField
+		label="Discover Picks Count"
+		description="How many albums appear in Discover Picks (default: 12)"
+		bind:value={data.discover_picks_count}
+		min={4}
+		max={30}
+		step={1}
+	/>
+	<SettingsNumberField
+		label="Genre Affinity Weight"
+		description="How strongly picks are biased towards your genres (0.0 = random, 1.0 = genre-only, default: 0.7)"
+		bind:value={data.discover_picks_genre_affinity_weight}
+		min={0}
+		max={1}
+		step={0.1}
 	/>
 </div>

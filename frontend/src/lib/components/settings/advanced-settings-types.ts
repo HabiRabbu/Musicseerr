@@ -68,4 +68,6 @@ export interface AdvancedSettingsForm {
 	audiodb_prewarm_concurrency: number;
 	audiodb_prewarm_delay: number;
 	artist_discovery_precache_concurrency: number;
+	discover_picks_genre_affinity_weight: number;
+	discover_picks_count: number;
 }

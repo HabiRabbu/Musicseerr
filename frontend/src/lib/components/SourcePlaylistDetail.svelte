@@ -3,7 +3,7 @@
 	import BackButton from '$lib/components/BackButton.svelte';
 	import { toastStore } from '$lib/stores/toast';
 	import { formatTotalDurationSec } from '$lib/utils/formatting';
-	import { Download, ListMusic } from 'lucide-svelte';
+	import { Disc3, Download } from 'lucide-svelte';
 	import type { SourcePlaylistDetail, SourceImportResult } from '$lib/types';
 	import type { Snippet } from 'svelte';
 
@@ -79,7 +79,7 @@
 					<img src={detail.cover_url} alt={detail.name} class="w-full h-full object-cover" />
 				{:else}
 					<div class="w-full h-full bg-base-200 flex items-center justify-center">
-						<ListMusic class="w-16 h-16 text-base-content/20" />
+						<Disc3 class="w-16 h-16 text-base-content/20" />
 					</div>
 				{/if}
 			</div>

@@ -91,7 +91,6 @@
 				showError();
 				return;
 			}
-			// Transient failure — retry once
 			await new Promise((r) => setTimeout(r, 1500));
 			const retry = await doSearch();
 			if (!retry.success) showError();
@@ -120,15 +119,14 @@
 		!ytConfigured
 			? 'Set up YouTube API key in Settings to preview'
 			: errorFlash
-				? 'Preview failed — tap to retry'
+				? 'Preview failed - tap to retry'
 				: cached === true
 					? 'Play · cached, no quota used'
 					: 'Preview · uses 1 YouTube lookup'
 	);
 
 	const btnClasses = $derived.by(() => {
-		const base =
-			size === 'sm' ? 'btn btn-circle btn-ghost btn-xs' : 'btn btn-circle btn-ghost btn-sm';
+		const base = size === 'sm' ? 'btn btn-circle btn-ghost btn-sm' : 'btn btn-circle btn-ghost';
 		if (!ytConfigured) return `${base} text-base-content/20 cursor-not-allowed`;
 		if (searching) return `${base} text-primary`;
 		if (errorFlash) return `${base} text-error`;
@@ -136,10 +134,10 @@
 		return `${base} text-base-content/50 hover:text-primary`;
 	});
 
-	const iconSize = $derived(size === 'sm' ? 'h-3.5 w-3.5' : 'h-4 w-4');
+	const iconSize = $derived(size === 'sm' ? 'h-4 w-4' : 'h-5 w-5');
 </script>
 
-<div class="tooltip tooltip-bottom" data-tip={tooltip}>
+<div class="tooltip tooltip-top z-50" data-tip={tooltip}>
 	<button
 		type="button"
 		class={btnClasses}

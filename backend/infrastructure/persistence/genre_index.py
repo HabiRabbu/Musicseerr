@@ -1,5 +1,6 @@
 """Domain 2 - Genre indexing persistence."""
 
+import logging
 import sqlite3
 from typing import Any
 
@@ -10,6 +11,8 @@ from infrastructure.persistence._database import (
     _encode_json,
     _normalize,
 )
+
+logger = logging.getLogger(__name__)
 
 LIBRARY_ARTISTS_TABLE = "library_artists"
 LIBRARY_ALBUMS_TABLE = "library_albums"
@@ -170,5 +173,124 @@ class GenreIndex(PersistenceBase):
                 (needle, max(limit, 1)),
             ).fetchall()
             return _decode_rows(rows)
+
+        return await self._read(operation)
+
+    async def get_top_genres(self, limit: int = 20) -> list[tuple[str, int]]:
+        """Return (genre_lower, artist_count) pairs ordered by count DESC.
+
+        Consumed by ``_build_genre_list()`` in ``homepage_service.py``.
+        """
+
+        def operation(conn: sqlite3.Connection) -> list[tuple[str, int]]:
+            rows = conn.execute(
+                """
+                SELECT g.genre_lower,
+                       COUNT(DISTINCT g.artist_mbid_lower) AS cnt
+                FROM artist_genre_lookup g
+                JOIN library_artists la ON la.mbid_lower = g.artist_mbid_lower
+                GROUP BY g.genre_lower
+                ORDER BY cnt DESC, g.genre_lower ASC
+                LIMIT ?
+                """,
+                (max(limit, 1),),
+            ).fetchall()
+            return [(row["genre_lower"], int(row["cnt"])) for row in rows]
+
+        return await self._read(operation)
+
+    async def get_genre_artist_counts(self, genres: list[str]) -> dict[str, int]:
+        """Return {genre_lower: library_artist_count} for the given genres."""
+        normalized = [_normalize_genre(g) for g in genres if g]
+        if not normalized:
+            return {}
+
+        def operation(conn: sqlite3.Connection) -> dict[str, int]:
+            placeholders = ",".join("?" * len(normalized))
+            rows = conn.execute(
+                f"""
+                SELECT g.genre_lower,
+                       COUNT(DISTINCT g.artist_mbid_lower) AS cnt
+                FROM artist_genre_lookup g
+                JOIN library_artists la ON la.mbid_lower = g.artist_mbid_lower
+                WHERE g.genre_lower IN ({placeholders})
+                GROUP BY g.genre_lower
+                """,
+                normalized,
+            ).fetchall()
+            return {row["genre_lower"]: int(row["cnt"]) for row in rows}
+
+        return await self._read(operation)
+
+    async def get_artists_for_genres(self, genres: list[str]) -> dict[str, list[str]]:
+        """Return {genre_lower: [artist_mbid_lower, ...]} for library artists."""
+        normalized = [_normalize_genre(g) for g in genres if g]
+        if not normalized:
+            return {}
+
+        def operation(conn: sqlite3.Connection) -> dict[str, list[str]]:
+            placeholders = ",".join("?" * len(normalized))
+            rows = conn.execute(
+                f"""
+                SELECT g.genre_lower, g.artist_mbid_lower
+                FROM artist_genre_lookup g
+                JOIN library_artists la ON la.mbid_lower = g.artist_mbid_lower
+                WHERE g.genre_lower IN ({placeholders})
+                """,
+                normalized,
+            ).fetchall()
+            result: dict[str, list[str]] = {}
+            for row in rows:
+                result.setdefault(row["genre_lower"], []).append(row["artist_mbid_lower"])
+            return result
+
+        return await self._read(operation)
+
+    async def get_genres_for_artists(self, artist_mbids: list[str]) -> dict[str, list[str]]:
+        """Return {artist_mbid_lower: [genre_display_name, ...]} from artist_genres."""
+        normalized = [_normalize(m) for m in artist_mbids if m]
+        if not normalized:
+            return {}
+
+        def operation(conn: sqlite3.Connection) -> dict[str, list[str]]:
+            placeholders = ",".join("?" * len(normalized))
+            rows = conn.execute(
+                f"SELECT artist_mbid_lower, genres_json FROM artist_genres WHERE artist_mbid_lower IN ({placeholders})",
+                normalized,
+            ).fetchall()
+            result: dict[str, list[str]] = {}
+            for row in rows:
+                try:
+                    genres = _decode_json(row["genres_json"])
+                except (ValueError, TypeError) as exc:
+                    logger.warning(
+                        "genre_index.get_genres_for_artists: failed to decode genres_json for artist %s: %s",
+                        row["artist_mbid_lower"],
+                        exc,
+                    )
+                    continue
+                if isinstance(genres, list):
+                    result[row["artist_mbid_lower"]] = _clean_genres(genres)
+            return result
+
+        return await self._read(operation)
+
+    async def get_underrepresented_genres(self, known_genres: list[str], threshold: int = 2) -> list[str]:
+        """Return genre_lower values with < threshold library artists, excluding known_genres."""
+        known_lower = {_normalize_genre(g) for g in known_genres}
+
+        def operation(conn: sqlite3.Connection) -> list[str]:
+            rows = conn.execute(
+                """
+                SELECT g.genre_lower, COUNT(DISTINCT g.artist_mbid_lower) AS cnt
+                FROM artist_genre_lookup g
+                JOIN library_artists la ON la.mbid_lower = g.artist_mbid_lower
+                GROUP BY g.genre_lower
+                HAVING cnt < ? AND cnt >= 1
+                ORDER BY cnt DESC
+                """,
+                (max(threshold, 1),),
+            ).fetchall()
+            return [row["genre_lower"] for row in rows if row["genre_lower"] not in known_lower]
 
         return await self._read(operation)

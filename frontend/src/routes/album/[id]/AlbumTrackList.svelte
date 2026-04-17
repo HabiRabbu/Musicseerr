@@ -21,6 +21,7 @@
 	import { playerStore } from '$lib/stores/player.svelte';
 	import NowPlayingIndicator from '$lib/components/NowPlayingIndicator.svelte';
 	import TrackPlayButton from '$lib/components/TrackPlayButton.svelte';
+	import TrackPreviewButton from '$lib/components/TrackPreviewButton.svelte';
 	import TrackSourceButton from '$lib/components/TrackSourceButton.svelte';
 	import ContextMenu from '$lib/components/ContextMenu.svelte';
 	import JellyfinIcon from '$lib/components/JellyfinIcon.svelte';
@@ -47,6 +48,7 @@
 		trackLinks: YouTubeTrackLink[];
 		youtubeEnabled: boolean;
 		youtubeApiConfigured: boolean;
+		previewCacheMap: Map<string, boolean>;
 		jellyfinEnabled: boolean;
 		localfilesEnabled: boolean;
 		navidromeEnabled: boolean;
@@ -87,6 +89,7 @@
 		trackLinks,
 		youtubeEnabled,
 		youtubeApiConfigured,
+		previewCacheMap,
 		jellyfinEnabled,
 		localfilesEnabled,
 		navidromeEnabled,
@@ -152,6 +155,13 @@
 				{@const showLocalBtn = localfilesEnabled && localMatch?.found}
 				{@const showNavidromeBtn = navidromeEnabled && navidromeMatch?.found}
 				{@const showPlexBtn = plexEnabled && plexMatch?.found}
+				{@const hasAnySource =
+					tl !== null ||
+					jellyfinTrack !== null ||
+					localTrack !== null ||
+					navidromeTrack !== null ||
+					plexTrack !== null}
+				{@const showPreview = youtubeApiConfigured && !hasAnySource}
 				<li
 					class="list-row group hover:bg-base-300/50 transition-colors p-3 sm:p-4"
 					style={isCurrentlyPlaying ? `background-color: ${colors.accent}20;` : ''}
@@ -183,8 +193,22 @@
 							{formatDuration(track.length)}
 						</div>
 
-						{#if youtubeEnabled || showJellyfinBtn || showLocalBtn || showNavidromeBtn || showPlexBtn}
+						{#if youtubeEnabled || showPreview || showJellyfinBtn || showLocalBtn || showNavidromeBtn || showPlexBtn}
 							<div class="flex items-center gap-1.5 shrink-0 ml-auto">
+								{#if showPreview}
+									<TrackPreviewButton
+										artist={album.artist_name}
+										track={track.title}
+										ytConfigured={youtubeApiConfigured}
+										initialCached={previewCacheMap.get(
+											`${album.artist_name.toLowerCase()}|${track.title.toLowerCase()}`
+										) ?? null}
+										albumId={album.musicbrainz_id}
+										coverUrl={album.cover_url ?? null}
+										artistId={album.artist_id}
+									/>
+								{/if}
+
 								{#if youtubeEnabled}
 									<TrackPlayButton
 										trackNumber={track.position}

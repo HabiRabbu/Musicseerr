@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { SourcePlaylistSummary } from '$lib/types';
 	import { formatTotalDurationSec } from '$lib/utils/formatting';
-	import { ListMusic } from 'lucide-svelte';
+	import { Disc3 } from 'lucide-svelte';
 
 	interface Props {
 		playlist: SourcePlaylistSummary;
@@ -44,10 +44,8 @@
 						}}
 					/>
 				{:else}
-					<div
-						class="w-full h-full bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center"
-					>
-						<ListMusic class="w-14 h-14 text-base-content/30" />
+					<div class="w-full h-full bg-base-200 flex items-center justify-center">
+						<Disc3 class="w-14 h-14 text-base-content/20" />
 					</div>
 				{/if}
 			</div>

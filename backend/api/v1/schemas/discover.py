@@ -1,3 +1,5 @@
+from typing import Literal
+
 from api.v1.schemas.home import HomeArtist, HomeSection, ServicePrompt
 from api.v1.schemas.common import GenreArtistMap, IntegrationStatus
 from api.v1.schemas.weekly_exploration import WeeklyExplorationSection
@@ -134,6 +136,31 @@ class DiscoverIgnoredRelease(AppStruct):
     ignored_at: float
 
 
+class RadioRequest(AppStruct):
+    seed_type: Literal["artist", "album", "genre"]
+    seed_id: str
+    count: int = 10
+    source: Literal["listenbrainz", "lastfm"] | None = None
+
+
+class PlaylistProfile(AppStruct):
+    artist_mbids: list[str] = []
+    genre_distribution: dict[str, list[str]] = {}
+    track_count: int = 0
+
+
+class PlaylistSuggestionsRequest(AppStruct):
+    playlist_id: str
+    count: int = 10
+    source: Literal["listenbrainz", "lastfm"] | None = None
+
+
+class PlaylistSuggestionsResponse(AppStruct):
+    suggestions: HomeSection
+    playlist_id: str
+    profile: PlaylistProfile
+
+
 class DiscoverIntegrationStatus(IntegrationStatus):
     pass
 
@@ -156,5 +183,9 @@ class DiscoverResponse(AppStruct):
     lastfm_weekly_artist_chart: HomeSection | None = None
     lastfm_weekly_album_chart: HomeSection | None = None
     lastfm_recent_scrobbles: HomeSection | None = None
+    daily_mixes: list[HomeSection] = []
+    radio_sections: list[HomeSection] = []
+    discover_picks: HomeSection | None = None
+    unexplored_genres: HomeSection | None = None
     refreshing: bool = False
     service_status: dict[str, str] | None = None

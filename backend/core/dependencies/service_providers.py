@@ -307,6 +307,7 @@ def get_playlist_service() -> "PlaylistService":
         repo=playlist_repo,
         cache_dir=settings.cache_dir,
         cache=get_cache(),
+        genre_index=get_genre_index(),
     )
 
 
@@ -517,6 +518,10 @@ def get_scrobble_service() -> "ScrobbleService":
 @singleton
 def get_discover_service() -> "DiscoverService":
     from services.discover_service import DiscoverService
+    from services.discover.radio_service import DiscoverRadioService
+    from services.discover.mbid_resolution_service import MbidResolutionService
+    from services.discover.integration_helpers import IntegrationHelpers
+    from services.home_transformers import HomeDataTransformers
 
     listenbrainz_repo = get_listenbrainz_repository()
     jellyfin_repo = get_jellyfin_repository()
@@ -529,6 +534,27 @@ def get_discover_service() -> "DiscoverService":
     wikidata_repo = get_wikidata_repository()
     lastfm_repo = get_lastfm_repository()
     audiodb_image_service = get_audiodb_image_service()
+    genre_index = get_genre_index()
+
+    radio_mbid_svc = MbidResolutionService(
+        musicbrainz_repo=musicbrainz_repo,
+        lidarr_repo=lidarr_repo,
+        listenbrainz_repo=listenbrainz_repo,
+        library_db=library_db,
+        mbid_store=mbid_store,
+    )
+    radio_integration = IntegrationHelpers(preferences_service)
+    radio_service = DiscoverRadioService(
+        lb_repo=listenbrainz_repo,
+        mb_repo=musicbrainz_repo,
+        mbid_svc=radio_mbid_svc,
+        artist_discovery=get_artist_discovery_service(),
+        album_discovery=get_album_discovery_service(),
+        genre_index=genre_index,
+        integration=radio_integration,
+        transformers=HomeDataTransformers(jellyfin_repo),
+    )
+
     return DiscoverService(
         listenbrainz_repo=listenbrainz_repo,
         jellyfin_repo=jellyfin_repo,
@@ -541,6 +567,9 @@ def get_discover_service() -> "DiscoverService":
         wikidata_repo=wikidata_repo,
         lastfm_repo=lastfm_repo,
         audiodb_image_service=audiodb_image_service,
+        genre_index=genre_index,
+        radio_service=radio_service,
+        playlist_service=get_playlist_service(),
     )
 
 
