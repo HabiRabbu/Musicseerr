@@ -72,7 +72,7 @@ async def update_preferences(
         return preferences
     except ConfigurationError as e:
         logger.warning(f"Configuration error updating preferences: {e}")
-        raise HTTPException(status_code=400, detail="Couldn't save these settings")
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.get("/lidarr", response_model=LidarrSettings)
@@ -92,7 +92,7 @@ async def update_lidarr_settings(
         return lidarr_settings
     except ConfigurationError as e:
         logger.warning(f"Configuration error updating Lidarr settings: {e}")
-        raise HTTPException(status_code=400, detail="Lidarr settings are incomplete or invalid")
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.get("/cache-ttls", response_model=FrontendCacheTTLs)
@@ -143,7 +143,7 @@ async def update_advanced_settings(
         return AdvancedSettingsFrontend.from_backend(saved)
     except ConfigurationError as e:
         logger.warning(f"Configuration error updating advanced settings: {e}")
-        raise HTTPException(status_code=400, detail="Couldn't save these settings")
+        raise HTTPException(status_code=400, detail=str(e))
     except ValueError as e:
         logger.warning(f"Validation error updating advanced settings: {e}")
         raise HTTPException(status_code=400, detail="That settings value isn't valid")
@@ -174,7 +174,7 @@ async def update_lidarr_connection(
         return LidarrConnectionSettingsResponse.from_settings(preferences_service.get_lidarr_connection())
     except ConfigurationError as e:
         logger.warning(f"Configuration error updating Lidarr connection: {e}")
-        raise HTTPException(status_code=400, detail="Lidarr connection settings are incomplete or invalid")
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.post("/lidarr/verify", response_model=LidarrVerifyResponse)
@@ -256,7 +256,7 @@ async def update_jellyfin_settings(
         return JellyfinConnectionSettingsResponse.from_settings(preferences_service.get_jellyfin_connection())
     except ConfigurationError as e:
         logger.warning(f"Configuration error updating Jellyfin settings: {e}")
-        raise HTTPException(status_code=400, detail="Jellyfin settings are incomplete or invalid")
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.post("/jellyfin/verify", response_model=JellyfinVerifyResponse)
@@ -294,7 +294,7 @@ async def update_navidrome_settings(
         return NavidromeConnectionSettingsResponse.from_settings(preferences_service.get_navidrome_connection())
     except ConfigurationError as e:
         logger.warning("Configuration error updating Navidrome settings: %s", e)
-        raise HTTPException(status_code=400, detail="Navidrome settings are incomplete or invalid")
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.post("/navidrome/verify", response_model=VerifyConnectionResponse)
@@ -332,7 +332,7 @@ async def update_plex_settings(
         return PlexConnectionSettingsResponse.from_settings(preferences_service.get_plex_connection())
     except ConfigurationError as e:
         logger.warning("Configuration error updating Plex settings: %s", e)
-        raise HTTPException(status_code=400, detail="Plex settings are incomplete or invalid")
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.post("/plex/verify", response_model=PlexVerifyResponse)
@@ -385,7 +385,7 @@ async def update_listenbrainz_settings(
         return ListenBrainzConnectionSettingsResponse.from_settings(preferences_service.get_listenbrainz_connection())
     except ConfigurationError as e:
         logger.warning(f"Configuration error updating ListenBrainz settings: {e}")
-        raise HTTPException(status_code=400, detail="ListenBrainz settings are incomplete or invalid")
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.post("/listenbrainz/verify", response_model=VerifyConnectionResponse)
@@ -419,7 +419,7 @@ async def update_youtube_settings(
         return YouTubeConnectionSettingsResponse.from_settings(preferences_service.get_youtube_connection())
     except ConfigurationError as e:
         logger.warning(f"Configuration error updating YouTube settings: {e}")
-        raise HTTPException(status_code=400, detail="YouTube settings are incomplete or invalid")
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.post("/youtube/verify", response_model=VerifyConnectionResponse)
@@ -450,7 +450,7 @@ async def update_home_settings(
         return settings
     except ConfigurationError as e:
         logger.warning(f"Configuration error updating home settings: {e}")
-        raise HTTPException(status_code=400, detail="Home settings are incomplete or invalid")
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.get("/local-files", response_model=LocalFilesConnectionSettings)
@@ -472,7 +472,7 @@ async def update_local_files_settings(
         return settings
     except ConfigurationError as e:
         logger.warning("Configuration error updating local files settings: %s", e)
-        raise HTTPException(status_code=400, detail="Local files settings are incomplete or invalid")
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.post("/local-files/verify", response_model=LocalFilesVerifyResponse)
@@ -504,7 +504,7 @@ async def update_lastfm_settings(
         return LastFmConnectionSettingsResponse.from_settings(saved)
     except ConfigurationError as e:
         logger.warning("Configuration error updating Last.fm settings: %s", e)
-        raise HTTPException(status_code=400, detail="Last.fm settings are incomplete or invalid")
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.post("/lastfm/verify", response_model=LastFmVerifyResponse)
@@ -533,7 +533,7 @@ async def update_scrobble_settings(
         return preferences_service.get_scrobble_settings()
     except ConfigurationError as e:
         logger.warning("Configuration error updating scrobble settings: %s", e)
-        raise HTTPException(status_code=400, detail="Scrobbling settings are incomplete or invalid")
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.get("/primary-source", response_model=PrimaryMusicSourceSettings)
@@ -556,4 +556,4 @@ async def update_primary_music_source(
         return preferences_service.get_primary_music_source()
     except ConfigurationError as e:
         logger.warning("Configuration error updating primary music source: %s", e)
-        raise HTTPException(status_code=400, detail="Invalid primary music source")
+        raise HTTPException(status_code=400, detail=str(e))

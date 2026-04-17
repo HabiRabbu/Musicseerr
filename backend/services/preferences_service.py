@@ -114,7 +114,15 @@ class PreferencesService:
     def _save_config(self, config: dict) -> None:
         with self._cache_lock:
             self._config_path.parent.mkdir(parents=True, exist_ok=True)
-            atomic_write_json(self._config_path, config)
+            try:
+                atomic_write_json(self._config_path, config)
+            except PermissionError:
+                raise ConfigurationError(
+                    f"Cannot write to config file {self._config_path} — "
+                    "check that the file and its directory are writable by the app user"
+                )
+            except OSError as e:
+                raise ConfigurationError(f"Failed to save settings: {e}")
             self._config_cache = config
 
     def _get_section(self, key: str, model: Type[T], default_factory: Optional[callable] = None) -> T:
