@@ -132,6 +132,7 @@
 
 	onMount(() => {
 		integrationStore.ensureLoaded();
+		void authStore.checkStatus();
 	});
 
 	$effect(() => {

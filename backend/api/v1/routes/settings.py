@@ -405,24 +405,28 @@ async def verify_emby_connection(
     if _is_masked(settings.api_key):
         current = preferences_service.get_emby_connection()
         settings = msgspec.structs.replace(settings, api_key=current.api_key)
-    from repositories.emby_repository import EmbyRepository, get_emby_users
+    from repositories.emby_repository import EmbyRepository, emby_get_all_users
     import httpx
-    repo = EmbyRepository(
-        http_client=httpx.AsyncClient(timeout=httpx.Timeout(10.0)),
-        base_url=settings.emby_url,
-        api_key=settings.api_key,
-        user_id=settings.user_id,
-    )
-    success, message = await repo.validate_connection()
-    users: list[EmbyUserInfo] = []
-    if success:
-        raw_users = await get_emby_users(settings.emby_url, settings.api_key)
-        users = [
-            EmbyUserInfo(id=u["Id"], name=u["Name"])
-            for u in raw_users
-            if u.get("Id") and u.get("Name")
-        ]
-    return EmbyVerifyConnectionResponse(success=success, message=message, users=users)
+    http_client = httpx.AsyncClient(timeout=httpx.Timeout(10.0))
+    try:
+        repo = EmbyRepository(
+            http_client=http_client,
+            base_url=settings.emby_url,
+            api_key=settings.api_key,
+            user_id=settings.user_id,
+        )
+        success, message = await repo.validate_connection()
+        users: list[EmbyUserInfo] = []
+        if success:
+            raw_users = await emby_get_all_users(settings.emby_url, settings.api_key)
+            users = [
+                EmbyUserInfo(id=u["Id"], name=u["Name"])
+                for u in raw_users
+                if u.get("Id") and u.get("Name")
+            ]
+        return EmbyVerifyConnectionResponse(success=success, message=message, users=users)
+    finally:
+        await http_client.aclose()
 
 
 @router.get("/listenbrainz", response_model=ListenBrainzConnectionSettingsResponse)
