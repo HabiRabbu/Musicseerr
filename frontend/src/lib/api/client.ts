@@ -46,6 +46,16 @@ async function handleResponse<T = void>(res: Response): Promise<T> {
 		} catch {
 			// text wasn't JSON — use raw text as message
 		}
+
+		// Redirect to login on 401 so the user gets a login form instead of raw error text
+		if (res.status === 401 && code === 'UNAUTHORIZED' && browser) {
+			localStorage.removeItem('musicseerr_token');
+			const loginUrl = '/login?next=' + encodeURIComponent(window.location.pathname);
+			if (window.location.pathname !== '/login') {
+				window.location.href = loginUrl;
+			}
+		}
+
 		throw new ApiError(res.status, message, code, details);
 	}
 

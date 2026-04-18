@@ -12,6 +12,12 @@
 	let loading = $state(false);
 	let plexPending = $state(false);
 
+	const nextPath = $derived(
+		typeof window !== 'undefined'
+			? (new URLSearchParams(window.location.search).get('next') ?? '/')
+			: '/'
+	);
+
 	// Emby sign-in
 	let embyExpanded = $state(false);
 	let embyUsername = $state('');
@@ -38,7 +44,7 @@
 
 			const data = await res.json();
 			authStore.setToken(data.token, data.username, data.role, data.is_primary ?? false);
-			goto('/');
+			goto(nextPath);
 		} catch {
 			error = 'Could not connect to the server';
 		} finally {
@@ -97,7 +103,7 @@
 		}
 		const data = await res.json();
 		authStore.setToken(data.token, data.username, data.role);
-		goto('/');
+		goto(nextPath);
 	}
 
 	function cancelPlexLogin() {
@@ -121,7 +127,7 @@
 			}
 			const data = await res.json();
 			authStore.setToken(data.token, data.username, data.role, data.is_primary ?? false);
-			goto('/');
+			goto(nextPath);
 		} catch {
 			error = 'Could not connect to the server';
 		} finally {
