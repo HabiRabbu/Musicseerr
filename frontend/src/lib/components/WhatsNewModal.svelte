@@ -116,7 +116,7 @@
 			<div
 				class="whats-new-content release-notes-prose max-h-[55vh] max-w-none overflow-y-auto rounded-lg border border-base-content/5 bg-base-100/50 p-4 mt-4"
 			>
-				{#each renderedSections as section, i}
+				{#each renderedSections as section, i (section.tag)}
 					{#if i > 0}
 						<div class="divider my-4 opacity-20"></div>
 					{/if}
