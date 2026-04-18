@@ -47,16 +47,18 @@
 
 	let hoveredIndex = $state<number | null>(null);
 	let cardEls: HTMLAnchorElement[] = [];
-	let tiltStyles: string[] = $derived(Array(cards.length).fill(''));
-	let specularStyles: string[] = $derived(Array(cards.length).fill(''));
+	// svelte-ignore state_referenced_locally
+	let tiltStyles: string[] = $state(Array(cards.length).fill(''));
+	// svelte-ignore state_referenced_locally
+	let specularStyles: string[] = $state(Array(cards.length).fill(''));
 
 	const tweenDuration = reducedMotion ? 0 : 1200;
-	const counters: Tweened<number>[] = $derived.by(() =>
-		Array.from({ length: cards.length }, () =>
-			tweened(0, { duration: tweenDuration, easing: cubicOut })
-		)
+	// svelte-ignore state_referenced_locally
+	const counters: Tweened<number>[] = Array.from({ length: cards.length }, () =>
+		tweened(0, { duration: tweenDuration, easing: cubicOut })
 	);
-	let counterValues: number[] = $derived(Array(cards.length).fill(0));
+	// svelte-ignore state_referenced_locally
+	let counterValues: number[] = $state(Array(cards.length).fill(0));
 
 	$effect(() => {
 		const unsubs = counters.map((c, i) =>
