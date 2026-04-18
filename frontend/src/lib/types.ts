@@ -1408,7 +1408,7 @@ export type NowPlayingSession = {
 	cover_url: string;
 	device_name: string;
 	is_paused: boolean;
-	source?: 'jellyfin' | 'navidrome' | 'plex';
+	source?: 'jellyfin' | 'navidrome' | 'plex' | 'emby';
 	progress_ms?: number;
 	duration_ms?: number;
 	audio_codec?: string;
