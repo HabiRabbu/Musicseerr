@@ -65,7 +65,7 @@
 		}
 	}
 
-	async function openAlbum(embyId: string, artistName: string) {
+	async function openAlbum(embyId: string, _artistName: string) {
 		albumModalOpen = true;
 		albumLoading = true;
 		selectedAlbum = null;

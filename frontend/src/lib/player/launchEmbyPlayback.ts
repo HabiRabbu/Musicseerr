@@ -1,5 +1,4 @@
 import { playerStore } from '$lib/stores/player.svelte';
-import { API } from '$lib/constants';
 import type { PlaybackMeta, QueueItem } from '$lib/player/types';
 import type { EmbyTrackInfo } from '$lib/types';
 import { getCoverUrl } from '$lib/utils/errorHandling';
