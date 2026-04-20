@@ -5,6 +5,11 @@ All public names are re-exported here so that existing imports like
 ``from core.dependencies import get_home_service`` continue to work.
 """
 
+from .auth_providers import (  # noqa: F401
+    get_auth_store,
+    get_auth_service,
+)
+
 from .cache_providers import (  # noqa: F401
     get_cache,
     get_disk_cache,
