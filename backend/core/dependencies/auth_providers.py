@@ -6,7 +6,7 @@ from core.config import get_settings
 from infrastructure.persistence.auth_store import AuthStore
 
 from ._registry import singleton
-from .cache_providers import get_persistence_write_lock
+from .cache_providers import get_persistence_write_lock, get_preferences_service
 
 
 @singleton
@@ -20,3 +20,14 @@ def get_auth_store() -> AuthStore:
 def get_auth_service() -> "AuthService":
     from services.auth_service import AuthService
     return AuthService(get_auth_store())
+
+
+@singleton
+def get_plex_user_auth_service() -> "PlexUserAuthService":
+    from services.plex_user_auth_service import PlexUserAuthService
+    from core.dependencies.repo_providers import get_plex_repository
+    return PlexUserAuthService(
+        auth_store = get_auth_store(),
+        plex_repository = get_plex_repository(),
+        preferences_service = get_preferences_service(),
+    )

@@ -61,6 +61,11 @@ class SetRoleRequest(msgspec.Struct, frozen = True):
     role: str
 
 
+class PlexPinResponse(msgspec.Struct, frozen = True):
+    pin_id: int
+    auth_url: str
+
+
 def user_to_response(user) -> UserResponse:
     return UserResponse(
         id = user.id,

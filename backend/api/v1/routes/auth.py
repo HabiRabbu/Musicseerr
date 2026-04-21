@@ -8,8 +8,9 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from api.v1.schemas.auth import (
     AuthResponse,
-    LoginRequest,
     CreateUserRequest,
+    LoginRequest,
+    PlexPinResponse,
     SessionListResponse,
     SetRoleRequest,
     SetupRequest,
@@ -18,10 +19,11 @@ from api.v1.schemas.auth import (
     session_to_response,
     user_to_response,
 )
-from core.dependencies.auth_providers import get_auth_service
+from core.dependencies.auth_providers import get_auth_service, get_plex_user_auth_service
 from core.exceptions import AuthenticationError, RegistrationError
 from infrastructure.msgspec_fastapi import MsgSpecRoute
 from services.auth_service import AuthService
+from services.plex_user_auth_service import PlexUserAuthService
 
 logger = logging.getLogger(__name__)
 
@@ -238,3 +240,28 @@ async def admin_revoke_user_sessions(
 ) -> None:
     await _require_admin(request, auth)
     await auth.revoke_user_sessions(user_id)
+
+
+@router.post("/plex/pin")
+async def plex_login_pin(plex_auth: PlexUserAuthService = Depends(get_plex_user_auth_service)) -> PlexPinResponse:
+    pin_id, auth_url = await plex_auth.create_login_pin()
+    return PlexPinResponse(pin_id = pin_id, auth_url = auth_url)
+
+
+@router.get("/plex/poll")
+async def plex_login_poll(
+    pin_id: int,
+    request: Request,
+    plex_auth: PlexUserAuthService = Depends(get_plex_user_auth_service),
+):
+    try:
+        result = await plex_auth.poll_and_login(
+            pin_id, user_agent = request.headers.get("User-Agent")
+        )
+    except AuthenticationError as e:
+        logger.debug(f"Plex login rejected: {e}")
+        raise HTTPException(status_code = status.HTTP_403_FORBIDDEN, detail = "Access denied")
+    if result is None:
+        return {"completed": False}
+    user, token = result
+    return AuthResponse(token = token, user = user_to_response(user))
