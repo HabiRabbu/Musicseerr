@@ -31,3 +31,14 @@ def get_plex_user_auth_service() -> "PlexUserAuthService":
         plex_repository = get_plex_repository(),
         preferences_service = get_preferences_service(),
     )
+
+
+@singleton
+def get_jellyfin_user_auth_service() -> "JellyfinUserAuthService":
+    from services.jellyfin_user_auth_service import JellyfinUserAuthService
+    from core.dependencies.repo_providers import get_jellyfin_repository
+    return JellyfinUserAuthService(
+        auth_store = get_auth_store(),
+        jellyfin_repository = get_jellyfin_repository(),
+        preferences_service = get_preferences_service(),
+    )

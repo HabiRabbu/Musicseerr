@@ -66,6 +66,11 @@ class PlexPinResponse(msgspec.Struct, frozen = True):
     auth_url: str
 
 
+class JellyfinLoginRequest(msgspec.Struct, frozen = True):
+    username: str
+    password: str
+
+
 def user_to_response(user) -> UserResponse:
     return UserResponse(
         id = user.id,

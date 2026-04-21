@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from api.v1.schemas.auth import (
     AuthResponse,
     CreateUserRequest,
+    JellyfinLoginRequest,
     LoginRequest,
     PlexPinResponse,
     SessionListResponse,
@@ -19,10 +20,11 @@ from api.v1.schemas.auth import (
     session_to_response,
     user_to_response,
 )
-from core.dependencies.auth_providers import get_auth_service, get_plex_user_auth_service
-from core.exceptions import AuthenticationError, RegistrationError
+from core.dependencies.auth_providers import get_auth_service, get_plex_user_auth_service, get_jellyfin_user_auth_service
+from core.exceptions import AuthenticationError, ExternalServiceError, RegistrationError
 from infrastructure.msgspec_fastapi import MsgSpecRoute
 from services.auth_service import AuthService
+from services.jellyfin_user_auth_service import JellyfinUserAuthService
 from services.plex_user_auth_service import PlexUserAuthService
 
 logger = logging.getLogger(__name__)
@@ -264,4 +266,30 @@ async def plex_login_poll(
     if result is None:
         return {"completed": False}
     user, token = result
+    return AuthResponse(token = token, user = user_to_response(user))
+
+
+@router.post("/jellyfin/login", response_model = AuthResponse)
+async def jellyfin_login(
+    body: JellyfinLoginRequest,
+    request: Request,
+    jellyfin_auth: JellyfinUserAuthService = Depends(get_jellyfin_user_auth_service),
+) -> AuthResponse:
+    try:
+        user, token = await jellyfin_auth.login(
+            username = body.username,
+            password = body.password,
+            user_agent = request.headers.get("User-Agent"),
+        )
+    except AuthenticationError:
+        raise HTTPException(
+            status_code = status.HTTP_401_UNAUTHORIZED,
+            detail = "Invalid credentials",
+            headers = {"WWW-Authenticate": "Bearer"},
+        )
+    except ExternalServiceError:
+        raise HTTPException(
+            status_code = status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail = "Jellyfin unavailable",
+        )
     return AuthResponse(token = token, user = user_to_response(user))

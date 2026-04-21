@@ -9,6 +9,7 @@ from .auth_providers import (  # noqa: F401
     get_auth_store,
     get_auth_service,
     get_plex_user_auth_service,
+    get_jellyfin_user_auth_service,
 )
 
 from .cache_providers import (  # noqa: F401
