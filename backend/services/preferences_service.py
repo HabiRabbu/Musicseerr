@@ -10,6 +10,7 @@ from api.v1.schemas.settings import (
     LidarrConnectionSettings,
     JellyfinConnectionSettings,
     ListenBrainzConnectionSettings,
+    OIDCConnectionSettings,
     YouTubeConnectionSettings,
     HomeSettings,
     LocalFilesConnectionSettings,
@@ -483,3 +484,13 @@ class PreferencesService:
         except Exception:  # noqa: BLE001
             logger.warning("Failed to migrate musicbrainz_concurrent_searches, using defaults")
             self._save_section("musicbrainz_settings", MusicBrainzConnectionSettings())
+    
+    def get_oidc_connection(self) -> OIDCConnectionSettings:
+        return self._get_section("oidc_settings", OIDCConnectionSettings)
+
+    def save_oidc_connection(self, settings: OIDCConnectionSettings) -> None:
+        try:
+            self._save_section("oidc_settings", settings)
+        except Exception as e:  # noqa: BLE001
+            logger.error(f"Failed to save OIDC settings: {e}")
+            raise ConfigurationError(f"Failed to save OIDC settings")

@@ -93,6 +93,15 @@ class JellyfinConnectionSettings(AppStruct):
         self.jellyfin_url = self.jellyfin_url.rstrip("/")
 
 
+class OIDCConnectionSettings(msgspec.Struct):
+    enabled: bool = False
+    issuer: str = ""
+    client_id: str = ""
+    client_secret: str = ""
+    scopes: str = "openid email profile"
+    redirect_uri: str = ""
+
+
 NAVIDROME_PASSWORD_MASK = "********"
 PLEX_TOKEN_MASK = "plex****"
 
