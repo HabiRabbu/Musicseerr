@@ -128,6 +128,9 @@ from .type_aliases import (  # noqa: F401
     CacheStatusServiceDep,
     GitHubRepositoryDep,
     VersionServiceDep,
+    CurrentUserDep,
+    CurrentAdminDep,
+    CurrentTokenDep,
 )
 
 from .cleanup import (  # noqa: F401
