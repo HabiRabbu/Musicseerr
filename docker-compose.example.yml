@@ -17,9 +17,10 @@ services:
       - PORT=8688            # must match the container port under "ports"
       - TZ=Etc/UTC           # e.g. America/New_York, Europe/London
       - SLSKD_DOWNLOADS_PATH=/data/slskd/complete  # path inside the common media mount below
-      # - TRUSTED_PROXY_IPS=172.17.0.1  # your reverse proxy's IP; defaults to * (fine for single-host)
+      # - BIND_HOST=auto      # dual-stack (IPv4 + IPv6) listener; set 0.0.0.0 to pin IPv4 only
+      # - TRUSTED_PROXY_IPS=172.17.0.1  # your reverse proxy's IP/CIDR; defaults to the loopbacks 127.0.0.1,::1
     ports:
-      - "8688:8688"          # host:container
+      - "8688:8688"          # host:container; publishes on IPv4 and IPv6 when the Docker daemon has IPv6 enabled
     volumes:
       - ./config:/app/config       # config + database
       - ./cache:/app/cache         # cover art and metadata cache

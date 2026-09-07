@@ -231,8 +231,12 @@ Everything user-editable lives in the web UI and lands in `config/config.json`. 
 | `PGID` | `1000` | File group inside the container |
 | `UMASK` | `027` | Creation mask for new files; `002` for trusted group-writable media |
 | `PORT` | `8688` | Port the app listens on |
+| `BIND_HOST` | `auto` | `auto` listens on IPv4 and IPv6, dropping to IPv4 alone where IPv6 is off. Set `0.0.0.0`, `::`, or one interface IP to pin it |
+| `TRUSTED_PROXY_IPS` | `127.0.0.1,::1` | IPs/CIDRs whose `X-Forwarded-*` headers are trusted; point it at your reverse proxy, listing every address family it arrives on |
 | `TZ` | `Etc/UTC` | Container timezone |
 | `SLSKD_DOWNLOADS_PATH` | `/data/downloads/slskd` | Exact in-container path to slskd completions (the compose example uses `/data/slskd/complete`) |
+
+The app answers on IPv4 and IPv6, but Docker still has to publish the port on both. `docker port droppedneedle` should list `0.0.0.0:8688` and `[::]:8688`; if only the first appears, turn on IPv6 for the daemon (`"ipv6"` and `"ip6tables"` in `/etc/docker/daemon.json`).
 
 <details>
 <summary>Permissions and NAS notes</summary>

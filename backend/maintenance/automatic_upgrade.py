@@ -19,13 +19,18 @@ import uuid
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager, contextmanager
 from dataclasses import dataclass
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from http.server import BaseHTTPRequestHandler
 from pathlib import Path
 from threading import Thread
 from typing import Any
 
 from core.config import Settings, get_settings, migrate_legacy_config
 from infrastructure.file_utils import atomic_write_json
+from infrastructure.network import (
+    LOOPBACK_PROBE_HOSTS,
+    resolve_bind_host,
+    wildcard_http_server,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -91,7 +96,7 @@ def _upgrade_health_server(port: int, base_path: str):
     handler = functools.partial(
         _UpgradeHealthHandler, health_path=f"{base_path}/health"
     )
-    server = ThreadingHTTPServer(("0.0.0.0", port), handler)
+    server = wildcard_http_server(port, handler)
     thread = Thread(target=server.serve_forever, name="upgrade-health", daemon=True)
     thread.start()
     try:
@@ -2180,8 +2185,8 @@ def _config_path_before_settings() -> Path:
     return root / "config" / "config.json"
 
 
-def _target_ready(port: int, base_path: str) -> bool:
-    connection = http.client.HTTPConnection("127.0.0.1", port, timeout=1)
+def _health_ok(host: str, port: int, base_path: str) -> bool:
+    connection = http.client.HTTPConnection(host, port, timeout=1)
     try:
         connection.request("GET", f"{base_path}/health")
         response = connection.getresponse()
@@ -2191,6 +2196,10 @@ def _target_ready(port: int, base_path: str) -> bool:
         return False
     finally:
         connection.close()
+
+
+def _target_ready(port: int, base_path: str) -> bool:
+    return any(_health_ok(host, port, base_path) for host in LOOPBACK_PROBE_HOSTS)
 
 
 def _admission_paths(settings: Settings, token: str) -> tuple[Path, Path]:
@@ -2293,7 +2302,7 @@ def _target_command(port: int) -> list[str]:
         "uvicorn",
         "target_main:app",
         "--host",
-        "0.0.0.0",
+        resolve_bind_host(),
         "--port",
         str(port),
         "--loop",

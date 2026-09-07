@@ -23,6 +23,7 @@ from unittest.mock import AsyncMock, MagicMock
 import maintenance.automatic_upgrade as automatic_upgrade
 
 from core.config import Settings
+from infrastructure.network import dual_stack_supported, resolve_bind_host
 from maintenance.automatic_upgrade import (
     AutomaticUpgradeError,
     UPGRADE_ID,
@@ -795,16 +796,20 @@ def test_docker_image_runs_automatic_upgrade_before_target_application() -> None
     )
     assert "find /app -type f" in dockerfile
     assert "find /app/backend" not in dockerfile
-    assert automatic_upgrade._target_command(8688)[-2:] == ["--workers", "1"]
+    command = automatic_upgrade._target_command(8688)
+    assert command[-2:] == ["--workers", "1"]
+    assert command[command.index("--host") + 1] == resolve_bind_host()
 
 
 def test_upgrade_health_endpoint_keeps_existing_orchestrators_waiting() -> None:
     port = _free_port()
+    hosts = ["127.0.0.1", "[::1]"] if dual_stack_supported() else ["127.0.0.1"]
 
     with _upgrade_health_server(port, ""):
-        with urlopen(f"http://127.0.0.1:{port}/health", timeout=2) as response:
-            assert response.status == 200
-            assert json.loads(response.read()) == {"status": "upgrading"}
+        for host in hosts:
+            with urlopen(f"http://{host}:{port}/health", timeout=2) as response:
+                assert response.status == 200
+                assert json.loads(response.read()) == {"status": "upgrading"}
         with pytest.raises(HTTPError) as error:
             urlopen(f"http://127.0.0.1:{port}/api/v1/library", timeout=2)
 
