@@ -267,7 +267,12 @@ class NamingTemplateEngine:
                 column=1,
             )
         cleaned = tuple(
-            self._clean_management_component(part, compatibility) for part in parts
+            self._clean_management_component(
+                part,
+                compatibility,
+                preserve_suffix=(index == len(parts) - 1),
+            )
+            for index, part in enumerate(parts)
         )
         relative = "/".join(cleaned)
         encoded_length = len(relative.encode("utf-8"))
@@ -334,7 +339,12 @@ class NamingTemplateEngine:
                 column=1,
             )
         cleaned = tuple(
-            self._clean_management_component(part, compatibility) for part in parts
+            self._clean_management_component(
+                part,
+                compatibility,
+                preserve_suffix=(index == len(parts) - 1),
+            )
+            for index, part in enumerate(parts)
         )
         relative = "/".join(cleaned)
         encoded_length = len(relative.encode("utf-8"))
@@ -574,6 +584,8 @@ class NamingTemplateEngine:
         cls,
         component: str,
         compatibility: PathCompatibilitySettings,
+        *,
+        preserve_suffix: bool = False,
     ) -> str:
         replacement = compatibility.separator_replacement
         cleaned = unicodedata.normalize(compatibility.unicode_normalization, component)
@@ -601,12 +613,41 @@ class NamingTemplateEngine:
         encoded = cleaned.encode("utf-8")
         maximum = compatibility.maximum_component_length
         if len(encoded) > maximum:
-            cleaned = encoded[:maximum].decode("utf-8", "ignore")
-            cleaned = (
-                cleaned.strip(" .") if compatibility.windows_compatible else cleaned
-            )
-            if not cleaned:
-                cleaned = replacement
+            if preserve_suffix:
+                suffix = Path(cleaned).suffix
+                suffix_bytes = suffix.encode("utf-8")
+                if (
+                    suffix
+                    and len(suffix_bytes) < maximum
+                    and cleaned.endswith(suffix)
+                ):
+                    stem = cleaned[: -len(suffix)]
+                    budget = maximum - len(suffix_bytes)
+                    truncated_stem = (
+                        stem.encode("utf-8")[:budget].decode("utf-8", "ignore")
+                    )
+                    if compatibility.windows_compatible:
+                        truncated_stem = truncated_stem.rstrip(" .")
+                    candidate = f"{truncated_stem}{suffix}"
+                    if not candidate:
+                        candidate = replacement
+                    cleaned = candidate
+                else:
+                    cleaned = encoded[:maximum].decode("utf-8", "ignore")
+                    cleaned = (
+                        cleaned.strip(" .")
+                        if compatibility.windows_compatible
+                        else cleaned
+                    )
+                    if not cleaned:
+                        cleaned = replacement
+            else:
+                cleaned = encoded[:maximum].decode("utf-8", "ignore")
+                cleaned = (
+                    cleaned.strip(" .") if compatibility.windows_compatible else cleaned
+                )
+                if not cleaned:
+                    cleaned = replacement
             if (
                 compatibility.windows_compatible
                 and cleaned.split(".", 1)[0].casefold() in _RESERVED_NAMES
